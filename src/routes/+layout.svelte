@@ -1,19 +1,27 @@
 <script lang="ts">
 	import "../app.css"
+	import "../treeview.css"
 	import "carbon-components-svelte/css/g90.css"
-	import "font-awesome/css/font-awesome.min.css"
+	import "@fortawesome/fontawesome-free/css/all.min.css"
 
 	import { appWindow } from "@tauri-apps/api/window"
-	import { HeaderNavItem, HeaderNavMenu, SkipToContent } from "carbon-components-svelte"
+	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent } from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import { onDestroy, onMount } from "svelte"
 	import { flip } from "svelte/animate"
 	import { fade } from "svelte/transition"
+	import type { Request } from "$lib/bindings-types"
 
 	let tasks: [string, string][] = []
 
 	let destroyFunc = () => {}
 	onDestroy(destroyFunc)
+
+	window.addEventListener("error", (evt) => {
+		errorModalError = String(evt.error)
+		errorModalOpen = true
+		tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+	})
 
 	onMount(async () => {
 		const unlistenStartTask = await listen("start-task", ({ payload: task }: { payload: [string, string] }) => {
@@ -24,19 +32,57 @@
 			tasks = tasks.filter((a) => a[0] !== task)
 		})
 
+		const unlistenRequest = await listen("request", ({ payload: request }: { payload: Request }) => {
+			if (request.type === "global" && request.data.type === "setWindowTitle") {
+				console.log("Layout handling request", request)
+
+				appWindow.setTitle(`Deeznuts - ${request.data.data}`)
+				windowTitle = request.data.data
+			}
+
+			if (request.type === "global" && request.data.type === "errorReport") {
+				console.log("Layout handling request", request)
+
+				errorModalError = request.data.data.error
+				errorModalOpen = true
+				tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+			}
+		})
+
 		destroyFunc = () => {
 			unlistenStartTask()
 			unlistenFinishTask()
+			unlistenRequest()
 		}
 	})
+
+	let windowTitle = "Deeznuts"
+
+	let errorModalOpen = false
+	let errorModalError = ""
 </script>
+
+<ComposedModal
+	open={errorModalOpen}
+	on:submit={() => {
+		errorModalOpen = false
+	}}
+>
+	<ModalHeader title="Error" />
+	<ModalBody>
+		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability.
+		<pre class="mt-2 p-4 bg-neutral-800"><code>{errorModalError}</code></pre>
+	</ModalBody>
+	<ModalFooter danger primaryButtonText="Continue" />
+</ComposedModal>
 
 <header data-tauri-drag-region class:bx--header={true}>
 	<SkipToContent />
+
 	<!-- svelte-ignore a11y-missing-attribute -->
 	<a data-tauri-drag-region class:bx--header__name={true}>Deeznuts</a>
 
-	<div data-tauri-drag-region class="pointer-events-none cursor-none w-full text-center text-neutral-400">Deeznuts</div>
+	<div data-tauri-drag-region class="pointer-events-none cursor-none w-full text-center text-neutral-400">{windowTitle}</div>
 
 	<div data-tauri-drag-region class="flex flex-row items-center justify-end text-white">
 		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.minimize}>
@@ -66,9 +112,13 @@
 </div>
 
 <div class="h-6 flex items-center gap-4 px-3 bg-neutral-600">
-	{#each tasks as [id, task] (id)}
-		<span transition:fade={{ duration: 100 }} animate:flip={{ duration: 250 }}>{task}</span>
-	{/each}
+	{#if tasks.length}
+		{#each tasks as [id, task] (id)}
+			<span transition:fade={{ duration: 100 }} animate:flip={{ duration: 250 }}>{task}</span>
+		{/each}
+	{:else}
+		<span>No tasks running</span>
+	{/if}
 </div>
 
 <style>
@@ -85,12 +135,64 @@
 		height: calc(100vh - 3rem - 1.5rem);
 	}
 
-	:global(.bx--tooltip__trigger.bx--tooltip--right::after, .bx--tooltip__trigger.bx--tooltip--right .bx--assistive-text, .bx--tooltip__trigger.bx--tooltip--right + .bx--assistive-text) {
+	:global(.bx--tooltip__trigger.bx--tooltip--right::after, .bx--tooltip__trigger .bx--assistive-text, .bx--tooltip__trigger + .bx--assistive-text) {
 		background-color: #505050 !important;
 		color: #f4f4f4 !important;
 	}
 
 	:global(.bx--tooltip__trigger.bx--tooltip--right::before) {
 		border-color: rgba(0, 0, 0, 0) #505050 rgba(0, 0, 0, 0) rgba(0, 0, 0, 0) !important;
+	}
+
+	:global(.bx--tooltip__trigger.bx--tooltip--bottom::before, .bx--tooltip__trigger.bx--btn--icon-only--bottom.bx--tooltip--align-center::before) {
+		border-color: rgba(0, 0, 0, 0) rgba(0, 0, 0, 0) #505050 rgba(0, 0, 0, 0) !important;
+	}
+
+	:global(.splitpanes__splitter) {
+		position: relative;
+		left: -4px;
+	}
+
+	:global(.splitpanes--vertical > .splitpanes__splitter) {
+		cursor: col-resize;
+		width: 8px;
+	}
+
+	:global(.splitpanes--horizontal > .splitpanes__splitter) {
+		cursor: row-resize;
+		height: 8px;
+	}
+
+	:global(.splitpanes__splitter:hover) {
+		background-color: white;
+		opacity: 10%;
+		transition: background-color 100ms linear;
+	}
+
+	:global(:root) {
+		color-scheme: dark;
+	}
+
+	:global(.jstree-node input) {
+		color: white;
+		outline: none !important;
+	}
+
+	:global(.jstree-default .jstree-search) {
+		font-style: normal;
+		font-weight: normal;
+		@apply text-emerald-200;
+	}
+
+	:global(.jstree-default .jstree-hovered) {
+		background: #3a3a3a;
+		border-radius: 2px;
+		box-shadow: none;
+	}
+
+	:global(.jstree-default .jstree-clicked) {
+		background: #525252;
+		border-radius: 2px;
+		box-shadow: none;
 	}
 </style>

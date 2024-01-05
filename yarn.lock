@@ -232,6 +232,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fortawesome/fontawesome-free@npm:^6.5.1":
+  version: 6.5.1
+  resolution: "@fortawesome/fontawesome-free@npm:6.5.1"
+  checksum: dc359ede1ddfc6d91915345143008420001c56b164a6fe95d81bcca631eecca41009bfacf794d55bdb9d927c112119ce90a11cb4f576a815ed69ec681e5eb824
+  languageName: node
+  linkType: hard
+
 "@humanwhocodes/config-array@npm:^0.11.13":
   version: 0.11.13
   resolution: "@humanwhocodes/config-array@npm:0.11.13"
@@ -674,10 +681,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/jquery@npm:*, @types/jquery@npm:^3":
+  version: 3.5.29
+  resolution: "@types/jquery@npm:3.5.29"
+  dependencies:
+    "@types/sizzle": "npm:*"
+  checksum: 17409b551956c54d641264895790b9e63a2179bacdabe2a87d5f8f2baebe2f16625d111b17b1441cdffbf9e059e683bb25bf04ba6ea56b36e39ea50cc77f5b8c
+  languageName: node
+  linkType: hard
+
 "@types/json-schema@npm:*, @types/json-schema@npm:^7.0.12":
   version: 7.0.15
   resolution: "@types/json-schema@npm:7.0.15"
   checksum: a996a745e6c5d60292f36731dd41341339d4eeed8180bb09226e5c8d23759067692b1d88e5d91d72ee83dfc00d3aca8e7bd43ea120516c17922cbcb7c3e252db
+  languageName: node
+  linkType: hard
+
+"@types/jstree@npm:^3":
+  version: 3.3.46
+  resolution: "@types/jstree@npm:3.3.46"
+  dependencies:
+    "@types/jquery": "npm:*"
+  checksum: afb9a7d16f3b5505dd574b4a1131deca9bccfd500fab846955e53a9a322ada6ff642760d1d61c4a474a40f2935490982aa1ede1379087dcd52b95abeba33b1ff
   languageName: node
   linkType: hard
 
@@ -692,6 +717,20 @@ __metadata:
   version: 7.5.6
   resolution: "@types/semver@npm:7.5.6"
   checksum: 196dc32db5f68cbcde2e6a42bb4aa5cbb100fa2b7bd9c8c82faaaf3e03fbe063e205dbb4f03c7cdf53da2edb70a0d34c9f2e601b54281b377eb8dc1743226acd
+  languageName: node
+  linkType: hard
+
+"@types/sizzle@npm:*":
+  version: 2.3.8
+  resolution: "@types/sizzle@npm:2.3.8"
+  checksum: ab5460147ae6680cc20c2223a8f17d9f7c97144b70f00a222a1c32d68b5207696d48177ab9784dda88c74d93ed5a78dd31f74d271b15382520b423c81b4aac89
+  languageName: node
+  linkType: hard
+
+"@types/uuid@npm:^9":
+  version: 9.0.7
+  resolution: "@types/uuid@npm:9.0.7"
+  checksum: b329ebd4f9d1d8e08d4f2cc211be4922d70d1149f73d5772630e4a3acfb5170c6d37b3d7a39a0412f1a56e86e8a844c7f297c798b082f90380608bf766688787
   languageName: node
   linkType: hard
 
@@ -1570,6 +1609,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"esm-env-robust@npm:0.0.3":
+  version: 0.0.3
+  resolution: "esm-env-robust@npm:0.0.3"
+  dependencies:
+    esm-env: "npm:^1.0.0"
+  checksum: a46445f537e60255425660dacdc9bc01c721167b92da0a96b3d9b8038c45a17a96a146cc797bf0e374ca4bbf50328ffc100a748072372a623801c28a339dd54e
+  languageName: node
+  linkType: hard
+
 "esm-env@npm:^1.0.0":
   version: 1.0.0
   resolution: "esm-env@npm:1.0.0"
@@ -1729,13 +1777,6 @@ __metadata:
   version: 3.2.9
   resolution: "flatted@npm:3.2.9"
   checksum: 5c91c5a0a21bbc0b07b272231e5b4efe6b822bcb4ad317caf6bb06984be4042a9e9045026307da0fdb4583f1f545e317a67ef1231a59e71f7fced3cc429cfc53
-  languageName: node
-  linkType: hard
-
-"font-awesome@npm:^4.7.0":
-  version: 4.7.0
-  resolution: "font-awesome@npm:4.7.0"
-  checksum: 1c456e2939c55192eed67db9c0efb8db3e92fd357ca189ca00030eb44acffa1e9f835288d2204c14b9a9c490a7b14b7090dfaff80ded6b2473f50a923dfb41e7
   languageName: node
   linkType: hard
 
@@ -2119,6 +2160,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"jquery@npm:^3.5.0, jquery@npm:^3.7.1":
+  version: 3.7.1
+  resolution: "jquery@npm:3.7.1"
+  checksum: 808cfbfb758438560224bf26e17fcd5afc7419170230c810dd11f5c1792e2263e2970cca8d659eb84fcd9acc301edb6d310096e450277d54be4f57071b0c82d9
+  languageName: node
+  linkType: hard
+
 "js-yaml@npm:^4.1.0":
   version: 4.1.0
   resolution: "js-yaml@npm:4.1.0"
@@ -2148,6 +2196,15 @@ __metadata:
   version: 1.0.1
   resolution: "json-stable-stringify-without-jsonify@npm:1.0.1"
   checksum: cb168b61fd4de83e58d09aaa6425ef71001bae30d260e2c57e7d09a5fd82223e2f22a042dedaab8db23b7d9ae46854b08bb1f91675a8be11c5cffebef5fb66a5
+  languageName: node
+  linkType: hard
+
+"jstree@npm:^3.3.16":
+  version: 3.3.16
+  resolution: "jstree@npm:3.3.16"
+  dependencies:
+    jquery: "npm:^3.5.0"
+  checksum: 1173d0c7eecfef0a0ef6c3f862e6e09e511258971a3fd0e8668e00a0b5c570433891ee75385e90fb0e127a7d81fa1a41b69f5ceab3dc4395e59b6eb3da590b96
   languageName: node
   linkType: hard
 
@@ -2436,12 +2493,16 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mod-studio@workspace:."
   dependencies:
+    "@fortawesome/fontawesome-free": "npm:^6.5.1"
     "@sveltejs/adapter-static": "npm:^3.0.1"
     "@sveltejs/kit": "npm:^2.0.0"
     "@sveltejs/vite-plugin-svelte": "npm:^3.0.0"
     "@tauri-apps/api": "npm:^1.5.3"
     "@tauri-apps/cli": "npm:^1.5.9"
     "@types/eslint": "npm:8.56.0"
+    "@types/jquery": "npm:^3"
+    "@types/jstree": "npm:^3"
+    "@types/uuid": "npm:^9"
     "@typescript-eslint/eslint-plugin": "npm:^6.0.0"
     "@typescript-eslint/parser": "npm:^6.0.0"
     autoprefixer: "npm:^10.4.16"
@@ -2450,15 +2511,18 @@ __metadata:
     eslint: "npm:^8.56.0"
     eslint-config-prettier: "npm:^9.1.0"
     eslint-plugin-svelte: "npm:^2.35.1"
-    font-awesome: "npm:^4.7.0"
+    jquery: "npm:^3.7.1"
+    jstree: "npm:^3.3.16"
     postcss: "npm:^8.4.32"
     prettier: "npm:^3.1.1"
     prettier-plugin-svelte: "npm:^3.1.2"
     svelte: "npm:^4.2.7"
     svelte-check: "npm:^3.6.0"
+    svelte-splitpanes: "npm:^0.8.0"
     tailwindcss: "npm:^3.4.0"
     tslib: "npm:^2.4.1"
     typescript: "npm:^5.0.0"
+    uuid: "npm:^9.0.1"
     vite: "npm:^5.0.3"
   languageName: unknown
   linkType: soft
@@ -3378,6 +3442,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"svelte-splitpanes@npm:^0.8.0":
+  version: 0.8.0
+  resolution: "svelte-splitpanes@npm:0.8.0"
+  dependencies:
+    esm-env-robust: "npm:0.0.3"
+  peerDependencies:
+    svelte: ^4.0.2
+  checksum: 0976d3e93c6b1df2328165bdd0fb3a681e095b65844e5cf32bc0413fd557e2c01c8235d816a41bfa8c0bef163c9246590ee207b6c585cb8f81fabf2ed1d3a2f2
+  languageName: node
+  linkType: hard
+
 "svelte@npm:^4.2.7":
   version: 4.2.8
   resolution: "svelte@npm:4.2.8"
@@ -3601,6 +3676,15 @@ __metadata:
   version: 1.0.2
   resolution: "util-deprecate@npm:1.0.2"
   checksum: 41a5bdd214df2f6c3ecf8622745e4a366c4adced864bc3c833739791aeeeb1838119af7daed4ba36428114b5c67dcda034a79c882e97e43c03e66a4dd7389942
+  languageName: node
+  linkType: hard
+
+"uuid@npm:^9.0.1":
+  version: 9.0.1
+  resolution: "uuid@npm:9.0.1"
+  bin:
+    uuid: dist/bin/uuid
+  checksum: 1607dd32ac7fc22f2d8f77051e6a64845c9bce5cd3dd8aa0070c074ec73e666a1f63c7b4e0f4bf2bc8b9d59dc85a15e17807446d9d2b17c8485fbc2147b27f9b
   languageName: node
   linkType: hard
 

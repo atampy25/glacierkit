@@ -43,7 +43,7 @@
 		box-shadow: inset 2px 0px 0px 0px white;
 	}
 
-	:global(.bx--tooltip__trigger.tool-button svg) {
+	:global(.bx--tooltip__trigger.tool-button.tool-tab-selected svg) {
 		fill: white !important;
 	}
 

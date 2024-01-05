@@ -14,7 +14,9 @@ export function event(event: Event) {
     return invoke()<null>("event", { event })
 }
 
-export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent }
-export type FileBrowserEvent = { type: "select"; data: null } | { type: "create"; data: null } | { type: "delete"; data: null } | { type: "move"; data: null } | { type: "rename"; data: null }
+export type GameBrowserEvent = { type: "select"; data: string | null } | { type: "search"; data: string }
+export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } }
 export type Event = { type: "tool"; data: ToolEvent } | { type: "global"; data: GlobalEvent }
-export type GlobalEvent = { type: "workspaceLoaded"; data: { path: string } }
+export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeGFEPath"; data: string | null }
+export type GlobalEvent = { type: "loadWorkspace"; data: string }
+export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type: "gameBrowser"; data: GameBrowserEvent } | { type: "settings"; data: SettingsEvent }
