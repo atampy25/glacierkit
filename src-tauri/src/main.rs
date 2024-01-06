@@ -7,6 +7,7 @@
 pub mod game_detection;
 pub mod hash_list;
 pub mod model;
+pub mod resourcelib;
 
 use std::{collections::HashMap, fmt::Debug, fs, ops::Deref, path::Path, sync::Arc};
 
@@ -17,10 +18,10 @@ use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
 use itertools::Itertools;
 use model::{
-	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, Event, FileBrowserEvent,
-	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project,
-	ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType,
-	ToolEvent, ToolRequest
+	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
+	EntityTreeEvent, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent,
+	GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings, Request, SettingsEvent, SettingsRequest,
+	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{generate_patch, qn_structs::Entity};
@@ -35,15 +36,20 @@ const HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/entity_hash_list.sml";
 
 fn main() {
-	#[cfg(debug_assertions)]
-	{
-		tauri_specta::ts::export(specta::collect_types![event], "../src/lib/bindings.ts").unwrap();
+	let specta = {
+		let specta_builder = tauri_specta::ts::builder().commands(tauri_specta::collect_commands![event]);
 
+		#[cfg(debug_assertions)]
+		let specta_builder = specta_builder.path("../src/lib/bindings.ts");
+
+		#[cfg(debug_assertions)]
 		specta::export::ts("../src/lib/bindings-types.ts").unwrap();
-	}
+
+		specta_builder.into_plugin()
+	};
 
 	tauri::Builder::default()
-		.invoke_handler(tauri::generate_handler![event])
+		.plugin(specta)
 		.setup(|app| {
 			let app_data_path = app.path_resolver().app_data_dir().unwrap();
 
@@ -502,6 +508,16 @@ fn event(app: AppHandle, event: Event) {
 									Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true })
 								)?;
 							}
+						}
+					},
+
+					EditorEvent::Entity(event) => match event {
+						EntityEditorEvent::Tree(event) => match event {
+							EntityTreeEvent::Select(_) => todo!(),
+							EntityTreeEvent::Create { id, content } => todo!(),
+							EntityTreeEvent::Delete(_) => todo!(),
+							EntityTreeEvent::Rename { id, new_name } => todo!(),
+							EntityTreeEvent::Reparent { id, new_parent } => todo!()
 						}
 					}
 				},

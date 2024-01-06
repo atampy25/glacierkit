@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 use notify::RecommendedWatcher;
-use quickentity_rs::qn_structs::Entity;
+use quickentity_rs::qn_structs::{Entity, Ref, SubEntity};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use structstruck::strike;
@@ -121,6 +121,29 @@ strike! {
 					id: Uuid,
 					content: String
 				}
+			}),
+
+			Entity(pub enum EntityEditorEvent {
+				Tree(pub enum EntityTreeEvent {
+					Select(String),
+
+					Create {
+						id: String,
+						content: SubEntity
+					},
+
+					Delete(String),
+
+					Rename {
+						id: String,
+						new_name: String
+					},
+
+					Reparent {
+						id: String,
+						new_parent: Ref
+					}
+				})
 			})
 		}),
 
@@ -190,7 +213,9 @@ strike! {
 					id: Uuid,
 					file_type: TextFileType
 				},
-			})
+			}),
+
+			Entity(pub enum EntityEditorRequest {})
 		}),
 
 		Global(pub enum GlobalRequest {

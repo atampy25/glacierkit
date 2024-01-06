@@ -16,6 +16,7 @@
 	import Save from "carbon-icons-svelte/lib/Save.svelte"
 	import NilEditor from "$lib/editors/nil/NilEditor.svelte"
 	import TextEditor from "$lib/editors/text/TextEditor.svelte"
+	import EntityEditor from "$lib/editors/entity/EntityEditor.svelte"
 
 	const tools = {
 		FileBrowser: {
@@ -48,10 +49,8 @@
 				return TextEditor
 
 			case "qnentity":
-				return NilEditor
-
 			case "qnpatch":
-				return NilEditor
+				return EntityEditor
 
 			default:
 				editorType satisfies never

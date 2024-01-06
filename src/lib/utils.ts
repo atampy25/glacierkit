@@ -1,4 +1,4 @@
-import {type Event, event as bindingEvent} from "$lib/bindings"
+import {type Event, commands} from "$lib/bindings"
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type ObjectEntry<T extends {}> = T extends object
@@ -18,5 +18,5 @@ export function typedEntries<T extends {}>(object: T): ReadonlyArray<ObjectEntry
 
 export async function event(event: Event) {
 	console.log("Sending event", event)
-	await bindingEvent(event)
+	await commands.event(event)
 }
