@@ -2513,6 +2513,7 @@ __metadata:
     eslint-plugin-svelte: "npm:^2.35.1"
     jquery: "npm:^3.7.1"
     jstree: "npm:^3.3.16"
+    monaco-editor: "npm:^0.45.0"
     postcss: "npm:^8.4.32"
     prettier: "npm:^3.1.1"
     prettier-plugin-svelte: "npm:^3.1.2"
@@ -2526,6 +2527,13 @@ __metadata:
     vite: "npm:^5.0.3"
   languageName: unknown
   linkType: soft
+
+"monaco-editor@npm:^0.45.0":
+  version: 0.45.0
+  resolution: "monaco-editor@npm:0.45.0"
+  checksum: 77b1522dbbf06b582f143a7be22f48ad82e5cade3f22c26fc19086446e473c720b2147f8a1ac6edf2172abf5d6bc92a5e858f62fb60df8617f8532f1fa1119ab
+  languageName: node
+  linkType: hard
 
 "mri@npm:^1.1.0":
   version: 1.2.0

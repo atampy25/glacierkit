@@ -343,6 +343,11 @@
 				}
 				break
 
+			case "select":
+				selectedFile = request.data && pathToID[request.data] ? request.data : null
+				fixSelection()
+				break
+
 			case "newTree":
 				path = request.data.base_path
 				await replaceTree(request.data.files)

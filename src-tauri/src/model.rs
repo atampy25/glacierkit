@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 use notify::RecommendedWatcher;
+use quickentity_rs::qn_structs::Entity;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use structstruck::strike;
@@ -41,9 +42,12 @@ pub struct EditorState {
 	pub data: EditorData
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EditorData {
-	Text(String)
+	Nil,
+	Text { content: String, file_type: TextFileType },
+	QNEntity(Box<Entity>),
+	QNPatch { base: Box<Entity>, current: Box<Entity> }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -107,10 +111,24 @@ strike! {
 			})
 		}),
 
-		// Editor(pub enum EditorEvent {}),
+		Editor(pub enum EditorEvent {
+			Text(pub enum TextEditorEvent {
+				Initialise {
+					id: Uuid
+				},
+
+				UpdateContent {
+					id: Uuid,
+					content: String
+				}
+			})
+		}),
 
 		Global(pub enum GlobalEvent {
-			LoadWorkspace(PathBuf)
+			LoadWorkspace(PathBuf),
+			SelectTab(Uuid),
+			RemoveTab(Uuid),
+			SaveTab(Uuid)
 		})
 	}
 }
@@ -132,6 +150,8 @@ strike! {
 					old_path: PathBuf,
 					new_path: PathBuf
 				},
+
+				Select(Option<PathBuf>),
 
 				NewTree {
 					base_path: PathBuf,
@@ -159,6 +179,20 @@ strike! {
 			})
 		}),
 
+		Editor(pub enum EditorRequest {
+			Text(pub enum TextEditorRequest {
+				ReplaceContent {
+					id: Uuid,
+					content: String
+				},
+
+				SetFileType {
+					id: Uuid,
+					file_type: TextFileType
+				},
+			})
+		}),
+
 		Global(pub enum GlobalRequest {
 			ErrorReport { error: String },
 			SetWindowTitle(String),
@@ -166,11 +200,24 @@ strike! {
 				id: Uuid,
 				name: String,
 				editor_type: pub enum EditorType {
-					Text,
+					Nil,
+					Text {
+						file_type: pub enum TextFileType {
+							Json,
+							ManifestJson,
+							PlainText,
+							Markdown
+						}
+					},
 					QNEntity,
 					QNPatch
 				},
-				file: Option<String>
+				file: Option<PathBuf>
+			},
+			SelectTab(Uuid),
+			SetTabUnsaved {
+				id: Uuid,
+				unsaved: bool
 			}
 		})
 	}

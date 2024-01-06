@@ -14,8 +14,10 @@
 
 	let tasks: [string, string][] = []
 
-	let destroyFunc = () => {}
-	onDestroy(destroyFunc)
+	let destroyFunc = { run: () => {} }
+	onDestroy(() => {
+		destroyFunc.run()
+	})
 
 	window.addEventListener("error", (evt) => {
 		errorModalError = String(evt.error)
@@ -49,7 +51,7 @@
 			}
 		})
 
-		destroyFunc = () => {
+		destroyFunc.run = () => {
 			unlistenStartTask()
 			unlistenFinishTask()
 			unlistenRequest()

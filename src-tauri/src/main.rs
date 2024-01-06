@@ -10,17 +10,20 @@ pub mod model;
 
 use std::{collections::HashMap, fmt::Debug, fs, ops::Deref, path::Path, sync::Arc};
 
-use anyhow::{Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use arc_swap::{access::Access, ArcSwap, Guard};
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
+use itertools::Itertools;
 use model::{
-	AppSettings, AppState, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent,
-	GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings, Request, SettingsEvent, SettingsRequest,
+	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, Event, FileBrowserEvent,
+	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project,
+	ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType,
 	ToolEvent, ToolRequest
 };
 use notify::Watcher;
+use quickentity_rs::{generate_patch, qn_structs::Entity};
 use serde_json::{from_slice, to_vec};
 use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
@@ -87,7 +90,204 @@ fn event(app: AppHandle, event: Event) {
 			match event {
 				Event::Tool(event) => match event {
 					ToolEvent::FileBrowser(event) => match event {
-						FileBrowserEvent::Select(path) => {}
+						FileBrowserEvent::Select(path) => {
+							if let Some(path) = path {
+								let task = start_task(
+									&app,
+									format!(
+										"Opening {}",
+										path.file_name().context("No file name")?.to_string_lossy()
+									)
+								)?;
+
+								let existing = {
+									let guard = app_state.editor_states.read().await;
+
+									guard
+										.iter()
+										.find(|(_, x)| x.file.as_ref().map(|x| x == &path).unwrap_or(false))
+										.map(|(x, _)| x.to_owned())
+								};
+
+								if let Some(existing) = existing {
+									send_request(&app, Request::Global(GlobalRequest::SelectTab(existing)))?;
+								} else {
+									let extension = path
+										.file_name()
+										.context("No file name")?
+										.to_string_lossy()
+										.split('.')
+										.skip(1)
+										.collect_vec()
+										.join(".");
+
+									match extension.as_ref() {
+										"entity.json" => {
+											let id = Uuid::new_v4();
+
+											let entity: Entity =
+												from_slice(&fs::read(&path).context("Couldn't read file")?)
+													.context("Invalid entity")?;
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: Some(path.to_owned()),
+													data: EditorData::QNEntity(Box::new(entity))
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: path
+														.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.into(),
+													editor_type: EditorType::QNEntity,
+													file: Some(path)
+												})
+											)?;
+										}
+
+										"json" => {
+											let id = Uuid::new_v4();
+
+											let file_type =
+												if path.file_name().context("No file name")?.to_string_lossy()
+													== "manifest.json"
+												{
+													TextFileType::ManifestJson
+												} else {
+													TextFileType::Json
+												};
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: Some(path.to_owned()),
+													data: EditorData::Text {
+														content: fs::read_to_string(&path)
+															.context("Couldn't read file")?,
+														file_type: file_type.to_owned()
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: path
+														.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.into(),
+													editor_type: EditorType::Text { file_type },
+													file: Some(path)
+												})
+											)?;
+										}
+
+										"txt" => {
+											let id = Uuid::new_v4();
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: Some(path.to_owned()),
+													data: EditorData::Text {
+														content: fs::read_to_string(&path)
+															.context("Couldn't read file")?,
+														file_type: TextFileType::PlainText
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: path
+														.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.into(),
+													editor_type: EditorType::Text {
+														file_type: TextFileType::PlainText
+													},
+													file: Some(path)
+												})
+											)?;
+										}
+
+										"md" => {
+											let id = Uuid::new_v4();
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: Some(path.to_owned()),
+													data: EditorData::Text {
+														content: fs::read_to_string(&path)
+															.context("Couldn't read file")?,
+														file_type: TextFileType::Markdown
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: path
+														.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.into(),
+													editor_type: EditorType::Text {
+														file_type: TextFileType::Markdown
+													},
+													file: Some(path)
+												})
+											)?;
+										}
+
+										_ => {
+											// Unsupported extension
+
+											let id = Uuid::new_v4();
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: Some(path.to_owned()),
+													data: EditorData::Nil
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: path
+														.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.into(),
+													editor_type: EditorType::Nil,
+													file: Some(path)
+												})
+											)?;
+										}
+									}
+								}
+
+								finish_task(&app, task)?;
+							}
+						}
 
 						FileBrowserEvent::Create { path, is_folder } => {
 							let task = start_task(
@@ -253,7 +453,59 @@ fn event(app: AppHandle, event: Event) {
 					}
 				},
 
-				// Event::Editor(event) => match event {},
+				Event::Editor(event) => match event {
+					EditorEvent::Text(event) => match event {
+						TextEditorEvent::Initialise { id } => {
+							let editor_state = app_state.editor_states.read().await;
+							let editor_state = editor_state.get(&id).context("No such editor")?;
+
+							let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
+								Err(anyhow!("Editor {} is not a text editor", id))?;
+								panic!();
+							};
+
+							send_request(
+								&app,
+								Request::Editor(EditorRequest::Text(TextEditorRequest::ReplaceContent {
+									id: id.to_owned(),
+									content
+								}))
+							)?;
+
+							send_request(
+								&app,
+								Request::Editor(EditorRequest::Text(TextEditorRequest::SetFileType {
+									id: id.to_owned(),
+									file_type
+								}))
+							)?;
+						}
+
+						TextEditorEvent::UpdateContent { id, content } => {
+							let mut editor_state = app_state.editor_states.write().await;
+							let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+
+							let EditorData::Text {
+								file_type,
+								content: old_content
+							} = editor_state.data.to_owned()
+							else {
+								Err(anyhow!("Editor {} is not a text editor", id))?;
+								panic!();
+							};
+
+							if content != old_content {
+								editor_state.data = EditorData::Text { content, file_type };
+
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true })
+								)?;
+							}
+						}
+					}
+				},
+
 				Event::Global(event) => match event {
 					GlobalEvent::LoadWorkspace(path) => {
 						let task = start_task(&app, format!("Loading project {}", path.display()))?;
@@ -542,6 +794,78 @@ fn event(app: AppHandle, event: Event) {
 							Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
 								settings.game_install.is_some() && app_state.hash_list.load().is_some()
 							)))
+						)?;
+					}
+
+					GlobalEvent::SelectTab(tab) => {
+						if let Some(file) = app_state
+							.editor_states
+							.read()
+							.await
+							.get(&tab)
+							.context("No such editor")?
+							.file
+							.as_ref()
+						{
+							send_request(
+								&app,
+								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(Some(
+									file.to_owned()
+								))))
+							)?;
+						}
+					}
+
+					GlobalEvent::RemoveTab(tab) => {
+						let old = app_state
+							.editor_states
+							.write()
+							.await
+							.remove(&tab)
+							.context("No such editor")?;
+
+						if old.file.is_some() {
+							send_request(
+								&app,
+								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+							)?;
+						}
+					}
+
+					GlobalEvent::SaveTab(tab) => {
+						let guard = app_state.editor_states.read().await;
+						let editor = guard.get(&tab).context("No such editor")?;
+
+						fs::write(
+							editor.file.as_ref().context("Tab has no intended file")?,
+							match &editor.data {
+								EditorData::Nil => {
+									Err(anyhow!("Editor is a nil editor"))?;
+									panic!();
+								}
+
+								EditorData::Text { content, .. } => content.as_bytes().to_owned(),
+
+								EditorData::QNEntity(entity) => {
+									serde_json::to_vec(&entity).context("Entity is invalid")?
+								}
+
+								EditorData::QNPatch { base, current } => serde_json::to_vec(
+									&generate_patch(base, current)
+										.map_err(|x| anyhow!(x))
+										.context("Couldn't generate patch")?
+								)
+								.context("Entity is invalid")?
+							}
+						)
+						.context("Couldn't write file")?;
+
+						send_request(
+							&app,
+							Request::Global(GlobalRequest::SetTabUnsaved {
+								id: tab,
+								unsaved: false
+							})
 						)?;
 					}
 				}

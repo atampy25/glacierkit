@@ -1,7 +1,7 @@
 <script lang="ts">
 	import FileBrowser from "$lib/tools/FileBrowser.svelte"
 	import Settings from "$lib/tools/Settings.svelte"
-	import { typedEntries } from "$lib/utils"
+	import { event, typedEntries } from "$lib/utils"
 	import Folders from "carbon-icons-svelte/lib/Folders.svelte"
 	import Box from "carbon-icons-svelte/lib/Box.svelte"
 	import SettingsIcon from "carbon-icons-svelte/lib/Settings.svelte"
@@ -10,10 +10,12 @@
 	import { Button } from "carbon-components-svelte"
 	import { SvelteComponent, beforeUpdate, onDestroy } from "svelte"
 	import { listen } from "@tauri-apps/api/event"
-	import type { Request } from "$lib/bindings-types"
+	import type { EditorType, Request } from "$lib/bindings-types"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
 	import Close from "carbon-icons-svelte/lib/Close.svelte"
 	import Save from "carbon-icons-svelte/lib/Save.svelte"
+	import NilEditor from "$lib/editors/nil/NilEditor.svelte"
+	import TextEditor from "$lib/editors/text/TextEditor.svelte"
 
 	const tools = {
 		FileBrowser: {
@@ -37,20 +39,42 @@
 
 	const toolComponents: Record<keyof typeof tools, { handleRequest: (request: any) => Promise<void> }> = ({} as unknown as null)!
 
-	const editors = {} as const
+	function getEditor(editorType: EditorType) {
+		switch (editorType.type) {
+			case "nil":
+				return NilEditor
+
+			case "text":
+				return TextEditor
+
+			case "qnentity":
+				return NilEditor
+
+			case "qnpatch":
+				return NilEditor
+
+			default:
+				editorType satisfies never
+				return NilEditor
+		}
+	}
 
 	let tabs: {
 		id: string
 		name: string
-		editor: SvelteComponent
+		editor: ReturnType<typeof getEditor>
 		file: string | null
 		unsaved: boolean
 	}[] = []
 
+	const tabComponents: Record<string, { handleRequest: (request: any) => Promise<void> }> = {}
+
 	let activeTab: string | null = null
 
-	let destroyFunc = () => {}
-	onDestroy(destroyFunc)
+	let destroyFunc = { run: () => {} }
+	onDestroy(() => {
+		destroyFunc.run()
+	})
 
 	let hasListened = false
 
@@ -90,6 +114,43 @@
 								// Handled by +layout.svelte
 								break
 
+							case "createTab":
+								tabs = [
+									...tabs,
+									{
+										id: request.data.data.id,
+										name: request.data.data.name,
+										file: request.data.data.file,
+										unsaved: false,
+										editor: getEditor(request.data.data.editor_type)
+									}
+								]
+
+								activeTab = request.data.data.id
+								break
+
+							case "setTabUnsaved":
+								const id = request.data.data.id
+								tabs.find((a) => a.id === id)!.unsaved = request.data.data.unsaved
+								tabs = tabs
+								break
+
+							case "selectTab":
+								activeTab = request.data.data
+								break
+
+							default:
+								request.data satisfies never
+								break
+						}
+						break
+
+					case "editor":
+						switch (request.data.type) {
+							case "text":
+								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								break
+
 							default:
 								request.data satisfies never
 								break
@@ -102,7 +163,7 @@
 				}
 			})
 
-			destroyFunc = unlisten
+			destroyFunc.run = unlisten
 		}
 	})
 </script>
@@ -133,19 +194,82 @@
 		<Pane>
 			{#if tabs.length}
 				<div class="mt-2 mr-2 mb-2 min-h-10 bg-[#202020] flex flex-wrap">
-					<div class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white border-b">
-						Deeznuts
-						<Button kind="ghost" size="field" icon={Save} iconDescription="Save" />
-						<Button kind="ghost" size="field" icon={Close} iconDescription="Close" />
-					</div>
-					<div class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer">
-						Deeznuts 2
-						<Button kind="ghost" size="field" icon={Close} iconDescription="Close" />
-					</div>
+					{#each tabs as tab (tab.id)}
+						<div
+							class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
+							class:border-b={activeTab === tab.id}
+							on:click={async () => {
+								activeTab = tab.id
+
+								await event({
+									type: "global",
+									data: {
+										type: "selectTab",
+										data: tab.id
+									}
+								})
+							}}
+						>
+							{tab.name}
+							{#if tab.unsaved}
+								<Button
+									kind="ghost"
+									size="field"
+									icon={Save}
+									iconDescription="Save"
+									on:click={async () => {
+										if (tab.file) {
+											await event({
+												type: "global",
+												data: {
+													type: "saveTab",
+													data: tab.id
+												}
+											})
+										}
+									}}
+								/>
+							{/if}
+							<Button
+								kind="ghost"
+								size="field"
+								icon={Close}
+								iconDescription="Close"
+								on:click={async () => {
+									tabs = tabs.filter((a) => a.id !== tab.id)
+									activeTab = null
+
+									await event({
+										type: "global",
+										data: {
+											type: "removeTab",
+											data: tab.id
+										}
+									})
+								}}
+							/>
+						</div>
+					{/each}
 				</div>
+				{#each tabs as tab (tab.id)}
+					<div class="h-full" class:hidden={activeTab !== tab.id}>
+						<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />
+					</div>
+				{/each}
+				{#if !activeTab}
+					<div class="h-full flex items-center justify-center">
+						<div class="text-center">
+							<h1>Welcome to Deeznuts</h1>
+							<p>Select a tab above to edit it here.</p>
+						</div>
+					</div>
+				{/if}
 			{:else}
-				<div class="h-full items-center justify-center">
-					<h1>Welcome to Deeznuts</h1>
+				<div class="h-full flex items-center justify-center">
+					<div class="text-center">
+						<h1>Welcome to Deeznuts</h1>
+						<p>You can start by selecting a project on the left.</p>
+					</div>
 				</div>
 			{/if}
 		</Pane>

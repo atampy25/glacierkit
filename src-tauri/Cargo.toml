@@ -39,6 +39,7 @@ trash = "3.1.2"
 notify = { version = "6.1.1", default-features = false, features = [
     "macos_fsevent",
 ] }
+quickentity-rs = { git = "https://github.com/atampy25/quickentity-rs" }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

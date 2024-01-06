@@ -150,7 +150,7 @@
 	}
 
 	let enabled = false
-	let gameDescription = ""
+	let gameDescription = "Search for a game file above to get started"
 	let searchFeedback = ""
 </script>
 
