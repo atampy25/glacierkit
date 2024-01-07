@@ -288,7 +288,12 @@ strike! {
 						entities: Vec<(String, Ref, String, String, bool)>
 					},
 
-					Paste {
+					/// Instructs the frontend to take the list of new entities, add any new ones and update any ones that already exist (by ID) with the new information.
+					/// A bit expensive so the other requests are obviously better for single actions.
+					/// This is used for pasting.
+					DiffTree {
+						editor_id: Uuid,
+
 						/// ID, parent, name, factory, has reverse parent refs
 						new_entities: Vec<(String, Ref, String, String, bool)>
 					}

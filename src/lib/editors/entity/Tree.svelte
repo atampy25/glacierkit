@@ -7,6 +7,7 @@
 	import { event } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { changeReferenceToLocalEntity, genRandHex, getReferencedLocalEntity } from "./utils"
+	import { clipboard } from "@tauri-apps/api"
 
 	export let editorID: string
 
@@ -180,6 +181,83 @@
 									}
 								})
 							}
+						},
+						ccp: {
+							separator_before: true,
+							separator_after: false,
+							label: "Clipboard",
+							icon: "far fa-clipboard",
+							action: false,
+							submenu: {
+								copy: {
+									separator_before: false,
+									separator_after: false,
+									label: "Copy Entity",
+									icon: "far fa-copy",
+									action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
+
+										await event({
+											type: "editor",
+											data: {
+												type: "entity",
+												data: {
+													type: "tree",
+													data: {
+														type: "copy",
+														data: {
+															editor_id: editorID,
+															id: selected_node.id
+														}
+													}
+												}
+											}
+										})
+									}
+								},
+								paste: {
+									separator_before: false,
+									_disabled: false,
+									separator_after: false,
+									label: "Paste Entity",
+									icon: "far fa-paste",
+									action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
+
+										await event({
+											type: "editor",
+											data: {
+												type: "entity",
+												data: {
+													type: "tree",
+													data: {
+														type: "paste",
+														data: {
+															editor_id: editorID,
+															parent_id: selected_node.id
+														}
+													}
+												}
+											}
+										})
+									}
+								}
+							}
+						},
+						copyID: {
+							separator_before: false,
+							separator_after: false,
+							_disabled: false,
+							label: "Copy ID",
+							icon: "far fa-copy",
+							action: function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+								const tree = jQuery.jstree!.reference(b.reference)
+								const selected_node = tree.get_node(b.reference)
+
+								clipboard.writeText(selected_node.id)
+							}
 						}
 					}
 				}
@@ -330,7 +408,7 @@
 						: icons.find((a) => factory.includes(a[0]))
 							? icons.find((a) => factory.includes(a[0]))![1]
 							: "fa-regular fa-file",
-				text: name,
+				text: `${name} (${entityID})`,
 				folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
 				parentRef: parent
 			})

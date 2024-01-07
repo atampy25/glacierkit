@@ -23,6 +23,12 @@ name: string;
  */
 text: string }
 
+export type CopiedEntityData = { 
+/**
+ * Which entity has been copied (and should be parented to the selection when pasting).
+ */
+rootEntity: string; data: { [key in string]: SubEntity } }
+
 /**
  * A dependency of an entity.
  */
@@ -114,13 +120,17 @@ export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent }
 
 export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest }
 
-export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } }
 
 export type EntityTreeRequest = { type: "create"; data: { editor_id: string; id: string; parent: Ref; name: string } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "select"; data: { editor_id: string; id: string | null } } | { type: "newTree"; data: { editor_id: string; 
 /**
  * ID, parent, name, factory, has reverse parent refs
  */
-entities: ([string, Ref, string, string, boolean])[] } }
+entities: ([string, Ref, string, string, boolean])[] } } | { type: "paste"; data: { editor_id: string; 
+/**
+ * ID, parent, name, factory, has reverse parent refs
+ */
+new_entities: ([string, Ref, string, string, boolean])[] } }
 
 export type Event = { type: "tool"; data: ToolEvent } | { type: "editor"; data: EditorEvent } | { type: "global"; data: GlobalEvent }
 

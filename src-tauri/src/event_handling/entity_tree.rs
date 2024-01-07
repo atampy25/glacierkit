@@ -20,8 +20,8 @@ use crate::{
 		get_local_reference, get_recursive_children, random_entity_id, CopiedEntityData, ReverseReferenceData
 	},
 	finish_task,
-	model::{AppState, EditorData},
-	send_notification, start_task, Notification, NotificationKind
+	model::{AppState, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, Request},
+	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
 #[try_fn]
@@ -768,10 +768,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 	paste_data.data = paste_data
 		.data
 		.into_iter()
-		.map(|(x, y)| (changed_entity_ids.remove(&x).unwrap(), y))
+		.map(|(x, y)| (changed_entity_ids.get(&x).unwrap().to_owned(), y))
 		.collect();
 
-	entity.entities.extend(paste_data.data);
+	entity.entities.extend(paste_data.data.to_owned());
 
 	entity
 		.entities
@@ -783,8 +783,72 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 			.get_mut(changed_entity_ids.get(&paste_data.root_entity).unwrap())
 			.unwrap()
 			.parent,
-		parent_id
+		parent_id.to_owned()
 	);
+
+	let mut new_entities = vec![];
+	let mut reverse_parent_refs: HashMap<String, Vec<String>> = HashMap::new();
+
+	for (entity_id, entity_data) in entity.entities.iter() {
+		match entity_data.parent {
+			Ref::Full(ref reference) if reference.external_scene.is_none() => {
+				reverse_parent_refs
+					.entry(reference.entity_ref.to_owned())
+					.and_modify(|x| x.push(entity_id.to_owned()))
+					.or_insert(vec![entity_id.to_owned()]);
+			}
+
+			Ref::Short(Some(ref reference)) => {
+				reverse_parent_refs
+					.entry(reference.to_owned())
+					.and_modify(|x| x.push(entity_id.to_owned()))
+					.or_insert(vec![entity_id.to_owned()]);
+			}
+
+			_ => {}
+		}
+	}
+
+	for (entity_id, entity_data) in paste_data.data {
+		let x = reverse_parent_refs.contains_key(&entity_id);
+		new_entities.push((entity_id, entity_data.parent, entity_data.name, entity_data.factory, x));
+	}
+
+	// Make sure the entity being pasted under is updated to be considered a folder
+	// TODO: Make sure the implementation of Paste request handles existing entities like this one
+	// TODO: Make sure that folder status is updated by tree view right click create events as well on the frontend
+	new_entities.push((
+		parent_id.to_owned(),
+		entity
+			.entities
+			.get(&parent_id)
+			.context("No such entity")?
+			.parent
+			.to_owned(),
+		entity
+			.entities
+			.get(&parent_id)
+			.context("No such entity")?
+			.name
+			.to_owned(),
+		entity
+			.entities
+			.get(&parent_id)
+			.context("No such entity")?
+			.factory
+			.to_owned(),
+		true
+	));
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+			EntityTreeRequest::DiffTree {
+				editor_id,
+				new_entities
+			}
+		)))
+	)?;
 
 	finish_task(app, task)?;
 
