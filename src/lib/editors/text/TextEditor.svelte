@@ -8,7 +8,7 @@
 
 	let monacoEditor: Monaco
 
-	let fileType: TextFileType["type"] = "plainText"
+	let fileType: TextFileType["type"] = "PlainText"
 
 	export async function handleRequest(request: TextEditorRequest) {
 		console.log(`Text editor ${id} handling request`, request)
@@ -30,7 +30,7 @@
 	}
 
 	async function contentChanged(content: string) {
-		if (fileType === "json" || fileType === "manifestJson") {
+		if (fileType === "Json" || fileType === "ManifestJson") {
 			try {
 				JSON.parse(content)
 			} catch {

@@ -41,7 +41,7 @@ export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "ent
 
 export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest }
 
-export type EditorType = { type: "nil" } | { type: "text"; data: { file_type: TextFileType } } | { type: "qnentity" } | { type: "qnpatch" }
+export type EditorType = { type: "Nil" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" }
 
 export type Entity = { 
 /**
@@ -112,9 +112,15 @@ comments: CommentEntity[] }
 
 export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent }
 
-export type EntityEditorRequest = never
+export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest }
 
-export type EntityTreeEvent = { type: "select"; data: string } | { type: "create"; data: { id: string; content: SubEntity } } | { type: "delete"; data: string } | { type: "rename"; data: { id: string; new_name: string } } | { type: "reparent"; data: { id: string; new_parent: Ref } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } }
+
+export type EntityTreeRequest = { type: "create"; data: { editor_id: string; id: string; parent: Ref; name: string } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "select"; data: { editor_id: string; id: string | null } } | { type: "newTree"; data: { editor_id: string; 
+/**
+ * ID, parent, name, factory, has reverse parent refs
+ */
+entities: ([string, Ref, string, string, boolean])[] } }
 
 export type Event = { type: "tool"; data: ToolEvent } | { type: "editor"; data: EditorEvent } | { type: "global"; data: GlobalEvent }
 
@@ -135,7 +141,11 @@ refersTo: Ref[] }
 
 export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } }
 
-export type FileBrowserRequest = { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "select"; data: string | null } | { type: "newTree"; data: { base_path: string; files: ([string, boolean])[] } }
+export type FileBrowserRequest = { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "select"; data: string | null } | { type: "newTree"; data: { base_path: string; 
+/**
+ * Relative path, is folder
+ */
+files: ([string, boolean])[] } }
 
 /**
  * A long-form reference to an entity, allowing for the specification of external scenes and/or an exposed entity.
@@ -347,6 +357,10 @@ value: SimpleProperty }
 
 export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; data: EditorRequest } | { type: "global"; data: GlobalRequest }
 
+export type ReverseReference = { from: string; data: ReverseReferenceData }
+
+export type ReverseReferenceData = { type: "parent" } | { type: "property"; data: { property_name: string } } | { type: "platformSpecificProperty"; data: { property_name: string; platform: string } } | { type: "event"; data: { event: string; trigger: string } } | { type: "inputCopy"; data: { trigger: string; propagate: string } } | { type: "outputCopy"; data: { event: string; propagate: string } } | { type: "propertyAlias"; data: { aliased_name: string; original_property: string } } | { type: "exposedEntity"; data: { exposed_name: string } } | { type: "exposedInterface"; data: { interface: string } } | { type: "subset"; data: { subset: string } }
+
 export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeGFEPath"; data: string | null }
 
 export type SettingsRequest = { type: "initialise"; data: { game_installs: GameInstall[]; settings: AppSettings } } | { type: "changeProjectSettings"; data: ProjectSettings }
@@ -442,7 +456,7 @@ export type TextEditorEvent = { type: "initialise"; data: { id: string } } | { t
 
 export type TextEditorRequest = { type: "replaceContent"; data: { id: string; content: string } } | { type: "setFileType"; data: { id: string; file_type: TextFileType } }
 
-export type TextFileType = { type: "json" } | { type: "manifestJson" } | { type: "plainText" } | { type: "markdown" }
+export type TextFileType = { type: "Json" } | { type: "ManifestJson" } | { type: "PlainText" } | { type: "Markdown" }
 
 export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type: "gameBrowser"; data: GameBrowserEvent } | { type: "settings"; data: SettingsEvent }
 

@@ -72,11 +72,11 @@
 
 		if (model) {
 			switch (fileType.type) {
-				case "json":
+				case "Json":
 					Monaco.editor.setModelLanguage(model, "json")
 					break
 
-				case "manifestJson":
+				case "ManifestJson":
 					Monaco.editor.setModelLanguage(model, "json")
 
 					try {
@@ -95,11 +95,11 @@
 					} catch {}
 					break
 
-				case "plainText":
+				case "PlainText":
 					Monaco.editor.setModelLanguage(model, "plaintext")
 					break
 
-				case "markdown":
+				case "Markdown":
 					Monaco.editor.setModelLanguage(model, "markdown")
 					break
 

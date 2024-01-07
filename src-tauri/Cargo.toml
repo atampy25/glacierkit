@@ -45,6 +45,10 @@ notify = { version = "6.1.1", default-features = false, features = [
 ] }
 quickentity-rs = { path = "../../quickentity-rs" }
 lazy_static = "1.4.0"
+velcro = "0.5.4"
+indexmap = "2.1.0"
+arboard = "3.3.0"
+rand = "0.8.5"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

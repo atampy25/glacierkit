@@ -11,9 +11,8 @@
 	import { v4 } from "uuid"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 
-	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
-
-	export let tree: JSTree = null!
+	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
+	let tree: JSTree = null!
 
 	function compareNodes(a: any, b: any) {
 		if ((!(a.original ? a.original : a).folder && !(b.original ? b.original : b).folder) || ((a.original ? a.original : a).folder && (b.original ? b.original : b).folder)) {
@@ -23,11 +22,11 @@
 		}
 	}
 
-	function getPositionOfNode(parent: string, text: string) {
+	function getPositionOfNode(parent: string, text: string, isFolder: boolean) {
 		let indexOfNewNode = tree
 			.settings!.core.data.filter((a: { parent: string }) => a.parent === parent)
 			.sort(compareNodes)
-			.findIndex((a: { text: string }) => a.text.localeCompare(text, undefined, { numeric: true, sensitivity: "base" }) > 0)
+			.findIndex((a: any) => compareNodes(a, { original: { folder: isFolder }, text, folder: isFolder }) > 0)
 
 		if (indexOfNewNode === -1) {
 			indexOfNewNode = "last"
@@ -82,10 +81,11 @@
 										text: "",
 										folder: false
 									},
-									getPositionOfNode(selected_node.id, ""),
+									getPositionOfNode(selected_node.id, "", false),
 									function (a: any) {
 										tree.edit(a, undefined, async (node, status, _c) => {
-											if (!status || !node.text) {
+											// Can't create entity.patch.json files
+											if (!status || !node.text || node.text.endsWith(".entity.patch.json")) {
 												tree.delete_node(id)
 												return
 											}
@@ -133,7 +133,7 @@
 										text: "",
 										folder: true
 									},
-									getPositionOfNode(selected_node.id, ""),
+									getPositionOfNode(selected_node.id, "", true),
 									function (a: any) {
 										tree.edit(a, undefined, async (node, status, _c) => {
 											if (!status || !node.text) {
@@ -177,7 +177,7 @@
 
 								tree.edit(selected_node, undefined, async (node, status, _cancelled) => {
 									if (status) {
-										tree.move_node(node, node.parent, getPositionOfNode(node.parent, node.text))
+										tree.move_node(node, node.parent, getPositionOfNode(node.parent, node.text, node.original.folder))
 
 										const oldPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[node.parent], oldName)
 										const newPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[node.parent], node.text)
@@ -266,7 +266,7 @@
 		jQuery("#" + elemID).on("move_node.jstree", async (_, { node, parent, old_parent }: { node: any; parent: string; old_parent: string }) => {
 			if (parent !== old_parent && tree.get_node(old_parent).original?.folder) {
 				if (tree.get_node(parent).original?.folder) {
-					tree.move_node(node, parent, getPositionOfNode(parent, node.text))
+					tree.move_node(node, parent, getPositionOfNode(parent, node.text, node.original.folder))
 
 					const oldPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[old_parent], node.text)
 					const newPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[parent], node.text)
@@ -286,7 +286,7 @@
 					})
 				} else {
 					// Invalid move, reset the node
-					tree.move_node(node, old_parent, getPositionOfNode(old_parent, node.text))
+					tree.move_node(node, old_parent, getPositionOfNode(old_parent, node.text, node.original.folder))
 				}
 			}
 		})
@@ -308,7 +308,7 @@
 							text: request.data.path.split(sep).at(-1)!,
 							folder: request.data.is_folder
 						},
-						getPositionOfNode(pathToID[request.data.path.split(sep).slice(0, -1).join(sep)], request.data.path.split(sep).at(-1)!)
+						getPositionOfNode(pathToID[request.data.path.split(sep).slice(0, -1).join(sep)], request.data.path.split(sep).at(-1)!, request.data.is_folder)
 					)
 
 					fixSelection()
@@ -332,7 +332,11 @@
 						tree.move_node(
 							tree.get_node(pathToID[request.data.old_path]),
 							pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
-							getPositionOfNode(pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)], request.data.new_path.at(-1)!),
+							getPositionOfNode(
+								pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
+								request.data.new_path.at(-1)!,
+								tree.get_node(pathToID[request.data.old_path]).original.folder
+							),
 							() => {
 								pathToID[request.data.new_path] = pathToID[request.data.old_path]
 								delete pathToID[request.data.old_path]

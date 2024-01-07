@@ -1,11 +1,17 @@
 <script lang="ts">
+	import type { EntityEditorRequest } from "$lib/bindings-types"
+	import Tree from "./Tree.svelte"
+
 	export let id: string
+
+	let tree: Tree
 
 	export async function handleRequest(request: EntityEditorRequest) {
 		console.log(`Entity editor ${id} handling request`, request)
 
 		switch (request.type) {
-			case "replaceContent":
+			case "tree":
+				tree.handleRequest(request.data)
 				break
 
 			default:
@@ -15,9 +21,4 @@
 	}
 </script>
 
-<div class="h-full flex items-center justify-center">
-	<div class="text-center">
-		<h1>This file can't be edited in Deeznuts.</h1>
-		<p>You may be able to use VS Code or another tool to edit it.</p>
-	</div>
-</div>
+<Tree editorID={id} bind:this={tree}></Tree>

@@ -17,6 +17,8 @@
 	import NilEditor from "$lib/editors/nil/NilEditor.svelte"
 	import TextEditor from "$lib/editors/text/TextEditor.svelte"
 	import EntityEditor from "$lib/editors/entity/EntityEditor.svelte"
+	import TextSelection from "carbon-icons-svelte/lib/TextSelection.svelte"
+	import TextTransformer from "$lib/tools/TextTransformer.svelte"
 
 	const tools = {
 		FileBrowser: {
@@ -28,6 +30,11 @@
 			name: "Game content",
 			icon: Box,
 			component: GameBrowser
+		},
+		TextTransformer: {
+			name: "Text tools",
+			icon: TextSelection,
+			component: TextTransformer
 		},
 		Settings: {
 			name: "Settings",
@@ -42,14 +49,14 @@
 
 	function getEditor(editorType: EditorType) {
 		switch (editorType.type) {
-			case "nil":
+			case "Nil":
 				return NilEditor
 
-			case "text":
+			case "Text":
 				return TextEditor
 
-			case "qnentity":
-			case "qnpatch":
+			case "QNEntity":
+			case "QNPatch":
 				return EntityEditor
 
 			default:
@@ -148,6 +155,10 @@
 						switch (request.data.type) {
 							case "text":
 								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								break
+
+							case "entity":
+								void tabComponents[request.data.data.data.data.editor_id].handleRequest?.(request.data.data)
 								break
 
 							default:

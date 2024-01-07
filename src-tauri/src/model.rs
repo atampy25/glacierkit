@@ -77,6 +77,24 @@ pub struct GameBrowserEntry {
 	pub hint: String
 }
 
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "data")]
+pub enum TextFileType {
+	Json,
+	ManifestJson,
+	PlainText,
+	Markdown
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "data")]
+pub enum EditorType {
+	Nil,
+	Text { file_type: TextFileType },
+	QNEntity,
+	QNPatch
+}
+
 strike! {
 	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, Debug)]]
 	#[strikethrough[serde(rename_all = "camelCase", tag = "type", content = "data")]]
@@ -125,23 +143,46 @@ strike! {
 
 			Entity(pub enum EntityEditorEvent {
 				Tree(pub enum EntityTreeEvent {
-					Select(String),
+					Initialise {
+						editor_id: Uuid
+					},
+
+					Select {
+						editor_id: Uuid,
+						id: String
+					},
 
 					Create {
+						editor_id: Uuid,
 						id: String,
 						content: SubEntity
 					},
 
-					Delete(String),
+					Delete {
+						editor_id: Uuid,
+						id: String
+					},
 
 					Rename {
+						editor_id: Uuid,
 						id: String,
 						new_name: String
 					},
 
 					Reparent {
+						editor_id: Uuid,
 						id: String,
 						new_parent: Ref
+					},
+
+					Copy {
+						editor_id: Uuid,
+						id: String
+					},
+
+					Paste {
+						editor_id: Uuid,
+						parent_id: String
 					}
 				})
 			})
@@ -179,7 +220,7 @@ strike! {
 				NewTree {
 					base_path: PathBuf,
 
-					// Relative path, is folder
+					/// Relative path, is folder
 					files: Vec<(PathBuf, bool)>
 				}
 			}),
@@ -215,7 +256,44 @@ strike! {
 				},
 			}),
 
-			Entity(pub enum EntityEditorRequest {})
+			Entity(pub enum EntityEditorRequest {
+				Tree(pub enum EntityTreeRequest {
+					Create {
+						editor_id: Uuid,
+						id: String,
+						parent: Ref,
+						name: String
+					},
+
+					Delete {
+						editor_id: Uuid,
+						id: String
+					},
+
+					Rename {
+						editor_id: Uuid,
+						id: String,
+						new_name: String
+					},
+
+					Select {
+						editor_id: Uuid,
+						id: Option<String>
+					},
+
+					NewTree {
+						editor_id: Uuid,
+
+						/// ID, parent, name, factory, has reverse parent refs
+						entities: Vec<(String, Ref, String, String, bool)>
+					},
+
+					Paste {
+						/// ID, parent, name, factory, has reverse parent refs
+						new_entities: Vec<(String, Ref, String, String, bool)>
+					}
+				})
+			})
 		}),
 
 		Global(pub enum GlobalRequest {
@@ -224,19 +302,7 @@ strike! {
 			CreateTab {
 				id: Uuid,
 				name: String,
-				editor_type: pub enum EditorType {
-					Nil,
-					Text {
-						file_type: pub enum TextFileType {
-							Json,
-							ManifestJson,
-							PlainText,
-							Markdown
-						}
-					},
-					QNEntity,
-					QNPatch
-				},
+				editor_type: EditorType,
 				file: Option<PathBuf>
 			},
 			SelectTab(Uuid),

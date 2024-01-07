@@ -5,14 +5,15 @@
 	import "@fortawesome/fontawesome-free/css/all.min.css"
 
 	import { appWindow } from "@tauri-apps/api/window"
-	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent } from "carbon-components-svelte"
+	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import { onDestroy, onMount } from "svelte"
 	import { flip } from "svelte/animate"
-	import { fade } from "svelte/transition"
+	import { fade, fly } from "svelte/transition"
 	import type { Request } from "$lib/bindings-types"
 
 	let tasks: [string, string][] = []
+	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
 
 	let destroyFunc = { run: () => {} }
 	onDestroy(() => {
@@ -32,6 +33,13 @@
 
 		const unlistenFinishTask = await listen("finish-task", ({ payload: task }: { payload: string }) => {
 			tasks = tasks.filter((a) => a[0] !== task)
+		})
+
+		const unlistedNotification = await listen("send-notification", ({ payload: notification }: { payload: (typeof notifications)[number] }) => {
+			notifications = [...notifications, notification]
+			setTimeout(() => {
+				notifications = notifications.filter((a) => a[0] !== notification[0])
+			}, 6000)
 		})
 
 		const unlistenRequest = await listen("request", ({ payload: request }: { payload: Request }) => {
@@ -54,6 +62,7 @@
 		destroyFunc.run = () => {
 			unlistenStartTask()
 			unlistenFinishTask()
+			unlistedNotification()
 			unlistenRequest()
 		}
 	})
@@ -121,6 +130,16 @@
 	{:else}
 		<span>No tasks running</span>
 	{/if}
+</div>
+
+<div class="absolute h-screen top-0 right-2" style="z-index: 9999">
+	<div class="h-screen flex flex-col-reverse content-end pb-4">
+		{#each notifications as [id, { kind, title, subtitle }] (id)}
+			<div in:fly={{ x: 100 }} out:fade animate:flip>
+				<ToastNotification hideCloseButton {kind} {title} {subtitle} />
+			</div>
+		{/each}
+	</div>
 </div>
 
 <style>
@@ -196,5 +215,17 @@
 		background: #525252;
 		border-radius: 2px;
 		box-shadow: none;
+	}
+
+	:global(code) {
+		font-family: "Fira Code", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace;
+	}
+
+	:global(.bx--snippet code) {
+		font-family: "Fira Code", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
+	}
+
+	:global(.bx--toast-notification__caption) {
+		display: none !important;
 	}
 </style>
