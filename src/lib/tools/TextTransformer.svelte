@@ -12,7 +12,7 @@
 	let pathToCalculateHash = ""
 </script>
 
-<div class="p-6">
+<div class="w-full h-full p-6 overflow-y-auto">
 	<h4 class="mb-2">Random UUID</h4>
 	<CodeSnippet
 		code={uuid}

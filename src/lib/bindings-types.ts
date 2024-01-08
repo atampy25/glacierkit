@@ -49,6 +49,8 @@ export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: 
 
 export type EditorType = { type: "Nil" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" }
 
+export type EditorValidity = { type: "Valid" } | { type: "Invalid"; data: string }
+
 export type Entity = { 
 /**
  * The hash of the TEMP file of this entity.
@@ -120,9 +122,9 @@ export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent } | { type
 
 export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest }
 
-export type EntityMonacoEvent = { type: "updateContent"; data: { id: string; content: string } }
+export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } }
 
-export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; content: string } } | { type: "updateIntellisense"; data: Record<string, never> }
+export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "updateIntellisense"; data: Record<string, never> } | { type: "updateValidity"; data: { editor_id: string; validity: EditorValidity } }
 
 export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } }
 

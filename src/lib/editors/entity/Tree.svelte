@@ -597,7 +597,5 @@
 	}
 </script>
 
-<div class="h-full flex flex-col gap-2">
-	<Search placeholder="Filter..." icon={Filter} size="lg" on:change={searchInput} />
-	<div id={elemID} class="overflow-auto" />
-</div>
+<Search placeholder="Filter..." icon={Filter} size="lg" on:change={searchInput} />
+<div id={elemID} class="flex-grow overflow-auto" />

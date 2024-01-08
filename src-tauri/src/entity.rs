@@ -12,6 +12,8 @@ use specta::Type;
 use tryvial::try_fn;
 use velcro::vec;
 
+use crate::model::EditorValidity;
+
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ReverseReference {
@@ -369,4 +371,158 @@ pub fn alter_ref_according_to_changelist(reference: &Ref, changelist: &HashMap<S
 			}
 		}
 	}
+}
+
+#[try_fn]
+#[context("Couldn't check whether local references refer to existing entities")]
+pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> Result<EditorValidity> {
+	if let Some(ent) = get_local_reference(&sub_entity.parent) {
+		if !entity.entities.contains_key(&ent) {
+			return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+		}
+	}
+
+	for property_data in sub_entity.properties.as_ref().unwrap_or(&Default::default()).values() {
+		if property_data.property_type == "SEntityTemplateReference" {
+			if let Some(ent) =
+				get_local_reference(&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?)
+			{
+				if !entity.entities.contains_key(&ent) {
+					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+				}
+			}
+		} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
+			for reference in
+				from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
+			{
+				if let Some(ent) = get_local_reference(&reference) {
+					if !entity.entities.contains_key(&ent) {
+						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+					}
+				}
+			}
+		}
+	}
+
+	for properties in sub_entity
+		.platform_specific_properties
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for property_data in properties.values() {
+			if property_data.property_type == "SEntityTemplateReference" {
+				if let Some(ent) = get_local_reference(
+					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
+				) {
+					if !entity.entities.contains_key(&ent) {
+						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+					}
+				}
+			} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
+				for reference in
+					from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
+				{
+					if let Some(ent) = get_local_reference(&reference) {
+						if !entity.entities.contains_key(&ent) {
+							return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (event, triggers) in sub_entity.events.as_ref().unwrap_or(&Default::default()) {
+		for (trigger, trigger_entities) in triggers {
+			for reference in trigger_entities {
+				let reference = match reference {
+					RefMaybeConstantValue::Ref(x) => x,
+					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
+				};
+
+				if let Some(ent) = get_local_reference(reference) {
+					if !entity.entities.contains_key(&ent) {
+						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+					}
+				}
+			}
+		}
+	}
+
+	for (trigger, propagates) in sub_entity.input_copying.as_ref().unwrap_or(&Default::default()) {
+		for (propagate, propagate_entities) in propagates {
+			for reference in propagate_entities {
+				let reference = match reference {
+					RefMaybeConstantValue::Ref(x) => x,
+					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
+				};
+
+				if let Some(ent) = get_local_reference(reference) {
+					if !entity.entities.contains_key(&ent) {
+						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+					}
+				}
+			}
+		}
+	}
+
+	for (event, propagates) in sub_entity.output_copying.as_ref().unwrap_or(&Default::default()) {
+		for (propagate, propagate_entities) in propagates {
+			for reference in propagate_entities {
+				let reference = match reference {
+					RefMaybeConstantValue::Ref(x) => x,
+					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
+				};
+
+				if let Some(ent) = get_local_reference(reference) {
+					if !entity.entities.contains_key(&ent) {
+						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+					}
+				}
+			}
+		}
+	}
+
+	for (aliased_name, aliases) in sub_entity.property_aliases.as_ref().unwrap_or(&Default::default()) {
+		for alias_data in aliases {
+			if let Some(ent) = get_local_reference(&alias_data.original_entity) {
+				if !entity.entities.contains_key(&ent) {
+					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+				}
+			}
+		}
+	}
+
+	for (exposed_name, exposed_entity) in sub_entity.exposed_entities.as_ref().unwrap_or(&Default::default()) {
+		for reference in &exposed_entity.refers_to {
+			if let Some(ent) = get_local_reference(reference) {
+				if !entity.entities.contains_key(&ent) {
+					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+				}
+			}
+		}
+	}
+
+	for (interface, referenced_entity) in sub_entity.exposed_interfaces.as_ref().unwrap_or(&Default::default()) {
+		if !entity.entities.contains_key(referenced_entity) {
+			return Ok(EditorValidity::Invalid(format!(
+				"Invalid reference {}",
+				referenced_entity
+			)));
+		}
+	}
+
+	for (subset, member_of) in sub_entity.subsets.as_ref().unwrap_or(&Default::default()) {
+		for parental_entity in member_of {
+			if !entity.entities.contains_key(parental_entity) {
+				return Ok(EditorValidity::Invalid(format!(
+					"Invalid reference {}",
+					parental_entity
+				)));
+			}
+		}
+	}
+
+	EditorValidity::Valid
 }

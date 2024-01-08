@@ -25,8 +25,9 @@ use anyhow::{anyhow, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::{access::Access, ArcSwap, Guard};
 use entity::{
-	alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local, get_local_reference,
-	get_recursive_children, random_entity_id, CopiedEntityData, ReverseReferenceData
+	alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local,
+	check_local_references_exist, get_local_reference, get_recursive_children, random_entity_id, CopiedEntityData,
+	ReverseReferenceData
 };
 use event_handling::entity_tree::{handle_delete, handle_paste};
 use fn_error_context::context;
@@ -34,11 +35,11 @@ use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
 use itertools::Itertools;
 use model::{
-	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
-	EntityEditorRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent,
-	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project,
-	ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType,
-	ToolEvent, ToolRequest
+	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
+	EntityEditorEvent, EntityEditorRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest,
+	Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent,
+	GlobalRequest, Project, ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent,
+	TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
@@ -677,6 +678,7 @@ fn event(app: AppHandle, event: Event) {
 									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 										EntityMonacoRequest::ReplaceContent {
 											editor_id,
+											entity_id: id,
 											content: String::from_utf8(buf)?
 										}
 									)))
@@ -814,7 +816,94 @@ fn event(app: AppHandle, event: Event) {
 							}
 						},
 
-						EntityEditorEvent::Monaco(event) => todo!()
+						EntityEditorEvent::Monaco(event) => match event {
+							EntityMonacoEvent::UpdateContent {
+								editor_id,
+								entity_id,
+								content
+							} => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity(ref mut ent) => ent,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								match from_str(&content) {
+									Ok(sub_entity) => match check_local_references_exist(&sub_entity, entity) {
+										Ok(EditorValidity::Valid) => {
+											entity.entities.insert(entity_id, sub_entity);
+
+											send_request(
+												&app,
+												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+													EntityMonacoRequest::UpdateValidity {
+														editor_id,
+														validity: EditorValidity::Valid
+													}
+												)))
+											)?;
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::SetTabUnsaved {
+													id: editor_id,
+													unsaved: true
+												})
+											)?;
+										}
+
+										Ok(EditorValidity::Invalid(reason)) => {
+											send_request(
+												&app,
+												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+													EntityMonacoRequest::UpdateValidity {
+														editor_id,
+														validity: EditorValidity::Invalid(reason)
+													}
+												)))
+											)?;
+										}
+
+										Err(err) => {
+											send_request(
+												&app,
+												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+													EntityMonacoRequest::UpdateValidity {
+														editor_id,
+														validity: EditorValidity::Invalid(format!(
+															"Invalid entity: {}",
+															err
+														))
+													}
+												)))
+											)?;
+										}
+									},
+
+									Err(err) => {
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+												EntityMonacoRequest::UpdateValidity {
+													editor_id,
+													validity: EditorValidity::Invalid(format!(
+														"Invalid entity: {}",
+														err
+													))
+												}
+											)))
+										)?;
+									}
+								}
+							}
+						}
 					}
 				},
 

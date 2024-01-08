@@ -95,6 +95,13 @@ pub enum EditorType {
 	QNPatch
 }
 
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "data")]
+pub enum EditorValidity {
+	Valid,
+	Invalid(String)
+}
+
 strike! {
 	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, Debug)]]
 	#[strikethrough[serde(rename_all = "camelCase", tag = "type", content = "data")]]
@@ -188,7 +195,8 @@ strike! {
 
 				Monaco(pub enum EntityMonacoEvent {
 					UpdateContent {
-						id: Uuid,
+						editor_id: Uuid,
+						entity_id: String,
 						content: String
 					}
 				})
@@ -291,11 +299,17 @@ strike! {
 				Monaco(pub enum EntityMonacoRequest {
 					ReplaceContent {
 						editor_id: Uuid,
+						entity_id: String,
 						content: String
 					},
 
 					UpdateIntellisense {
 
+					},
+
+					UpdateValidity {
+						editor_id: Uuid,
+						validity: EditorValidity
 					}
 				})
 			})

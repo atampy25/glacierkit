@@ -65,7 +65,7 @@
 	let selectedGameInstall: string | null = null
 </script>
 
-<div class="p-6">
+<div class="w-full h-full p-6 overflow-x-hidden overflow-y-auto">
 	<h4>Deeznuts settings</h4>
 	<div class="flex items-center gap-2">
 		<div class="flex-shrink">

@@ -154,7 +154,7 @@
 	let searchFeedback = ""
 </script>
 
-<div class="p-2">
+<div class="w-full h-full p-2 flex flex-col">
 	{#if !enabled}
 		<div class="p-4">
 			<p>You haven't selected a copy of the game to work with - go to the Settings tool to do that.</p>
@@ -167,7 +167,7 @@
 		</div>
 	{/if}
 
-	<div class="h-[85vh] overflow-y-auto">
-		<div id={elemID} />
+	<div class="flex-grow overflow-y-auto">
+		<div class="w-full h-full" id={elemID} />
 	</div>
 </div>

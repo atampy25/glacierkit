@@ -1,35 +1,43 @@
 {
 	"bool": {
 		"type": "boolean",
-		"description": "A boolean value."
+		"description": "A boolean value.",
+		"default": null
 	},
 	"ZString": {
 		"type": "string",
-		"description": "A string."
+		"description": "A string.",
+		"default": ""
 	},
 	"float32": {
 		"type": "number",
-		"description": "A single-precision floating-point number."
+		"description": "A single-precision floating-point number.",
+		"default": null
 	},
 	"int32": {
 		"type": "number",
-		"description": "A signed 32-bit integer. Can store values from -2147483648 to 2147483648."
+		"description": "A signed 32-bit integer. Can store values from -2147483648 to 2147483648.",
+		"default": null
 	},
 	"uint8": {
 		"type": "number",
-		"description": "An unsigned 8-bit integer. Can store values from 0 to 255."
+		"description": "An unsigned 8-bit integer. Can store values from 0 to 255.",
+		"default": null
 	},
 	"uint16": {
 		"type": "number",
-		"description": "An unsigned 16-bit integer. Can store values from 0 to 65535."
+		"description": "An unsigned 16-bit integer. Can store values from 0 to 65535.",
+		"default": null
 	},
 	"uint32": {
 		"type": "number",
-		"description": "An unsigned 32-bit integer. Can store values from 0 to 4294967295."
+		"description": "An unsigned 32-bit integer. Can store values from 0 to 4294967295.",
+		"default": null
 	},
 	"uint64": {
 		"type": "number",
-		"description": "An unsigned 64-bit integer. Can store values from 0 to 18446744073709551615."
+		"description": "An unsigned 64-bit integer. Can store values from 0 to 18446744073709551615.",
+		"default": null
 	},
 	"SColorRGB": {
 		"type": "string",
@@ -160,7 +168,8 @@
 				"type": "integer"
 			}
 		},
-		"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"]
+		"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"],
+		"default": null
 	},
 	"S25DProjectionSettings": {
 		"type": "object",
@@ -276,7 +285,8 @@
 			"fWorldSizeScalingFactorMax",
 			"fWorldSizeScalingFactorMin",
 			"sWorldSpaceSettings"
-		]
+		],
+		"default": null
 	},
 	"SMatrix43": {
 		"type": "object",
@@ -420,7 +430,8 @@
 			"m_fRHandDamageScalar",
 			"m_fRLegDamageScalar",
 			"m_fTorsoDamageMultiplier"
-		]
+		],
+		"default": null
 	},
 	"SCCEffectSet": {
 		"type": "object",
@@ -433,7 +444,8 @@
 				"type": "string"
 			}
 		},
-		"required": ["m_eDecalEffect", "m_eEmitterEffect"]
+		"required": ["m_eDecalEffect", "m_eEmitterEffect"],
+		"default": null
 	},
 	"SSCCuriousConfiguration": {
 		"type": "object",
@@ -449,7 +461,8 @@
 				"type": "boolean"
 			}
 		},
-		"required": ["m_CanCiviliansInvestigate", "m_CanGuardsInvestigate", "m_CanVIPsInvestigate"]
+		"required": ["m_CanCiviliansInvestigate", "m_CanGuardsInvestigate", "m_CanVIPsInvestigate"],
+		"default": null
 	},
 	"ZCurve": {
 		"type": "object",
@@ -501,6 +514,7 @@
 				}
 			}
 		},
-		"required": ["data"]
+		"required": ["data"],
+		"default": [[0, 0, 0, 0, 0, 0, 0, 0]]
 	}
 }

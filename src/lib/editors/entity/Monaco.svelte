@@ -4,7 +4,7 @@
 	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import baseSchema from "./schema.json"
-	import type { EntityMonacoRequest } from "$lib/bindings-types"
+	import type { EditorValidity, EntityMonacoRequest } from "$lib/bindings-types"
 	import { cloneDeep, debounce, merge } from "lodash"
 	import propertyTypeSchemas from "./property-type-schemas.json"
 	import enums from "./enums.json"
@@ -14,6 +14,9 @@
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
 
 	export let editorID: string
+
+	let entityID: string | null = null
+	let validity: EditorValidity = { type: "Valid" }
 
 	let destroyFunc = { run: () => {} }
 
@@ -143,10 +146,14 @@
 																},
 																value: valSchema
 															},
-															default: {
-																type: propType,
-																value: valSchema.default
-															}
+															...(valSchema.default
+																? {
+																		default: {
+																			type: propType,
+																			value: valSchema.default
+																		}
+																	}
+																: {})
 														})
 													}),
 													...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
@@ -157,10 +164,14 @@
 																},
 																value: { type: "array", items: valSchema }
 															},
-															default: {
-																type: `TArray<${propType}>`,
-																value: [valSchema.default]
-															}
+															...(valSchema.default
+																? {
+																		default: {
+																			type: `TArray<${propType}>`,
+																			value: [valSchema.default]
+																		}
+																	}
+																: {})
 														})
 													}),
 													...Object.entries(enums).map(([propType, possibleValues]) => {
@@ -215,22 +226,25 @@
 
 		editor.onDidChangeModelContent(
 			debounce(async () => {
-				await event({
-					type: "editor",
-					data: {
-						type: "entity",
+				if (entityID) {
+					await event({
+						type: "editor",
 						data: {
-							type: "monaco",
+							type: "entity",
 							data: {
-								type: "updateContent",
+								type: "monaco",
 								data: {
-									id: editorID,
-									content: editor.getValue({ preserveBOM: true, lineEnding: "\n" })
+									type: "updateContent",
+									data: {
+										editor_id: editorID,
+										entity_id: entityID,
+										content: editor.getValue({ preserveBOM: true, lineEnding: "\n" })
+									}
 								}
 							}
 						}
-					}
-				})
+					})
+				}
 			}, 1000)
 		)
 	})
@@ -246,7 +260,12 @@
 
 		switch (request.type) {
 			case "replaceContent":
+				entityID = request.data.entity_id
 				editor.setValue(request.data.content)
+				break
+
+			case "updateValidity":
+				validity = request.data.validity
 				break
 
 			case "updateIntellisense":
@@ -259,4 +278,17 @@
 	}
 </script>
 
-<div bind:this={el} class="h-full w-full" />
+<div class="w-full h-full pt-1 flex flex-col gap-2" class:hidden={entityID === null}>
+	<div class="flex flex-wrap gap-2">
+		<code>{entityID}</code>
+		{#if validity.type === "Valid"}
+			<span class="text-green-200">Valid entity</span>
+		{:else}
+			<span class="text-red-200">{validity.data}</span>
+		{/if}
+	</div>
+	<div bind:this={el} class="flex-grow" />
+</div>
+{#if entityID === null}
+	<p>Select an entity on the left to edit it here.</p>
+{/if}

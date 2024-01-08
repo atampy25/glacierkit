@@ -1,7 +1,6 @@
 #[cfg(target_os = "linux")]
 use fork::{daemon, Fork};
-use std::fs;
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use std::path::PathBuf;
 use std::process::Command;
 #[cfg(target_os = "linux")]
