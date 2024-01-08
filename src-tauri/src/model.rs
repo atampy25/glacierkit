@@ -184,6 +184,13 @@ strike! {
 						editor_id: Uuid,
 						parent_id: String
 					}
+				}),
+
+				Monaco(pub enum EntityMonacoEvent {
+					UpdateContent {
+						id: Uuid,
+						content: String
+					}
 				})
 			})
 		}),
@@ -258,24 +265,7 @@ strike! {
 
 			Entity(pub enum EntityEditorRequest {
 				Tree(pub enum EntityTreeRequest {
-					Create {
-						editor_id: Uuid,
-						id: String,
-						parent: Ref,
-						name: String
-					},
-
-					Delete {
-						editor_id: Uuid,
-						id: String
-					},
-
-					Rename {
-						editor_id: Uuid,
-						id: String,
-						new_name: String
-					},
-
+					/// Will trigger a Select event from the tree - ensure this doesn't end up in a loop
 					Select {
 						editor_id: Uuid,
 						id: Option<String>
@@ -289,13 +279,23 @@ strike! {
 					},
 
 					/// Instructs the frontend to take the list of new entities, add any new ones and update any ones that already exist (by ID) with the new information.
-					/// A bit expensive so the other requests are obviously better for single actions.
-					/// This is used for pasting.
-					DiffTree {
+					/// This is used for pasting, and for ensuring that icons/parent status/name are updated when a sub-entity is updated.
+					NewItems {
 						editor_id: Uuid,
 
 						/// ID, parent, name, factory, has reverse parent refs
 						new_entities: Vec<(String, Ref, String, String, bool)>
+					}
+				}),
+
+				Monaco(pub enum EntityMonacoRequest {
+					ReplaceContent {
+						editor_id: Uuid,
+						content: String
+					},
+
+					UpdateIntellisense {
+
 					}
 				})
 			})

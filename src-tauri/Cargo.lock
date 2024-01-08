@@ -154,6 +154,7 @@ dependencies = [
  "arc-swap",
  "brotli-decompressor",
  "fn-error-context",
+ "fork",
  "indexmap 2.1.0",
  "itertools 0.12.0",
  "keyvalues-serde",
@@ -1642,6 +1643,15 @@ name = "foreign-types-shared"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
+
+[[package]]
+name = "fork"
+version = "0.1.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf2ca97a59201425e7ee4d197c9c4fea282fe87a97d666a580bda889b95b8e88"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "form_urlencoded"

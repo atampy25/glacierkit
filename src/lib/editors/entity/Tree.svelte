@@ -49,7 +49,7 @@
 				force_text: true
 			},
 			search: {
-				fuzzy: true,
+				fuzzy: false,
 				show_only_matches: true,
 				close_opened_onclear: false
 			},
@@ -80,6 +80,8 @@
 										icon: "fa fa-project-diagram",
 										text: "",
 										folder: false,
+										factory: "[modules:/zentity.class].pc_entitytype",
+										hasReverseParentRefs: false,
 										parentRef: selected_node.id
 									},
 									getPositionOfNode(selected_node.id, "", false),
@@ -89,6 +91,25 @@
 												tree.delete_node(newEntityID)
 												return
 											}
+
+											// Ensure parent gets reclassified as a folder if necessary
+											selected_node.original.hasReverseParentRefs = true
+											selected_node.original.folder = selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+
+											tree.set_icon(
+												selected_node.id,
+												selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+													? "fa-regular fa-folder"
+													: icons.find((a) => selected_node.original.factory.includes(a[0]))
+														? icons.find((a) => selected_node.original.factory.includes(a[0]))![1]
+														: "fa-regular fa-file"
+											)
+
+											// If it's a folder it might move to the top
+											tree.move_node(selected_node.id, selected_node.parent, getPositionOfNode(selected_node.parent, selected_node.text, selected_node.original.folder))
+
+											// Add the entity ID to the displayed name
+											tree.rename_node(node, `${node.text} (${node.id})`)
 
 											await event({
 												type: "editor",
@@ -127,9 +148,15 @@
 								const tree = jQuery.jstree!.reference(b.reference)
 								const selected_node = tree.get_node(b.reference)
 
+								// don't include entity ID in editing input
+								tree.rename_node(selected_node, selected_node.text.split(" ").slice(0, -1).join(" "))
+
 								tree.edit(selected_node, undefined, async (node, status, _cancelled) => {
 									if (status) {
 										tree.move_node(node, node.parent, getPositionOfNode(node.parent, node.text, node.original.folder))
+
+										// re-add the entity ID
+										tree.rename_node(node, `${node.text} (${node.id})`)
 
 										await event({
 											type: "editor",
@@ -148,6 +175,9 @@
 												}
 											}
 										})
+									} else {
+										// re-add the entity ID
+										tree.rename_node(node, `${node.text} (${node.id})`)
 									}
 								})
 							}
@@ -163,6 +193,25 @@
 								const selected_node = tree.get_node(b.reference)
 
 								tree.is_selected(selected_node) ? tree.delete_node(tree.get_selected()) : tree.delete_node(selected_node)
+
+								tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some((a: any) => a.parent == selected_node.id)
+								tree.get_node(selected_node.parent).original.folder =
+									tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+									tree.get_node(selected_node.parent).original.hasReverseParentRefs
+
+								// Reclassify parent as not folder if necessary
+								tree.set_icon(
+									selected_node.parent,
+									tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+										tree.get_node(selected_node.parent).original.hasReverseParentRefs
+										? "fa-regular fa-folder"
+										: icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))
+											? icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))![1]
+											: "fa-regular fa-file"
+								)
+
+								// If it's no longer a folder it might move down
+								tree.move_node(selected_node.id, selected_node.parent, getPositionOfNode(selected_node.parent, selected_node.text, selected_node.original.folder))
 
 								await event({
 									type: "editor",
@@ -252,11 +301,11 @@
 							_disabled: false,
 							label: "Copy ID",
 							icon: "far fa-copy",
-							action: function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
 								const tree = jQuery.jstree!.reference(b.reference)
 								const selected_node = tree.get_node(b.reference)
 
-								clipboard.writeText(selected_node.id)
+								await clipboard.writeText(selected_node.id)
 							}
 						}
 					}
@@ -295,24 +344,26 @@
 			}
 		})
 
-		jQuery("#" + elemID).on("move_node.jstree", async (_, { node, parent }: { node: any; parent: string }) => {
-			tree.move_node(node, parent, getPositionOfNode(parent, node.text, node.original.folder))
+		jQuery("#" + elemID).on("move_node.jstree", async (_, { node, parent, old_parent }: { node: any; parent: string; old_parent: string }) => {
+			if (parent !== old_parent) {
+				tree.move_node(node, parent, getPositionOfNode(parent, node.text, node.original.folder))
 
-			node.original.parentRef = parent !== "#" ? changeReferenceToLocalEntity(node.original.parentRef, parent) : null
+				node.original.parentRef = parent !== "#" ? changeReferenceToLocalEntity(node.original.parentRef, parent) : null
 
-			await event({
-				type: "editor",
-				data: {
-					type: "entity",
+				await event({
+					type: "editor",
 					data: {
-						type: "tree",
+						type: "entity",
 						data: {
-							type: "reparent",
-							data: { editor_id: editorID, id: node.id, new_parent: node.original.parentRef }
+							type: "tree",
+							data: {
+								type: "reparent",
+								data: { editor_id: editorID, id: node.id, new_parent: node.original.parentRef }
+							}
 						}
 					}
-				}
-			})
+				})
+			}
 		})
 
 		await event({
@@ -336,15 +387,6 @@
 		console.log(`Tree for editor ${editorID} handling request`, request)
 
 		switch (request.type) {
-			case "create":
-				break
-
-			case "delete":
-				break
-
-			case "rename":
-				break
-
 			case "select":
 				selectedNode = request.data.id
 				fixSelection()
@@ -352,6 +394,10 @@
 
 			case "newTree":
 				await replaceTree(request.data.entities)
+				break
+
+			case "newItems":
+				await newItems(request.data.new_entities)
 				break
 
 			default:
@@ -410,11 +456,125 @@
 							: "fa-regular fa-file",
 				text: `${name} (${entityID})`,
 				folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+				factory,
+				hasReverseParentRefs,
 				parentRef: parent
 			})
 		}
 
 		tree.refresh()
+	}
+
+	async function newItems(nodes: [string, Ref, string, string, boolean][]) {
+		let added = 0
+		while (added < nodes.length) {
+			for (const [entityID, parent, name, factory, hasReverseParentRefs] of nodes) {
+				// We have to add the top-level entities first to ensure the tree responds appropriately
+				if (!getReferencedLocalEntity(parent) || tree.get_node(getReferencedLocalEntity(parent) || "#")) {
+					const existingNode = tree.get_node(entityID)
+
+					if (existingNode) {
+						tree.move_node(
+							existingNode,
+							getReferencedLocalEntity(parent) || "#",
+							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+						)
+
+						tree.rename_node(existingNode, `${name} (${entityID})`)
+
+						tree.set_icon(
+							existingNode,
+							factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+								? "fa-regular fa-folder"
+								: icons.find((a) => factory.includes(a[0]))
+									? icons.find((a) => factory.includes(a[0]))![1]
+									: "fa-regular fa-file"
+						)
+
+						existingNode.original.folder = factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+						existingNode.original.factory = factory
+						existingNode.original.hasReverseParentRefs = hasReverseParentRefs
+						existingNode.original.parentRef = parent
+
+						if (getReferencedLocalEntity(parent)) {
+							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
+							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+
+							tree.set_icon(
+								getReferencedLocalEntity(parent),
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+									? "fa-regular fa-folder"
+									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
+										? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
+										: "fa-regular fa-file"
+							)
+
+							tree.move_node(
+								getReferencedLocalEntity(parent),
+								tree.get_node(getReferencedLocalEntity(parent)).parent,
+								getPositionOfNode(
+									tree.get_node(getReferencedLocalEntity(parent)).parent,
+									tree.get_node(getReferencedLocalEntity(parent)).text,
+									tree.get_node(getReferencedLocalEntity(parent)).original.folder
+								)
+							)
+						}
+					} else {
+						tree.create_node(
+							getReferencedLocalEntity(parent) || "#",
+							{
+								id: entityID,
+								parent: getReferencedLocalEntity(parent) || "#",
+								icon:
+									factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+										? "fa-regular fa-folder"
+										: icons.find((a) => factory.includes(a[0]))
+											? icons.find((a) => factory.includes(a[0]))![1]
+											: "fa-regular fa-file",
+								text: `${name} (${entityID})`,
+								folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+								factory,
+								hasReverseParentRefs,
+								parentRef: parent
+							},
+							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+						)
+
+						if (getReferencedLocalEntity(parent)) {
+							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
+							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+
+							tree.set_icon(
+								getReferencedLocalEntity(parent),
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+									? "fa-regular fa-folder"
+									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
+										? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
+										: "fa-regular fa-file"
+							)
+
+							tree.move_node(
+								getReferencedLocalEntity(parent),
+								tree.get_node(getReferencedLocalEntity(parent)).parent,
+								getPositionOfNode(
+									tree.get_node(getReferencedLocalEntity(parent)).parent,
+									tree.get_node(getReferencedLocalEntity(parent)).text,
+									tree.get_node(getReferencedLocalEntity(parent)).original.folder
+								)
+							)
+						}
+					}
+
+					added += 1
+				}
+			}
+		}
 	}
 
 	function searchInput(event: any) {
@@ -437,10 +597,7 @@
 	}
 </script>
 
-<div class="mt-4 mb-2 mx-2 leading-tight text-base">
-	<Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} />
-</div>
-
-<div class="h-full overflow-y-auto">
-	<div id={elemID} />
+<div class="h-full flex flex-col gap-2">
+	<Search placeholder="Filter..." icon={Filter} size="lg" on:change={searchInput} />
+	<div id={elemID} class="overflow-auto" />
 </div>

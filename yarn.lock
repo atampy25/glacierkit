@@ -232,6 +232,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fontsource/fira-code@npm:^5.0.16":
+  version: 5.0.16
+  resolution: "@fontsource/fira-code@npm:5.0.16"
+  checksum: 00f97a8343a61acefc55e502e6c97bd407ced646e2b8e326a366a4a38487b2943fe091ab00aead4d3bb75062f480739f3a2150c4754c51638d36d31b484526c8
+  languageName: node
+  linkType: hard
+
 "@fortawesome/fontawesome-free@npm:^6.5.1":
   version: 6.5.1
   resolution: "@fortawesome/fontawesome-free@npm:6.5.1"
@@ -703,6 +710,13 @@ __metadata:
   dependencies:
     "@types/jquery": "npm:*"
   checksum: afb9a7d16f3b5505dd574b4a1131deca9bccfd500fab846955e53a9a322ada6ff642760d1d61c4a474a40f2935490982aa1ede1379087dcd52b95abeba33b1ff
+  languageName: node
+  linkType: hard
+
+"@types/lodash@npm:^4":
+  version: 4.14.202
+  resolution: "@types/lodash@npm:4.14.202"
+  checksum: 6064d43c8f454170841bd67c8266cc9069d9e570a72ca63f06bceb484cb4a3ee60c9c1f305c1b9e3a87826049fd41124b8ef265c4dd08b00f6766609c7fe9973
   languageName: node
   linkType: hard
 
@@ -2320,6 +2334,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lodash@npm:^4.17.21":
+  version: 4.17.21
+  resolution: "lodash@npm:4.17.21"
+  checksum: d8cbea072bb08655bb4c989da418994b073a608dffa608b09ac04b43a791b12aeae7cd7ad919aa4c925f33b48490b5cfe6c1f71d827956071dae2e7bb3a6b74c
+  languageName: node
+  linkType: hard
+
 "lru-cache@npm:^10.0.1, lru-cache@npm:^9.1.1 || ^10.0.0":
   version: 10.1.0
   resolution: "lru-cache@npm:10.1.0"
@@ -2539,6 +2560,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mod-studio@workspace:."
   dependencies:
+    "@fontsource/fira-code": "npm:^5.0.16"
     "@fortawesome/fontawesome-free": "npm:^6.5.1"
     "@sveltejs/adapter-static": "npm:^3.0.1"
     "@sveltejs/kit": "npm:^2.0.0"
@@ -2548,6 +2570,7 @@ __metadata:
     "@types/eslint": "npm:8.56.0"
     "@types/jquery": "npm:^3"
     "@types/jstree": "npm:^3"
+    "@types/lodash": "npm:^4"
     "@types/md5": "npm:^2"
     "@types/uuid": "npm:^9"
     "@typescript-eslint/eslint-plugin": "npm:^6.0.0"
@@ -2561,6 +2584,7 @@ __metadata:
     eslint-plugin-svelte: "npm:^2.35.1"
     jquery: "npm:^3.7.1"
     jstree: "npm:^3.3.16"
+    lodash: "npm:^4.17.21"
     md5: "npm:^2.3.0"
     monaco-editor: "npm:^0.45.0"
     postcss: "npm:^8.4.32"

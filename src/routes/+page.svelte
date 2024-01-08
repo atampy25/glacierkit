@@ -179,7 +179,7 @@
 </script>
 
 <div class="h-full w-full flex">
-	<div class="w-14 bg-neutral-900 flex flex-col">
+	<div class="min-w-14 bg-neutral-900 flex flex-col">
 		{#each typedEntries(tools) as [toolID, tool] (toolID)}
 			<ToolButton
 				icon={tool.icon}
@@ -201,87 +201,91 @@
 				{/each}
 			</div>
 		</Pane>
-		<Pane>
-			{#if tabs.length}
-				<div class="mt-2 mr-2 mb-2 min-h-10 bg-[#202020] flex flex-wrap">
-					{#each tabs as tab (tab.id)}
-						<div
-							class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
-							class:border-b={activeTab === tab.id}
-							on:click={async () => {
-								activeTab = tab.id
-
-								await event({
-									type: "global",
-									data: {
-										type: "selectTab",
-										data: tab.id
-									}
-								})
-							}}
-						>
-							{tab.name}
-							{#if tab.unsaved}
-								<Button
-									kind="ghost"
-									size="field"
-									icon={Save}
-									iconDescription="Save"
-									on:click={async () => {
-										if (tab.file) {
-											await event({
-												type: "global",
-												data: {
-													type: "saveTab",
-													data: tab.id
-												}
-											})
-										}
-									}}
-								/>
-							{/if}
-							<Button
-								kind="ghost"
-								size="field"
-								icon={Close}
-								iconDescription="Close"
+		<Pane class="h-full">
+			<div class="h-full w-full flex flex-col py-2 pr-2 gap-2">
+				{#if tabs.length}
+					<div class="h-10 bg-[#202020] flex overflow-x-auto overflow-y-hidden">
+						{#each tabs as tab (tab.id)}
+							<div
+								class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
+								class:border-b={activeTab === tab.id}
 								on:click={async () => {
-									tabs = tabs.filter((a) => a.id !== tab.id)
-									activeTab = null
+									activeTab = tab.id
 
 									await event({
 										type: "global",
 										data: {
-											type: "removeTab",
+											type: "selectTab",
 											data: tab.id
 										}
 									})
 								}}
-							/>
+							>
+								{tab.name}
+								<div class="flex">
+									{#if tab.unsaved}
+										<Button
+											kind="ghost"
+											size="field"
+											icon={Save}
+											iconDescription="Save"
+											on:click={async () => {
+												if (tab.file) {
+													await event({
+														type: "global",
+														data: {
+															type: "saveTab",
+															data: tab.id
+														}
+													})
+												}
+											}}
+										/>
+									{/if}
+									<Button
+										kind="ghost"
+										size="field"
+										icon={Close}
+										iconDescription="Close"
+										on:click={async () => {
+											tabs = tabs.filter((a) => a.id !== tab.id)
+											activeTab = null
+
+											await event({
+												type: "global",
+												data: {
+													type: "removeTab",
+													data: tab.id
+												}
+											})
+										}}
+									/>
+								</div>
+							</div>
+						{/each}
+					</div>
+					{#each tabs as tab (tab.id)}
+						<div class="h-full w-full" class:hidden={activeTab !== tab.id}>
+							<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />
 						</div>
 					{/each}
-				</div>
-				{#each tabs as tab (tab.id)}
-					<div class="h-full" class:hidden={activeTab !== tab.id}>
-						<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />
-					</div>
-				{/each}
-				{#if !activeTab}
+					{#if !activeTab}
+						<div class="h-full flex items-center justify-center">
+							<div class="text-center">
+								<h1>Welcome to Deeznuts</h1>
+								<p>Select a tab above to edit it here.</p>
+							</div>
+						</div>
+					{/if}
+				{:else}
 					<div class="h-full flex items-center justify-center">
 						<div class="text-center">
 							<h1>Welcome to Deeznuts</h1>
-							<p>Select a tab above to edit it here.</p>
+							<p>You can start by selecting a project on the left.</p>
 						</div>
 					</div>
 				{/if}
-			{:else}
-				<div class="h-full flex items-center justify-center">
-					<div class="text-center">
-						<h1>Welcome to Deeznuts</h1>
-						<p>You can start by selecting a project on the left.</p>
-					</div>
-				</div>
-			{/if}
+			</div>
 		</Pane>
 	</Splitpanes>
 </div>

@@ -5,7 +5,7 @@
 	import { join, sep } from "@tauri-apps/api/path"
 	import type { FileBrowserRequest } from "$lib/bindings-types"
 	import { Button, Search } from "carbon-components-svelte"
-	import { event } from "$lib/utils"
+	import { event, showInFolder } from "$lib/utils"
 	import { open } from "@tauri-apps/api/dialog"
 	import FolderAdd from "carbon-icons-svelte/lib/FolderAdd.svelte"
 	import { v4 } from "uuid"
@@ -92,6 +92,8 @@
 
 											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
 
+											tree.set_icon(id, path.endsWith(".json") ? "fa-regular fa-pen-to-square" : "fa-regular fa-file")
+
 											pathToID[path] = id
 
 											await event({
@@ -161,6 +163,21 @@
 										})
 									}
 								)
+							}
+						},
+						showinexplorer: {
+							separator_before: false,
+							separator_after: false,
+							_disabled: false,
+							label: "Show in Explorer",
+							icon: "fa-regular fa-folder",
+							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+								const tree = jQuery.jstree!.reference(b.reference)
+								const selected_node = tree.get_node(b.reference)
+
+								const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+
+								await showInFolder(path)
 							}
 						},
 						rename: {

@@ -10,6 +10,7 @@ pub mod game_detection;
 pub mod hash_list;
 pub mod model;
 pub mod resourcelib;
+pub mod show_in_folder;
 
 use std::{
 	collections::{HashMap, HashSet},
@@ -34,9 +35,10 @@ use hash_list::HashList;
 use itertools::Itertools;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
-	EntityEditorRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
-	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings,
-	Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	EntityEditorRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent,
+	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project,
+	ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType,
+	ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
@@ -45,7 +47,8 @@ use quickentity_rs::{
 	qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity, SubType}
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, from_str, from_value, to_string, to_value, to_vec, Value};
+use serde_json::{from_slice, from_str, from_value, to_string, to_string_pretty, to_value, to_vec, Value};
+use show_in_folder::show_in_folder;
 use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
@@ -57,7 +60,8 @@ const HASH_LIST_ENDPOINT: &str =
 
 fn main() {
 	let specta = {
-		let specta_builder = tauri_specta::ts::builder().commands(tauri_specta::collect_commands![event]);
+		let specta_builder =
+			tauri_specta::ts::builder().commands(tauri_specta::collect_commands![event, show_in_folder]);
 
 		#[cfg(debug_assertions)]
 		let specta_builder = specta_builder.path("../src/lib/bindings.ts");
@@ -645,7 +649,41 @@ fn event(app: AppHandle, event: Event) {
 								)?;
 							}
 
-							EntityTreeEvent::Select { editor_id, id } => todo!(),
+							EntityTreeEvent::Select { editor_id, id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity(ref ent) => ent,
+									EditorData::QNPatch { ref current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								let mut buf = Vec::new();
+								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+								entity
+									.entities
+									.get(&id)
+									.context("No such entity")?
+									.serialize(&mut ser)?;
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+										EntityMonacoRequest::ReplaceContent {
+											editor_id,
+											content: String::from_utf8(buf)?
+										}
+									)))
+								)?;
+
+								// TODO: intellisense
+							}
 
 							EntityTreeEvent::Create { editor_id, id, content } => {
 								let mut editor_state = app_state.editor_states.write().await;
@@ -662,6 +700,14 @@ fn event(app: AppHandle, event: Event) {
 								};
 
 								entity.entities.insert(id, content);
+
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::SetTabUnsaved {
+										id: editor_id,
+										unsaved: true
+									})
+								)?;
 							}
 
 							EntityTreeEvent::Delete { editor_id, id } => {
@@ -687,6 +733,14 @@ fn event(app: AppHandle, event: Event) {
 								};
 
 								entity.entities.get_mut(&id).context("No such entity")?.name = new_name;
+
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::SetTabUnsaved {
+										id: editor_id,
+										unsaved: true
+									})
+								)?;
 							}
 
 							EntityTreeEvent::Reparent {
@@ -708,6 +762,14 @@ fn event(app: AppHandle, event: Event) {
 								};
 
 								entity.entities.get_mut(&id).context("No such entity")?.parent = new_parent;
+
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::SetTabUnsaved {
+										id: editor_id,
+										unsaved: true
+									})
+								)?;
 							}
 
 							EntityTreeEvent::Copy { editor_id, id } => {
@@ -750,7 +812,9 @@ fn event(app: AppHandle, event: Event) {
 							EntityTreeEvent::Paste { editor_id, parent_id } => {
 								handle_paste(&app, editor_id, parent_id).await?;
 							}
-						}
+						},
+
+						EntityEditorEvent::Monaco(event) => todo!()
 					}
 				},
 

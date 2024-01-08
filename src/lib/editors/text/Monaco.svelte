@@ -1,12 +1,10 @@
 <script lang="ts">
 	import * as monaco from "monaco-editor"
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
-	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
-	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import type { TextFileType } from "$lib/bindings-types"
+	import { debounce } from "lodash"
 
 	let el: HTMLDivElement = null!
-	let Monaco: typeof monaco
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
 
 	export let id: string
@@ -20,28 +18,8 @@
 	})
 
 	onMount(async () => {
-		// @ts-ignore
-		self.MonacoEnvironment = {
-			getWorker: function (_moduleId: any, label: string) {
-				if (label === "json") {
-					return new jsonWorker()
-				} else {
-					return new editorWorker()
-				}
-			}
-		}
-
-		Monaco = await import("monaco-editor")
-
-		Monaco.editor.defineTheme("theme", {
-			base: "vs-dark",
-			inherit: true,
-			rules: [{ token: "keyword.json", foreground: "b5cea8" }],
-			colors: {}
-		})
-
-		editor = Monaco.editor.create(el, {
-			model: Monaco.editor.createModel("", "plaintext", Monaco.Uri.parse(`monaco-model://${id}`)),
+		editor = monaco.editor.create(el, {
+			model: monaco.editor.createModel("", "plaintext", monaco.Uri.parse(`monaco-model://${id}`)),
 			roundedSelection: false,
 			theme: "theme",
 			minimap: {
@@ -50,9 +28,11 @@
 			automaticLayout: true
 		})
 
-		editor.onDidChangeModelContent(() => {
-			dispatch("contentChanged", editor.getValue({ preserveBOM: true, lineEnding: "\n" }))
-		})
+		editor.onDidChangeModelContent(
+			debounce(() => {
+				dispatch("contentChanged", editor.getValue({ preserveBOM: true, lineEnding: "\n" }))
+			}, 1000)
+		)
 
 		destroyFunc.run = () => {
 			editor.dispose()
@@ -73,34 +53,19 @@
 		if (model) {
 			switch (fileType.type) {
 				case "Json":
-					Monaco.editor.setModelLanguage(model, "json")
+					monaco.editor.setModelLanguage(model, "json")
 					break
 
 				case "ManifestJson":
-					Monaco.editor.setModelLanguage(model, "json")
-
-					try {
-						;(async () => {
-							Monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-								...Monaco.languages.json.jsonDefaults.diagnosticsOptions,
-								schemas: [
-									{
-										uri: `monaco-schema://manifest`,
-										fileMatch: [id],
-										schema: await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
-									}
-								]
-							})
-						})()
-					} catch {}
+					editor.setModel(monaco.editor.createModel(editor.getValue(), "json", monaco.Uri.parse(`monaco-model://manifest-${id}`)))
 					break
 
 				case "PlainText":
-					Monaco.editor.setModelLanguage(model, "plaintext")
+					monaco.editor.setModelLanguage(model, "plaintext")
 					break
 
 				case "Markdown":
-					Monaco.editor.setModelLanguage(model, "markdown")
+					monaco.editor.setModelLanguage(model, "markdown")
 					break
 
 				default:
@@ -115,4 +80,4 @@
 	}
 </script>
 
-<div bind:this={el} class="h-[95%]" />
+<div bind:this={el} class="h-full w-full" />

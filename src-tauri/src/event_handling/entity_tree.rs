@@ -20,7 +20,7 @@ use crate::{
 		get_local_reference, get_recursive_children, random_entity_id, CopiedEntityData, ReverseReferenceData
 	},
 	finish_task,
-	model::{AppState, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, Request},
+	model::{AppState, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, GlobalRequest, Request},
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
@@ -340,6 +340,14 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 			)
 		}
 	)?;
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
 }
 
 #[try_fn]
@@ -391,15 +399,17 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 		.collect::<HashSet<_>>();
 
 	// Change all internal references so they match with the new randomised entity IDs, and also remove any local references that don't exist in the entity we're pasting into
-	for sub_entity in paste_data.data.values_mut() {
-		// Parent refs are all internal to the paste since the paste is created based on parent hierarchy
-		sub_entity.parent = change_reference_to_local(
-			&sub_entity.parent,
-			changed_entity_ids
-				.get(&get_local_reference(&sub_entity.parent).unwrap())
-				.unwrap()
-				.to_owned()
-		);
+	for (sub_entity_id, sub_entity) in paste_data.data.iter_mut() {
+		if paste_data.root_entity != *sub_entity_id {
+			// Parent refs are all internal to the paste since the paste is created based on parent hierarchy
+			sub_entity.parent = change_reference_to_local(
+				&sub_entity.parent,
+				changed_entity_ids
+					.get(&get_local_reference(&sub_entity.parent).unwrap())
+					.unwrap()
+					.to_owned()
+			);
+		}
 
 		for property_data in sub_entity
 			.properties
@@ -421,8 +431,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 					..
 				}) = entity_ref
 				{
-					entity.external_scenes.push(scene.to_owned());
-					added_external_scenes += 1;
+					if !entity.external_scenes.contains(scene) {
+						entity.external_scenes.push(scene.to_owned());
+						added_external_scenes += 1;
+					}
 				}
 
 				// If the ref is local but to a sub-entity that doesn't exist in the entity we're pasting into (and isn't an internal reference within the paste), set the property to null
@@ -480,8 +492,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 						..
 					}) = entity_ref
 					{
-						entity.external_scenes.push(scene.to_owned());
-						added_external_scenes += 1;
+						if !entity.external_scenes.contains(scene) {
+							entity.external_scenes.push(scene.to_owned());
+							added_external_scenes += 1;
+						}
 					}
 
 					// If the ref is local but to a sub-entity that doesn't exist in the entity we're pasting into (and isn't an internal reference within the paste), set the property to null
@@ -539,8 +553,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 						..
 					}) = underlying_ref
 					{
-						entity.external_scenes.push(scene.to_owned());
-						added_external_scenes += 1;
+						if !entity.external_scenes.contains(scene) {
+							entity.external_scenes.push(scene.to_owned());
+							added_external_scenes += 1;
+						}
 					}
 
 					*reference = match reference {
@@ -591,8 +607,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 						..
 					}) = underlying_ref
 					{
-						entity.external_scenes.push(scene.to_owned());
-						added_external_scenes += 1;
+						if !entity.external_scenes.contains(scene) {
+							entity.external_scenes.push(scene.to_owned());
+							added_external_scenes += 1;
+						}
 					}
 
 					*reference = match reference {
@@ -643,8 +661,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 						..
 					}) = underlying_ref
 					{
-						entity.external_scenes.push(scene.to_owned());
-						added_external_scenes += 1;
+						if !entity.external_scenes.contains(scene) {
+							entity.external_scenes.push(scene.to_owned());
+							added_external_scenes += 1;
+						}
 					}
 
 					*reference = match reference {
@@ -690,8 +710,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 					..
 				}) = alias_data.original_entity
 				{
-					entity.external_scenes.push(scene.to_owned());
-					added_external_scenes += 1;
+					if !entity.external_scenes.contains(scene) {
+						entity.external_scenes.push(scene.to_owned());
+						added_external_scenes += 1;
+					}
 				}
 			}
 
@@ -716,8 +738,10 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 					..
 				}) = reference
 				{
-					entity.external_scenes.push(scene.to_owned());
-					added_external_scenes += 1;
+					if !entity.external_scenes.contains(scene) {
+						entity.external_scenes.push(scene.to_owned());
+						added_external_scenes += 1;
+					}
 				}
 			}
 
@@ -771,20 +795,20 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 		.map(|(x, y)| (changed_entity_ids.get(&x).unwrap().to_owned(), y))
 		.collect();
 
-	entity.entities.extend(paste_data.data.to_owned());
-
-	entity
-		.entities
+	paste_data
+		.data
 		.get_mut(changed_entity_ids.get(&paste_data.root_entity).unwrap())
 		.unwrap()
 		.parent = change_reference_to_local(
-		&entity
-			.entities
+		&paste_data
+			.data
 			.get_mut(changed_entity_ids.get(&paste_data.root_entity).unwrap())
 			.unwrap()
 			.parent,
 		parent_id.to_owned()
 	);
+
+	entity.entities.extend(paste_data.data.to_owned());
 
 	let mut new_entities = vec![];
 	let mut reverse_parent_refs: HashMap<String, Vec<String>> = HashMap::new();
@@ -814,9 +838,7 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 		new_entities.push((entity_id, entity_data.parent, entity_data.name, entity_data.factory, x));
 	}
 
-	// Make sure the entity being pasted under is updated to be considered a folder
-	// TODO: Make sure the implementation of Paste request handles existing entities like this one
-	// TODO: Make sure that folder status is updated by tree view right click create events as well on the frontend
+	// Make sure the entity being pasted under is updated to be considered a folder (if it's a ZEntity)
 	new_entities.push((
 		parent_id.to_owned(),
 		entity
@@ -843,7 +865,7 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 	send_request(
 		app,
 		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-			EntityTreeRequest::DiffTree {
+			EntityTreeRequest::NewItems {
 				editor_id,
 				new_entities
 			}
@@ -866,4 +888,12 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 			}
 		)?;
 	}
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
 }

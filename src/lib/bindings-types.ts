@@ -116,17 +116,30 @@ extraBlueprintDependencies: Dependency[];
  */
 comments: CommentEntity[] }
 
-export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent }
+export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent }
 
-export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest }
+export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest }
+
+export type EntityMonacoEvent = { type: "updateContent"; data: { id: string; content: string } }
+
+export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; content: string } } | { type: "updateIntellisense"; data: Record<string, never> }
 
 export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } }
 
-export type EntityTreeRequest = { type: "create"; data: { editor_id: string; id: string; parent: Ref; name: string } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "select"; data: { editor_id: string; id: string | null } } | { type: "newTree"; data: { editor_id: string; 
+export type EntityTreeRequest = 
+/**
+ * Will trigger a Select event from the tree - ensure this doesn't end up in a loop
+ */
+{ type: "select"; data: { editor_id: string; id: string | null } } | { type: "newTree"; data: { editor_id: string; 
 /**
  * ID, parent, name, factory, has reverse parent refs
  */
-entities: ([string, Ref, string, string, boolean])[] } } | { type: "paste"; data: { editor_id: string; 
+entities: ([string, Ref, string, string, boolean])[] } } | 
+/**
+ * Instructs the frontend to take the list of new entities, add any new ones and update any ones that already exist (by ID) with the new information.
+ * This is used for pasting, and for ensuring that icons/parent status/name are updated when a sub-entity is updated.
+ */
+{ type: "newItems"; data: { editor_id: string; 
 /**
  * ID, parent, name, factory, has reverse parent refs
  */

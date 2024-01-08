@@ -3,6 +3,7 @@
 	import "../treeview.css"
 	import "carbon-components-svelte/css/g90.css"
 	import "@fortawesome/fontawesome-free/css/all.min.css"
+	import "@fontsource/fira-code"
 
 	import { appWindow } from "@tauri-apps/api/window"
 	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
@@ -11,6 +12,9 @@
 	import { flip } from "svelte/animate"
 	import { fade, fly } from "svelte/transition"
 	import type { Request } from "$lib/bindings-types"
+	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
+	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
+	import * as monaco from "monaco-editor"
 
 	let tasks: [string, string][] = []
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
@@ -21,9 +25,11 @@
 	})
 
 	window.addEventListener("error", (evt) => {
-		errorModalError = String(evt.error)
-		errorModalOpen = true
-		tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+		if (evt.error) {
+			errorModalError = String(evt.error)
+			errorModalOpen = true
+			tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+		}
 	})
 
 	onMount(async () => {
@@ -65,6 +71,39 @@
 			unlistedNotification()
 			unlistenRequest()
 		}
+
+		self.MonacoEnvironment = {
+			getWorker: function (_moduleId: any, label: string) {
+				if (label === "json") {
+					return new jsonWorker()
+				} else {
+					return new editorWorker()
+				}
+			}
+		}
+
+		monaco.editor.defineTheme("theme", {
+			base: "vs-dark",
+			inherit: true,
+			rules: [{ token: "keyword.json", foreground: "b5cea8" }],
+			colors: {}
+		})
+
+		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+			validate: true,
+			schemas: [
+				{
+					uri: "monaco-schema://manifest",
+					fileMatch: ["*manifest*"],
+					schema: await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
+				},
+				{
+					uri: "monaco-schema://qn-subentity",
+					fileMatch: ["*subentity*"],
+					schema: {}
+				}
+			]
+		})
 	})
 
 	let windowTitle = "Deeznuts"

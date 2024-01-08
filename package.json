@@ -18,6 +18,7 @@
 		"@types/eslint": "8.56.0",
 		"@types/jquery": "^3",
 		"@types/jstree": "^3",
+		"@types/lodash": "^4",
 		"@types/md5": "^2",
 		"@types/uuid": "^9",
 		"@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -36,6 +37,7 @@
 	"type": "module",
 	"packageManager": "yarn@4.0.2",
 	"dependencies": {
+		"@fontsource/fira-code": "^5.0.16",
 		"@fortawesome/fontawesome-free": "^6.5.1",
 		"@tauri-apps/api": "^1.5.3",
 		"@tauri-apps/cli": "^1.5.9",
@@ -45,6 +47,7 @@
 		"decimal.js": "^10.4.3",
 		"jquery": "^3.7.1",
 		"jstree": "^3.3.16",
+		"lodash": "^4.17.21",
 		"md5": "^2.3.0",
 		"monaco-editor": "^0.45.0",
 		"postcss": "^8.4.32",

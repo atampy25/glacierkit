@@ -1,4 +1,4 @@
-import {type Event, commands} from "$lib/bindings"
+import { type Event, commands } from "$lib/bindings"
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type ObjectEntry<T extends {}> = T extends object
@@ -20,3 +20,5 @@ export async function event(event: Event) {
 	console.log("Sending event", event)
 	await commands.event(event)
 }
+
+export const showInFolder = commands.showInFolder

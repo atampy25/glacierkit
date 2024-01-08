@@ -1,0 +1,506 @@
+{
+	"bool": {
+		"type": "boolean",
+		"description": "A boolean value."
+	},
+	"ZString": {
+		"type": "string",
+		"description": "A string."
+	},
+	"float32": {
+		"type": "number",
+		"description": "A single-precision floating-point number."
+	},
+	"int32": {
+		"type": "number",
+		"description": "A signed 32-bit integer. Can store values from -2147483648 to 2147483648."
+	},
+	"uint8": {
+		"type": "number",
+		"description": "An unsigned 8-bit integer. Can store values from 0 to 255."
+	},
+	"uint16": {
+		"type": "number",
+		"description": "An unsigned 16-bit integer. Can store values from 0 to 65535."
+	},
+	"uint32": {
+		"type": "number",
+		"description": "An unsigned 32-bit integer. Can store values from 0 to 4294967295."
+	},
+	"uint64": {
+		"type": "number",
+		"description": "An unsigned 64-bit integer. Can store values from 0 to 18446744073709551615."
+	},
+	"SColorRGB": {
+		"type": "string",
+		"description": "A colour in standard RGB hexadecimal format.",
+		"default": "#ffffff"
+	},
+	"SColorRGBA": {
+		"type": "string",
+		"description": "A colour in standard RGBA hexadecimal format.",
+		"default": "#ffffffff"
+	},
+	"ZGuid": {
+		"type": "string",
+		"description": "A UUID in standard text format.",
+		"default": "00000000-0000-0000-0000-000000000000"
+	},
+	"ZGameTime": {
+		"type": "object",
+		"description": "A time expressed in the number of game ticks. There are 1048576 (1024 x 1024) ticks in each real second.",
+		"properties": {
+			"m_nTicks": {
+				"type": "number"
+			}
+		},
+		"default": {
+			"m_nTicks": 0
+		},
+		"required": ["m_nTicks"]
+	},
+	"ZRuntimeResourceID": {
+		"anyOf": [
+			{
+				"$ref": "#/definitions/DependencyWithFlag"
+			},
+			{
+				"type": "string"
+			},
+			{
+				"type": "null"
+			}
+		],
+		"description": "A game resource, referenced by its path and, optionally, a flag.",
+		"default": null
+	},
+	"SVector2": {
+		"type": "object",
+		"description": "A vector of two values.",
+		"properties": {
+			"x": {
+				"type": "number"
+			},
+			"y": {
+				"type": "number"
+			}
+		},
+		"default": {
+			"x": 0,
+			"y": 0
+		},
+		"required": ["x", "y"]
+	},
+	"SVector3": {
+		"type": "object",
+		"description": "A vector of three values.",
+		"properties": {
+			"x": {
+				"type": "number"
+			},
+			"y": {
+				"type": "number"
+			},
+			"z": {
+				"type": "number"
+			}
+		},
+		"default": {
+			"x": 0,
+			"y": 0,
+			"z": 0
+		},
+		"required": ["x", "y", "z"]
+	},
+	"SVector4": {
+		"type": "object",
+		"description": "A vector of four values.",
+		"properties": {
+			"x": {
+				"type": "number"
+			},
+			"y": {
+				"type": "number"
+			},
+			"z": {
+				"type": "number"
+			},
+			"w": {
+				"type": "number"
+			}
+		},
+		"default": {
+			"x": 0,
+			"y": 0,
+			"z": 0,
+			"w": 0
+		},
+		"required": ["x", "y", "z", "w"]
+	},
+	"SWorldSpaceSettings": {
+		"type": "object",
+		"description": "Worldspace settings.",
+		"properties": {
+			"fCloseupDistance": {
+				"type": "number"
+			},
+			"fScale": {
+				"type": "integer"
+			},
+			"bDynamicScale": {
+				"type": "boolean"
+			},
+			"fDynamicScaleAlpha": {
+				"type": "number"
+			},
+			"fDynamicScaleNearDistance": {
+				"type": "integer"
+			},
+			"fDynamicScaleBlendRange": {
+				"type": "integer"
+			}
+		},
+		"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"]
+	},
+	"S25DProjectionSettings": {
+		"type": "object",
+		"description": "2.5D projection settings.",
+		"properties": {
+			"fNearDistance": {
+				"type": "integer"
+			},
+			"fFarDistance": {
+				"type": "integer"
+			},
+			"fNearScale": {
+				"type": "integer"
+			},
+			"fFarScale": {
+				"type": "integer"
+			},
+			"fNearFov": {
+				"type": "integer"
+			},
+			"fFarFov": {
+				"type": "integer"
+			},
+			"fNearScaleFov": {
+				"type": "integer"
+			},
+			"fFarScaleFov": {
+				"type": "integer"
+			},
+			"fScaleFactor": {
+				"type": "integer"
+			},
+			"fNearAlpha": {
+				"type": "integer"
+			},
+			"fFarAlpha": {
+				"type": "integer"
+			},
+			"fAlphaFactor": {
+				"type": "integer"
+			},
+			"aScaleCurve": {
+				"type": "array",
+				"items": {}
+			},
+			"aAlphaCurve": {
+				"type": "array",
+				"items": {}
+			},
+			"eViewportLock": {
+				"type": "string"
+			},
+			"fViewportGutter": {
+				"type": "integer"
+			},
+			"enableWorldSizeScaling": {
+				"type": "boolean"
+			},
+			"fWorldSizeScalingBaseDistance": {
+				"type": "integer"
+			},
+			"fWorldSizeScalingFactorMax": {
+				"type": "number"
+			},
+			"fWorldSizeScalingFactorMin": {
+				"type": "number"
+			},
+			"sWorldSpaceSettings": {
+				"type": "object",
+				"description": "Worldspace settings.",
+				"properties": {
+					"fCloseupDistance": {
+						"type": "number"
+					},
+					"fScale": {
+						"type": "integer"
+					},
+					"bDynamicScale": {
+						"type": "boolean"
+					},
+					"fDynamicScaleAlpha": {
+						"type": "number"
+					},
+					"fDynamicScaleNearDistance": {
+						"type": "integer"
+					},
+					"fDynamicScaleBlendRange": {
+						"type": "integer"
+					}
+				},
+				"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"]
+			}
+		},
+		"required": [
+			"aAlphaCurve",
+			"aScaleCurve",
+			"eViewportLock",
+			"enableWorldSizeScaling",
+			"fAlphaFactor",
+			"fFarAlpha",
+			"fFarDistance",
+			"fFarFov",
+			"fFarScale",
+			"fFarScaleFov",
+			"fNearAlpha",
+			"fNearDistance",
+			"fNearFov",
+			"fNearScale",
+			"fNearScaleFov",
+			"fScaleFactor",
+			"fViewportGutter",
+			"fWorldSizeScalingBaseDistance",
+			"fWorldSizeScalingFactorMax",
+			"fWorldSizeScalingFactorMin",
+			"sWorldSpaceSettings"
+		]
+	},
+	"SMatrix43": {
+		"type": "object",
+		"description": "A transform with position, rotation, and optionally, scale.",
+		"properties": {
+			"rotation": {
+				"type": "object",
+				"description": "A rotation expressed in Euler angles (in degrees) in the order XYZ.",
+				"properties": {
+					"x": {
+						"type": "number"
+					},
+					"y": {
+						"type": "number"
+					},
+					"z": {
+						"type": "number"
+					}
+				},
+				"default": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				}
+			},
+			"position": {
+				"type": "object",
+				"description": "A position on the 3D plane, where positive Z is vertical.",
+				"properties": {
+					"x": {
+						"type": "number"
+					},
+					"y": {
+						"type": "number"
+					},
+					"z": {
+						"type": "number"
+					}
+				},
+				"default": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				}
+			},
+			"scale": {
+				"type": "object",
+				"description": "The scale component of the transform. This is typically all set to 1, which is the default when omitted.",
+				"properties": {
+					"x": {
+						"type": "number"
+					},
+					"y": {
+						"type": "number"
+					},
+					"z": {
+						"type": "number"
+					}
+				},
+				"default": {
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			}
+		},
+		"default": {
+			"rotation": {
+				"x": 0,
+				"y": 0,
+				"z": 0
+			},
+			"position": {
+				"x": 0,
+				"y": 0,
+				"z": 0
+			}
+		},
+		"required": ["position", "rotation"]
+	},
+	"SEntityTemplateReference": {
+		"$ref": "#/definitions/Ref",
+		"description": "A reference to another sub-entity, in this entity or another.",
+		"default": null
+	},
+	"SBodyPartDamageMultipliers": {
+		"type": "object",
+		"description": "Damage multipliers for individual body parts.",
+		"properties": {
+			"m_fHeadDamageMultiplier": {
+				"type": "integer"
+			},
+			"m_fFaceDamageMultiplier": {
+				"type": "integer"
+			},
+			"m_fArmDamageMultiplier": {
+				"type": "integer"
+			},
+			"m_fLArmDamageScalar": {
+				"type": "integer"
+			},
+			"m_fRArmDamageScalar": {
+				"type": "integer"
+			},
+			"m_fHandDamageMultiplier": {
+				"type": "number"
+			},
+			"m_fLHandDamageScalar": {
+				"type": "integer"
+			},
+			"m_fRHandDamageScalar": {
+				"type": "integer"
+			},
+			"m_fLegDamageMultiplier": {
+				"type": "number"
+			},
+			"m_fLLegDamageScalar": {
+				"type": "integer"
+			},
+			"m_fRLegDamageScalar": {
+				"type": "integer"
+			},
+			"m_fTorsoDamageMultiplier": {
+				"type": "integer"
+			},
+			"m_bApplyLeftRightScalars": {
+				"type": "boolean"
+			}
+		},
+		"required": [
+			"m_bApplyLeftRightScalars",
+			"m_fArmDamageMultiplier",
+			"m_fFaceDamageMultiplier",
+			"m_fHandDamageMultiplier",
+			"m_fHeadDamageMultiplier",
+			"m_fLArmDamageScalar",
+			"m_fLHandDamageScalar",
+			"m_fLLegDamageScalar",
+			"m_fLegDamageMultiplier",
+			"m_fRArmDamageScalar",
+			"m_fRHandDamageScalar",
+			"m_fRLegDamageScalar",
+			"m_fTorsoDamageMultiplier"
+		]
+	},
+	"SCCEffectSet": {
+		"type": "object",
+		"description": "A set of close-combat effects.",
+		"properties": {
+			"m_eDecalEffect": {
+				"type": "string"
+			},
+			"m_eEmitterEffect": {
+				"type": "string"
+			}
+		},
+		"required": ["m_eDecalEffect", "m_eEmitterEffect"]
+	},
+	"SSCCuriousConfiguration": {
+		"type": "object",
+		"description": "A Sniper Challenge AI configuration object.",
+		"properties": {
+			"m_CanGuardsInvestigate": {
+				"type": "boolean"
+			},
+			"m_CanCiviliansInvestigate": {
+				"type": "boolean"
+			},
+			"m_CanVIPsInvestigate": {
+				"type": "boolean"
+			}
+		},
+		"required": ["m_CanCiviliansInvestigate", "m_CanGuardsInvestigate", "m_CanVIPsInvestigate"]
+	},
+	"ZCurve": {
+		"type": "object",
+		"description": "A ZCurve.",
+		"properties": {
+			"data": {
+				"type": "array",
+				"description": "A curve made up of polynomial functions. ZCurves usually end with a constant curve where all coefficients are set to zero.",
+				"items": {
+					"type": "array",
+					"description": "A polynomial function.",
+					"items": [
+						{
+							"type": "number",
+							"description": "An X position on the curve where this polynomial starts. Usually between 0 and 1 if the curve deals with time."
+						},
+						{
+							"type": "number",
+							"description": "The exact value of the curve at the given time."
+						},
+						{
+							"type": "number",
+							"description": "The fifth coefficient of the polynomial (i.e. what x^5 is multiplied by)."
+						},
+						{
+							"type": "number",
+							"description": "The fourth coefficient of the polynomial (i.e. what x^4 is multiplied by)."
+						},
+						{
+							"type": "number",
+							"description": "The third coefficient of the polynomial (i.e. what x^3 is multiplied by)."
+						},
+						{
+							"type": "number",
+							"description": "The second coefficient of the polynomial (i.e. the 3 in 3x^2 + 4x + 12)."
+						},
+						{
+							"type": "number",
+							"description": "The first coefficient of the polynomial (i.e. the 4 in 3x^2 + 4x + 12)."
+						},
+						{
+							"type": "number",
+							"description": "The constant term of the polynomial (i.e. the 12 in 3x^2 + 4x + 12)."
+						}
+					],
+					"additionalItems": false,
+					"minItems": 8,
+					"maxItems": 8
+				}
+			}
+		},
+		"required": ["data"]
+	}
+}

@@ -67,6 +67,4 @@
 	}
 </script>
 
-<div class="h-full mr-2 mb-2">
-	<Monaco {id} on:contentChanged={({ detail }) => contentChanged(detail)} bind:this={monacoEditor} on:ready={onReady} />
-</div>
+<Monaco {id} on:contentChanged={({ detail }) => contentChanged(detail)} bind:this={monacoEditor} on:ready={onReady} />
