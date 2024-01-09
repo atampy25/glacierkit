@@ -9,6 +9,7 @@
 	import propertyTypeSchemas from "./property-type-schemas.json"
 	import enums from "./enums.json"
 	import { event } from "$lib/utils"
+	import { listen } from "@tauri-apps/api/event"
 
 	let el: HTMLDivElement = null!
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
@@ -42,12 +43,12 @@
 			theme: "theme",
 			minimap: {
 				enabled: true
-			},
-			automaticLayout: true
+			}
 		})
 
 		destroyFunc.run = () => {
 			editor.dispose()
+			editor.getModel()?.dispose()
 		}
 
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -249,12 +250,6 @@
 		)
 	})
 
-	onDestroy(() => {
-		if (editor) {
-			editor.getModel()?.dispose()
-		}
-	})
-
 	export async function handleRequest(request: EntityMonacoRequest) {
 		console.log(`Tree for editor ${editorID} handling request`, request)
 
@@ -278,17 +273,15 @@
 	}
 </script>
 
-<div class="w-full h-full pt-1 flex flex-col gap-2" class:hidden={entityID === null}>
-	<div class="flex flex-wrap gap-2">
-		<code>{entityID}</code>
-		{#if validity.type === "Valid"}
-			<span class="text-green-200">Valid entity</span>
-		{:else}
-			<span class="text-red-200">{validity.data}</span>
-		{/if}
-	</div>
-	<div bind:this={el} class="flex-grow" />
+<div class="flex flex-wrap gap-2" class:hidden={entityID === null}>
+	<code>{entityID}</code>
+	{#if validity.type === "Valid"}
+		<span class="text-green-200">Valid entity</span>
+	{:else}
+		<span class="text-red-200">{validity.data}</span>
+	{/if}
 </div>
+<div bind:this={el} class="flex-grow overflow-auto" class:hidden={entityID === null} />
 {#if entityID === null}
 	<p>Select an entity on the left to edit it here.</p>
 {/if}

@@ -9,7 +9,7 @@
 	import ToolButton from "$lib/components/ToolButton.svelte"
 	import { Button } from "carbon-components-svelte"
 	import { SvelteComponent, beforeUpdate, onDestroy } from "svelte"
-	import { listen } from "@tauri-apps/api/event"
+	import { emit, listen } from "@tauri-apps/api/event"
 	import type { EditorType, Request } from "$lib/bindings-types"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
 	import Close from "carbon-icons-svelte/lib/Close.svelte"

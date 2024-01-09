@@ -3,11 +3,13 @@
 	import { Pane, Splitpanes } from "svelte-splitpanes"
 	import Tree from "./Tree.svelte"
 	import Monaco from "./Monaco.svelte"
+	import MetaPane from "./MetaPane.svelte"
 
 	export let id: string
 
 	let tree: Tree
 	let monaco: Monaco
+	let metaPane: MetaPane
 
 	export async function handleRequest(request: EntityEditorRequest) {
 		console.log(`Entity editor ${id} handling request`, request)
@@ -19,6 +21,10 @@
 
 			case "monaco":
 				monaco.handleRequest(request.data)
+				break
+
+			case "metaPane":
+				metaPane.handleRequest(request.data)
 				break
 
 			default:
@@ -58,15 +64,13 @@
 					</div>
 				</Pane>
 				<Pane>
-					<div class="h-full w-full flex flex-col gap-1">
-						<h3>Reverse references</h3>
-					</div>
+					<MetaPane editorID={id} bind:this={metaPane} />
 				</Pane>
 			</Splitpanes>
 		</div>
 		<div class="col-span-3 h-full w-full flex flex-col">
 			<h3>Editor</h3>
-			<div class="flex-grow w-full">
+			<div class="flex-grow pt-1 flex flex-col gap-2 min-h-0 basis-0">
 				<Monaco editorID={id} bind:this={monaco} />
 			</div>
 		</div>

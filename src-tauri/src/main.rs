@@ -14,20 +14,17 @@ pub mod show_in_folder;
 
 use std::{
 	collections::{HashMap, HashSet},
-	fmt::Debug,
 	fs,
 	ops::Deref,
-	path::Path,
 	sync::Arc
 };
 
 use anyhow::{anyhow, Context, Error, Result};
 use arboard::Clipboard;
-use arc_swap::{access::Access, ArcSwap, Guard};
+use arc_swap::ArcSwap;
 use entity::{
-	alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local,
-	check_local_references_exist, get_local_reference, get_recursive_children, random_entity_id, CopiedEntityData,
-	ReverseReferenceData
+	calculate_reverse_references, check_local_references_exist, get_local_reference, get_recursive_children,
+	CopiedEntityData
 };
 use event_handling::entity_tree::{handle_delete, handle_paste};
 use fn_error_context::context;
@@ -36,19 +33,18 @@ use hash_list::HashList;
 use itertools::Itertools;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
-	EntityEditorEvent, EntityEditorRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest,
-	Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent,
-	GlobalRequest, Project, ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent,
-	TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	EntityEditorEvent, EntityEditorRequest, EntityMetaPaneEvent, EntityMetaPaneRequest, EntityMonacoEvent,
+	EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
+	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings,
+	Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
-	apply_patch, generate_patch,
-	patch_structs::{Patch, PatchOperation, SubEntityOperation},
-	qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity, SubType}
+	generate_patch,
+	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, from_str, from_value, to_string, to_string_pretty, to_value, to_vec, Value};
+use serde_json::{from_slice, from_str, to_string, to_vec};
 use show_in_folder::show_in_folder;
 use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
@@ -156,9 +152,26 @@ fn event(app: AppHandle, event: Event) {
 										"entity.json" => {
 											let id = Uuid::new_v4();
 
-											let entity: Entity =
+											let mut entity: Entity =
 												from_slice(&fs::read(&path).context("Couldn't read file")?)
 													.context("Invalid entity")?;
+
+											// Normalise comments to form used by Deeznuts (single comment for each entity)
+											let mut comments: Vec<CommentEntity> = vec![];
+											for comment in entity.comments {
+												if let Some(x) =
+													comments.iter_mut().find(|x| x.parent == comment.parent)
+												{
+													x.text = format!("{}\n\n{}", x.text, comment.text);
+												} else {
+													comments.push(CommentEntity {
+														parent: comment.parent,
+														name: "Notes".into(),
+														text: comment.text
+													});
+												}
+											}
+											entity.comments = comments;
 
 											app_state.editor_states.write().await.insert(
 												id.to_owned(),
@@ -667,6 +680,7 @@ fn event(app: AppHandle, event: Event) {
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
 								entity
 									.entities
 									.get(&id)
@@ -677,9 +691,49 @@ fn event(app: AppHandle, event: Event) {
 									&app,
 									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 										EntityMonacoRequest::ReplaceContent {
-											editor_id,
-											entity_id: id,
+											editor_id: editor_id.to_owned(),
+											entity_id: id.to_owned(),
 											content: String::from_utf8(buf)?
+										}
+									)))
+								)?;
+
+								let reverse_refs = calculate_reverse_references(entity)?
+									.remove(&id)
+									.context("No such entity")?;
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
+										EntityMetaPaneRequest::SetReverseRefs {
+											editor_id: editor_id.to_owned(),
+											entity_names: reverse_refs
+												.iter()
+												.map(|x| {
+													(
+														x.from.to_owned(),
+														entity.entities.get(&x.from).unwrap().name.to_owned()
+													)
+												})
+												.collect(),
+											reverse_refs
+										}
+									)))
+								)?;
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
+										EntityMetaPaneRequest::SetNotes {
+											editor_id: editor_id.to_owned(),
+											entity_id: id.to_owned(),
+											notes: entity
+												.comments
+												.iter()
+												.find(|x| matches!(x.parent, Ref::Short(Some(ref x)) if *x == id))
+												.map(|x| x.text.deref())
+												.unwrap_or("")
+												.into()
 										}
 									)))
 								)?;
@@ -902,6 +956,41 @@ fn event(app: AppHandle, event: Event) {
 										)?;
 									}
 								}
+							}
+						},
+
+						EntityEditorEvent::MetaPane(event) => match event {
+							EntityMetaPaneEvent::JumpToReference { editor_id, reference } => todo!(),
+
+							EntityMetaPaneEvent::SetNotes {
+								editor_id,
+								entity_id,
+								notes
+							} => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity(ref mut ent) => ent,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								// Remove comment referring to given entity
+								entity
+									.comments
+									.retain(|x| get_local_reference(&x.parent).map(|x| x != entity_id).unwrap_or(true));
+
+								// Add new comment
+								entity.comments.push(CommentEntity {
+									parent: Ref::Short(Some(entity_id)),
+									name: "Notes".into(),
+									text: notes
+								});
 							}
 						}
 					}

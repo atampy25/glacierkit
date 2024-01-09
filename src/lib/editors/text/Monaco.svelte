@@ -35,16 +35,11 @@
 		)
 
 		destroyFunc.run = () => {
+			editor.getModel()?.dispose()
 			editor.dispose()
 		}
 
 		dispatch("ready")
-	})
-
-	onDestroy(() => {
-		if (editor) {
-			editor.getModel()?.dispose()
-		}
 	})
 
 	export function setFileType(fileType: TextFileType) {

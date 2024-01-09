@@ -9,7 +9,7 @@ use structstruck::strike;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::{game_detection::GameInstall, hash_list::HashList};
+use crate::{entity::ReverseReference, game_detection::GameInstall, hash_list::HashList};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -199,6 +199,19 @@ strike! {
 						entity_id: String,
 						content: String
 					}
+				}),
+
+				MetaPane(pub enum EntityMetaPaneEvent {
+					JumpToReference {
+						editor_id: Uuid,
+						reference: String
+					},
+
+					SetNotes {
+						editor_id: Uuid,
+						entity_id: String,
+						notes: String
+					}
 				})
 			})
 		}),
@@ -310,6 +323,20 @@ strike! {
 					UpdateValidity {
 						editor_id: Uuid,
 						validity: EditorValidity
+					}
+				}),
+
+				MetaPane(pub enum EntityMetaPaneRequest {
+					SetReverseRefs {
+						editor_id: Uuid,
+						entity_names: HashMap<String, String>,
+						reverse_refs: Vec<ReverseReference>
+					},
+
+					SetNotes {
+						editor_id: Uuid,
+						entity_id: String,
+						notes: String
 					}
 				})
 			})

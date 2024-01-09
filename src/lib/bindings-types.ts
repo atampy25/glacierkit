@@ -118,9 +118,13 @@ extraBlueprintDependencies: Dependency[];
  */
 comments: CommentEntity[] }
 
-export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent }
+export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent }
 
-export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest }
+export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest }
+
+export type EntityMetaPaneEvent = { type: "jumpToReference"; data: { editor_id: string; reference: string } } | { type: "setNotes"; data: { editor_id: string; entity_id: string; notes: string } }
+
+export type EntityMetaPaneRequest = { type: "setReverseRefs"; data: { editor_id: string; entity_names: { [key in string]: string }; reverse_refs: ReverseReference[] } } | { type: "setNotes"; data: { editor_id: string; entity_id: string; notes: string } }
 
 export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } }
 

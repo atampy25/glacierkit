@@ -433,8 +433,8 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for (event, triggers) in sub_entity.events.as_ref().unwrap_or(&Default::default()) {
-		for (trigger, trigger_entities) in triggers {
+	for triggers in sub_entity.events.as_ref().unwrap_or(&Default::default()).values() {
+		for trigger_entities in triggers.values() {
 			for reference in trigger_entities {
 				let reference = match reference {
 					RefMaybeConstantValue::Ref(x) => x,
@@ -450,8 +450,13 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for (trigger, propagates) in sub_entity.input_copying.as_ref().unwrap_or(&Default::default()) {
-		for (propagate, propagate_entities) in propagates {
+	for propagates in sub_entity
+		.input_copying
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for propagate_entities in propagates.values() {
 			for reference in propagate_entities {
 				let reference = match reference {
 					RefMaybeConstantValue::Ref(x) => x,
@@ -467,8 +472,13 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for (event, propagates) in sub_entity.output_copying.as_ref().unwrap_or(&Default::default()) {
-		for (propagate, propagate_entities) in propagates {
+	for propagates in sub_entity
+		.output_copying
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for propagate_entities in propagates.values() {
 			for reference in propagate_entities {
 				let reference = match reference {
 					RefMaybeConstantValue::Ref(x) => x,
@@ -484,7 +494,12 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for (aliased_name, aliases) in sub_entity.property_aliases.as_ref().unwrap_or(&Default::default()) {
+	for aliases in sub_entity
+		.property_aliases
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
 		for alias_data in aliases {
 			if let Some(ent) = get_local_reference(&alias_data.original_entity) {
 				if !entity.entities.contains_key(&ent) {
@@ -494,7 +509,12 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for (exposed_name, exposed_entity) in sub_entity.exposed_entities.as_ref().unwrap_or(&Default::default()) {
+	for exposed_entity in sub_entity
+		.exposed_entities
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
 		for reference in &exposed_entity.refers_to {
 			if let Some(ent) = get_local_reference(reference) {
 				if !entity.entities.contains_key(&ent) {
@@ -504,7 +524,12 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for (interface, referenced_entity) in sub_entity.exposed_interfaces.as_ref().unwrap_or(&Default::default()) {
+	for referenced_entity in sub_entity
+		.exposed_interfaces
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
 		if !entity.entities.contains_key(referenced_entity) {
 			return Ok(EditorValidity::Invalid(format!(
 				"Invalid reference {}",
@@ -513,7 +538,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for (subset, member_of) in sub_entity.subsets.as_ref().unwrap_or(&Default::default()) {
+	for member_of in sub_entity.subsets.as_ref().unwrap_or(&Default::default()).values() {
 		for parental_entity in member_of {
 			if !entity.entities.contains_key(parental_entity) {
 				return Ok(EditorValidity::Invalid(format!(
