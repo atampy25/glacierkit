@@ -37,8 +37,8 @@
 	let activeMode: (typeof modes)[number] = "Tree"
 </script>
 
-<div class="w-full h-full flex flex-col gap-2">
-	<div class="flex-shrink-0 flex flex-wrap gap-4">
+<div class="w-full h-full">
+	<div class="flex-shrink-0 flex flex-wrap gap-4 mb-2">
 		<div class="h-10 bg-[#202020] flex flex-wrap w-fit">
 			{#each modes as mode}
 				<div
@@ -51,8 +51,9 @@
 			{/each}
 		</div>
 	</div>
-	<div class="flex-grow grid grid-cols-4 gap-4">
-		<div class="h-full w-full">
+	<div class="grid grid-cols-4 gap-4" style="height: calc(100vh - 11rem)">
+		<!-- Unfortunately flex can't be used at all here because the monaco editor's overflow for large subentities is counted by the grid for some reason and extends the height of all grid cells accordingly, thus pushing reverse refs below the screen -->
+		<div class="w-full pb-4" style="height: calc(100vh - 11rem)">
 			<Splitpanes horizontal theme="">
 				<Pane size={80}>
 					<div class="h-full w-full flex flex-col gap-1">
@@ -68,11 +69,9 @@
 				</Pane>
 			</Splitpanes>
 		</div>
-		<div class="col-span-3 h-full w-full flex flex-col">
+		<div class="col-span-3 h-full w-full flex flex-col gap-1">
 			<h3>Editor</h3>
-			<div class="flex-grow pt-1 flex flex-col gap-2 min-h-0 basis-0">
-				<Monaco editorID={id} bind:this={monaco} />
-			</div>
+			<Monaco editorID={id} bind:this={monaco} />
 		</div>
 	</div>
 </div>
