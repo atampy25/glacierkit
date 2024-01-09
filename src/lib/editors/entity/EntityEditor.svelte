@@ -51,27 +51,32 @@
 			{/each}
 		</div>
 	</div>
-	<div class="grid grid-cols-4 gap-4" style="height: calc(100vh - 11rem)">
-		<!-- Unfortunately flex can't be used at all here because the monaco editor's overflow for large subentities is counted by the grid for some reason and extends the height of all grid cells accordingly, thus pushing reverse refs below the screen -->
-		<div class="w-full pb-4" style="height: calc(100vh - 11rem)">
-			<Splitpanes horizontal theme="">
-				<Pane size={80}>
-					<div class="h-full w-full flex flex-col gap-1">
-						<h3>Tree</h3>
-						<!-- The `min-h-0 basis-0` here is EXTREMELY necessary as the tree will refuse to apply overflow-auto if it is removed, instead extending the box past its allowance! -->
-						<div class="flex-grow flex flex-col gap-2 min-h-0 basis-0">
-							<Tree editorID={id} bind:this={tree} />
-						</div>
-					</div>
-				</Pane>
-				<Pane>
-					<MetaPane editorID={id} bind:this={metaPane} />
-				</Pane>
-			</Splitpanes>
-		</div>
-		<div class="col-span-3 h-full w-full flex flex-col gap-1">
-			<h3>Editor</h3>
-			<Monaco editorID={id} bind:this={monaco} />
-		</div>
+	<div style="height: calc(100vh - 11rem)">
+		<Splitpanes theme="">
+			<Pane size={25}>
+				<div class="w-full h-full pb-4 pr-2">
+					<Splitpanes horizontal theme="">
+						<Pane size={80}>
+							<div class="h-full w-full flex flex-col gap-1">
+								<h3>Tree</h3>
+								<!-- The `min-h-0 basis-0` here is EXTREMELY necessary as the tree will refuse to apply overflow-auto if it is removed, instead extending the box past its allowance! -->
+								<div class="flex-grow flex flex-col gap-2 min-h-0 basis-0">
+									<Tree editorID={id} bind:this={tree} />
+								</div>
+							</div>
+						</Pane>
+						<Pane>
+							<MetaPane editorID={id} bind:this={metaPane} />
+						</Pane>
+					</Splitpanes>
+				</div>
+			</Pane>
+			<Pane>
+				<div class="h-full w-full flex flex-col gap-1">
+					<h3>Editor</h3>
+					<Monaco editorID={id} bind:this={monaco} />
+				</div>
+			</Pane>
+		</Splitpanes>
 	</div>
 </div>

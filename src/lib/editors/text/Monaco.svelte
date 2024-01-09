@@ -25,7 +25,9 @@
 			minimap: {
 				enabled: true
 			},
-			automaticLayout: true
+			automaticLayout: true,
+			fontFamily: "Fira Code",
+			fontLigatures: true
 		})
 
 		editor.onDidChangeModelContent(
