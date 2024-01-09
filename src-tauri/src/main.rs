@@ -24,7 +24,7 @@ use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use entity::{
 	calculate_reverse_references, check_local_references_exist, get_local_reference, get_recursive_children,
-	CopiedEntityData
+	CopiedEntityData, ReverseReferenceData
 };
 use event_handling::entity_tree::{handle_delete, handle_paste};
 use fn_error_context::context;
@@ -33,10 +33,11 @@ use hash_list::HashList;
 use itertools::Itertools;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
-	EntityEditorEvent, EntityEditorRequest, EntityMetaPaneEvent, EntityMetaPaneRequest, EntityMonacoEvent,
-	EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
-	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings,
-	Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetaPaneRequest,
+	EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent,
+	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project,
+	ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType,
+	ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
@@ -177,7 +178,10 @@ fn event(app: AppHandle, event: Event) {
 												id.to_owned(),
 												EditorState {
 													file: Some(path.to_owned()),
-													data: EditorData::QNEntity(Box::new(entity))
+													data: EditorData::QNEntity {
+														entity: Box::new(entity),
+														settings: Default::default()
+													}
 												}
 											);
 
@@ -607,13 +611,35 @@ fn event(app: AppHandle, event: Event) {
 					},
 
 					EditorEvent::Entity(event) => match event {
-						EntityEditorEvent::Tree(event) => match event {
-							EntityTreeEvent::Initialise { editor_id } => {
+						EntityEditorEvent::General(event) => match event {
+							EntityGeneralEvent::SetShowReverseParentRefs {
+								editor_id,
+								show_reverse_parent_refs
+							} => {
 								let mut editor_state = app_state.editor_states.write().await;
 								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
+								let settings = match editor_state.data {
+									EditorData::QNEntity { ref mut settings, .. } => settings,
+									EditorData::QNPatch { ref mut settings, .. } => settings,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								settings.show_reverse_parent_refs = show_reverse_parent_refs;
+							}
+						},
+
+						EntityEditorEvent::Tree(event) => match event {
+							EntityTreeEvent::Initialise { editor_id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref ent) => ent,
+									EditorData::QNEntity { ref entity, .. } => entity,
 									EditorData::QNPatch { ref current, .. } => current,
 
 									_ => {
@@ -668,7 +694,7 @@ fn event(app: AppHandle, event: Event) {
 								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
 
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref ent) => ent,
+									EditorData::QNEntity { ref entity, .. } => entity,
 									EditorData::QNPatch { ref current, .. } => current,
 
 									_ => {
@@ -702,6 +728,16 @@ fn event(app: AppHandle, event: Event) {
 									.remove(&id)
 									.context("No such entity")?;
 
+								let settings = match editor_state.data {
+									EditorData::QNEntity { ref settings, .. } => settings,
+									EditorData::QNPatch { ref settings, .. } => settings,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
 								send_request(
 									&app,
 									Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
@@ -709,6 +745,10 @@ fn event(app: AppHandle, event: Event) {
 											editor_id: editor_id.to_owned(),
 											entity_names: reverse_refs
 												.iter()
+												.filter(|x| {
+													settings.show_reverse_parent_refs
+														|| !matches!(x.data, ReverseReferenceData::Parent)
+												})
 												.map(|x| {
 													(
 														x.from.to_owned(),
@@ -716,7 +756,13 @@ fn event(app: AppHandle, event: Event) {
 													)
 												})
 												.collect(),
-											reverse_refs
+											reverse_refs: reverse_refs
+												.into_iter()
+												.filter(|x| {
+													settings.show_reverse_parent_refs
+														|| !matches!(x.data, ReverseReferenceData::Parent)
+												})
+												.collect()
 										}
 									)))
 								)?;
@@ -746,7 +792,7 @@ fn event(app: AppHandle, event: Event) {
 								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref mut ent) => ent,
+									EditorData::QNEntity { ref mut entity, .. } => entity,
 									EditorData::QNPatch { ref mut current, .. } => current,
 
 									_ => {
@@ -779,7 +825,7 @@ fn event(app: AppHandle, event: Event) {
 								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref mut ent) => ent,
+									EditorData::QNEntity { ref mut entity, .. } => entity,
 									EditorData::QNPatch { ref mut current, .. } => current,
 
 									_ => {
@@ -808,7 +854,7 @@ fn event(app: AppHandle, event: Event) {
 								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref mut ent) => ent,
+									EditorData::QNEntity { ref mut entity, .. } => entity,
 									EditorData::QNPatch { ref mut current, .. } => current,
 
 									_ => {
@@ -835,7 +881,7 @@ fn event(app: AppHandle, event: Event) {
 								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
 
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref ent) => ent,
+									EditorData::QNEntity { ref entity, .. } => entity,
 									EditorData::QNPatch { ref current, .. } => current,
 
 									_ => {
@@ -880,7 +926,7 @@ fn event(app: AppHandle, event: Event) {
 								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref mut ent) => ent,
+									EditorData::QNEntity { ref mut entity, .. } => entity,
 									EditorData::QNPatch { ref mut current, .. } => current,
 
 									_ => {
@@ -960,7 +1006,17 @@ fn event(app: AppHandle, event: Event) {
 						},
 
 						EntityEditorEvent::MetaPane(event) => match event {
-							EntityMetaPaneEvent::JumpToReference { editor_id, reference } => todo!(),
+							EntityMetaPaneEvent::JumpToReference { editor_id, reference } => {
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+										EntityTreeRequest::Select {
+											editor_id,
+											id: Some(reference)
+										}
+									)))
+								)?;
+							}
 
 							EntityMetaPaneEvent::SetNotes {
 								editor_id,
@@ -971,7 +1027,7 @@ fn event(app: AppHandle, event: Event) {
 								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
 								let entity = match editor_state.data {
-									EditorData::QNEntity(ref mut ent) => ent,
+									EditorData::QNEntity { ref mut entity, .. } => entity,
 									EditorData::QNPatch { ref mut current, .. } => current,
 
 									_ => {
@@ -1336,11 +1392,11 @@ fn event(app: AppHandle, event: Event) {
 
 								EditorData::Text { content, .. } => content.as_bytes().to_owned(),
 
-								EditorData::QNEntity(entity) => {
+								EditorData::QNEntity { entity, .. } => {
 									serde_json::to_vec(&entity).context("Entity is invalid")?
 								}
 
-								EditorData::QNPatch { base, current } => serde_json::to_vec(
+								EditorData::QNPatch { base, current, .. } => serde_json::to_vec(
 									&generate_patch(base, current)
 										.map_err(|x| anyhow!(x))
 										.context("Couldn't generate patch")?

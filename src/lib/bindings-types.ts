@@ -118,9 +118,11 @@ extraBlueprintDependencies: Dependency[];
  */
 comments: CommentEntity[] }
 
-export type EntityEditorEvent = { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent }
+export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent }
 
 export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest }
+
+export type EntityGeneralEvent = { type: "setShowReverseParentRefs"; data: { editor_id: string; show_reverse_parent_refs: boolean } }
 
 export type EntityMetaPaneEvent = { type: "jumpToReference"; data: { editor_id: string; reference: string } } | { type: "setNotes"; data: { editor_id: string; entity_id: string; notes: string } }
 
@@ -150,6 +152,8 @@ entities: ([string, Ref, string, string, boolean])[] } } |
  * ID, parent, name, factory, has reverse parent refs
  */
 new_entities: ([string, Ref, string, string, boolean])[] } }
+
+export type EphemeralQNSettings = { showReverseParentRefs: boolean }
 
 export type Event = { type: "tool"; data: ToolEvent } | { type: "editor"; data: EditorEvent } | { type: "global"; data: GlobalEvent }
 

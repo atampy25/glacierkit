@@ -45,9 +45,33 @@ pub struct EditorState {
 #[derive(Debug, Clone)]
 pub enum EditorData {
 	Nil,
-	Text { content: String, file_type: TextFileType },
-	QNEntity(Box<Entity>),
-	QNPatch { base: Box<Entity>, current: Box<Entity> }
+	Text {
+		content: String,
+		file_type: TextFileType
+	},
+	QNEntity {
+		settings: EphemeralQNSettings,
+		entity: Box<Entity>
+	},
+	QNPatch {
+		settings: EphemeralQNSettings,
+		base: Box<Entity>,
+		current: Box<Entity>
+	}
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EphemeralQNSettings {
+	pub show_reverse_parent_refs: bool
+}
+
+impl Default for EphemeralQNSettings {
+	fn default() -> Self {
+		Self {
+			show_reverse_parent_refs: false
+		}
+	}
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -149,6 +173,13 @@ strike! {
 			}),
 
 			Entity(pub enum EntityEditorEvent {
+				General(pub enum EntityGeneralEvent {
+					SetShowReverseParentRefs {
+						editor_id: Uuid,
+						show_reverse_parent_refs: bool
+					}
+				}),
+
 				Tree(pub enum EntityTreeEvent {
 					Initialise {
 						editor_id: Uuid

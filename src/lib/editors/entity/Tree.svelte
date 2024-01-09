@@ -389,7 +389,10 @@
 		switch (request.type) {
 			case "select":
 				selectedNode = request.data.id
-				fixSelection()
+				tree.deselect_all(true)
+				if (request.data.id) {
+					tree.select_node(request.data.id)
+				}
 				break
 
 			case "newTree":

@@ -35,7 +35,7 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
-		EditorData::QNEntity(ref mut ent) => ent,
+		EditorData::QNEntity { ref mut entity, .. } => entity,
 		EditorData::QNPatch { ref mut current, .. } => current,
 
 		_ => {
@@ -373,7 +373,7 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
-		EditorData::QNEntity(ref mut ent) => ent,
+		EditorData::QNEntity { ref mut entity, .. } => entity,
 		EditorData::QNPatch { ref mut current, .. } => current,
 
 		_ => {

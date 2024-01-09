@@ -254,7 +254,7 @@
 	})
 
 	export async function handleRequest(request: EntityMonacoRequest) {
-		console.log(`Tree for editor ${editorID} handling request`, request)
+		console.log(`Monaco editor for editor ${editorID} handling request`, request)
 
 		switch (request.type) {
 			case "replaceContent":
