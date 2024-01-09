@@ -43,7 +43,8 @@
 			theme: "theme",
 			minimap: {
 				enabled: true
-			}
+			},
+			automaticLayout: true
 		})
 
 		destroyFunc.run = () => {

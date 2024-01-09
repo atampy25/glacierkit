@@ -179,7 +179,7 @@
 </script>
 
 <div class="h-full w-full flex">
-	<div class="flex-shrink-0 w-14 bg-neutral-900 flex flex-col">
+	<div class="w-14 bg-neutral-900 flex flex-col">
 		{#each typedEntries(tools) as [toolID, tool] (toolID)}
 			<ToolButton
 				icon={tool.icon}
@@ -191,7 +191,7 @@
 			/>
 		{/each}
 	</div>
-	<div class="flex-grow">
+	<div style="width: calc(100vw - 3.5rem)">
 		<Splitpanes theme="">
 			<Pane size={15}>
 				<div class="w-full h-full bg-[#202020]">
