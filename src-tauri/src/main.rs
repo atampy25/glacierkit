@@ -67,6 +67,9 @@ use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
 
+const HASH_LIST_VERSION_ENDPOINT: &str =
+	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
+
 const HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/hash_list.sml";
 
@@ -113,7 +116,8 @@ fn main() {
 					.into(),
 				fs_watcher: None.into(),
 				editor_states: RwLock::new(HashMap::new()).into(),
-				resource_packages: None.into()
+				resource_packages: None.into(),
+				cached_entities: RwLock::new(HashMap::new()).into()
 			});
 
 			Ok(())
@@ -228,6 +232,7 @@ fn event(app: AppHandle, event: Event) {
 													.load()
 													.as_deref()
 													.context("Game install not fully loaded")?,
+												&app_state.cached_entities,
 												app_state
 													.game_installs
 													.iter()
@@ -251,7 +256,8 @@ fn event(app: AppHandle, event: Event) {
 													.version,
 												app_state.hash_list.load().as_ref().unwrap(),
 												&patch.factory_hash
-											)?;
+											)
+											.await?;
 
 											apply_patch(&mut entity, patch, true)
 												.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
@@ -570,10 +576,12 @@ fn event(app: AppHandle, event: Event) {
 									.load()
 									.as_deref()
 									.context("Game install not fully loaded")?,
+								&app_state.cached_entities,
 								game_install_data.version,
 								app_state.hash_list.load().as_ref().unwrap(),
 								&hash
-							)?;
+							)
+							.await?;
 
 							// Normalise comments to form used by Deeznuts (single comment for each entity)
 							let mut comments: Vec<CommentEntity> = vec![];
@@ -1783,20 +1791,33 @@ fn event(app: AppHandle, event: Event) {
 
 						let task = start_task(&app, "Acquiring latest hash list")?;
 
-						if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
-							if let Ok(data) = data.bytes().await {
-								let hash_list = HashList::from_slice(&data)?;
+						let current_version = app_state.hash_list.load().as_ref().map(|x| x.version).unwrap_or(0);
 
-								fs::write(
-									app.path_resolver()
-										.app_data_dir()
-										.context("Couldn't get app data dir")?
-										.join("hash_list.sml"),
-									serde_smile::to_vec(&hash_list).unwrap()
-								)
-								.unwrap();
+						if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await {
+							if let Ok(data) = data.text().await {
+								let new_version = data
+									.trim()
+									.parse::<u16>()
+									.context("Online hash list version wasn't a number")?;
 
-								app_state.hash_list.store(Some(hash_list.into()));
+								if current_version < new_version {
+									if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
+										if let Ok(data) = data.bytes().await {
+											let hash_list = HashList::from_slice(&data)?;
+
+											fs::write(
+												app.path_resolver()
+													.app_data_dir()
+													.context("Couldn't get app data dir")?
+													.join("hash_list.sml"),
+												serde_smile::to_vec(&hash_list).unwrap()
+											)
+											.unwrap();
+
+											app_state.hash_list.store(Some(hash_list.into()));
+										}
+									}
+								}
 							}
 						}
 
