@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use anyhow::{bail, Context, Result};
 use fn_error_context::context;
 use lazy_static::lazy_static;
+use quickentity_rs::rt_2016_structs::{RTBlueprint2016, RTFactory2016};
 use quickentity_rs::rt_structs::{RTBlueprint, RTFactory};
 use tryvial::try_fn;
 
@@ -296,7 +297,7 @@ pub fn h2_convert_blueprint_to_binary(data: &RTBlueprint) -> Result<Vec<u8>> {
 
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
-pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory> {
+pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory2016> {
 	let _lock = CONVERTER_MUTEX.lock();
 
 	unsafe {
@@ -321,7 +322,7 @@ pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory> {
 			.to_str()
 			.context("Couldn't convert CStr to str")?
 		)
-		.context("Couldn't deserialise returned JsonString as RTFactory")?;
+		.context("Couldn't deserialise returned JsonString as RTFactory2016")?;
 
 		(*converter).FreeJsonString.unwrap()(json_string);
 
@@ -331,7 +332,7 @@ pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory> {
 
 #[try_fn]
 #[context("Couldn't convert ResourceLib TEMP to binary data")]
-pub fn h2016_convert_factory_to_binary(data: &RTFactory) -> Result<Vec<u8>> {
+pub fn h2016_convert_factory_to_binary(data: &RTFactory2016) -> Result<Vec<u8>> {
 	let _lock = GENERATOR_MUTEX.lock();
 
 	unsafe {
@@ -364,7 +365,7 @@ pub fn h2016_convert_factory_to_binary(data: &RTFactory) -> Result<Vec<u8>> {
 
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TBLU")]
-pub fn h2016_convert_binary_to_blueprint(data: &[u8]) -> Result<RTBlueprint> {
+pub fn h2016_convert_binary_to_blueprint(data: &[u8]) -> Result<RTBlueprint2016> {
 	let _lock = CONVERTER_MUTEX.lock();
 
 	unsafe {
@@ -389,7 +390,7 @@ pub fn h2016_convert_binary_to_blueprint(data: &[u8]) -> Result<RTBlueprint> {
 			.to_str()
 			.context("Couldn't convert CStr to str")?
 		)
-		.context("Couldn't deserialise returned JsonString as RTBlueprint")?;
+		.context("Couldn't deserialise returned JsonString as RTBlueprint2016")?;
 
 		(*converter).FreeJsonString.unwrap()(json_string);
 
@@ -399,7 +400,7 @@ pub fn h2016_convert_binary_to_blueprint(data: &[u8]) -> Result<RTBlueprint> {
 
 #[try_fn]
 #[context("Couldn't convert ResourceLib TBLU to binary data")]
-pub fn h2016_convert_blueprint_to_binary(data: &RTBlueprint) -> Result<Vec<u8>> {
+pub fn h2016_convert_blueprint_to_binary(data: &RTBlueprint2016) -> Result<Vec<u8>> {
 	let _lock = GENERATOR_MUTEX.lock();
 
 	unsafe {

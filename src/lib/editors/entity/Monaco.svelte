@@ -276,7 +276,7 @@
 	}
 </script>
 
-<div class="flex flex-wrap gap-2" class:hidden={entityID === null}>
+<div class="flex flex-wrap gap-2 mb-1" class:hidden={entityID === null}>
 	<code>{entityID}</code>
 	{#if validity.type === "Valid"}
 		<span class="text-green-200">Valid entity</span>
@@ -284,7 +284,7 @@
 		<span class="text-red-200">{validity.data}</span>
 	{/if}
 </div>
-<div bind:this={el} class="overflow-hidden" style="height: calc(100vh - 11rem - 2rem - 0.5rem - 2rem)" class:hidden={entityID === null} />
+<div bind:this={el} class="overflow-hidden" style="height: calc(100vh - 11rem - 2rem - 0.5rem - 2.25rem)" class:hidden={entityID === null} />
 {#if entityID === null}
 	<p>Select an entity on the left to edit it here.</p>
 {/if}

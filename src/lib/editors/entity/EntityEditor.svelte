@@ -6,12 +6,14 @@
 	import MetaPane from "./MetaPane.svelte"
 	import { Checkbox } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
+	import Metadata from "./Metadata.svelte"
 
 	export let id: string
 
 	let tree: Tree
 	let monaco: Monaco
 	let metaPane: MetaPane
+	let metadata: Metadata
 
 	export async function handleRequest(request: EntityEditorRequest) {
 		console.log(`Entity editor ${id} handling request`, request)
@@ -27,6 +29,10 @@
 
 			case "metaPane":
 				metaPane.handleRequest(request.data)
+				break
+
+			case "metadata":
+				metadata.handleRequest(request.data)
 				break
 
 			default:
@@ -77,7 +83,10 @@
 		</div>
 		<Checkbox checked={showReverseParentRefs} on:change={showReverseParentRefsChanged} labelText="Show reverse parent references" />
 	</div>
-	<div style="height: calc(100vh - 11rem)">
+	<div style="height: calc(100vh - 11rem)" class:hidden={activeMode !== "Metadata"}>
+		<Metadata editorID={id} bind:this={metadata} />
+	</div>
+	<div style="height: calc(100vh - 11rem)" class:hidden={activeMode !== "Tree"}>
 		<Splitpanes theme="">
 			<Pane size={25}>
 				<div class="w-full h-full pb-4 pr-2">

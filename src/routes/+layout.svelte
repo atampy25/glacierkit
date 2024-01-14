@@ -4,6 +4,7 @@
 	import "carbon-components-svelte/css/g90.css"
 	import "@fortawesome/fontawesome-free/css/all.min.css"
 	import "@fontsource/fira-code"
+	import "$lib/crc32"
 
 	import { appWindow } from "@tauri-apps/api/window"
 	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
@@ -266,5 +267,9 @@
 
 	:global(.bx--toast-notification__caption) {
 		display: none !important;
+	}
+
+	:global(.code-font) {
+		font-family: "Fira Code", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
 	}
 </style>

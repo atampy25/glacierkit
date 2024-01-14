@@ -34,8 +34,6 @@ impl HashList {
 
 		let mut hash_list: HashList = serde_smile::from_slice(&decompressed).context("Deserialisation failed")?;
 
-		hash_list.entries.retain(|x| x.resource_type == "TEMP");
-
 		hash_list
 			.entries
 			.sort_by_cached_key(|x| format!("{}{}{}", x.path, x.hint, x.hash));

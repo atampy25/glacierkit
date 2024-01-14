@@ -96,6 +96,7 @@
 		for (const entry of entries) {
 			const path = /\[(.*)\]\.pc_entity/.exec(entry.path)
 
+			// TODO: Display items with unknown paths
 			if (path) {
 				for (const pathSection of path[1]
 					.split("/")

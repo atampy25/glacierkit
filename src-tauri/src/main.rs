@@ -3,6 +3,7 @@
 // Specta creates non snake case functions
 #![allow(non_snake_case)]
 #![feature(try_blocks)]
+#![feature(try_find)]
 
 pub mod entity;
 pub mod event_handling;
@@ -10,18 +11,22 @@ pub mod game_detection;
 pub mod hash_list;
 pub mod model;
 pub mod resourcelib;
+pub mod rpkg;
 pub mod show_in_folder;
 
 use std::{
 	collections::{HashMap, HashSet},
-	fs,
+	fs::{self, File},
+	io::Cursor,
 	ops::Deref,
+	path::Path,
 	sync::Arc
 };
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
+use binrw::BinReaderExt;
 use entity::{
 	calculate_reverse_references, check_local_references_exist, get_local_reference, get_recursive_children,
 	CopiedEntityData, ReverseReferenceData
@@ -30,19 +35,27 @@ use event_handling::entity_tree::{handle_delete, handle_paste};
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
+use indexmap::IndexMap;
 use itertools::Itertools;
+use memmap2::Mmap;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
 	EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetaPaneRequest,
-	EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent,
-	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project,
-	ProjectSettings, Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType,
-	ToolEvent, ToolRequest
+	EntityMetadataEvent, EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent,
+	EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent,
+	GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings, Request, SettingsEvent, SettingsRequest,
+	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
-	generate_patch,
+	apply_patch, generate_patch,
+	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
+};
+use rpkg::extract_entity;
+use rpkg_rs::{
+	misc::ini_file::IniFile,
+	runtime::resource::{package_manager::PackageManager, resource_container::ResourceContainer}
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, to_string, to_vec};
@@ -51,10 +64,11 @@ use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
 use uuid::Uuid;
+use velcro::vec;
 use walkdir::WalkDir;
 
 const HASH_LIST_ENDPOINT: &str =
-	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/entity_hash_list.sml";
+	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/hash_list.sml";
 
 fn main() {
 	let specta = {
@@ -98,7 +112,8 @@ fn main() {
 					.and_then(|x| serde_smile::from_slice(&x).ok())
 					.into(),
 				fs_watcher: None.into(),
-				editor_states: RwLock::new(HashMap::new()).into()
+				editor_states: RwLock::new(HashMap::new()).into(),
+				resource_packages: None.into()
 			});
 
 			Ok(())
@@ -156,6 +171,90 @@ fn event(app: AppHandle, event: Event) {
 											let mut entity: Entity =
 												from_slice(&fs::read(&path).context("Couldn't read file")?)
 													.context("Invalid entity")?;
+
+											// Normalise comments to form used by Deeznuts (single comment for each entity)
+											let mut comments: Vec<CommentEntity> = vec![];
+											for comment in entity.comments {
+												if let Some(x) =
+													comments.iter_mut().find(|x| x.parent == comment.parent)
+												{
+													x.text = format!("{}\n\n{}", x.text, comment.text);
+												} else {
+													comments.push(CommentEntity {
+														parent: comment.parent,
+														name: "Notes".into(),
+														text: comment.text
+													});
+												}
+											}
+											entity.comments = comments;
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: Some(path.to_owned()),
+													data: EditorData::QNEntity {
+														entity: Box::new(entity),
+														settings: Default::default()
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: path
+														.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.into(),
+													editor_type: EditorType::QNEntity,
+													file: Some(path)
+												})
+											)?;
+										}
+
+										"entity.patch.json" => {
+											let id = Uuid::new_v4();
+
+											let patch: Patch =
+												from_slice(&fs::read(&path).context("Couldn't read file")?)
+													.context("Invalid entity")?;
+
+											let mut entity = extract_entity(
+												app_state
+													.resource_packages
+													.load()
+													.as_deref()
+													.context("Game install not fully loaded")?,
+												app_state
+													.game_installs
+													.iter()
+													.try_find(|x| {
+														Ok::<_, Error>(
+															x.path
+																== *app_state
+																	.project
+																	.load()
+																	.as_ref()
+																	.context("No project loaded")?
+																	.settings
+																	.load()
+																	.game_install
+																	.as_ref()
+																	.context("No game install selected")?
+																	.as_path()
+														)
+													})?
+													.context("No such game install")?
+													.version,
+												app_state.hash_list.load().as_ref().unwrap(),
+												&patch.factory_hash
+											)?;
+
+											apply_patch(&mut entity, patch, true)
+												.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 											// Normalise comments to form used by Deeznuts (single comment for each entity)
 											let mut comments: Vec<CommentEntity> = vec![];
@@ -441,8 +540,114 @@ fn event(app: AppHandle, event: Event) {
 					},
 
 					ToolEvent::GameBrowser(event) => match event {
-						GameBrowserEvent::Select(path) => {
-							// TODO
+						GameBrowserEvent::Select(hash) => {
+							let task = start_task(&app, format!("Loading entity {}", hash))?;
+
+							let game_install_data = app_state
+								.game_installs
+								.iter()
+								.try_find(|x| {
+									Ok::<_, Error>(
+										x.path
+											== *app_state
+												.project
+												.load()
+												.as_ref()
+												.context("No project loaded")?
+												.settings
+												.load()
+												.game_install
+												.as_ref()
+												.context("No game install selected")?
+												.as_path()
+									)
+								})?
+								.context("No such game install")?;
+
+							let mut entity = extract_entity(
+								app_state
+									.resource_packages
+									.load()
+									.as_deref()
+									.context("Game install not fully loaded")?,
+								game_install_data.version,
+								app_state.hash_list.load().as_ref().unwrap(),
+								&hash
+							)?;
+
+							// Normalise comments to form used by Deeznuts (single comment for each entity)
+							let mut comments: Vec<CommentEntity> = vec![];
+							for comment in entity.comments {
+								if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+									x.text = format!("{}\n\n{}", x.text, comment.text);
+								} else {
+									comments.push(CommentEntity {
+										parent: comment.parent,
+										name: "Notes".into(),
+										text: comment.text
+									});
+								}
+							}
+							entity.comments = comments;
+
+							let default_tab_name = format!(
+								"{} ({})",
+								entity
+									.entities
+									.get(&entity.root_entity)
+									.context("Root entity doesn't exist")?
+									.name,
+								hash
+							);
+
+							let tab_name = if let Some(hash_list) = app_state.hash_list.load().as_ref() {
+								if let Some(entry) = hash_list.entries.iter().find(|x| x.hash == hash) {
+									if !entry.path.is_empty() {
+										entry
+											.path
+											.replace("].pc_entitytype", "")
+											.replace("].pc_entitytemplate", "")
+											.split('/')
+											.last()
+											.map(|x| x.to_owned())
+											.unwrap_or(default_tab_name)
+									} else if !entry.hint.is_empty() {
+										format!("{} ({})", entry.hint, hash)
+									} else {
+										default_tab_name
+									}
+								} else {
+									default_tab_name
+								}
+							} else {
+								default_tab_name
+							};
+
+							let id = Uuid::new_v4();
+
+							app_state.editor_states.write().await.insert(
+								id.to_owned(),
+								EditorState {
+									file: None,
+									data: EditorData::QNPatch {
+										base: Box::new(entity.to_owned()),
+										current: Box::new(entity),
+										settings: Default::default()
+									}
+								}
+							);
+
+							send_request(
+								&app,
+								Request::Global(GlobalRequest::CreateTab {
+									id,
+									name: tab_name,
+									editor_type: EditorType::QNPatch,
+									file: None
+								})
+							)?;
+
+							finish_task(&app, task)?;
 						}
 
 						GameBrowserEvent::Search(query) => {
@@ -487,6 +692,7 @@ fn event(app: AppHandle, event: Event) {
 												.entries
 												.iter()
 												.filter(|x| x.game_flags & game_flag == game_flag)
+												.filter(|x| x.resource_type == "TEMP")
 												.filter(|x| query.split(' ').all(|y| x.path.contains(y)))
 												.map(|x| GameBrowserEntry {
 													hash: x.hash.to_owned(),
@@ -515,10 +721,76 @@ fn event(app: AppHandle, event: Event) {
 						}
 
 						SettingsEvent::ChangeGameInstall(path) => {
+							let task = start_task(&app, "Loading game files")?;
+
 							send_request(
 								&app,
 								Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(path.is_some())))
 							)?;
+
+							if let Some(path) = path.as_ref() {
+								let mut thumbs = IniFile::new();
+								thumbs
+									.load(&path.join("thumbs.dat").to_string_lossy())
+									.map_err(|x| anyhow!("RPKG error in parsing thumbs.dat: {:?}", x))?;
+
+								let mut resource_packages = IndexMap::new();
+
+								if let (Ok(proj_path), Ok(relative_runtime_path)) = (
+									thumbs.get_value("application", "PROJECT_PATH"),
+									thumbs.get_value("application", "RUNTIME_PATH")
+								) {
+									let mut package_manager = PackageManager::new(
+										&path.join(proj_path).join(relative_runtime_path).to_string_lossy()
+									);
+
+									let mut resource_container = ResourceContainer::default();
+
+									package_manager.initialize(&mut resource_container).map_err(|x| {
+										anyhow!("RPKG error in initialising resource container: {:?}", x)
+									})?;
+
+									for partition in &package_manager.partition_infos {
+										for patch in vec![
+											0,
+											..ResourceContainer::get_patch_indices(
+												&package_manager.runtime_dir,
+												partition.index
+											)
+											.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
+											.iter()
+											.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
+										]
+										.into_iter()
+										.rev()
+										{
+											let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
+												"chunk{}{}.rpkg",
+												partition.index,
+												if patch > 0 {
+													format!("patch{}", patch)
+												} else {
+													"".into()
+												}
+											));
+
+											resource_packages.insert(rpkg_path.to_owned(), {
+												let package_file = File::open(&rpkg_path)?;
+
+												let mmap = unsafe { Mmap::map(&package_file)? };
+												let mut reader = Cursor::new(&mmap[..]);
+
+												reader.read_ne_args((patch > 0,)).context("Couldn't parse RPKG file")?
+											});
+										}
+									}
+								} else {
+									Err(anyhow!("thumbs.dat was missing required properties"))?;
+									panic!();
+								}
+
+								app_state.resource_packages.store(Some(resource_packages.into()));
+							}
 
 							if let Some(project) = app_state.project.load().deref() {
 								let mut settings = (*project.settings.load_full()).to_owned();
@@ -526,6 +798,8 @@ fn event(app: AppHandle, event: Event) {
 								fs::write(project.path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
 								project.settings.store(settings.into());
 							}
+
+							finish_task(&app, task)?;
 						}
 
 						SettingsEvent::ChangeExtractModdedFiles(value) => {
@@ -1048,6 +1322,131 @@ fn event(app: AppHandle, event: Event) {
 									text: notes
 								});
 							}
+						},
+
+						EntityEditorEvent::Metadata(event) => match event {
+							EntityMetadataEvent::Initialise { editor_id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref entity, .. } => entity,
+									EditorData::QNPatch { ref current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+										EntityMetadataRequest::Initialise {
+											editor_id,
+											factory_hash: entity.factory_hash.to_owned(),
+											blueprint_hash: entity.blueprint_hash.to_owned(),
+											root_entity: entity.root_entity.to_owned(),
+											sub_type: entity.sub_type.to_owned(),
+											external_scenes: entity.external_scenes.to_owned()
+										}
+									)))
+								)?;
+							}
+
+							EntityMetadataEvent::SetFactoryHash {
+								editor_id,
+								factory_hash
+							} => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								entity.factory_hash = factory_hash;
+							}
+
+							EntityMetadataEvent::SetBlueprintHash {
+								editor_id,
+								blueprint_hash
+							} => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								entity.blueprint_hash = blueprint_hash;
+							}
+
+							EntityMetadataEvent::SetRootEntity { editor_id, root_entity } => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								entity.root_entity = root_entity;
+							}
+
+							EntityMetadataEvent::SetSubType { editor_id, sub_type } => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								entity.sub_type = sub_type;
+							}
+
+							EntityMetadataEvent::SetExternalScenes {
+								editor_id,
+								external_scenes
+							} => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								entity.external_scenes = external_scenes;
+							}
 						}
 					}
 				},
@@ -1314,6 +1713,74 @@ fn event(app: AppHandle, event: Event) {
 
 						finish_task(&app, task)?;
 
+						let task = start_task(&app, "Loading game files")?;
+
+						if let Some(path) = settings.game_install.as_ref() {
+							let mut thumbs = IniFile::new();
+							thumbs
+								.load(&path.join("thumbs.dat").to_string_lossy())
+								.map_err(|x| anyhow!("RPKG error in parsing thumbs.dat: {:?}", x))?;
+
+							let mut resource_packages = IndexMap::new();
+
+							if let (Ok(proj_path), Ok(relative_runtime_path)) = (
+								thumbs.get_value("application", "PROJECT_PATH"),
+								thumbs.get_value("application", "RUNTIME_PATH")
+							) {
+								let mut package_manager = PackageManager::new(
+									&path.join(proj_path).join(relative_runtime_path).to_string_lossy()
+								);
+
+								let mut resource_container = ResourceContainer::default();
+
+								package_manager
+									.initialize(&mut resource_container)
+									.map_err(|x| anyhow!("RPKG error in initialising resource container: {:?}", x))?;
+
+								for partition in &package_manager.partition_infos {
+									for patch in vec![
+										0,
+										..ResourceContainer::get_patch_indices(
+											&package_manager.runtime_dir,
+											partition.index
+										)
+										.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
+										.iter()
+										.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
+									]
+									.into_iter()
+									.rev()
+									{
+										let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
+											"chunk{}{}.rpkg",
+											partition.index,
+											if patch > 0 {
+												format!("patch{}", patch)
+											} else {
+												"".into()
+											}
+										));
+
+										resource_packages.insert(rpkg_path.to_owned(), {
+											let package_file = File::open(&rpkg_path)?;
+
+											let mmap = unsafe { Mmap::map(&package_file)? };
+											let mut reader = Cursor::new(&mmap[..]);
+
+											reader.read_ne_args((patch > 0,)).context("Couldn't parse RPKG file")?
+										});
+									}
+								}
+							} else {
+								Err(anyhow!("thumbs.dat was missing required properties"))?;
+								panic!();
+							}
+
+							app_state.resource_packages.store(Some(resource_packages.into()));
+						}
+
+						finish_task(&app, task)?;
+
 						let task = start_task(&app, "Acquiring latest hash list")?;
 
 						if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
@@ -1333,14 +1800,14 @@ fn event(app: AppHandle, event: Event) {
 							}
 						}
 
-						finish_task(&app, task)?;
-
 						send_request(
 							&app,
 							Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
 								settings.game_install.is_some() && app_state.hash_list.load().is_some()
 							)))
 						)?;
+
+						finish_task(&app, task)?;
 					}
 
 					GlobalEvent::SelectTab(tab) => {

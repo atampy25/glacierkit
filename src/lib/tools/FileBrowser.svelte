@@ -58,113 +58,117 @@
 			},
 			contextmenu: {
 				select_node: false,
-				items: (b: { id: string }, c: any) => {
+				items: (rightClickedNode: { original: { folder: boolean } }, c: any) => {
 					return {
-						newfile: {
-							separator_before: false,
-							separator_after: true,
-							_disabled: false,
-							label: "New File",
-							icon: "fa fa-plus",
-							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
+						...(!rightClickedNode.original.folder
+							? {}
+							: {
+									newfile: {
+										separator_before: false,
+										separator_after: true,
+										_disabled: false,
+										label: "New File",
+										icon: "fa fa-plus",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-								const id = v4()
+											const id = v4()
 
-								tree.create_node(
-									selected_node,
-									{
-										id,
-										parent: selected_node.id,
-										icon: "fa-regular fa-file",
-										text: "",
-										folder: false
-									},
-									getPositionOfNode(selected_node.id, "", false),
-									function (a: any) {
-										tree.edit(a, undefined, async (node, status, _c) => {
-											// Can't create entity.patch.json files
-											if (!status || !node.text || node.text.endsWith(".entity.patch.json")) {
-												tree.delete_node(id)
-												return
-											}
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
-
-											tree.set_icon(id, path.endsWith(".json") ? "fa-regular fa-pen-to-square" : "fa-regular fa-file")
-
-											pathToID[path] = id
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "create",
-														data: {
-															path,
-															is_folder: false
+											tree.create_node(
+												selected_node,
+												{
+													id,
+													parent: selected_node.id,
+													icon: "fa-regular fa-file",
+													text: "",
+													folder: false
+												},
+												getPositionOfNode(selected_node.id, "", false),
+												function (a: any) {
+													tree.edit(a, undefined, async (node, status, _c) => {
+														// Can't create entity.patch.json files
+														if (!status || !node.text || node.text.endsWith(".entity.patch.json")) {
+															tree.delete_node(id)
+															return
 														}
-													}
+
+														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
+
+														tree.set_icon(id, path.endsWith(".json") ? "fa-regular fa-pen-to-square" : "fa-regular fa-file")
+
+														pathToID[path] = id
+
+														await event({
+															type: "tool",
+															data: {
+																type: "fileBrowser",
+																data: {
+																	type: "create",
+																	data: {
+																		path,
+																		is_folder: false
+																	}
+																}
+															}
+														})
+													})
 												}
-											})
-										})
-									}
-								)
-							}
-						},
-						newfolder: {
-							separator_before: false,
-							separator_after: true,
-							_disabled: false,
-							label: "New Folder",
-							icon: "fa fa-plus",
-							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
-
-								const id = v4()
-
-								tree.create_node(
-									selected_node,
-									{
-										id,
-										parent: selected_node.id,
-										icon: "fa-regular fa-folder",
-										text: "",
-										folder: true
+											)
+										}
 									},
-									getPositionOfNode(selected_node.id, "", true),
-									function (a: any) {
-										tree.edit(a, undefined, async (node, status, _c) => {
-											if (!status || !node.text) {
-												tree.delete_node(id)
-												return
-											}
+									newfolder: {
+										separator_before: false,
+										separator_after: true,
+										_disabled: false,
+										label: "New Folder",
+										icon: "fa fa-plus",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
+											const id = v4()
 
-											pathToID[path] = id
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "create",
-														data: {
-															path,
-															is_folder: true
+											tree.create_node(
+												selected_node,
+												{
+													id,
+													parent: selected_node.id,
+													icon: "fa-regular fa-folder",
+													text: "",
+													folder: true
+												},
+												getPositionOfNode(selected_node.id, "", true),
+												function (a: any) {
+													tree.edit(a, undefined, async (node, status, _c) => {
+														if (!status || !node.text) {
+															tree.delete_node(id)
+															return
 														}
-													}
+
+														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
+
+														pathToID[path] = id
+
+														await event({
+															type: "tool",
+															data: {
+																type: "fileBrowser",
+																data: {
+																	type: "create",
+																	data: {
+																		path,
+																		is_folder: true
+																	}
+																}
+															}
+														})
+													})
 												}
-											})
-										})
+											)
+										}
 									}
-								)
-							}
-						},
+								}),
 						showinexplorer: {
 							separator_before: false,
 							separator_after: false,

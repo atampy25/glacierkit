@@ -118,9 +118,9 @@ extraBlueprintDependencies: Dependency[];
  */
 comments: CommentEntity[] }
 
-export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent }
+export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent } | { type: "metadata"; data: EntityMetadataEvent }
 
-export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest }
+export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest } | { type: "metadata"; data: EntityMetadataRequest }
 
 export type EntityGeneralEvent = { type: "setShowReverseParentRefs"; data: { editor_id: string; show_reverse_parent_refs: boolean } }
 
@@ -128,9 +128,13 @@ export type EntityMetaPaneEvent = { type: "jumpToReference"; data: { editor_id: 
 
 export type EntityMetaPaneRequest = { type: "setReverseRefs"; data: { editor_id: string; entity_names: { [key in string]: string }; reverse_refs: ReverseReference[] } } | { type: "setNotes"; data: { editor_id: string; entity_id: string; notes: string } }
 
+export type EntityMetadataEvent = { type: "initialise"; data: { editor_id: string } } | { type: "setFactoryHash"; data: { editor_id: string; factory_hash: string } } | { type: "setBlueprintHash"; data: { editor_id: string; blueprint_hash: string } } | { type: "setRootEntity"; data: { editor_id: string; root_entity: string } } | { type: "setSubType"; data: { editor_id: string; sub_type: SubType } } | { type: "setExternalScenes"; data: { editor_id: string; external_scenes: string[] } }
+
+export type EntityMetadataRequest = { type: "initialise"; data: { editor_id: string; factory_hash: string; blueprint_hash: string; root_entity: string; sub_type: SubType; external_scenes: string[] } }
+
 export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } }
 
-export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "updateIntellisense"; data: Record<string, never> } | { type: "updateValidity"; data: { editor_id: string; validity: EditorValidity } }
+export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "updateIntellisense"; data: { editor_id: string } } | { type: "updateValidity"; data: { editor_id: string; validity: EditorValidity } }
 
 export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } }
 
@@ -199,7 +203,7 @@ exposedEntity?: string | null }
 
 export type GameBrowserEntry = { hash: string; path: string; hint: string }
 
-export type GameBrowserEvent = { type: "select"; data: string | null } | { type: "search"; data: string }
+export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: string }
 
 export type GameBrowserRequest = { type: "setEnabled"; data: boolean } | { type: "newTree"; data: { game_description: string; entries: GameBrowserEntry[] } }
 

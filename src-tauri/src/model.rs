@@ -1,8 +1,10 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
+use indexmap::IndexMap;
 use notify::RecommendedWatcher;
-use quickentity_rs::qn_structs::{Entity, Ref, SubEntity};
+use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
+use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use structstruck::strike;
@@ -27,13 +29,13 @@ impl Default for AppSettings {
 	}
 }
 
-#[derive(Debug)]
 pub struct AppState {
 	pub game_installs: Vec<GameInstall>,
 	pub project: ArcSwapOption<Project>,
 	pub hash_list: ArcSwapOption<HashList>,
 	pub fs_watcher: ArcSwapOption<RecommendedWatcher>,
-	pub editor_states: Arc<RwLock<HashMap<Uuid, EditorState>>>
+	pub editor_states: Arc<RwLock<HashMap<Uuid, EditorState>>>,
+	pub resource_packages: ArcSwapOption<IndexMap<PathBuf, ResourcePackage>>
 }
 
 #[derive(Debug)]
@@ -148,7 +150,7 @@ strike! {
 			}),
 
 			GameBrowser(pub enum GameBrowserEvent {
-				Select(Option<String>),
+				Select(String),
 				Search(String)
 			}),
 
@@ -242,6 +244,37 @@ strike! {
 						editor_id: Uuid,
 						entity_id: String,
 						notes: String
+					}
+				}),
+
+				Metadata(pub enum EntityMetadataEvent {
+					Initialise {
+						editor_id: Uuid
+					},
+
+					SetFactoryHash {
+						editor_id: Uuid,
+						factory_hash: String
+					},
+
+					SetBlueprintHash {
+						editor_id: Uuid,
+						blueprint_hash: String
+					},
+
+					SetRootEntity {
+						editor_id: Uuid,
+						root_entity: String
+					},
+
+					SetSubType {
+						editor_id: Uuid,
+						sub_type: SubType
+					},
+
+					SetExternalScenes {
+						editor_id: Uuid,
+						external_scenes: Vec<String>
 					}
 				})
 			})
@@ -348,6 +381,7 @@ strike! {
 					},
 
 					UpdateIntellisense {
+						editor_id: Uuid,
 
 					},
 
@@ -368,6 +402,17 @@ strike! {
 						editor_id: Uuid,
 						entity_id: String,
 						notes: String
+					}
+				}),
+
+				Metadata(pub enum EntityMetadataRequest {
+					Initialise {
+						editor_id: Uuid,
+						factory_hash: String,
+						blueprint_hash: String,
+						root_entity: String,
+						sub_type: SubType,
+						external_scenes: Vec<String>
 					}
 				})
 			})

@@ -10,6 +10,7 @@
 
 	let uuid = v4()
 	let pathToCalculateHash = ""
+	let stringToCalculateLocHash = ""
 </script>
 
 <div class="w-full h-full p-6 overflow-y-auto">
@@ -29,5 +30,15 @@
 		<br />
 		<div class="bx--label">Decimal</div>
 		<CodeSnippet code={new Decimal("0x" + md5(pathToCalculateHash).slice(2, 16)).toString()} />
+	</div>
+
+	<h4 class="mt-4 mb-2">Localisation hash calculator</h4>
+	<TextInput bind:value={stringToCalculateLocHash} placeholder="UI_SOME_TEXT" />
+	<div class="mt-4">
+		<div class="bx--label">Hex</div>
+		<CodeSnippet code={window.crc.crc32(stringToCalculateLocHash).toString(16).toUpperCase()} />
+		<br />
+		<div class="bx--label">Decimal</div>
+		<CodeSnippet code={window.crc.crc32(stringToCalculateLocHash).toString()} />
 	</div>
 </div>
