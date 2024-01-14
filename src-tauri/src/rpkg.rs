@@ -159,12 +159,16 @@ pub async fn extract_entity(
 	hash_list: &HashList,
 	factory_path: &str
 ) -> Result<Entity> {
-	if let Some(cached) = cached_entities.read().await.get(factory_path) {
-		cached.to_owned()
-	} else {
-		let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, factory_path)?;
+	{
+		if let Some(cached) = cached_entities.read().await.get(factory_path) {
+			return Ok(cached.to_owned());
+		}
+	}
 
-		let factory = match game_version {
+	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, factory_path)?;
+
+	let factory =
+		match game_version {
 			GameVersion::H1 => convert_2016_factory_to_modern(
 				&h2016_convert_binary_to_factory(&temp_data)
 					.context("Couldn't convert binary data to ResourceLib factory")?
@@ -177,39 +181,38 @@ pub async fn extract_entity(
 				.context("Couldn't convert binary data to ResourceLib factory")?
 		};
 
-		let blueprint_hash = &temp_meta
-			.hash_reference_data
-			.get(factory.blueprint_index_in_resource_header as usize)
-			.context("Blueprint referenced in factory does not exist in dependencies")?
-			.hash;
+	let blueprint_hash = &temp_meta
+		.hash_reference_data
+		.get(factory.blueprint_index_in_resource_header as usize)
+		.context("Blueprint referenced in factory does not exist in dependencies")?
+		.hash;
 
-		let (tblu_meta, tblu_data) = extract_latest_resource(resource_packages, hash_list, blueprint_hash)?;
+	let (tblu_meta, tblu_data) = extract_latest_resource(resource_packages, hash_list, blueprint_hash)?;
 
-		let blueprint = match game_version {
-			GameVersion::H1 => convert_2016_blueprint_to_modern(
-				&h2016_convert_binary_to_blueprint(&tblu_data)
-					.context("Couldn't convert binary data to ResourceLib blueprint")?
-			),
-
-			GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
-				.context("Couldn't convert binary data to ResourceLib blueprint")?,
-
-			GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data)
+	let blueprint = match game_version {
+		GameVersion::H1 => convert_2016_blueprint_to_modern(
+			&h2016_convert_binary_to_blueprint(&tblu_data)
 				.context("Couldn't convert binary data to ResourceLib blueprint")?
-		};
+		),
 
-		let entity = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, true)
-			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+		GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
+			.context("Couldn't convert binary data to ResourceLib blueprint")?,
 
-		cached_entities.write().await.insert(
-			if factory_path.starts_with('0') {
-				factory_path.to_owned()
-			} else {
-				format!("{:0>16X}", Md5Engine::compute(&factory_path.to_lowercase()))
-			},
-			entity.to_owned()
-		);
+		GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data)
+			.context("Couldn't convert binary data to ResourceLib blueprint")?
+	};
 
-		entity
-	}
+	let entity = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, true)
+		.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+	cached_entities.write().await.insert(
+		if factory_path.starts_with('0') {
+			factory_path.to_owned()
+		} else {
+			format!("{:0>16X}", Md5Engine::compute(&factory_path.to_lowercase()))
+		},
+		entity.to_owned()
+	);
+
+	entity
 }

@@ -1196,6 +1196,42 @@ fn event(app: AppHandle, event: Event) {
 							EntityTreeEvent::Paste { editor_id, parent_id } => {
 								handle_paste(&app, editor_id, parent_id).await?;
 							}
+
+							EntityTreeEvent::Search { editor_id, query } => {
+								let task = start_task(&app, format!("Searching for {}", query))?;
+
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref entity, .. } => entity,
+									EditorData::QNPatch { ref current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+										EntityTreeRequest::SearchResults {
+											editor_id,
+											results: entity
+												.entities
+												.iter()
+												.filter(|(id, ent)| {
+													format!("{}{}", id, to_string(ent).unwrap()).contains(&query)
+												})
+												.map(|(id, _)| id.to_owned())
+												.collect()
+										}
+									)))
+								)?;
+
+								finish_task(&app, task)?;
+							}
 						},
 
 						EntityEditorEvent::Monaco(event) => match event {

@@ -224,6 +224,11 @@ strike! {
 					Paste {
 						editor_id: Uuid,
 						parent_id: String
+					},
+
+					Search {
+						editor_id: Uuid,
+						query: String
 					}
 				}),
 
@@ -371,6 +376,13 @@ strike! {
 
 						/// ID, parent, name, factory, has reverse parent refs
 						new_entities: Vec<(String, Ref, String, String, bool)>
+					},
+
+					SearchResults {
+						editor_id: Uuid,
+
+						/// The IDs of the entities matching the query
+						results: Vec<String>
 					}
 				}),
 

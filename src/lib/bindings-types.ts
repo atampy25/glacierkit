@@ -136,7 +136,7 @@ export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: stri
 
 export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "updateIntellisense"; data: { editor_id: string } } | { type: "updateValidity"; data: { editor_id: string; validity: EditorValidity } }
 
-export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } }
 
 export type EntityTreeRequest = 
 /**
@@ -155,7 +155,11 @@ entities: ([string, Ref, string, string, boolean])[] } } |
 /**
  * ID, parent, name, factory, has reverse parent refs
  */
-new_entities: ([string, Ref, string, string, boolean])[] } }
+new_entities: ([string, Ref, string, string, boolean])[] } } | { type: "searchResults"; data: { editor_id: string; 
+/**
+ * The IDs of the entities matching the query
+ */
+results: string[] } }
 
 export type EphemeralQNSettings = { showReverseParentRefs: boolean }
 

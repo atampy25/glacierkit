@@ -35,6 +35,9 @@
 		return indexOfNewNode
 	}
 
+	// Gets around having to use JS for search
+	let entitiesToShowOnSearch: Set<string> = new Set()
+
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
 			core: {
@@ -51,7 +54,8 @@
 			search: {
 				fuzzy: false,
 				show_only_matches: true,
-				close_opened_onclear: false
+				close_opened_onclear: false,
+				search_callback: (search: string, node: { id: string }) => entitiesToShowOnSearch.has(node.id)
 			},
 			sort: function (a: any, b: any) {
 				return compareNodes(this.get_node(a), this.get_node(b))
@@ -403,6 +407,11 @@
 				await newItems(request.data.new_entities)
 				break
 
+			case "searchResults":
+				entitiesToShowOnSearch = new Set(request.data.results)
+				tree.search("dummy")
+				break
+
 			default:
 				request satisfies never
 				break
@@ -580,9 +589,29 @@
 		}
 	}
 
-	function searchInput(event: any) {
-		const _event = event as { target: HTMLInputElement }
-		tree.search(_event.target.value.toLowerCase())
+	async function searchInput(evt: any) {
+		const _event = evt as { target: HTMLInputElement }
+
+		if (_event.target.value.length === 0) {
+			tree.clear_search()
+		} else {
+			await event({
+				type: "editor",
+				data: {
+					type: "entity",
+					data: {
+						type: "tree",
+						data: {
+							type: "search",
+							data: {
+								editor_id: editorID,
+								query: _event.target.value.toLowerCase()
+							}
+						}
+					}
+				}
+			})
+		}
 	}
 
 	function fixSelection() {
