@@ -16,15 +16,13 @@ use crate::{entity::ReverseReference, game_detection::GameInstall, hash_list::Ha
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
-	pub extract_modded_files: bool,
-	pub game_file_extensions_path: Option<PathBuf>
+	pub extract_modded_files: bool
 }
 
 impl Default for AppSettings {
 	fn default() -> Self {
 		Self {
-			extract_modded_files: false,
-			game_file_extensions_path: None
+			extract_modded_files: false
 		}
 	}
 }
@@ -158,8 +156,7 @@ strike! {
 			Settings(pub enum SettingsEvent {
 				Initialise,
 				ChangeGameInstall(Option<PathBuf>),
-				ChangeExtractModdedFiles(bool),
-				ChangeGFEPath(Option<PathBuf>)
+				ChangeExtractModdedFiles(bool)
 			})
 		}),
 
@@ -437,8 +434,7 @@ strike! {
 			CreateTab {
 				id: Uuid,
 				name: String,
-				editor_type: EditorType,
-				file: Option<PathBuf>
+				editor_type: EditorType
 			},
 			SelectTab(Uuid),
 			SetTabUnsaved {

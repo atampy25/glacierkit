@@ -23,7 +23,7 @@ use std::{
 	sync::Arc
 };
 
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
@@ -52,6 +52,7 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
+use rfd::AsyncFileDialog;
 use rpkg::extract_entity;
 use rpkg_rs::{
 	misc::ini_file::IniFile,
@@ -213,8 +214,7 @@ fn event(app: AppHandle, event: Event) {
 														.context("No file name")?
 														.to_string_lossy()
 														.into(),
-													editor_type: EditorType::QNEntity,
-													file: Some(path)
+													editor_type: EditorType::QNEntity
 												})
 											)?;
 										}
@@ -226,83 +226,104 @@ fn event(app: AppHandle, event: Event) {
 												from_slice(&fs::read(&path).context("Couldn't read file")?)
 													.context("Invalid entity")?;
 
-											let mut entity = extract_entity(
-												app_state
-													.resource_packages
-													.load()
-													.as_deref()
-													.context("Game install not fully loaded")?,
-												&app_state.cached_entities,
-												app_state
-													.game_installs
-													.iter()
-													.try_find(|x| {
-														Ok::<_, Error>(
-															x.path
-																== *app_state
-																	.project
-																	.load()
-																	.as_ref()
-																	.context("No project loaded")?
-																	.settings
-																	.load()
-																	.game_install
-																	.as_ref()
-																	.context("No game install selected")?
-																	.as_path()
-														)
-													})?
-													.context("No such game install")?
-													.version,
-												app_state.hash_list.load().as_ref().unwrap(),
-												&patch.factory_hash
-											)
-											.await?;
+											if app_state
+												.project
+												.load()
+												.as_ref()
+												.map(|x| x.settings.load().game_install.is_some())
+												.unwrap_or(false)
+											{
+												let mut entity = extract_entity(
+													app_state
+														.resource_packages
+														.load()
+														.as_deref()
+														.context("Game install not fully loaded")?,
+													&app_state.cached_entities,
+													app_state
+														.game_installs
+														.iter()
+														.try_find(|x| {
+															Ok::<_, Error>(
+																x.path
+																	== *app_state
+																		.project
+																		.load()
+																		.as_ref()
+																		.unwrap()
+																		.settings
+																		.load()
+																		.game_install
+																		.as_ref()
+																		.unwrap()
+																		.as_path()
+															)
+														})?
+														.context("No such game install")?
+														.version,
+													app_state.hash_list.load().as_ref().unwrap(),
+													&patch.factory_hash
+												)
+												.await?;
 
-											apply_patch(&mut entity, patch, true)
-												.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+												let base = entity.to_owned();
 
-											// Normalise comments to form used by Deeznuts (single comment for each entity)
-											let mut comments: Vec<CommentEntity> = vec![];
-											for comment in entity.comments {
-												if let Some(x) =
-													comments.iter_mut().find(|x| x.parent == comment.parent)
-												{
-													x.text = format!("{}\n\n{}", x.text, comment.text);
-												} else {
-													comments.push(CommentEntity {
-														parent: comment.parent,
-														name: "Notes".into(),
-														text: comment.text
-													});
-												}
-											}
-											entity.comments = comments;
+												apply_patch(&mut entity, patch, true)
+													.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-											app_state.editor_states.write().await.insert(
-												id.to_owned(),
-												EditorState {
-													file: Some(path.to_owned()),
-													data: EditorData::QNEntity {
-														entity: Box::new(entity),
-														settings: Default::default()
+												// Normalise comments to form used by Deeznuts (single comment for each entity)
+												let mut comments: Vec<CommentEntity> = vec![];
+												for comment in entity.comments {
+													if let Some(x) =
+														comments.iter_mut().find(|x| x.parent == comment.parent)
+													{
+														x.text = format!("{}\n\n{}", x.text, comment.text);
+													} else {
+														comments.push(CommentEntity {
+															parent: comment.parent,
+															name: "Notes".into(),
+															text: comment.text
+														});
 													}
 												}
-											);
+												entity.comments = comments;
 
-											send_request(
-												&app,
-												Request::Global(GlobalRequest::CreateTab {
-													id,
-													name: path
-														.file_name()
-														.context("No file name")?
-														.to_string_lossy()
-														.into(),
-													editor_type: EditorType::QNEntity,
-													file: Some(path)
-												})
-											)?;
+												app_state.editor_states.write().await.insert(
+													id.to_owned(),
+													EditorState {
+														file: Some(path.to_owned()),
+														data: EditorData::QNPatch {
+															base: Box::new(base),
+															current: Box::new(entity),
+															settings: Default::default()
+														}
+													}
+												);
+
+												send_request(
+													&app,
+													Request::Global(GlobalRequest::CreateTab {
+														id,
+														name: path
+															.file_name()
+															.context("No file name")?
+															.to_string_lossy()
+															.into(),
+														editor_type: EditorType::QNPatch
+													})
+												)?;
+											} else {
+												send_notification(
+													&app,
+													Notification {
+														kind: NotificationKind::Error,
+														title: "No game selected".into(),
+														subtitle: "You can't open patch files without a copy of the \
+														           game selected."
+															.into()
+													}
+												)?;
+											}
 										}
 
 										"json" => {
@@ -338,8 +359,7 @@ fn event(app: AppHandle, event: Event) {
 														.context("No file name")?
 														.to_string_lossy()
 														.into(),
-													editor_type: EditorType::Text { file_type },
-													file: Some(path)
+													editor_type: EditorType::Text { file_type }
 												})
 											)?;
 										}
@@ -370,8 +390,7 @@ fn event(app: AppHandle, event: Event) {
 														.into(),
 													editor_type: EditorType::Text {
 														file_type: TextFileType::PlainText
-													},
-													file: Some(path)
+													}
 												})
 											)?;
 										}
@@ -402,8 +421,7 @@ fn event(app: AppHandle, event: Event) {
 														.into(),
 													editor_type: EditorType::Text {
 														file_type: TextFileType::Markdown
-													},
-													file: Some(path)
+													}
 												})
 											)?;
 										}
@@ -430,8 +448,7 @@ fn event(app: AppHandle, event: Event) {
 														.context("No file name")?
 														.to_string_lossy()
 														.into(),
-													editor_type: EditorType::Nil,
-													file: Some(path)
+													editor_type: EditorType::Nil
 												})
 											)?;
 										}
@@ -650,8 +667,7 @@ fn event(app: AppHandle, event: Event) {
 								Request::Global(GlobalRequest::CreateTab {
 									id,
 									name: tab_name,
-									editor_type: EditorType::QNPatch,
-									file: None
+									editor_type: EditorType::QNPatch
 								})
 							)?;
 
@@ -731,11 +747,6 @@ fn event(app: AppHandle, event: Event) {
 						SettingsEvent::ChangeGameInstall(path) => {
 							let task = start_task(&app, "Loading game files")?;
 
-							send_request(
-								&app,
-								Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(path.is_some())))
-							)?;
-
 							if let Some(path) = path.as_ref() {
 								let mut thumbs = IniFile::new();
 								thumbs
@@ -800,6 +811,11 @@ fn event(app: AppHandle, event: Event) {
 								app_state.resource_packages.store(Some(resource_packages.into()));
 							}
 
+							send_request(
+								&app,
+								Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(path.is_some())))
+							)?;
+
 							if let Some(project) = app_state.project.load().deref() {
 								let mut settings = (*project.settings.load_full()).to_owned();
 								settings.game_install = path;
@@ -813,20 +829,6 @@ fn event(app: AppHandle, event: Event) {
 						SettingsEvent::ChangeExtractModdedFiles(value) => {
 							let mut settings = (*app_settings.load_full()).to_owned();
 							settings.extract_modded_files = value;
-							fs::write(
-								app.path_resolver()
-									.app_data_dir()
-									.context("Couldn't get app data dir")?
-									.join("settings.json"),
-								to_vec(&settings).unwrap()
-							)
-							.unwrap();
-							app_settings.store(settings.into());
-						}
-
-						SettingsEvent::ChangeGFEPath(value) => {
-							let mut settings = (*app_settings.load_full()).to_owned();
-							settings.game_file_extensions_path = value;
 							fs::write(
 								app.path_resolver()
 									.app_data_dir()
@@ -1903,40 +1905,115 @@ fn event(app: AppHandle, event: Event) {
 					}
 
 					GlobalEvent::SaveTab(tab) => {
-						let guard = app_state.editor_states.read().await;
-						let editor = guard.get(&tab).context("No such editor")?;
+						let mut guard = app_state.editor_states.write().await;
+						let editor = guard.get_mut(&tab).context("No such editor")?;
 
-						fs::write(
-							editor.file.as_ref().context("Tab has no intended file")?,
-							match &editor.data {
-								EditorData::Nil => {
-									Err(anyhow!("Editor is a nil editor"))?;
-									panic!();
-								}
-
-								EditorData::Text { content, .. } => content.as_bytes().to_owned(),
-
-								EditorData::QNEntity { entity, .. } => {
-									serde_json::to_vec(&entity).context("Entity is invalid")?
-								}
-
-								EditorData::QNPatch { base, current, .. } => serde_json::to_vec(
-									&generate_patch(base, current)
-										.map_err(|x| anyhow!(x))
-										.context("Couldn't generate patch")?
-								)
-								.context("Entity is invalid")?
+						let data_to_save = match &editor.data {
+							EditorData::Nil => {
+								Err(anyhow!("Editor is a nil editor"))?;
+								panic!();
 							}
-						)
-						.context("Couldn't write file")?;
 
-						send_request(
-							&app,
-							Request::Global(GlobalRequest::SetTabUnsaved {
-								id: tab,
-								unsaved: false
-							})
-						)?;
+							EditorData::Text { content, .. } => content.as_bytes().to_owned(),
+
+							EditorData::QNEntity { entity, .. } => {
+								serde_json::to_vec(&entity).context("Entity is invalid")?
+							}
+
+							EditorData::QNPatch { base, current, .. } => serde_json::to_vec(
+								&generate_patch(base, current)
+									.map_err(|x| anyhow!(x))
+									.context("Couldn't generate patch")?
+							)
+							.context("Entity is invalid")?
+						};
+
+						if let Some(file) = editor.file.as_ref() {
+							fs::write(file, data_to_save).context("Couldn't write file")?;
+
+							send_request(
+								&app,
+								Request::Global(GlobalRequest::SetTabUnsaved {
+									id: tab,
+									unsaved: false
+								})
+							)?;
+						} else {
+							let mut dialog = AsyncFileDialog::new().set_title("Save file");
+
+							if let Some(project) = app_state.project.load().as_ref() {
+								dialog = dialog.set_directory(&project.path);
+							}
+
+							if let Some(save_handle) = dialog
+								.add_filter(
+									match &editor.data {
+										EditorData::Nil => {
+											Err(anyhow!("Editor is a nil editor"))?;
+											panic!();
+										}
+
+										EditorData::Text {
+											file_type: TextFileType::PlainText,
+											..
+										} => "Text file",
+
+										EditorData::Text {
+											file_type: TextFileType::Markdown,
+											..
+										} => "Markdown file",
+
+										EditorData::Text {
+											file_type: TextFileType::Json | TextFileType::ManifestJson,
+											..
+										} => "JSON file",
+
+										EditorData::QNEntity { .. } => "QuickEntity entity",
+
+										EditorData::QNPatch { .. } => "QuickEntity patch"
+									},
+									&[match &editor.data {
+										EditorData::Nil => {
+											Err(anyhow!("Editor is a nil editor"))?;
+											panic!();
+										}
+
+										EditorData::Text {
+											file_type: TextFileType::PlainText,
+											..
+										} => "txt",
+
+										EditorData::Text {
+											file_type: TextFileType::Markdown,
+											..
+										} => "md",
+
+										EditorData::Text {
+											file_type: TextFileType::Json | TextFileType::ManifestJson,
+											..
+										} => "json",
+
+										EditorData::QNEntity { .. } => "entity.json",
+
+										EditorData::QNPatch { .. } => "entity.patch.json"
+									}]
+								)
+								.save_file()
+								.await
+							{
+								editor.file = Some(save_handle.path().into());
+
+								fs::write(save_handle.path(), data_to_save).context("Couldn't write file")?;
+
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::SetTabUnsaved {
+										id: tab,
+										unsaved: false
+									})
+								)?;
+							}
+						}
 					}
 				}
 			}

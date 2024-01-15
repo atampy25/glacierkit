@@ -12,9 +12,12 @@
 		"AudioCurve_LastFadeCurve",
 		"AudioCurve_Constant"
 	],
-
-	"AudioEventCullingBehavior": ["AutoSendStop", "AutoSendStopAfterTriggered", "NoAutoSendStop", "NoDistanceCulling"],
-
+	"AudioEventCullingBehavior": [
+		"AutoSendStop",
+		"AutoSendStopAfterTriggered",
+		"NoAutoSendStop",
+		"NoDistanceCulling"
+	],
 	"BoneId.Enum": [
 		"GROUND",
 		"PELVIS",
@@ -162,7 +165,6 @@
 		"PISTOL_HOLSTER_ATTACHER",
 		"BONEID_LAST"
 	],
-
 	"CrowdMapImpl.CellFlags": [
 		"CELLFLAG_RESTRICTED_A",
 		"CELLFLAG_RESTRICTED_B",
@@ -173,9 +175,13 @@
 		"CELLFLAG_UNUSED",
 		"CELLFLAG_PANIC_ONLY"
 	],
-
-	"CrowdReactionAIEventType": ["CROWDAIEVENT_NONE", "CROWDAIEVENT_CURIOUS", "CROWDAIEVENT_ALERTED", "CROWDAIEVENT_BLAME_FOR_WEAPON", "CROWDAIEVENT_BLAME_FOR_KILL"],
-
+	"CrowdReactionAIEventType": [
+		"CROWDAIEVENT_NONE",
+		"CROWDAIEVENT_CURIOUS",
+		"CROWDAIEVENT_ALERTED",
+		"CROWDAIEVENT_BLAME_FOR_WEAPON",
+		"CROWDAIEVENT_BLAME_FOR_KILL"
+	],
 	"CrowdRegionType": [
 		"CROWDSPHERE_NONE",
 		"CROWDSPHERE_SAFE",
@@ -188,17 +194,39 @@
 		"CROWDSPHERE_GETDOWN",
 		"CROWDSPHERE_DIE"
 	],
-
-	"CrowdUtil.ECrowdActorMood": ["CM_AMBIENT", "CM_ALERTED", "CM_SCARED", "CM_PANICED", "CM_DEAD", "CM_DISABLED", "NUM_ACTOR_MOOD_TYPES"],
-
-	"CrowdUtil.ECrowdDirection": ["NORTH", "EAST", "SOUTH", "WEST"],
-
-	"CrowdUtil.ECrowdFacing": ["FRONT", "BACK"],
-
-	"CrowdUtil.ECrowdSide": ["LEFT", "RIGHT"],
-
-	"CrowdUtil.ECrowdStandingPush": ["PUSH_FRONT", "PUSH_FRONT_LEFT", "PUSH_LEFT", "PUSH_BACK_LEFT", "PUSH_BACK", "PUSH_BACK_RIGHT", "PUSH_RIGHT", "PUSH_FRONT_RIGHT"],
-
+	"CrowdUtil.ECrowdActorMood": [
+		"CM_AMBIENT",
+		"CM_ALERTED",
+		"CM_SCARED",
+		"CM_PANICED",
+		"CM_DEAD",
+		"CM_DISABLED",
+		"NUM_ACTOR_MOOD_TYPES"
+	],
+	"CrowdUtil.ECrowdDirection": [
+		"NORTH",
+		"EAST",
+		"SOUTH",
+		"WEST"
+	],
+	"CrowdUtil.ECrowdFacing": [
+		"FRONT",
+		"BACK"
+	],
+	"CrowdUtil.ECrowdSide": [
+		"LEFT",
+		"RIGHT"
+	],
+	"CrowdUtil.ECrowdStandingPush": [
+		"PUSH_FRONT",
+		"PUSH_FRONT_LEFT",
+		"PUSH_LEFT",
+		"PUSH_BACK_LEFT",
+		"PUSH_BACK",
+		"PUSH_BACK_RIGHT",
+		"PUSH_RIGHT",
+		"PUSH_FRONT_RIGHT"
+	],
 	"CrowdUtil.EDefaultStateTypes": [
 		"STATE_IDLE",
 		"STATE_WALK",
@@ -213,9 +241,11 @@
 		"STATE_PENDINGRELOCATE",
 		"NUM_DEFAULT_STATES"
 	],
-
-	"CrowdUtil.EGenderReq": ["eGender_Any", "eGender_Male", "eGender_Female"],
-
+	"CrowdUtil.EGenderReq": [
+		"eGender_Any",
+		"eGender_Male",
+		"eGender_Female"
+	],
 	"EAIEventType": [
 		"AIET_None",
 		"AIET_Ignore",
@@ -446,9 +476,11 @@
 		"AIET_Debug_ThrowFlashbangHere",
 		"AIET_DEBUG_EVENTS_END"
 	],
-
-	"EAIFormationMemberSpeed": ["eFMS_Slow", "eFMS_Normal", "eFMS_Fast"],
-
+	"EAIFormationMemberSpeed": [
+		"eFMS_Slow",
+		"eFMS_Normal",
+		"eFMS_Fast"
+	],
 	"EAIGoal": [
 		"AIG_Kill",
 		"AIG_Arrest",
@@ -487,11 +519,24 @@
 		"AIG_SC_Alerted",
 		"AIG_None"
 	],
-
-	"EAILegalType": ["AILT_Weapon", "AILT_Shooting", "AILT_Aiming", "AILT_CloseCombat", "AILT_ChangeOutfit", "AILT_Count"],
-
-	"EAIModifierScope": ["AIMS_Volume", "AIMS_Behavior", "AIMS_Role", "AIMS_Item", "AIMS_Situation", "AIMS_Outfit", "AIMS_Override", "AIMS_Status"],
-
+	"EAILegalType": [
+		"AILT_Weapon",
+		"AILT_Shooting",
+		"AILT_Aiming",
+		"AILT_CloseCombat",
+		"AILT_ChangeOutfit",
+		"AILT_Count"
+	],
+	"EAIModifierScope": [
+		"AIMS_Volume",
+		"AIMS_Behavior",
+		"AIMS_Role",
+		"AIMS_Item",
+		"AIMS_Situation",
+		"AIMS_Outfit",
+		"AIMS_Override",
+		"AIMS_Status"
+	],
 	"EAIModifiers": [
 		"AIM_Invalid",
 		"AIM_IgnoreLowNoise",
@@ -525,7 +570,6 @@
 		"AIM_DisableDeadBodySensor",
 		"AIM_DeafAndBlind"
 	],
-
 	"EAISharedEventType": [
 		"AISET_None",
 		"AISET_StandOffCrowdReactionDone",
@@ -959,7 +1003,6 @@
 		"AISET_DynamicEnforcer_ArrestReason_SillyHitman",
 		"AISET_DYNAMIC_ENFORCER_ARREST_REASON_END"
 	],
-
 	"EAISituation": [
 		"AIS_GENERIC",
 		"AIS_SPECIAL",
@@ -992,17 +1035,34 @@
 		"AIS_RECOVER_UNC",
 		"AIS_SNIPER"
 	],
-
-	"EAISituationEvent": ["AISE_Any", "AISE_ActorJoined", "AISE_ActorLeft", "AISE_Data"],
-
-	"EAccidentDeathContext": ["eADC_DeathByAccident", "eADC_DeathBySniper", "eADC_DeathByPoison", "eADC_DeathByShot"],
-
-	"EAccidentScaleContext": ["eASC_Standard", "eASC_Unsafe", "eASC_Dangerous"],
-
-	"EActBodyType": ["ABT_UpperBodyOnly", "ABT_FullBodyWithLeadIn", "ABT_FullBodyOnly"],
-
-	"EActionPromptState": ["eActionPromptState_Disabled", "eActionPromptState_Enabled", "eActionPromptState_Activated", "eActionPromptState_Held"],
-
+	"EAISituationEvent": [
+		"AISE_Any",
+		"AISE_ActorJoined",
+		"AISE_ActorLeft",
+		"AISE_Data"
+	],
+	"EAccidentDeathContext": [
+		"eADC_DeathByAccident",
+		"eADC_DeathBySniper",
+		"eADC_DeathByPoison",
+		"eADC_DeathByShot"
+	],
+	"EAccidentScaleContext": [
+		"eASC_Standard",
+		"eASC_Unsafe",
+		"eASC_Dangerous"
+	],
+	"EActBodyType": [
+		"ABT_UpperBodyOnly",
+		"ABT_FullBodyWithLeadIn",
+		"ABT_FullBodyOnly"
+	],
+	"EActionPromptState": [
+		"eActionPromptState_Disabled",
+		"eActionPromptState_Enabled",
+		"eActionPromptState_Activated",
+		"eActionPromptState_Held"
+	],
 	"EActionRadialArcIconType": [
 		"EARAIT_NoIcon",
 		"EARAIT_Locked",
@@ -1023,7 +1083,6 @@
 		"EARAIT_Poison",
 		"EARAIT_Exsplosive"
 	],
-
 	"EActionType": [
 		"AT_ITEM_INTERACTION",
 		"AT_INVALID",
@@ -1057,7 +1116,6 @@
 		"AT_ITEMCONTAINER",
 		"AT_USE_QUICK"
 	],
-
 	"EActivationPriority": [
 		"eActivatable_First",
 		"eActivatable_PlayModeAddedPhysics",
@@ -1099,7 +1157,6 @@
 		"eActivatable_GameEventListener",
 		"eLAST_ACTIVATION_PRIORITY"
 	],
-
 	"EActorAIDot": [
 		"eAAID_None",
 		"eAAID_Distracted",
@@ -1113,7 +1170,6 @@
 		"eAAID_Grenade",
 		"eAAID_PotentialThreatDisabled"
 	],
-
 	"EActorAIState": [
 		"eAAIS_None",
 		"eAAIS_Distracted",
@@ -1130,7 +1186,6 @@
 		"eAAIS_Disabled",
 		"eAAIS_Max"
 	],
-
 	"EActorAnimationOrder": [
 		"AAO_None",
 		"AAO_Stand",
@@ -1145,13 +1200,28 @@
 		"AAO_Impact",
 		"AAO_Controlled"
 	],
-
-	"EActorBumpType": ["EABT_NONE", "EABT_UPPERBODY", "EABT_HEAD"],
-
-	"EActorCCPreset": ["ACCP_CivilianFemale", "ACCP_CivilianeMale", "ACCP_GuardMale", "ACCP_GuardMaleElite", "ACCP_GuardMaleSuperElite", "ACCP_Ignore", "ACCP_None"],
-
-	"EActorEmotionState": ["AES_Ambient", "AES_Alerted", "AES_Scared", "AES_Hunt", "AES_Combat", "AES_None"],
-
+	"EActorBumpType": [
+		"EABT_NONE",
+		"EABT_UPPERBODY",
+		"EABT_HEAD"
+	],
+	"EActorCCPreset": [
+		"ACCP_CivilianFemale",
+		"ACCP_CivilianeMale",
+		"ACCP_GuardMale",
+		"ACCP_GuardMaleElite",
+		"ACCP_GuardMaleSuperElite",
+		"ACCP_Ignore",
+		"ACCP_None"
+	],
+	"EActorEmotionState": [
+		"AES_Ambient",
+		"AES_Alerted",
+		"AES_Scared",
+		"AES_Hunt",
+		"AES_Combat",
+		"AES_None"
+	],
 	"EActorEventTypes": [
 		"eAET_OnAlive",
 		"eAET_OnPacified",
@@ -1167,7 +1237,6 @@
 		"eAET_OnBodyDumped",
 		"eAET_OnDelete"
 	],
-
 	"EActorFaction": [
 		"eActorFaction_Default",
 		"eActorFaction_VIP_1",
@@ -1176,11 +1245,25 @@
 		"eActorFaction_VIP_4",
 		"eActorFaction_VIP_5",
 		"eActorFaction_VIP_6",
-		"eActorFaction_VIP_7"
+		"eActorFaction_VIP_7",
+		"eActorFaction_VIP_8",
+		"eActorFaction_VIP_9",
+		"eActorFaction_VIP_10",
+		"eActorFaction_VIP_11",
+		"eActorFaction_VIP_12",
+		"eActorFaction_VIP_13",
+		"eActorFaction_VIP_14",
+		"eActorFaction_VIP_15",
+		"eActorFaction_VIP_16",
+		"eActorFaction_VIP_17"
 	],
-
-	"EActorGroup": ["eAG_Group_A", "eAG_Group_B", "eAG_Group_C", "eAG_Group_D", "eAG_Count"],
-
+	"EActorGroup": [
+		"eAG_Group_A",
+		"eAG_Group_B",
+		"eAG_Group_C",
+		"eAG_Group_D",
+		"eAG_Count"
+	],
 	"EActorLookAtPriority": [
 		"eALAPriority_Ambient",
 		"eALAPriority_AmbientHigh",
@@ -1191,7 +1274,6 @@
 		"eALAPriority_Combat",
 		"eALAPriority_CombatHigh"
 	],
-
 	"EActorLookAtStopReason": [
 		"eSR_Unknown",
 		"eSR_Disabled",
@@ -1204,17 +1286,51 @@
 		"eSR_HigherPriorityProfile",
 		"eSR_HideInPlainSight"
 	],
-
-	"EActorLookAtTargetType": ["eALAT_Invalid", "eALAT_PositionTarget", "eALAT_KnownEntityType", "eALAT_PointOfInterest", "eALAT_Hero", "eALAT_Screenplay", "eALAPT_Max"],
-
-	"EActorPerceptionSensitivity": ["APS_AMBIENT_DEAFBLIND", "APS_AMBIENT_SLEEPING", "APS_AMBIENT_PREOCCUPIED", "APS_AMBIENT", "APS_ALERT_LOW", "APS_ALERT", "APS_COMBAT", "APS_SPIDER_SENSE"],
-
-	"EActorRank": ["AR_Default", "AR_Elite", "AR_Cop", "AR_Goon"],
-
-	"EActorRole": ["eActorRole_Default", "eActorRole_Bodyguard", "eActorRole_VIP"],
-
-	"EActorSecondaryIconState": ["eSIS_Clear", "eSIS_Infected", "eSIS_Infected_Stage1", "eSIS_Infected_Stage2", "eSIS_Infected_Stage3"],
-
+	"EActorLookAtTargetType": [
+		"eALAT_Invalid",
+		"eALAT_PositionTarget",
+		"eALAT_KnownEntityType",
+		"eALAT_PointOfInterest",
+		"eALAT_Hero",
+		"eALAT_Screenplay",
+		"eALAPT_Max"
+	],
+	"EActorObstacleBlockage": [
+		"eAOB_Guard",
+		"eAOB_Civilian",
+		"eAOB_Threat",
+		"eAOB_Combat",
+		"eAOB_Suspect",
+		"eAOB_Lookout"
+	],
+	"EActorPerceptionSensitivity": [
+		"APS_AMBIENT_DEAFBLIND",
+		"APS_AMBIENT_SLEEPING",
+		"APS_AMBIENT_PREOCCUPIED",
+		"APS_AMBIENT",
+		"APS_ALERT_LOW",
+		"APS_ALERT",
+		"APS_COMBAT",
+		"APS_SPIDER_SENSE"
+	],
+	"EActorRank": [
+		"AR_Default",
+		"AR_Elite",
+		"AR_Cop",
+		"AR_Goon"
+	],
+	"EActorRole": [
+		"eActorRole_Default",
+		"eActorRole_Bodyguard",
+		"eActorRole_VIP"
+	],
+	"EActorSecondaryIconState": [
+		"eSIS_Clear",
+		"eSIS_Infected",
+		"eSIS_Infected_Stage1",
+		"eSIS_Infected_Stage2",
+		"eSIS_Infected_Stage3"
+	],
 	"EActorSoundDefs": [
 		"_NoSound",
 		"Dth_BrkNck",
@@ -1642,11 +1758,19 @@
 		"InDedBdy_CivCmntPhonePcfd",
 		"Gen_SocialAck"
 	],
-
-	"EActorState": ["AS_DEACTIVATED", "AS_ALIVE", "AS_DYING", "AS_DEAD", "AS_DISABLED"],
-
-	"EActorType": ["eAT_Civilian", "eAT_Guard", "eAT_Hitman", "eAT_Last"],
-
+	"EActorState": [
+		"AS_DEACTIVATED",
+		"AS_ALIVE",
+		"AS_DYING",
+		"AS_DEAD",
+		"AS_DISABLED"
+	],
+	"EActorType": [
+		"eAT_Civilian",
+		"eAT_Guard",
+		"eAT_Hitman",
+		"eAT_Last"
+	],
 	"EActorVoiceVariation": [
 		"eAVV_Undefined",
 		"eAVV_ABIATTI",
@@ -2207,9 +2331,28 @@
 		"eAVV_YACHTCREW04",
 		"eAVV_YAMASAKI",
 		"eAVV_YATES",
-		"eAVV_ZAYDAN"
+		"eAVV_ZAYDAN",
+		"eAVV_DUGONG_COOKJOB_FHI02",
+		"eAVV_DUGONG_COOKJOB_FHI03",
+		"eAVV_DUGONG_COOKJOB_MCH02",
+		"eAVV_DUGONG_COOKJOB_MHI02",
+		"eAVV_DUGONG_COOKJOB_MHI03",
+		"eAVV_DUGONG_ENGINEER_MCH02",
+		"eAVV_DUGONG_ENGINEER_MHI02",
+		"eAVV_DUGONG_ENGINEER_MHI03",
+		"eAVV_DUGONG_FARAH_FI03",
+		"eAVV_DUGONG_METALWKR_MHI02",
+		"eAVV_DUGONG_METALWKR_MHI03",
+		"eAVV_DUGONG_MILITIA_M05",
+		"eAVV_DUGONG_MILITIA_M06",
+		"eAVV_DUGONG_MILITIA_M07",
+		"eAVV_DUGONG_MILITIA_SP01",
+		"eAVV_DUGONG_PIRATE_MHI02",
+		"eAVV_DUGONG_PIRATE_MHI03",
+		"eAVV_CREST",
+		"eAVV_AKKA",
+		"eAVV_ET_DROP"
 	],
-
 	"EAgilityState": [
 		"eAgState_JumpToHangFromLocomotion",
 		"eAgState_ClimbOnToLedgeFromLocomotion",
@@ -2248,13 +2391,23 @@
 		"eAgState_Deactivate",
 		"eAgState_Unknown"
 	],
-
-	"EAimAssistActivationState": ["eAAAS_Activated", "eAAAS_Activating", "eAAAS_Deactivated", "eAAAS_Deactivating"],
-
-	"EAmmoBehaviourConfigType": ["eAB_None", "eAB_Explosive", "eAB_Penetration"],
-
-	"EAnimBlendMode": ["EAnimBlendMode_InterpAttInterpPos", "EAnimBlendMode_InterpAttAddPos", "EAnimBlendMode_AddAttLeavePos", "EAnimBlendMode_AddAttAddPos"],
-
+	"EAimAssistActivationState": [
+		"eAAAS_Activated",
+		"eAAAS_Activating",
+		"eAAAS_Deactivated",
+		"eAAAS_Deactivating"
+	],
+	"EAmmoBehaviourConfigType": [
+		"eAB_None",
+		"eAB_Explosive",
+		"eAB_Penetration"
+	],
+	"EAnimBlendMode": [
+		"EAnimBlendMode_InterpAttInterpPos",
+		"EAnimBlendMode_InterpAttAddPos",
+		"EAnimBlendMode_AddAttLeavePos",
+		"EAnimBlendMode_AddAttAddPos"
+	],
 	"EAnimSetState": [
 		"EASES_DEFAULT",
 		"EASES_AMBIENT_ARMED",
@@ -2265,7 +2418,6 @@
 		"EASES_SICK",
 		"EASES_INFECTED"
 	],
-
 	"EAnimSetType": [
 		"EAST_UNDEFINED",
 		"EAST_DEFAULT",
@@ -2298,19 +2450,47 @@
 		"EAST_CARRY_TUBE",
 		"EAST_CARRY_UMBRELLA"
 	],
-
-	"EAnimationPose": ["AP_Undefined", "AP_Standing", "AP_SittingChair", "AP_SittingGround", "AP_LyingGround", "AP_Crouching", "AP_SittingBench", "AP_SittingChairTable"],
-
-	"EAsyncRaycastsGroup": ["eAsyncRaycasts_Gameplay", "eAsyncRaycasts_ParticlesSoundCloth", "eAsyncRaycasts_UNUSED_LAST"],
-
-	"EAttachLocation": ["eALRightHand", "eALLeftHand", "eALFreeBone", "eALBack", "eALRifle", "eALAttachCount", "eALUndefined"],
-
-	"EAudioVolumetricMixingMode": ["AUDIO_VOLUMETRIC_MIXING_MAX_ALL", "AUDIO_VOLUMETRIC_MIXING_MAX_3D", "AUDIO_VOLUMETRIC_MIXING_ADD"],
-
-	"EAutoScanMode": ["ASM_GEOMETRY", "ASM_VOLUMEBOX"],
-
-	"EBIEventTypes": ["eBIL_HM_HitNPC", "eBIL_HM_HitNPCKilled", "eBIL_HM_HitNPCHeadShot", "eBIL_HM_HitNPCCloseCombatShot", "eBIL_NPC_HitHM", "eBIL_Geometry"],
-
+	"EAnimationPose": [
+		"AP_Undefined",
+		"AP_Standing",
+		"AP_SittingChair",
+		"AP_SittingGround",
+		"AP_LyingGround",
+		"AP_Crouching",
+		"AP_SittingBench",
+		"AP_SittingChairTable"
+	],
+	"EAsyncRaycastsGroup": [
+		"eAsyncRaycasts_Gameplay",
+		"eAsyncRaycasts_ParticlesSoundCloth",
+		"eAsyncRaycasts_UNUSED_LAST"
+	],
+	"EAttachLocation": [
+		"eALRightHand",
+		"eALLeftHand",
+		"eALFreeBone",
+		"eALBack",
+		"eALRifle",
+		"eALAttachCount",
+		"eALUndefined"
+	],
+	"EAudioVolumetricMixingMode": [
+		"AUDIO_VOLUMETRIC_MIXING_MAX_ALL",
+		"AUDIO_VOLUMETRIC_MIXING_MAX_3D",
+		"AUDIO_VOLUMETRIC_MIXING_ADD"
+	],
+	"EAutoScanMode": [
+		"ASM_GEOMETRY",
+		"ASM_VOLUMEBOX"
+	],
+	"EBIEventTypes": [
+		"eBIL_HM_HitNPC",
+		"eBIL_HM_HitNPCKilled",
+		"eBIL_HM_HitNPCHeadShot",
+		"eBIL_HM_HitNPCCloseCombatShot",
+		"eBIL_NPC_HitHM",
+		"eBIL_Geometry"
+	],
 	"EBaseMovementType": [
 		"eMovementNone",
 		"eMovementDead",
@@ -2353,15 +2533,28 @@
 		"eMovementLast",
 		"eMovementPickupItem"
 	],
-
-	"EBehaviorTreeVariableType": ["BTVT_Invalid", "BTVT_SceneReference", "BTVT_Contextual", "BTVT_Dynamic", "BTVT_NumTypes"],
-
-	"EBoolCheckType": ["eBCT_IGNORE", "eBCT_TRUE", "eBCT_FALSE"],
-
-	"EBoolStateRequirement": ["eBSR_Any", "eBSR_RequireTrue", "eBSR_RequireFalse"],
-
-	"EBooleanOption": ["BO_Off", "BO_On", "BO_Default"],
-
+	"EBehaviorTreeVariableType": [
+		"BTVT_Invalid",
+		"BTVT_SceneReference",
+		"BTVT_Contextual",
+		"BTVT_Dynamic",
+		"BTVT_NumTypes"
+	],
+	"EBoolCheckType": [
+		"eBCT_IGNORE",
+		"eBCT_TRUE",
+		"eBCT_FALSE"
+	],
+	"EBoolStateRequirement": [
+		"eBSR_Any",
+		"eBSR_RequireTrue",
+		"eBSR_RequireFalse"
+	],
+	"EBooleanOption": [
+		"BO_Off",
+		"BO_On",
+		"BO_Default"
+	],
 	"EBulletType": [
 		"BULLET_TYPE_NONE",
 		"BULLET_TYPE_GUN",
@@ -2373,7 +2566,6 @@
 		"BULLET_TYPE_SNIPER",
 		"BULLET_TYPE_RPG"
 	],
-
 	"EButtonDisplay": [
 		"BUTTON_DISPLAY_AT_OPENDOOR",
 		"BUTTON_DISPLAY_AT_PICKUP",
@@ -2450,15 +2642,30 @@
 		"BUTTON_DISPLAY_COMPLY",
 		"BUTTON_DISPLAY_MAX"
 	],
-
-	"EButtonPressType": ["BUTTON_PRESS", "BUTTON_HOLD", "BUTTON_REPEAT", "BUTTON_TAP", "BUTTON_ROTATE_CCW", "BUTTON_PRESS_TYPE_MAX"],
-
-	"EButtonState": ["BUTTON_STATE_DISABLED", "BUTTON_STATE_NONE", "BUTTON_STATE_ENABLED", "BUTTON_STATE_PRESSED", "BUTTON_STATE_BLINKING"],
-
-	"EBystanderPointType": ["BPT_Scared", "BPT_Alerted"],
-
-	"ECCDUsage": ["ECCDUSAGE_DISABLED", "ECCDUSAGE_AGAINST_STATIC", "ECCDUSAGE_AGAINST_STATIC_DYNAMIC"],
-
+	"EButtonPressType": [
+		"BUTTON_PRESS",
+		"BUTTON_HOLD",
+		"BUTTON_REPEAT",
+		"BUTTON_TAP",
+		"BUTTON_ROTATE_CCW",
+		"BUTTON_PRESS_TYPE_MAX"
+	],
+	"EButtonState": [
+		"BUTTON_STATE_DISABLED",
+		"BUTTON_STATE_NONE",
+		"BUTTON_STATE_ENABLED",
+		"BUTTON_STATE_PRESSED",
+		"BUTTON_STATE_BLINKING"
+	],
+	"EBystanderPointType": [
+		"BPT_Scared",
+		"BPT_Alerted"
+	],
+	"ECCDUsage": [
+		"ECCDUSAGE_DISABLED",
+		"ECCDUSAGE_AGAINST_STATIC",
+		"ECCDUSAGE_AGAINST_STATIC_DYNAMIC"
+	],
 	"ECCDecalEffect": [
 		"eCCDecalEffect_None",
 		"eCCDecalEffect_Stab",
@@ -2473,7 +2680,6 @@
 		"eCCDecalEffect_FacePunch",
 		"eCCDecalEffect_Bruise"
 	],
-
 	"ECCEmitterEffect": [
 		"eCCEmitterEffect_None",
 		"eCCEmitterEffect_Stab",
@@ -2488,7 +2694,6 @@
 		"eCCEmitterEffect_FacePunch",
 		"eCCEmitterEffect_Blood"
 	],
-
 	"ECCNodeSubtype": [
 		"eCCNodeSubtype_Left",
 		"eCCNodeSubtype_Right",
@@ -2501,7 +2706,6 @@
 		"eCCNodeSubtype_Front_Back",
 		"eCCNodeSubtype_Count"
 	],
-
 	"ECCNodeType": [
 		"eCCNodeType_Counter",
 		"eCCNodeType_ExecutePistol",
@@ -2535,7 +2739,6 @@
 		"eCCNodeType_FailChainPush",
 		"eCCNodeType_Count"
 	],
-
 	"ECCWeaponAnimSet": [
 		"AS_SLIT_THROAT_1H",
 		"AS_SWING_1H",
@@ -2551,17 +2754,30 @@
 		"AS_SWORD_1H",
 		"AS_AXE"
 	],
-
-	"ECOMUsage": ["ECOMUSAGE_AUTOCOMPUTE", "ECOMUSAGE_PIVOT"],
-
-	"ECameraAssistanceMode": ["eCAM_None", "eCAM_TrackAssist", "eCAM_AutoTrackTarget"],
-
-	"ECameraCollisionMode": ["ECAMERACOLLISIONMODE_COLLIDE_ALWAYS", "ECAMERACOLLISIONMODE_CAMERA_OBSTACLE", "ECAMERACOLLISIONMODE_COLLIDE_NEVER", "ECAMERACOLLISIONMODE_COLLIDE_DEFAULT"],
-
-	"ECameraControls": ["eCameraControlsNormal", "eCameraControlsOTS"],
-
-	"ECameraOffset_old": ["eCameraOffset_Center", "eCameraOffset_Left", "eCameraOffset_Right"],
-
+	"ECOMUsage": [
+		"ECOMUSAGE_AUTOCOMPUTE",
+		"ECOMUSAGE_PIVOT"
+	],
+	"ECameraAssistanceMode": [
+		"eCAM_None",
+		"eCAM_TrackAssist",
+		"eCAM_AutoTrackTarget"
+	],
+	"ECameraCollisionMode": [
+		"ECAMERACOLLISIONMODE_COLLIDE_ALWAYS",
+		"ECAMERACOLLISIONMODE_CAMERA_OBSTACLE",
+		"ECAMERACOLLISIONMODE_COLLIDE_NEVER",
+		"ECAMERACOLLISIONMODE_COLLIDE_DEFAULT"
+	],
+	"ECameraControls": [
+		"eCameraControlsNormal",
+		"eCameraControlsOTS"
+	],
+	"ECameraOffset_old": [
+		"eCameraOffset_Center",
+		"eCameraOffset_Left",
+		"eCameraOffset_Right"
+	],
 	"ECameraShakerChannel": [
 		"eCameraShakerChannel_Default",
 		"eCameraShakerChannle_Locomotion",
@@ -2570,7 +2786,6 @@
 		"eCameraShakerChannel_CloseCombat",
 		"eCameraShakerChannel_Num"
 	],
-
 	"ECameraState": [
 		"eCamSneakStand",
 		"eCamSneakWalk",
@@ -2633,9 +2848,12 @@
 		"eCamNumProfiles",
 		"eCamAll"
 	],
-
-	"ECausalGraphTraversal": ["eCGT_NONE", "eCGT_INPUT", "eCGT_OUTPUT", "eCGT_BOTH"],
-
+	"ECausalGraphTraversal": [
+		"eCGT_NONE",
+		"eCGT_INPUT",
+		"eCGT_OUTPUT",
+		"eCGT_BOTH"
+	],
 	"ECautiousDisturbanceState": [
 		"eCDS_Pending",
 		"eCDS_Expired",
@@ -2649,9 +2867,11 @@
 		"eCDS_ManHunt",
 		"eCDS_CombatSuppressGunshots"
 	],
-
-	"ECharSetCharacterType": ["ECSCT_Actor", "ECSCT_Nude", "ECSCT_HeroA"],
-
+	"ECharSetCharacterType": [
+		"ECSCT_Actor",
+		"ECSCT_Nude",
+		"ECSCT_HeroA"
+	],
 	"ECharacterActionRequests": [
 		"eSM_AR_None",
 		"eSM_AR_ReloadR",
@@ -2692,11 +2912,19 @@
 		"eSM_AR_CloseHandR",
 		"eSM_AR_CloseHandL"
 	],
-
-	"ECharacterActionSyncRequests": ["eSM_ASR_Reload", "eSM_ASR_SwapItemHandL", "eSM_ASR_SwapItemHandR"],
-
-	"ECharacterAnimChildNetworkSlot": ["eCACNS_None", "eCACNS_FlavorIdle_FB", "eCACNS_FlavorIdle_RH", "eCACNS_FlavorIdle_LH", "eCACNS_Interaction_RH", "eCACNS_Interaction_LH"],
-
+	"ECharacterActionSyncRequests": [
+		"eSM_ASR_Reload",
+		"eSM_ASR_SwapItemHandL",
+		"eSM_ASR_SwapItemHandR"
+	],
+	"ECharacterAnimChildNetworkSlot": [
+		"eCACNS_None",
+		"eCACNS_FlavorIdle_FB",
+		"eCACNS_FlavorIdle_RH",
+		"eCACNS_FlavorIdle_LH",
+		"eCACNS_Interaction_RH",
+		"eCACNS_Interaction_LH"
+	],
 	"ECharacterAnimEvent": [
 		"eCAE_EarlyExit",
 		"eCAE_ReloadStarted",
@@ -2737,13 +2965,25 @@
 		"eCAE_HandIKEnableRight",
 		"eCAE_HandIKDisableRight"
 	],
-
-	"ECharacterAnimEventState": ["eES_None", "eES_Pending", "eES_Completed", "eES_TimedOut"],
-
-	"ECharacterBodyType": ["eCT_MaleRegular", "eCT_FemaleRegular", "eCT_Male47", "eCT_Undefined"],
-
-	"ECharacterCollidableLayer": ["CCL_DYNAMIC", "CCL_DYNAMIC_TRANSPARENT", "CCL_DYNAMIC_NO_COLLISION", "CCL_DYNAMIC_NO_COLLISION_TRANSPARENT", "CCL_UNUSED_LAST"],
-
+	"ECharacterAnimEventState": [
+		"eES_None",
+		"eES_Pending",
+		"eES_Completed",
+		"eES_TimedOut"
+	],
+	"ECharacterBodyType": [
+		"eCT_MaleRegular",
+		"eCT_FemaleRegular",
+		"eCT_Male47",
+		"eCT_Undefined"
+	],
+	"ECharacterCollidableLayer": [
+		"CCL_DYNAMIC",
+		"CCL_DYNAMIC_TRANSPARENT",
+		"CCL_DYNAMIC_NO_COLLISION",
+		"CCL_DYNAMIC_NO_COLLISION_TRANSPARENT",
+		"CCL_UNUSED_LAST"
+	],
 	"ECharacterEvent": [
 		"eCIET_PickUp",
 		"eCIET_LadderEnded",
@@ -2762,7 +3002,6 @@
 		"eCIET_Damaged",
 		"eCIET_None"
 	],
-
 	"ECharacterFullBodyStateType": [
 		"eSM_FB_OldMovementPlaceholder",
 		"eSM_FB_Slave",
@@ -2775,11 +3014,16 @@
 		"eSM_FB_AssembleRetrieve",
 		"eSM_FB_AssembleStore"
 	],
-
-	"ECharacterIdleHandlerFullbodyType": ["ecIHFBT_DisguisedIdle", "ecIHFBT_Event"],
-
-	"ECharacterIdleHandlerUpperBodyType": ["eCIHUBT_NothingToDoEmptySingleHand", "eCIHUBT_NothingToDoEmptyHands", "eCIHUBT_Event", "eCIHUBT_Custom"],
-
+	"ECharacterIdleHandlerFullbodyType": [
+		"ecIHFBT_DisguisedIdle",
+		"ecIHFBT_Event"
+	],
+	"ECharacterIdleHandlerUpperBodyType": [
+		"eCIHUBT_NothingToDoEmptySingleHand",
+		"eCIHUBT_NothingToDoEmptyHands",
+		"eCIHUBT_Event",
+		"eCIHUBT_Custom"
+	],
 	"ECharacterIdlePriority": [
 		"eCIP_Irrelevant",
 		"eCIP_VeryLow",
@@ -2793,9 +3037,12 @@
 		"eCIP_VeryHigh",
 		"eCIP_Urgent"
 	],
-
-	"ECharacterResourceType": ["eSMT_Invalid", "eSMT_FullBody", "eSMT_RightHand", "eSMT_LeftHand"],
-
+	"ECharacterResourceType": [
+		"eSMT_Invalid",
+		"eSMT_FullBody",
+		"eSMT_RightHand",
+		"eSMT_LeftHand"
+	],
 	"ECharacterStateTags": [
 		"eSM_ST_UsingFullBody",
 		"eSM_ST_UsingRightHand",
@@ -2817,7 +3064,6 @@
 		"eSM_ST_Assemble",
 		"eSM_ST_EmptyStateLeftHand"
 	],
-
 	"ECharacterStateTransitionAttempt": [
 		"eSM_TA_IfDestinationCan",
 		"eSM_TA_IfDestinationCanAndWants",
@@ -2825,7 +3071,6 @@
 		"eSM_TA_IfDestinationCanAndWantsOriginDoesNotWant",
 		"eSM_TA_IfDestinationCanAndOriginCanNot"
 	],
-
 	"ECharacterSubcontrollerType": [
 		"eSCT_IDGenerator",
 		"eSCT_Debugger",
@@ -2854,7 +3099,6 @@
 		"eSCT_StickingItems",
 		"eSCT_Fiberwire"
 	],
-
 	"ECharacterUpperBodyStateType": [
 		"eSM_UB_EmptyHanded",
 		"eSM_UB_Unholster",
@@ -2876,17 +3120,38 @@
 		"eSM_UB_PrimeTwoHanded",
 		"eSM_UB_SnapNeck"
 	],
-
-	"ECheatGroup": ["eCGNone", "eCGPistols", "eCGSMGs", "eCGAssaultRifles", "eCGShotguns", "eCGSniper", "eCGExotics", "eCGDevices"],
-
-	"EClipSpawnAxis": ["eCSA_XPos", "eCSA_XNeg", "eCSA_YPos", "eCSA_YNeg", "eCSA_ZPos", "eCSA_ZNeg"],
-
-	"EClothBendConstrainType": ["eClothBendConstrainType_Stick", "eClothBendConstrainType_Triangle"],
-
-	"EClothColliderFilter": ["EClothColliderFilter_Environment", "EClothColliderFilter_Character", "EClothColliderFilter_Character_Environment"],
-
-	"EClothStretchConstrainType": ["eClothBendConstrainType_Anchor", "eClothBendConstrainType_LRA", "eClothBendConstrainType_None"],
-
+	"ECheatGroup": [
+		"eCGNone",
+		"eCGPistols",
+		"eCGSMGs",
+		"eCGAssaultRifles",
+		"eCGShotguns",
+		"eCGSniper",
+		"eCGExotics",
+		"eCGDevices"
+	],
+	"EClipSpawnAxis": [
+		"eCSA_XPos",
+		"eCSA_XNeg",
+		"eCSA_YPos",
+		"eCSA_YNeg",
+		"eCSA_ZPos",
+		"eCSA_ZNeg"
+	],
+	"EClothBendConstrainType": [
+		"eClothBendConstrainType_Stick",
+		"eClothBendConstrainType_Triangle"
+	],
+	"EClothColliderFilter": [
+		"EClothColliderFilter_Environment",
+		"EClothColliderFilter_Character",
+		"EClothColliderFilter_Character_Environment"
+	],
+	"EClothStretchConstrainType": [
+		"eClothBendConstrainType_Anchor",
+		"eClothBendConstrainType_LRA",
+		"eClothBendConstrainType_None"
+	],
 	"ECollidableLayer": [
 		"eCollLayer_COLLIDE_WITH_ALL",
 		"eCollLayer_STATIC_COLLIDABLES_ONLY",
@@ -2920,11 +3185,16 @@
 		"eCollLayer_AI_VISION_BLOCKER_AMBIENT_ONLY",
 		"eCollayer_UNUSED_LAST"
 	],
-
-	"ECollidableShape": ["ECOLLIDABLESHAPE_SPHERE", "ECOLLIDABLESHAPE_CAPSULE", "ECOLLIDABLESHAPE_BOX"],
-
-	"ECollidablesType": ["ECST_STATIC_AND_DYNAMIC", "ECST_STATIC_ONLY", "ECST_DYNAMIC_ONLY"],
-
+	"ECollidableShape": [
+		"ECOLLIDABLESHAPE_SPHERE",
+		"ECOLLIDABLESHAPE_CAPSULE",
+		"ECOLLIDABLESHAPE_BOX"
+	],
+	"ECollidablesType": [
+		"ECST_STATIC_AND_DYNAMIC",
+		"ECST_STATIC_ONLY",
+		"ECST_DYNAMIC_ONLY"
+	],
 	"ECollisionNotifyGroup": [
 		"eCollisionNotifyGroup_Default",
 		"eCollisionNotifyGroup_CollisionListener",
@@ -2932,13 +3202,23 @@
 		"eCollisionNotifyGroup_DontNotify",
 		"eCollisionNotifyGroup_ForceNotify"
 	],
-
-	"ECollisionPriority": ["ECOLLISIONPRIORITY_LOW", "ECOLLISIONPRIORITY_NORMAL", "ECOLLISIONPRIORITY_HIGH", "ECOLLISIONPRIORITY_CRITICAL"],
-
-	"ECollisionResponse": ["REFLECT_VELOCITY", "SLIDE_ON", "STAY_AT_COLLISION_POINT", "CUSTOM"],
-
-	"ECombatZoneState": ["CZS_Inactive", "CZS_Triggered", "CZS_Engaged"],
-
+	"ECollisionPriority": [
+		"ECOLLISIONPRIORITY_LOW",
+		"ECOLLISIONPRIORITY_NORMAL",
+		"ECOLLISIONPRIORITY_HIGH",
+		"ECOLLISIONPRIORITY_CRITICAL"
+	],
+	"ECollisionResponse": [
+		"REFLECT_VELOCITY",
+		"SLIDE_ON",
+		"STAY_AT_COLLISION_POINT",
+		"CUSTOM"
+	],
+	"ECombatZoneState": [
+		"CZS_Inactive",
+		"CZS_Triggered",
+		"CZS_Engaged"
+	],
 	"ECommunicationBarMessage": [
 		"ECBM_Unknown",
 		"ECBM_Spotted",
@@ -2964,7 +3244,6 @@
 		"ECBM_SpottedByCamera",
 		"ECBM_UnconsciousWitness"
 	],
-
 	"ECommunicationBarState": [
 		"COMMUNICATION_BAR_NONE",
 		"COMMUNICATION_BAR_CLEAR",
@@ -2977,7 +3256,6 @@
 		"COMMUNICATION_BAR_GUARDS_ALERTED",
 		"COMMUNICATION_BAR_BACKUP_ARRIVED"
 	],
-
 	"ECompiledBehaviorType": [
 		"BT_ConditionScope",
 		"BT_Random",
@@ -3171,7 +3449,6 @@
 		"BT_COMMANDS_END",
 		"BT_Invalid"
 	],
-
 	"ECompiledConditionType": [
 		"CT_IsCurrent",
 		"CT_Current",
@@ -3333,11 +3610,19 @@
 		"CT_IsAccidentVictimDisposable",
 		"CT_IsAccidentBystandingGuardSearching"
 	],
-
-	"EConstraintType": ["ECONSTRAINTTYPE_UNKNOWN", "ECONSTRAINTTYPE_BALL_AND_SOCKET", "ECONSTRAINTTYPE_HINGE", "ECONSTRAINTTYPE_FIXED", "ECONSTRAINTTYPE_DISTANCE", "ECONSTRAINTTYPE_D6"],
-
-	"EContinuity": ["C0", "C1", "C2"],
-
+	"EConstraintType": [
+		"ECONSTRAINTTYPE_UNKNOWN",
+		"ECONSTRAINTTYPE_BALL_AND_SOCKET",
+		"ECONSTRAINTTYPE_HINGE",
+		"ECONSTRAINTTYPE_FIXED",
+		"ECONSTRAINTTYPE_DISTANCE",
+		"ECONSTRAINTTYPE_D6"
+	],
+	"EContinuity": [
+		"C0",
+		"C1",
+		"C2"
+	],
 	"EControlButtonName": [
 		"eCN_ABORT",
 		"eCN_ACTION",
@@ -3380,7 +3665,6 @@
 		"eCN_PAUSE",
 		"eCN_NO_ICON"
 	],
-
 	"EControllerButton": [
 		"BUTTON_NONE",
 		"BUTTON_CROSS",
@@ -3409,7 +3693,6 @@
 		"BUTTON_KEYBOARD",
 		"BUTTON_ESCAPE"
 	],
-
 	"EConversationID": [
 		"eCI_GuardCivilian_Distraction_Investigation",
 		"eCI_HearBulletImpact_Distraction_Investigation",
@@ -3448,15 +3731,30 @@
 		"eCI_Suitcase_Distraction_RadioRequestHelp",
 		"eCI_Count"
 	],
-
-	"EConversationRole": ["eCR_Leader", "eCR_Assistant"],
-
-	"ECoordinateSpace": ["CSPACE_INVALID", "CSPACE_OBJECT_TO_WORLD", "CSPACE_OBJECT_TO_PARENT", "CSPACE_SEQUENCE_ORIGIN", "CSPACE_CHARACTER_RELATIVE"],
-
-	"ECoverPosition": ["COVER_POSITION_NONE", "COVER_POSITION_LEFT", "COVER_POSITION_RIGHT", "COVER_POSITION_MIDDLE"],
-
-	"ECppTypeFlags": ["EDITOR_ONLY", "EDITOR_ONLY_CRITICAL", "RESETABLE", "RESETABLE_COND", "RESETABLE_STATIC"],
-
+	"EConversationRole": [
+		"eCR_Leader",
+		"eCR_Assistant"
+	],
+	"ECoordinateSpace": [
+		"CSPACE_INVALID",
+		"CSPACE_OBJECT_TO_WORLD",
+		"CSPACE_OBJECT_TO_PARENT",
+		"CSPACE_SEQUENCE_ORIGIN",
+		"CSPACE_CHARACTER_RELATIVE"
+	],
+	"ECoverPosition": [
+		"COVER_POSITION_NONE",
+		"COVER_POSITION_LEFT",
+		"COVER_POSITION_RIGHT",
+		"COVER_POSITION_MIDDLE"
+	],
+	"ECppTypeFlags": [
+		"EDITOR_ONLY",
+		"EDITOR_ONLY_CRITICAL",
+		"RESETABLE",
+		"RESETABLE_COND",
+		"RESETABLE_STATIC"
+	],
 	"ECrossHairType": [
 		"CROSSHAIR_NONE",
 		"CROSSHAIR_PISTOL",
@@ -3473,11 +3771,16 @@
 		"CROSSHAIR_RANGEINDICATOR",
 		"CROSSHAIR_DOT"
 	],
-
-	"ECrowdFlowCandidates": ["NONE", "EVERYONE", "SPAWNED_ON_FLOW"],
-
-	"ECustomSoundDefType": ["eCSDT_Distraction_InvestigationAck", "eCSDT_Distraction_InvestigationInvestigate", "eCSDT_Distraction_InvestigationStnd"],
-
+	"ECrowdFlowCandidates": [
+		"NONE",
+		"EVERYONE",
+		"SPAWNED_ON_FLOW"
+	],
+	"ECustomSoundDefType": [
+		"eCSDT_Distraction_InvestigationAck",
+		"eCSDT_Distraction_InvestigationInvestigate",
+		"eCSDT_Distraction_InvestigationStnd"
+	],
 	"EDamageEvent": [
 		"eDE_UNDEFINED",
 		"eDE_InCloset",
@@ -3499,21 +3802,51 @@
 		"eDE_Drop",
 		"eDE_Drown"
 	],
-
-	"EDamageResponse": ["eDR_Fractured", "eDR_Detached", "eDR_Destroyed", "eDR_Collided", "eDR_Count"],
-
-	"EDeathAnimationType": ["DAT_None", "DAT_SingleShot", "DAT_BurstShot", "DAT_HeavyShot", "DAT_Unknown"],
-
-	"EDeathBehavior": ["eDB_IMPACT_ANIM", "eDB_NO_IMPACT_ANIM", "eDB_NO_VELOCITY", "eDB_NO_RAGDOLL"],
-
-	"EDeathContext": ["eDC_UNDEFINED", "eDC_NOT_HERO", "eDC_HIDDEN", "eDC_ACCIDENT", "eDC_MURDER"],
-
-	"EDeathType": ["eDT_UNDEFINED", "eDT_SLAP", "eDT_PUNCH", "eDT_PACIFY", "eDT_KILL", "eDT_BLOODY_KILL"],
-
-	"EDebugExclusionLayerState": ["DEBUGELSTATE_UNBLOCKED", "DEBUGELSTATE_BLOCKED", "DEBUGELSTATE_UNKNOWN"],
-
-	"EDebugSpatialInfoVerbosity": ["EDSIV_Overview", "EDSIV_HierachicalView", "EDSIV_Full"],
-
+	"EDamageResponse": [
+		"eDR_Fractured",
+		"eDR_Detached",
+		"eDR_Destroyed",
+		"eDR_Collided",
+		"eDR_Count"
+	],
+	"EDeathAnimationType": [
+		"DAT_None",
+		"DAT_SingleShot",
+		"DAT_BurstShot",
+		"DAT_HeavyShot",
+		"DAT_Unknown"
+	],
+	"EDeathBehavior": [
+		"eDB_IMPACT_ANIM",
+		"eDB_NO_IMPACT_ANIM",
+		"eDB_NO_VELOCITY",
+		"eDB_NO_RAGDOLL"
+	],
+	"EDeathContext": [
+		"eDC_UNDEFINED",
+		"eDC_NOT_HERO",
+		"eDC_HIDDEN",
+		"eDC_ACCIDENT",
+		"eDC_MURDER"
+	],
+	"EDeathType": [
+		"eDT_UNDEFINED",
+		"eDT_SLAP",
+		"eDT_PUNCH",
+		"eDT_PACIFY",
+		"eDT_KILL",
+		"eDT_BLOODY_KILL"
+	],
+	"EDebugExclusionLayerState": [
+		"DEBUGELSTATE_UNBLOCKED",
+		"DEBUGELSTATE_BLOCKED",
+		"DEBUGELSTATE_UNKNOWN"
+	],
+	"EDebugSpatialInfoVerbosity": [
+		"EDSIV_Overview",
+		"EDSIV_HierachicalView",
+		"EDSIV_Full"
+	],
 	"EDefaultCollidableLayer": [
 		"DCL_STATIC",
 		"DCL_KINEMATIC",
@@ -3526,17 +3859,36 @@
 		"DCL_DYNAMIC_NO_CHARACTER",
 		"DCL_UNUSED_LAST"
 	],
-
-	"EDestructibleInteractionType": ["eDIT_SHOT", "eDIT_EXPLOSION", "eDIT_COLLISION", "eDIT_FRACTURE_AND_DETACH_ALL", "eDIT_OUT_OF_WORLD", "eDIT_COUNT"],
-
-	"EDetachUsage": ["EDU_NEVER", "EDU_ALWAYS", "EDU_RAGDOLL_ONLY"],
-
-	"EDetectedNatType": ["NAT_UNSET", "NAT_1", "NAT_2", "NAT_3"],
-
-	"EDialogEventEndReason": ["EDialogEvent_Completed", "EDialogEvent_Stopped"],
-
-	"EDialogEventItemType": ["eDEIT_WavFile", "eDEIT_RandomContainer", "eDEIT_SwitchContainer", "eDEIT_SequenceContainer", "eDEIT_Invalid"],
-
+	"EDestructibleInteractionType": [
+		"eDIT_SHOT",
+		"eDIT_EXPLOSION",
+		"eDIT_COLLISION",
+		"eDIT_FRACTURE_AND_DETACH_ALL",
+		"eDIT_OUT_OF_WORLD",
+		"eDIT_COUNT"
+	],
+	"EDetachUsage": [
+		"EDU_NEVER",
+		"EDU_ALWAYS",
+		"EDU_RAGDOLL_ONLY"
+	],
+	"EDetectedNatType": [
+		"NAT_UNSET",
+		"NAT_1",
+		"NAT_2",
+		"NAT_3"
+	],
+	"EDialogEventEndReason": [
+		"EDialogEvent_Completed",
+		"EDialogEvent_Stopped"
+	],
+	"EDialogEventItemType": [
+		"eDEIT_WavFile",
+		"eDEIT_RandomContainer",
+		"eDEIT_SwitchContainer",
+		"eDEIT_SequenceContainer",
+		"eDEIT_Invalid"
+	],
 	"EDialogueLine": [
 		"Hello",
 		"MoveAlong",
@@ -3561,9 +3913,14 @@
 		"DropWeapon_Escalate_Double01",
 		"DropWeapon_Escalate_Multiple01"
 	],
-
-	"EDifficultyLevel": ["eDL_NO_FLAGS", "eDL_EASY", "eDL_NORMAL", "eDL_HARD", "eDL_VERY_HARD", "eDL_ALL_FLAGS"],
-
+	"EDifficultyLevel": [
+		"eDL_NO_FLAGS",
+		"eDL_EASY",
+		"eDL_NORMAL",
+		"eDL_HARD",
+		"eDL_VERY_HARD",
+		"eDL_ALL_FLAGS"
+	],
 	"EDifficultyParameter": [
 		"EDP_Invalid",
 		"EDP_AIAttentionGainMultiplier",
@@ -3725,11 +4082,22 @@
 		"EDP_StrictItemRules",
 		"EDP_COUNT"
 	],
-
-	"EDisconnectReason": ["eNOTIFICATION", "eCONNECTION_LOST", "eNETWORK_STATE"],
-
-	"EDisposalType": ["DISPOSAL_UNDEFINED", "DISPOSAL_NOTHING", "DISPOSAL_HOLSTER", "DISPOSAL_HIDE", "DISPOSAL_PLACE", "DISPOSAL_DROP", "DISPOSAL_DROP_HIDE", "DISPOSAL_DESTROY", "DISPOSAL_COUNT"],
-
+	"EDisconnectReason": [
+		"eNOTIFICATION",
+		"eCONNECTION_LOST",
+		"eNETWORK_STATE"
+	],
+	"EDisposalType": [
+		"DISPOSAL_UNDEFINED",
+		"DISPOSAL_NOTHING",
+		"DISPOSAL_HOLSTER",
+		"DISPOSAL_HIDE",
+		"DISPOSAL_PLACE",
+		"DISPOSAL_DROP",
+		"DISPOSAL_DROP_HIDE",
+		"DISPOSAL_DESTROY",
+		"DISPOSAL_COUNT"
+	],
 	"EDisturbanceType": [
 		"DT_Generic",
 		"DT_SeeWeapon",
@@ -3775,9 +4143,15 @@
 		"DT_Accident",
 		"DT_MAX"
 	],
-
-	"EDramaEventAction": ["eDEA_NONE", "eDEA_TERMINATE_DRAMA", "eDEA_DONE_DRAMA", "eDEA_STOP_BEHAVIOR", "eDEA_DONT_STOP_SPEAK", "eDEA_RESET_CASTING", "eDEA_RESET_STATE"],
-
+	"EDramaEventAction": [
+		"eDEA_NONE",
+		"eDEA_TERMINATE_DRAMA",
+		"eDEA_DONE_DRAMA",
+		"eDEA_STOP_BEHAVIOR",
+		"eDEA_DONT_STOP_SPEAK",
+		"eDEA_RESET_CASTING",
+		"eDEA_RESET_STATE"
+	],
 	"EDramaSituationDescriptors": [
 		"eDSD_NONE",
 		"eDSD_HERO",
@@ -3793,11 +4167,24 @@
 		"eDSD_PREOCCUPIED",
 		"eDSD_PRIVATE"
 	],
-
-	"EDramaStateFlag": ["eDSF_DEFAULT", "eDSF_ENABLED", "eDSF_CAST", "eDSF_RESUMING", "eDSF_RUNNING", "eDSF_DONE", "eDSF_TERMINATED"],
-
-	"EDynamicVariableType": ["DV_Invalid", "DV_Me", "DV_Hitman", "DV_InSight", "DV_RecentlyInSight", "DV_Sounds", "DV_NumVariables"],
-
+	"EDramaStateFlag": [
+		"eDSF_DEFAULT",
+		"eDSF_ENABLED",
+		"eDSF_CAST",
+		"eDSF_RESUMING",
+		"eDSF_RUNNING",
+		"eDSF_DONE",
+		"eDSF_TERMINATED"
+	],
+	"EDynamicVariableType": [
+		"DV_Invalid",
+		"DV_Me",
+		"DV_Hitman",
+		"DV_InSight",
+		"DV_RecentlyInSight",
+		"DV_Sounds",
+		"DV_NumVariables"
+	],
 	"EEngineFrameUpdatePriority": [
 		"eFUP_AILogger",
 		"eFUP_GridManager",
@@ -3924,29 +4311,90 @@
 		"eFrameUpdatePriority_LevelManager",
 		"eFrameUpdatePriority_OutfitStreamingManager"
 	],
-
-	"EEngineModeId": ["EngineMode_Invalid", "EngineMode_SinglePlayer", "EngineMode_SplitScreen", "EngineMode_Multiplayer", "EngineMode_Max"],
-
-	"EEntityOrdering": ["EO_LOW", "EO_NORMAL", "EO_HIGH"],
-
-	"EEquipAbility": ["EA_EQUIP_IN_HANDS", "EA_CANNOT_BE_EQUIPPED"],
-
-	"EExclusionLayer": ["EL_NONE", "EL_STORY", "EL_AMBIENT"],
-
-	"EExtendedPropertyType": ["TYPE_RESOURCEPTR", "TYPE_INT32", "TYPE_UINT32", "TYPE_FLOAT", "TYPE_STRING", "TYPE_BOOL", "TYPE_ENTITYREF", "TYPE_VARIANT"],
-
-	"EFSMInternalEvent": ["eFSMEvent_Completed", "eFSMEvent_Failed", "eFSMEvent_Choice", "eFSMEvent_Max"],
-
-	"EFSMStateStatus": ["eInactive", "eActive", "eCompleted", "eFailed", "eInterrupted"],
-
-	"EFilterMaskBit": ["eFilterMaskBit_ObjectCollision", "eFilterMaskBit_OpaqueCollision", "eFilterMaskBit_UNUSED_LAST"],
-
-	"EFocusBarState": ["FOCUS_BAR_NORMAL", "FOCUS_BAR_INSTINCT", "FOCUS_BAR_BURNING"],
-
-	"EFontFlags": ["FV_Normal", "FV_Italic", "FV_Bold", "FV_BoldItalic", "FV_FauxItalic", "FV_FauxBold", "FV_FauxBoldItalic", "FV_Original", "FV_NoAutoFit"],
-
-	"EGSBodyPart": ["GSBODYPART_UNKNOWN", "GSBODYPART_HEAD", "GSBODYPART_TORSO", "GSBODYPART_ARM", "GSBODYPART_LEG"],
-
+	"EEngineModeId": [
+		"EngineMode_Invalid",
+		"EngineMode_SinglePlayer",
+		"EngineMode_SplitScreen",
+		"EngineMode_Multiplayer",
+		"EngineMode_Max"
+	],
+	"EEntityOrdering": [
+		"EO_LOW",
+		"EO_NORMAL",
+		"EO_HIGH"
+	],
+	"EEquipAbility": [
+		"EA_EQUIP_IN_HANDS",
+		"EA_CANNOT_BE_EQUIPPED"
+	],
+	"EEvergreenMenuLabelPurpose": [
+		"NONE",
+		"ACTION_KILL_TYPE",
+		"POISON_LETHAL",
+		"POISON_EMETIC",
+		"POISON_SEDATIVE",
+		"ITEMRARITY_COMMON",
+		"ITEMRARITY_RARE",
+		"ITEMRARITY_EPIC",
+		"ITEMRARITY_LEGENDARY",
+		"LOSE_ON_WOUNDED"
+	],
+	"EExclusionLayer": [
+		"EL_NONE",
+		"EL_STORY",
+		"EL_AMBIENT"
+	],
+	"EExtendedPropertyType": [
+		"TYPE_RESOURCEPTR",
+		"TYPE_INT32",
+		"TYPE_UINT32",
+		"TYPE_FLOAT",
+		"TYPE_STRING",
+		"TYPE_BOOL",
+		"TYPE_ENTITYREF",
+		"TYPE_VARIANT"
+	],
+	"EFSMInternalEvent": [
+		"eFSMEvent_Completed",
+		"eFSMEvent_Failed",
+		"eFSMEvent_Choice",
+		"eFSMEvent_Max"
+	],
+	"EFSMStateStatus": [
+		"eInactive",
+		"eActive",
+		"eCompleted",
+		"eFailed",
+		"eInterrupted"
+	],
+	"EFilterMaskBit": [
+		"eFilterMaskBit_ObjectCollision",
+		"eFilterMaskBit_OpaqueCollision",
+		"eFilterMaskBit_UNUSED_LAST"
+	],
+	"EFocusBarState": [
+		"FOCUS_BAR_NORMAL",
+		"FOCUS_BAR_INSTINCT",
+		"FOCUS_BAR_BURNING"
+	],
+	"EFontFlags": [
+		"FV_Normal",
+		"FV_Italic",
+		"FV_Bold",
+		"FV_BoldItalic",
+		"FV_FauxItalic",
+		"FV_FauxBold",
+		"FV_FauxBoldItalic",
+		"FV_Original",
+		"FV_NoAutoFit"
+	],
+	"EGSBodyPart": [
+		"GSBODYPART_UNKNOWN",
+		"GSBODYPART_HEAD",
+		"GSBODYPART_TORSO",
+		"GSBODYPART_ARM",
+		"GSBODYPART_LEG"
+	],
 	"EGSEvent": [
 		"GSEvent_StrayBullet",
 		"GSEvent_TookDamage",
@@ -3989,7 +4437,6 @@
 		"GSEvent_Projectile_Missed",
 		"GSEvent_Projectile_MultiKillTargets"
 	],
-
 	"EGSExplodingPropType": [
 		"eGSExplodingProp_Unknown",
 		"eGSExplodingProp_Barrel",
@@ -4002,7 +4449,6 @@
 		"eGSExplodingProp_FireworksBox",
 		"eGSExplodingProp_Car"
 	],
-
 	"EGSKillSituation": [
 		"GSKILLSITUATION_UNKNOWN",
 		"GSKILLSITUATION_CLOSECOMBAT",
@@ -4015,9 +4461,12 @@
 		"GSKILLSITUATION_PACIFY",
 		"GSKILLSITUATION_FIBERWIRE"
 	],
-
-	"EGSKillVictim": ["GSKILLVICTIM_UNKNOWN", "GSKILLVICTIM_CIVILIAN", "GSKILLVICTIM_GUARD", "GSKILLVICTIM_TARGET"],
-
+	"EGSKillVictim": [
+		"GSKILLVICTIM_UNKNOWN",
+		"GSKILLVICTIM_CIVILIAN",
+		"GSKILLVICTIM_GUARD",
+		"GSKILLVICTIM_TARGET"
+	],
 	"EGait": [
 		"eGait_Normal",
 		"eGait_Reposition",
@@ -4128,7 +4577,6 @@
 		"eGait_Custom8",
 		"eGait_Custom9"
 	],
-
 	"EGameEventArgType": [
 		"GE_ARGS_KILL",
 		"GE_ARGS_PRIORITYKILL",
@@ -4139,13 +4587,34 @@
 		"GE_ARGS_CHECKPOINTEVENT",
 		"GE_ARGS_AI_SITUATION"
 	],
-
-	"EGameEventType": ["GET_GameplayStart", "GET_GameplayStop", "GET_IntroCutStart", "GET_IntroCutEnd", "GET_ProfilingStart", "GET_SavegameRestored", "GET_PlayingAfterLoad", "GET_COUNT"],
-
-	"EGameModeId": ["GameMode_Invalid", "GameMode_Normal", "GameMode_Sniper", "GameMode_Versus", "GameMode_Max"],
-
-	"EGameTension": ["EGT_Undefined", "EGT_Ambient", "EGT_Agitated", "EGT_Searching", "EGT_AlertedLow", "EGT_AlertedHigh", "EGT_Hunting", "EGT_Arrest", "EGT_Combat"],
-
+	"EGameEventType": [
+		"GET_GameplayStart",
+		"GET_GameplayStop",
+		"GET_IntroCutStart",
+		"GET_IntroCutEnd",
+		"GET_ProfilingStart",
+		"GET_SavegameRestored",
+		"GET_PlayingAfterLoad",
+		"GET_COUNT"
+	],
+	"EGameModeId": [
+		"GameMode_Invalid",
+		"GameMode_Normal",
+		"GameMode_Sniper",
+		"GameMode_Versus",
+		"GameMode_Max"
+	],
+	"EGameTension": [
+		"EGT_Undefined",
+		"EGT_Ambient",
+		"EGT_Agitated",
+		"EGT_Searching",
+		"EGT_AlertedLow",
+		"EGT_AlertedHigh",
+		"EGT_Hunting",
+		"EGT_Arrest",
+		"EGT_Combat"
+	],
 	"EGameUIMenu": [
 		"eUIMenu_IntroMenu",
 		"eUIMenu_PauseMenu",
@@ -4162,13 +4631,23 @@
 		"eUIMenu_TutorialMenu",
 		"eUIMenu_SplashHintMenu",
 		"eUIMenu_EmoteMenu",
+		"eUIMenu_WardrobeMenu",
 		"eUIMenu_Count"
 	],
-
-	"EGestureCategory": ["EGC_None", "EGC_AmbientDialog", "EGC_TrespassWarn1", "EGC_TrespassWarn2", "EGC_TrespassWarn3", "EGC_StopWarn"],
-
-	"EGuardPointType": ["GPT_Hold", "GPT_Combat", "GPT_CombatAndHold", "GPT_VIPSafeRoom"],
-
+	"EGestureCategory": [
+		"EGC_None",
+		"EGC_AmbientDialog",
+		"EGC_TrespassWarn1",
+		"EGC_TrespassWarn2",
+		"EGC_TrespassWarn3",
+		"EGC_StopWarn"
+	],
+	"EGuardPointType": [
+		"GPT_Hold",
+		"GPT_Combat",
+		"GPT_CombatAndHold",
+		"GPT_VIPSafeRoom"
+	],
 	"EHM5GameInputFlag": [
 		"eGameInputActionPerform",
 		"eGameInputActionPickup",
@@ -4236,9 +4715,13 @@
 		"eGameInputDefault",
 		"eGameInputActionsNUM"
 	],
-
-	"EHM5SoundBulletType": ["ESBT_SMALL", "ESBT_MEDIUM", "ESBT_LARGE", "ESBT_GORGEOUS", "ESBT_ANY"],
-
+	"EHM5SoundBulletType": [
+		"ESBT_SMALL",
+		"ESBT_MEDIUM",
+		"ESBT_LARGE",
+		"ESBT_GORGEOUS",
+		"ESBT_ANY"
+	],
 	"EHM5SoundCloseCombatEvent": [
 		"ECCE_PUNCH_FACE",
 		"ECCE_PUNCH_BODY",
@@ -4257,13 +4740,28 @@
 		"ECCE_SKULL_CRACK",
 		"ECCE_ANY"
 	],
-
-	"EHM5SoundFootstepEmitterTarget": ["EFSAT_MAIN", "EFSAT_NPC"],
-
-	"EHM5SoundFootstepEvent": ["EFSE_START", "EFSE_STOP", "EFSE_LEFT", "EFSE_RIGHT", "EFSE_TURN", "EFSE_SLIDE", "EFSE_JUMP", "EFSE_LAND"],
-
-	"EHM5SoundFootstepStance": ["EFSS_SNEAK", "EFSS_SNEAKRUN", "EFSS_WALKSLOWLY", "EFSS_WALK", "EFSS_RUN", "EFSS_ANY"],
-
+	"EHM5SoundFootstepEmitterTarget": [
+		"EFSAT_MAIN",
+		"EFSAT_NPC"
+	],
+	"EHM5SoundFootstepEvent": [
+		"EFSE_START",
+		"EFSE_STOP",
+		"EFSE_LEFT",
+		"EFSE_RIGHT",
+		"EFSE_TURN",
+		"EFSE_SLIDE",
+		"EFSE_JUMP",
+		"EFSE_LAND"
+	],
+	"EHM5SoundFootstepStance": [
+		"EFSS_SNEAK",
+		"EFSS_SNEAKRUN",
+		"EFSS_WALKSLOWLY",
+		"EFSS_WALK",
+		"EFSS_RUN",
+		"EFSS_ANY"
+	],
 	"EHM5SoundFootwearType": [
 		"EFWT_UNDEFINED",
 		"EFWT_BAREFOOT",
@@ -4282,9 +4780,10 @@
 		"EFWT_LEATHER_KEYS",
 		"EFWT_SWAT_BOOTS"
 	],
-
-	"EHM5SoundRicochetType": ["ESRT_VARIATION1", "ESRT_VARIATION2"],
-
+	"EHM5SoundRicochetType": [
+		"ESRT_VARIATION1",
+		"ESRT_VARIATION2"
+	],
 	"EHUDElement": [
 		"HUD_ELEMENT_NONE",
 		"HUD_ELEMENT_MINIMAP",
@@ -4311,13 +4810,29 @@
 		"HUD_ELEMENT_OBJECTIVES",
 		"HUD_ALL_ELEMENTS"
 	],
-
-	"EHUDIconFlags": ["HUD_ICON_FLAG_POSITION", "HUD_ICON_FLAG_VALUE", "HUD_ICON_FLAG_SCALE", "HUD_ICON_FLAG_TEXT"],
-
-	"EHUDIconType": ["HUD_ICON_NONE", "HUD_ICON_ALARM_TIMER", "HUD_ICON_CLOSECOMBAT", "HUD_ICON_BREADCRUMB", "HUD_ICON_EXIT", "HUD_ICON_OBJECTIVE", "HUD_ICON_TARGET", "HUD_ICON_TUTORIAL_ARROW"],
-
-	"EHUDMessageStatus": ["HUD_MESSAGE_UNUSED", "HUD_MESSAGE_ATTACH", "HUD_MESSAGE_FADEIN", "HUD_MESSAGE_DISPLAY", "HUD_MESSAGE_FADEOUT"],
-
+	"EHUDIconFlags": [
+		"HUD_ICON_FLAG_POSITION",
+		"HUD_ICON_FLAG_VALUE",
+		"HUD_ICON_FLAG_SCALE",
+		"HUD_ICON_FLAG_TEXT"
+	],
+	"EHUDIconType": [
+		"HUD_ICON_NONE",
+		"HUD_ICON_ALARM_TIMER",
+		"HUD_ICON_CLOSECOMBAT",
+		"HUD_ICON_BREADCRUMB",
+		"HUD_ICON_EXIT",
+		"HUD_ICON_OBJECTIVE",
+		"HUD_ICON_TARGET",
+		"HUD_ICON_TUTORIAL_ARROW"
+	],
+	"EHUDMessageStatus": [
+		"HUD_MESSAGE_UNUSED",
+		"HUD_MESSAGE_ATTACH",
+		"HUD_MESSAGE_FADEIN",
+		"HUD_MESSAGE_DISPLAY",
+		"HUD_MESSAGE_FADEOUT"
+	],
 	"EHeroGameState": [
 		"eHGS_Reserved_QueryALL",
 		"eHGS_Reserved_QueryAny",
@@ -4367,9 +4882,10 @@
 		"eHGS_MvPlaceItem",
 		"eHGS_NUM"
 	],
-
-	"EHeroHand": ["Left", "Right"],
-
+	"EHeroHand": [
+		"Left",
+		"Right"
+	],
 	"EHintMessageSoundType": [
 		"EHintMessageSound_None",
 		"EHintMessageSound_GeneralHint",
@@ -4383,9 +4899,12 @@
 		"EHintMessageSound_CanBeTurnedOff",
 		"EHintMessageSound_Agility"
 	],
-
-	"EHintMessageType": ["EHintMessageType_Hint", "EHintMessageType_InstinctHint", "EHintMessageType_InstinctPrompt", "EHintMessageType_Tutorial"],
-
+	"EHintMessageType": [
+		"EHintMessageType_Hint",
+		"EHintMessageType_InstinctHint",
+		"EHintMessageType_InstinctPrompt",
+		"EHintMessageType_Tutorial"
+	],
 	"EHitmanPermissionFlag": [
 		"eHPFlag_InventorySelect",
 		"eHPFlag_CanHolsterItem",
@@ -4398,7 +4917,6 @@
 		"eHPFlag_CanOpenPauseMenu",
 		"eHPFlag_PermissionsNUM"
 	],
-
 	"EIKEndEffector": [
 		"BEE_Pelvis",
 		"BEE_SpineOrigin",
@@ -4426,9 +4944,14 @@
 		"BEE_RightToe",
 		"BEE_Count"
 	],
-
-	"EImpactEffectsOptions": ["eIE_None", "eIE_BloodSplatter", "eIE_Decals", "eIE_MaterialImpactEffects", "eIE_AmmoImpactEffect", "eIE_All"],
-
+	"EImpactEffectsOptions": [
+		"eIE_None",
+		"eIE_BloodSplatter",
+		"eIE_Decals",
+		"eIE_MaterialImpactEffects",
+		"eIE_AmmoImpactEffect",
+		"eIE_All"
+	],
 	"EInformationBarMessage": [
 		"eIBM_Clear",
 		"eIBM_LastEnemyKilledCP",
@@ -4443,25 +4966,73 @@
 		"eIBM_Trespassing",
 		"eIBM_NUM"
 	],
-
-	"EIntelStage": ["eIT_MAIN", "eIT_STAGE", "eIT_HINT"],
-
-	"EIntelTensionLevel": ["eITL_Undefined", "eITL_Ambient", "eITL_Agitated", "eITL_Searching", "eITL_AlertedLow", "eITL_AlertedHigh", "eITL_Hunting", "eITL_Arrest", "eITL_Combat"],
-
-	"EIntelType": ["eIT_DATA", "eIT_OPPORTUNITY", "eIT_BACKGROUND", "eIT_HANDLER", "eIT_UNDEFINED"],
-
-	"EInteractionIndicatorState": ["EIIS_AVAILABLE", "EIIS_COLLAPSED", "EIIS_ACTIVATING", "EIIS_NOTAVAILABLE"],
-
-	"EInteractionInputType": ["EIIT_UNKNOWN", "EIIT_PRESS", "EIIT_HOLD", "EIIT_HOLD_DOWN", "EIIT_REPEAT", "EIIT_GUIDE"],
-
-	"EInventoryConfigCustomRule": ["EICCR_None", "EICCR_Surrender", "EICCR_TempDropLeftHandItem"],
-
-	"EInventoryConfigFormerEquippedItems": ["EICFEI_Equip", "EICFEI_EquipOrPickup", "EICFEI_Forget"],
-
-	"EInventoryConfigItemHandling": ["EICIH_Allow", "EICIH_Store", "EICIH_InstaStore", "EICIH_Drop", "EICIH_DropOrStore", "EICIH_DropAndPickup", "EICIH_DoNothing"],
-
-	"EInventoryStorageType": ["EIST_None", "EIST_Bag", "EIST_RightHand", "EIST_LeftHand", "EIST_Back", "EIST_Support", "EIST_Quest", "EIST_Temporary", "EIST_Debug"],
-
+	"EIntelStage": [
+		"eIT_MAIN",
+		"eIT_STAGE",
+		"eIT_HINT"
+	],
+	"EIntelTensionLevel": [
+		"eITL_Undefined",
+		"eITL_Ambient",
+		"eITL_Agitated",
+		"eITL_Searching",
+		"eITL_AlertedLow",
+		"eITL_AlertedHigh",
+		"eITL_Hunting",
+		"eITL_Arrest",
+		"eITL_Combat"
+	],
+	"EIntelType": [
+		"eIT_DATA",
+		"eIT_OPPORTUNITY",
+		"eIT_BACKGROUND",
+		"eIT_HANDLER",
+		"eIT_UNDEFINED"
+	],
+	"EInteractionIndicatorState": [
+		"EIIS_AVAILABLE",
+		"EIIS_COLLAPSED",
+		"EIIS_ACTIVATING",
+		"EIIS_NOTAVAILABLE"
+	],
+	"EInteractionInputType": [
+		"EIIT_UNKNOWN",
+		"EIIT_PRESS",
+		"EIIT_HOLD",
+		"EIIT_HOLD_DOWN",
+		"EIIT_REPEAT",
+		"EIIT_GUIDE"
+	],
+	"EInventoryConfigCustomRule": [
+		"EICCR_None",
+		"EICCR_Surrender",
+		"EICCR_TempDropLeftHandItem"
+	],
+	"EInventoryConfigFormerEquippedItems": [
+		"EICFEI_Equip",
+		"EICFEI_EquipOrPickup",
+		"EICFEI_Forget"
+	],
+	"EInventoryConfigItemHandling": [
+		"EICIH_Allow",
+		"EICIH_Store",
+		"EICIH_InstaStore",
+		"EICIH_Drop",
+		"EICIH_DropOrStore",
+		"EICIH_DropAndPickup",
+		"EICIH_DoNothing"
+	],
+	"EInventoryStorageType": [
+		"EIST_None",
+		"EIST_Bag",
+		"EIST_RightHand",
+		"EIST_LeftHand",
+		"EIST_Back",
+		"EIST_Support",
+		"EIST_Quest",
+		"EIST_Temporary",
+		"EIST_Debug"
+	],
 	"EItemGripType": [
 		"IGT_Empty",
 		"IGT_Suitcase",
@@ -4505,13 +5076,25 @@
 		"IGT_Prop_1h_Phone",
 		"IGT_None"
 	],
-
-	"EItemHUDType": ["EIHT_None", "EIHT_GhostItem", "EIHT_OutbreakHealingItem"],
-
-	"EItemLocation": ["eIL_Anywhere", "eIL_Inventory", "eIL_RightHand", "eIL_LeftHand", "eIL_FreeBone", "eIL_Count"],
-
-	"EItemMeleeDamageBehavior": ["EIMDB_Undefined", "EIMDB_Bouncing", "EIMDB_Slashing", "EIMDB_Sticking"],
-
+	"EItemHUDType": [
+		"EIHT_None",
+		"EIHT_GhostItem",
+		"EIHT_OutbreakHealingItem"
+	],
+	"EItemLocation": [
+		"eIL_Anywhere",
+		"eIL_Inventory",
+		"eIL_RightHand",
+		"eIL_LeftHand",
+		"eIL_FreeBone",
+		"eIL_Count"
+	],
+	"EItemMeleeDamageBehavior": [
+		"EIMDB_Undefined",
+		"EIMDB_Bouncing",
+		"EIMDB_Slashing",
+		"EIMDB_Sticking"
+	],
 	"EItemModifierType": [
 		"MODIFIER_NONE",
 		"MODIFIER_THROW",
@@ -4539,13 +5122,24 @@
 		"MODIFIER_MAGAZINE",
 		"MODIFIER_BURST"
 	],
-
-	"EItemPoisonType": ["POISONTYPE_NONE", "POISONTYPE_LETHAL", "POISONTYPE_SEDATIVE", "POISONTYPE_EMETIC"],
-
-	"EItemRequirement": ["eIR_NoRequirement", "eIR_RequireEmpty", "eIR_RequireItem", "eIR_RequireNoBigItem"],
-
-	"EKeywordSetBehavior": ["EKWSB_All", "EKWSB_None", "EKWSB_Any", "EKWSB_No"],
-
+	"EItemPoisonType": [
+		"POISONTYPE_NONE",
+		"POISONTYPE_LETHAL",
+		"POISONTYPE_SEDATIVE",
+		"POISONTYPE_EMETIC"
+	],
+	"EItemRequirement": [
+		"eIR_NoRequirement",
+		"eIR_RequireEmpty",
+		"eIR_RequireItem",
+		"eIR_RequireNoBigItem"
+	],
+	"EKeywordSetBehavior": [
+		"EKWSB_All",
+		"EKWSB_None",
+		"EKWSB_Any",
+		"EKWSB_No"
+	],
 	"EKillType": [
 		"EKillType_Undefined",
 		"EKillType_Throw",
@@ -4559,29 +5153,81 @@
 		"EKillType_Push",
 		"EKillType_Pull"
 	],
-
-	"EKnownEntityType": ["KET_UNKNOWN", "KET_HITMAN", "KET_ACTOR", "KET_ITEM", "KET_LOCATION", "KET_OBJECT", "KET_COVER", "KET_PERCEPTIBLE", "KET_TEMPCROWDBODY"],
-
-	"ELastSoundTension": ["EST_Unknown", "EST_Ambient", "EST_Yellow", "EST_Orange", "EST_Red"],
-
-	"ELedgeDismountBehavior": ["eLDB_DontCare", "eLDB_Stand", "eLDB_Crouch"],
-
-	"ELedgeDismountDirection": ["eLDD_DontCare", "eLDD_FaceLedge", "eLDD_FaceLeft", "eLDD_FaceRight", "eLDD_Turn180"],
-
-	"ELocale": ["Locale_En", "Locale_Fr", "Locale_It", "Locale_De", "Locale_Es", "Locale_Ru", "Locale_Mx", "Locale_Br", "Locale_Pl", "Locale_Cn", "Locale_Jp", "Locale_Tc"],
-
-	"EMapType": ["E_MAPTYPE_Minimap", "E_MAPTYPE_MainMap", "E_MAPTYPE_MenuMap"],
-
-	"EMarkerClipAlgorithm": ["MCA_NONE", "MCA_SIMPLE", "MCA_ADVANCED"],
-
-	"EMarkerInclusionMode": ["MIM_DEFAULT", "MIM_IF_FORCE_INCLUDED_ONLY"],
-
-	"EMassImpulseType": ["eMIT_None", "eMIT_Explosion", "eMIT_ShockWave", "eMIT_ShockWaveNoExplosion"],
-
-	"EMatchOverCondition": ["CompletedNormally", "OpponentsDisconnected", "OpponentsAbandoned"],
-
-	"EMaterialRegistrationState": ["eMRS_None", "eMRS_Pending", "eMRS_Success", "eMRS_Failed"],
-
+	"EKnownEntityType": [
+		"KET_UNKNOWN",
+		"KET_HITMAN",
+		"KET_ACTOR",
+		"KET_ITEM",
+		"KET_LOCATION",
+		"KET_OBJECT",
+		"KET_COVER",
+		"KET_PERCEPTIBLE",
+		"KET_TEMPCROWDBODY"
+	],
+	"ELastSoundTension": [
+		"EST_Unknown",
+		"EST_Ambient",
+		"EST_Yellow",
+		"EST_Orange",
+		"EST_Red"
+	],
+	"ELedgeDismountBehavior": [
+		"eLDB_DontCare",
+		"eLDB_Stand",
+		"eLDB_Crouch"
+	],
+	"ELedgeDismountDirection": [
+		"eLDD_DontCare",
+		"eLDD_FaceLedge",
+		"eLDD_FaceLeft",
+		"eLDD_FaceRight",
+		"eLDD_Turn180"
+	],
+	"ELocale": [
+		"Locale_En",
+		"Locale_Fr",
+		"Locale_It",
+		"Locale_De",
+		"Locale_Es",
+		"Locale_Ru",
+		"Locale_Mx",
+		"Locale_Br",
+		"Locale_Pl",
+		"Locale_Cn",
+		"Locale_Jp",
+		"Locale_Tc"
+	],
+	"EMapType": [
+		"E_MAPTYPE_Minimap",
+		"E_MAPTYPE_MainMap",
+		"E_MAPTYPE_MenuMap"
+	],
+	"EMarkerClipAlgorithm": [
+		"MCA_NONE",
+		"MCA_SIMPLE",
+		"MCA_ADVANCED"
+	],
+	"EMarkerInclusionMode": [
+		"MIM_DEFAULT",
+		"MIM_IF_FORCE_INCLUDED_ONLY"
+	],
+	"EMassImpulseType": [
+		"eMIT_None",
+		"eMIT_Explosion",
+		"eMIT_ShockWave",
+		"eMIT_ShockWaveNoExplosion"
+	],
+	"EMatchOverCondition": [
+		"CompletedNormally",
+		"OpponentsDisconnected",
+		"OpponentsAbandoned"
+	],
+	"EMaterialRegistrationState": [
+		"eMRS_None",
+		"eMRS_Pending",
+		"eMRS_Success",
+		"eMRS_Failed"
+	],
 	"EMeBarState": [
 		"ME_BAR_NONE",
 		"ME_BAR_TRESPASSING",
@@ -4592,7 +5238,6 @@
 		"ME_BAR_DISGUISE_SUSPICIOUS",
 		"ME_BAR_NEAR_BODY"
 	],
-
 	"EMorphemeEventId": [
 		"eDE_None",
 		"eDE_UnholsterWeapon",
@@ -4665,25 +5310,61 @@
 		"eDE_Act_FB_BlendOut_End",
 		"eDE_Act_LeadIn_Marker"
 	],
-
-	"EMotionType": ["MOTION_LOCKED", "MOTION_LIMITED", "MOTION_FREE"],
-
-	"EMoveEndState": ["MES_Moving", "MES_Stopping", "MES_Standing"],
-
-	"EMoveRecenterMode": ["VR_MOVE_TRIGGER_INDEPENDENT", "VR_MOVE_TRIGGER_AVERAGE"],
-
-	"EMoveSpeed": ["MS_Sneaking", "MS_Walking", "MS_Jogging", "MS_Sprinting", "MS_Flash"],
-
-	"EMultiplayerLobbyRequestType": ["LOBBY_REQUEST_VOID", "LOBBY_REQUEST_IDLE", "LOBBY_REQUEST_CREATE", "LOBBY_REQUEST_CREATE_LOCALHOST", "LOBBY_REQUEST_JOIN"],
-
-	"EMultiplayerNetworkState": ["Base", "Idle", "Searching", "Connecting", "Joining", "Creating", "Connected", "Disconnecting", "Count"],
-
-	"ENamedGameEvents": ["eEvent_IntroCutStart", "eEvent_PlayingAfterLoad", "eEvent_SetModePlaying", "eNumNamedGameEvents"],
-
-	"ENetPlayerEvent": ["Login", "Logout", "NewHost"],
-
-	"ENetRole": ["None", "Master", "Client"],
-
+	"EMotionType": [
+		"MOTION_LOCKED",
+		"MOTION_LIMITED",
+		"MOTION_FREE"
+	],
+	"EMoveEndState": [
+		"MES_Moving",
+		"MES_Stopping",
+		"MES_Standing"
+	],
+	"EMoveRecenterMode": [
+		"VR_MOVE_TRIGGER_INDEPENDENT",
+		"VR_MOVE_TRIGGER_AVERAGE"
+	],
+	"EMoveSpeed": [
+		"MS_Sneaking",
+		"MS_Walking",
+		"MS_Jogging",
+		"MS_Sprinting",
+		"MS_Flash"
+	],
+	"EMultiplayerLobbyRequestType": [
+		"LOBBY_REQUEST_VOID",
+		"LOBBY_REQUEST_IDLE",
+		"LOBBY_REQUEST_CREATE",
+		"LOBBY_REQUEST_CREATE_LOCALHOST",
+		"LOBBY_REQUEST_JOIN"
+	],
+	"EMultiplayerNetworkState": [
+		"Base",
+		"Idle",
+		"Searching",
+		"Connecting",
+		"Joining",
+		"Creating",
+		"Connected",
+		"Disconnecting",
+		"Count"
+	],
+	"ENamedGameEvents": [
+		"eEvent_IntroCutStart",
+		"eEvent_PlayingAfterLoad",
+		"eEvent_SetModePlaying",
+		"eNumNamedGameEvents"
+	],
+	"ENetPlayerEvent": [
+		"Login",
+		"Logout",
+		"NewHost"
+	],
+	"ENetRole": [
+		"None",
+		"Master",
+		"Client"
+	],
 	"ENetworkSystemID": [
 		"NSID_UNDEFINED",
 		"NSID_DEBUG_SWAP_PLAYER_RPC",
@@ -4759,11 +5440,15 @@
 		"NSID_VS_TARGET_PACIFIED_CONFIRMED_RPC",
 		"NSID_MAX"
 	],
-
-	"EObjectiveType": ["OBJECTIVE_PRIMARY", "OBJECTIVE_SECONDARY", "OBJECTIVE_TERTIARY"],
-
-	"EOnlinTest": ["eHELLO", "eWORLD"],
-
+	"EObjectiveType": [
+		"OBJECTIVE_PRIMARY",
+		"OBJECTIVE_SECONDARY",
+		"OBJECTIVE_TERTIARY"
+	],
+	"EOnlinTest": [
+		"eHELLO",
+		"eWORLD"
+	],
 	"EOnlineEventInvestigationType": [
 		"OEIT_Generic",
 		"OEIT_HearBulletImpact",
@@ -4784,15 +5469,33 @@
 		"OEIT_CrowdCurious",
 		"OEIT_CameraDefect"
 	],
-
-	"EOpportunityRevealState": ["ORS_REVEALING", "ORS_HINT", "ORS_DISTANCE", "ORS_RANGE_FLAGS", "ORS_REVEALED", "ORS_REVEAL_FLAGS", "ORS_BYPASS_MENU"],
-
-	"EOpportunityState": ["OS_TRACKED", "OS_ENABLED", "OS_UNLOCKED", "OS_REVEAL_PENDING"],
-
-	"EOrderCompletionStatus": ["OCS_Undetermined", "OCS_Succeeded", "OCS_Interrupted", "OCS_Blocked", "OCS_Failed"],
-
-	"EOutbreakInfectionStage": ["eOIS_Stage1", "eOIS_Stage2", "eOIS_Stage3"],
-
+	"EOpportunityRevealState": [
+		"ORS_REVEALING",
+		"ORS_HINT",
+		"ORS_DISTANCE",
+		"ORS_RANGE_FLAGS",
+		"ORS_REVEALED",
+		"ORS_REVEAL_FLAGS",
+		"ORS_BYPASS_MENU"
+	],
+	"EOpportunityState": [
+		"OS_TRACKED",
+		"OS_ENABLED",
+		"OS_UNLOCKED",
+		"OS_REVEAL_PENDING"
+	],
+	"EOrderCompletionStatus": [
+		"OCS_Undetermined",
+		"OCS_Succeeded",
+		"OCS_Interrupted",
+		"OCS_Blocked",
+		"OCS_Failed"
+	],
+	"EOutbreakInfectionStage": [
+		"eOIS_Stage1",
+		"eOIS_Stage2",
+		"eOIS_Stage3"
+	],
 	"EOutfitAICategory": [
 		"OAC_Undefined",
 		"OAC_Fallback",
@@ -4998,31 +5701,78 @@
 		"OAC_Gaucho",
 		"OAC_WineMkr",
 		"OAC_Fixer",
-		"OAC_Sommelier"
+		"OAC_Sommelier",
+		"OAC_Cook",
+		"OAC_EngineerDug",
+		"OAC_HavPirate",
+		"OAC_Pirate"
 	],
-
-	"EOutfitType": ["eOT_None", "eOT_Suit", "eOT_Guard", "eOT_Worker", "eOT_Waiter", "eOT_LucasGrey"],
-
-	"EParticleColorUsage": ["REPLACE_PARTICLE_COLOR", "LEAVE_PARTICLE_COLOR"],
-
-	"EParticleDecalSpawnEntity_Constraints": ["FACTOR_AND_RANDOMIZE", "SIZE_RANGE"],
-
-	"EParticleModifierImpulseDirections": ["TARGET_ZAXIS_DIRECTION", "TOWARDS_TARGET_PIVOT", "AWAY_FROM_TARGET_PIVOT"],
-
-	"EParticleSpritePivotLocation": ["CENTER_PIVOT", "BOTTOM_PIVOT", "TOP_PIVOT"],
-
-	"EPathFinderBoxType": ["PFBT_INCLUDE_MESH_COLLISION", "PFBT_EXCLUDE_MESH_COLLISION", "PFBT_CREATE_MESH_COLLISION", "PFBT_REGION", "PFBT_INCLUDE_PORTALS", "PFBT_EXCLUDE_PORTALS", "PFBT_IGNORE"],
-
-	"EPersistentBoolDataSyncType": ["ePBDST_None", "ePBDST_ServerAuthoritative", "ePBDST_Full"],
-
-	"EPhysicsObjectType": ["EPHYSICSOBJECTTYPE_UNKNOWN", "EPHYSICSOBJECTTYPE_DYNAMIC", "EPHYSICSOBJECTTYPE_KINEMATIC", "EPHYSICSOBJECTTYPE_STATIC"],
-
-	"EPlaceableType": ["PLACEABLE_NOT", "PLACEABLE_FULL_PHYSICS", "PLACEABLE_SLEEP_PHYSICS", "PLACEABLE_NO_PHYSICS", "PLACEABLE_ATTACH"],
-
-	"EPlayMode": ["PLAYMODE_STOPPED", "PLAYMODE_PAUSED", "PLAYMODE_PLAYING"],
-
-	"EPostProcessorComponentType": ["MRP_LOOKAT", "MRP_AIM", "MRP_LEDGEFEETLOCK", "MRP_LEDGEHANG", "MRP_IMPACT", "MRP_BLINDFIRE"],
-
+	"EOutfitType": [
+		"eOT_None",
+		"eOT_Suit",
+		"eOT_Guard",
+		"eOT_Worker",
+		"eOT_Waiter",
+		"eOT_LucasGrey"
+	],
+	"EParticleColorUsage": [
+		"REPLACE_PARTICLE_COLOR",
+		"LEAVE_PARTICLE_COLOR"
+	],
+	"EParticleDecalSpawnEntity_Constraints": [
+		"FACTOR_AND_RANDOMIZE",
+		"SIZE_RANGE"
+	],
+	"EParticleModifierImpulseDirections": [
+		"TARGET_ZAXIS_DIRECTION",
+		"TOWARDS_TARGET_PIVOT",
+		"AWAY_FROM_TARGET_PIVOT"
+	],
+	"EParticleSpritePivotLocation": [
+		"CENTER_PIVOT",
+		"BOTTOM_PIVOT",
+		"TOP_PIVOT"
+	],
+	"EPathFinderBoxType": [
+		"PFBT_INCLUDE_MESH_COLLISION",
+		"PFBT_EXCLUDE_MESH_COLLISION",
+		"PFBT_CREATE_MESH_COLLISION",
+		"PFBT_REGION",
+		"PFBT_INCLUDE_PORTALS",
+		"PFBT_EXCLUDE_PORTALS",
+		"PFBT_IGNORE"
+	],
+	"EPersistentBoolDataSyncType": [
+		"ePBDST_None",
+		"ePBDST_ServerAuthoritative",
+		"ePBDST_Full"
+	],
+	"EPhysicsObjectType": [
+		"EPHYSICSOBJECTTYPE_UNKNOWN",
+		"EPHYSICSOBJECTTYPE_DYNAMIC",
+		"EPHYSICSOBJECTTYPE_KINEMATIC",
+		"EPHYSICSOBJECTTYPE_STATIC"
+	],
+	"EPlaceableType": [
+		"PLACEABLE_NOT",
+		"PLACEABLE_FULL_PHYSICS",
+		"PLACEABLE_SLEEP_PHYSICS",
+		"PLACEABLE_NO_PHYSICS",
+		"PLACEABLE_ATTACH"
+	],
+	"EPlayMode": [
+		"PLAYMODE_STOPPED",
+		"PLAYMODE_PAUSED",
+		"PLAYMODE_PLAYING"
+	],
+	"EPostProcessorComponentType": [
+		"MRP_LOOKAT",
+		"MRP_AIM",
+		"MRP_LEDGEFEETLOCK",
+		"MRP_LEDGEHANG",
+		"MRP_IMPACT",
+		"MRP_BLINDFIRE"
+	],
 	"EPushNotificationType": [
 		"PUSH_NOTIFICATION_OBJECTIVE",
 		"PUSH_NOTIFICATION_DISGUISE",
@@ -5034,15 +5784,30 @@
 		"PUSH_NOTIFICATION_TECHNIQUE_UNLOCKED",
 		"PUSH_NOTIFICATION_SCORE_COMPARISON"
 	],
-
-	"EQueryMaskType": ["eQueryMaskType_CameraCollision", "eQueryMaskType_CameraObstacle", "eQueryMaskType_ExplosionRelevant"],
-
-	"ERANDOM_DISTRIBUTION": ["RND_UNIFORM", "RND_SAWTOOTH"],
-
-	"ERagdollPart": ["ERAGDOLLPART_NONE", "ERAGDOLLPART_BODY", "ERAGDOLLPART_HEAD", "ERAGDOLLPART_HAND", "ERAGDOLLPART_FOOT"],
-
-	"ERatingCategory": ["ERatingCategory_Invalid", "ERatingCategory_Flawless", "ERatingCategory_Violence", "ERatingCategory_Cunning", "ERatingCategory_Noise", "ERatingCategory_COUNT"],
-
+	"EQueryMaskType": [
+		"eQueryMaskType_CameraCollision",
+		"eQueryMaskType_CameraObstacle",
+		"eQueryMaskType_ExplosionRelevant"
+	],
+	"ERANDOM_DISTRIBUTION": [
+		"RND_UNIFORM",
+		"RND_SAWTOOTH"
+	],
+	"ERagdollPart": [
+		"ERAGDOLLPART_NONE",
+		"ERAGDOLLPART_BODY",
+		"ERAGDOLLPART_HEAD",
+		"ERAGDOLLPART_HAND",
+		"ERAGDOLLPART_FOOT"
+	],
+	"ERatingCategory": [
+		"ERatingCategory_Invalid",
+		"ERatingCategory_Flawless",
+		"ERatingCategory_Violence",
+		"ERatingCategory_Cunning",
+		"ERatingCategory_Noise",
+		"ERatingCategory_COUNT"
+	],
 	"ERatingTitle": [
 		"ERatingTitle_SilentAssassin",
 		"ERatingTitle_PerfectAssassin",
@@ -5056,11 +5821,16 @@
 		"ERatingTitle_Angel",
 		"ERatingTitle_COUNT"
 	],
-
-	"ERatingTitleRequirement": ["ERatingTitleRequirement_Optional", "ERatingTitleRequirement_Required", "ERatingTitleRequirement_Fails"],
-
-	"ERayDetailLevel": ["RAYDETAILS_NONE", "RAYDETAILS_BONES", "RAYDETAILS_MESH"],
-
+	"ERatingTitleRequirement": [
+		"ERatingTitleRequirement_Optional",
+		"ERatingTitleRequirement_Required",
+		"ERatingTitleRequirement_Fails"
+	],
+	"ERayDetailLevel": [
+		"RAYDETAILS_NONE",
+		"RAYDETAILS_BONES",
+		"RAYDETAILS_MESH"
+	],
 	"ERayLayer": [
 		"eRayLayer_COLLIDE_WITH_ALL",
 		"eRayLayer_CAMERA_COLI",
@@ -5084,11 +5854,15 @@
 		"eRayLayer_PHYSICS_MANIPULATOR",
 		"eRayLayer_UNUSED_LAST"
 	],
-
-	"ERayType": ["ERAY_CLOSESTHIT_SIMPLE", "ERAY_CLOSESTHIT_DETAILED"],
-
-	"ERegionId": ["RegionId_Default", "RegionId_Japan", "RegionId_Asia"],
-
+	"ERayType": [
+		"ERAY_CLOSESTHIT_SIMPLE",
+		"ERAY_CLOSESTHIT_DETAILED"
+	],
+	"ERegionId": [
+		"RegionId_Default",
+		"RegionId_Japan",
+		"RegionId_Asia"
+	],
 	"ERegionMask": [
 		"eRM_None",
 		"eRM_LowCover",
@@ -5104,9 +5878,14 @@
 		"eRM_User_7",
 		"eRM_User_8"
 	],
-
-	"ERegistrationState": ["eINITIAL", "eNOP", "ePENDING", "eCANCELLED_REMOTELY", "eCANCELLED_LOCALLY", "eFOUNDMATCH"],
-
+	"ERegistrationState": [
+		"eINITIAL",
+		"eNOP",
+		"ePENDING",
+		"eCANCELLED_REMOTELY",
+		"eCANCELLED_LOCALLY",
+		"eFOUNDMATCH"
+	],
 	"ERenderGlowTypes": [
 		"ERENDERGLOWTYPE_NONE",
 		"ERENDERGLOWTYPE_ENEMIES",
@@ -5119,6 +5898,7 @@
 		"ERENDERGLOWTYPE_CONTRACT_TARGET",
 		"ERENDERGLOWTYPE_CONTRACT_TARGET_NON_CRITICAL",
 		"ERENDERGLOWTYPE_CONTRACT_TARGET_SPECIAL",
+		"ERENDERGLOWTYPE_CONTRACT_SUSPECT",
 		"ERENDERGLOWTYPE_OBJECTIVES",
 		"ERENDERGLOWTYPE_ENFORCER",
 		"ERENDERGLOWTYPE_LTMEMORY",
@@ -5138,13 +5918,21 @@
 		"ERENDERGLOWTYPE_OPPONENT",
 		"ERENDERGLOWTYPE_CAMERA"
 	],
-
-	"ERenderVRTrackingID": ["RENDER_VR_TRACK_HEAD", "RENDER_VR_TRACK_EYE_LEFT", "RENDER_VR_TRACK_EYE_RIGHT", "RENDER_VR_TRACK_HAND_LEFT", "RENDER_VR_TRACK_HAND_RIGHT"],
-
-	"EReplicaMode": ["E_RM_STATIC_OBJECT", "E_RM_DYNAMIC"],
-
-	"EReplicaOperation": ["E_Created", "E_Destroyed"],
-
+	"ERenderVRTrackingID": [
+		"RENDER_VR_TRACK_HEAD",
+		"RENDER_VR_TRACK_EYE_LEFT",
+		"RENDER_VR_TRACK_EYE_RIGHT",
+		"RENDER_VR_TRACK_HAND_LEFT",
+		"RENDER_VR_TRACK_HAND_RIGHT"
+	],
+	"EReplicaMode": [
+		"E_RM_STATIC_OBJECT",
+		"E_RM_DYNAMIC"
+	],
+	"EReplicaOperation": [
+		"E_Created",
+		"E_Destroyed"
+	],
 	"ERequirementId": [
 		"EREQUIREMENT_INVALID",
 		"EREQUIREMENT_TOKEN_OUTFIT_LEGACY_HERO_REQUIEMSUIT",
@@ -5187,15 +5975,35 @@
 		"EREQUIREMENT_H3_DEADLYSINS_LUST",
 		"EREQUIREMENT_H3_DEADLYSINS_GLUTTONY",
 		"EREQUIREMENT_H3_DEADLYSINS_WRATH",
-		"EREQUIREMENT_H3_DEADLYSINS_ENVY"
+		"EREQUIREMENT_H3_DEADLYSINS_ENVY",
+		"EREQUIREMENT_LOCATION_ROCKY",
+		"EREQUIREMENT_H3_VANITY_CONCRETEART",
+		"EREQUIREMENT_H3_VANITY_MAKESHIFTSCRAP",
+		"EREQUIREMENT_H3_SARAJEVO_SIX"
 	],
-
-	"ERestitutionCombineMode": ["ERestitutionCombineMode_AVERAGE", "ERestitutionCombineMode_MIN", "ERestitutionCombineMode_MULTIPLY", "ERestitutionCombineMode_MAX"],
-
-	"ERoleEvent": ["eRE_NONE", "eRE_CAST", "eRE_CLEAR", "eRE_ENTER_DRAMA", "eRE_REENTER_DRAMA", "eRE_LEAVE_DRAMA", "eRE_NEW_DRAMA", "eRE_PAUSED", "eRE_RESUMING", "eRE_RUNNING"],
-
-	"ERuntimeMemoryAllocationState": ["eRMAS_NeverAllocated", "eRMAS_Allocated", "eRMAS_Released"],
-
+	"ERestitutionCombineMode": [
+		"ERestitutionCombineMode_AVERAGE",
+		"ERestitutionCombineMode_MIN",
+		"ERestitutionCombineMode_MULTIPLY",
+		"ERestitutionCombineMode_MAX"
+	],
+	"ERoleEvent": [
+		"eRE_NONE",
+		"eRE_CAST",
+		"eRE_CLEAR",
+		"eRE_ENTER_DRAMA",
+		"eRE_REENTER_DRAMA",
+		"eRE_LEAVE_DRAMA",
+		"eRE_NEW_DRAMA",
+		"eRE_PAUSED",
+		"eRE_RESUMING",
+		"eRE_RUNNING"
+	],
+	"ERuntimeMemoryAllocationState": [
+		"eRMAS_NeverAllocated",
+		"eRMAS_Allocated",
+		"eRMAS_Released"
+	],
 	"ESaveLoadStatus": [
 		"ESaveLoadStatus_OK",
 		"ESaveLoadStatus_PROCESSING",
@@ -5212,9 +6020,12 @@
 		"ESaveLoadStatus_ERROR_VRMODE",
 		"ESaveLoadStatus_ERROR_INVALIDATED"
 	],
-
-	"ESaveType": ["ESaveType_AutoSave", "ESaveType_QuickSave", "ESaveType_SystemData", "ESaveType_LocalProfile"],
-
+	"ESaveType": [
+		"ESaveType_AutoSave",
+		"ESaveType_QuickSave",
+		"ESaveType_SystemData",
+		"ESaveType_LocalProfile"
+	],
 	"EScreenAnchor": [
 		"SCREEN_ANCHOR_TOP_LEFT",
 		"SCREEN_ANCHOR_TOP_CENTER",
@@ -5226,23 +6037,72 @@
 		"SCREEN_ANCHOR_BOTTOM_CENTER",
 		"SCREEN_ANCHOR_BOTTOM_RIGHT"
 	],
-
-	"EScreenPlayState": ["State_Stopped", "State_Running", "State_Resuming", "State_Pausing", "State_Paused", "State_Done", "State_Terminated"],
-
-	"EScreenplayStateFlag": ["eSSF_DEFAULT", "eSSF_ENABLED", "eSSF_CAST", "eSSF_RESUMING", "eSSF_RUNNING", "eSSF_DONE", "eSSF_TERMINATED"],
-
-	"EScreenplayTriggerEvent": ["STT_ReportCrime", "STT_ReportCrimeToHitman", "STT_ReportCrimeMoveBack"],
-
-	"ESeamFixMode": ["SEAMFIX_NONE", "SEAMFIX_X", "SEAMFIX_Y", "SEAMFIX_XY", "SEAMFIX_Z", "SEAMFIX_XZ", "SEAMFIX_YZ", "SEAMFIX_XYZ"],
-
-	"ESentryActionPrompt": ["eSAP_None", "eSAP_Frisk", "eSAP_ShowItem", "eSAP_Max"],
-
-	"ESequencePreviewState": ["PREVIEW_STOPPED", "PREVIEW_PLAYING", "PREVIEW_PAUSED"],
-
-	"ESilenceRating": ["eSR_NotSilenced", "eSR_Silenced", "eSR_SuperSilenced", "eSR_CompletelySilenced"],
-
-	"ESituationAvailability": ["ESA_AMBIENCE", "ESA_AMBIENCE_RESV", "ESA_OVR_STANDING", "ESA_OVR_CURIOUS", "ESA_OVR_SENTRY", "ESA_OVR_CAUTIOUS", "ESA_OVR_COMBAT", "ESA_OVR_ALL"],
-
+	"EScreenPlayState": [
+		"State_Stopped",
+		"State_Running",
+		"State_Resuming",
+		"State_Pausing",
+		"State_Paused",
+		"State_Done",
+		"State_Terminated"
+	],
+	"EScreenplayStateFlag": [
+		"eSSF_DEFAULT",
+		"eSSF_ENABLED",
+		"eSSF_CAST",
+		"eSSF_RESUMING",
+		"eSSF_RUNNING",
+		"eSSF_DONE",
+		"eSSF_TERMINATED"
+	],
+	"EScreenplayTriggerEvent": [
+		"STT_ReportCrime",
+		"STT_ReportCrimeToHitman",
+		"STT_ReportCrimeMoveBack"
+	],
+	"ESeamFixMode": [
+		"SEAMFIX_NONE",
+		"SEAMFIX_X",
+		"SEAMFIX_Y",
+		"SEAMFIX_XY",
+		"SEAMFIX_Z",
+		"SEAMFIX_XZ",
+		"SEAMFIX_YZ",
+		"SEAMFIX_XYZ"
+	],
+	"ESentryActionPrompt": [
+		"eSAP_None",
+		"eSAP_Frisk",
+		"eSAP_ShowItem",
+		"eSAP_Max"
+	],
+	"ESequencePreviewState": [
+		"PREVIEW_STOPPED",
+		"PREVIEW_PLAYING",
+		"PREVIEW_PAUSED"
+	],
+	"ESignInState": [
+		"eSignInState_NotSignedIn",
+		"eSignInState_Local",
+		"eSignInState_Online",
+		"eSignInState_ENUM_END"
+	],
+	"ESilenceRating": [
+		"eSR_NotSilenced",
+		"eSR_Silenced",
+		"eSR_SuperSilenced",
+		"eSR_CompletelySilenced"
+	],
+	"ESituationAvailability": [
+		"ESA_AMBIENCE",
+		"ESA_AMBIENCE_RESV",
+		"ESA_OVR_STANDING",
+		"ESA_OVR_CURIOUS",
+		"ESA_OVR_SENTRY",
+		"ESA_OVR_CAUTIOUS",
+		"ESA_OVR_COMBAT",
+		"ESA_OVR_ALL"
+	],
 	"ESituationJoinReason": [
 		"AISJR_Default",
 		"AISJR_HeardSound",
@@ -5265,7 +6125,6 @@
 		"AISJR_SC_HeardBulletImpact",
 		"AISJR_SC_HeardSetPiece"
 	],
-
 	"ESituationStateChangeReason": [
 		"eSSCR_NONE",
 		"eSSCR_C_DIED",
@@ -5287,7 +6146,6 @@
 		"eSSCR_PAUSED_FROM_PLAYING",
 		"eSSCR_PAUSED_FROM_RESUMING"
 	],
-
 	"ESituationType": [
 		"AIST_Any",
 		"AIST_DetectedInPrivate",
@@ -5316,15 +6174,36 @@
 		"AIST_Infected",
 		"ESituationType_Count"
 	],
-
-	"ESmartBehaviorOrder": ["SBO_Stand", "SBO_Move", "SBO_React", "SBO_Act", "SBO_MoveToAct", "SBO_MoveToCover", "SBO_ShootFromCover", "SBO_Death", "SBO_Teleport"],
-
-	"ESmartWaitCondition": ["SWC_Time", "SWC_Distance", "SWC_Executing", "SWC_Executed"],
-
-	"ESmoothingMode": ["ESM_LINEAR", "ESM_EXPONENTIAL"],
-
-	"ESniperScoreMessageType": ["ESSMT_STYLE_DEFAULT", "ESSMT_STYLE_SCORE", "ESSMT_STYLE_PENALTY", "ESSMT_STYLE_STREAK", "ESSMT_STYLE_CIVKILL"],
-
+	"ESmartBehaviorOrder": [
+		"SBO_Stand",
+		"SBO_Move",
+		"SBO_React",
+		"SBO_Act",
+		"SBO_MoveToAct",
+		"SBO_MoveToCover",
+		"SBO_ShootFromCover",
+		"SBO_Death",
+		"SBO_Teleport"
+	],
+	"ESmartWaitCondition": [
+		"SWC_Time",
+		"SWC_Distance",
+		"SWC_Executing",
+		"SWC_Executed"
+	],
+	"ESmoothingMode": [
+		"ESM_LINEAR",
+		"ESM_EXPONENTIAL",
+		"ESM_EASING_SINEOUT",
+		"ESM_EASING_SINEINOUT"
+	],
+	"ESniperScoreMessageType": [
+		"ESSMT_STYLE_DEFAULT",
+		"ESSMT_STYLE_SCORE",
+		"ESSMT_STYLE_PENALTY",
+		"ESSMT_STYLE_STREAK",
+		"ESSMT_STYLE_CIVKILL"
+	],
 	"ESoundChannelGroup": [
 		"ESCG_NONE",
 		"SND_Default",
@@ -5401,27 +6280,64 @@
 		"SND_Diag_NPC_Oneliner",
 		"SND_Moments"
 	],
-
-	"ESoundCollisionFlags": ["ESoundCollisionFlags_None", "ESoundCollisionFlags_RagdollInvolved", "ESoundCollisionFlags_HandInvolved"],
-
-	"ESoundCollisionObjectType": ["StaticRigidBody", "DynamicRigidBody", "Ragdoll", "HeroHand"],
-
-	"ESoundCollisionType": ["Impact", "Rolling", "Sliding"],
-
-	"ESoundGateFlags": ["SOUNDGATE_FLAGS_AMBIENCE", "SOUNDGATE_FLAGS_OCCLUSION", "SOUNDGATE_FLAGS_ALL"],
-
-	"ESoundGateType": ["SOUNDGATE_TYPE_ROUND", "SOUNDGATE_TYPE_SHARPCORNERS"],
-
-	"ESoundMaterialType": ["eGeneric", "eFlesh", "eSilent"],
-
-	"ESpeechPriority": ["SP_AMBIENT", "SP_ALERTED", "SP_PAIN", "SP_ALERTED_IMPORTANT", "SP_COMBAT", "SP_COMBAT_IMPORTANT", "SP_DEATH", "SP_MAX", "SP_COUNT__"],
-
-	"ESpeed": ["eSpeed_Idle", "eSpeed_Slow", "eSpeed_Normal", "eSpeed_Fast", "eSpeed_Sprint"],
-
-	"EStandRepositionStrategy": ["SRS_InPlaceRepositioning", "SRS_NoRepositioning"],
-
-	"EStashpointContainedEntityType": ["PICKUP_NONE", "PICKUP_ITEMS", "PICKUP_OUTFIT", "PICKUP_PICKEDUP"],
-
+	"ESoundCollisionFlags": [
+		"ESoundCollisionFlags_None",
+		"ESoundCollisionFlags_RagdollInvolved",
+		"ESoundCollisionFlags_HandInvolved"
+	],
+	"ESoundCollisionObjectType": [
+		"StaticRigidBody",
+		"DynamicRigidBody",
+		"Ragdoll",
+		"HeroHand"
+	],
+	"ESoundCollisionType": [
+		"Impact",
+		"Rolling",
+		"Sliding"
+	],
+	"ESoundGateFlags": [
+		"SOUNDGATE_FLAGS_AMBIENCE",
+		"SOUNDGATE_FLAGS_OCCLUSION",
+		"SOUNDGATE_FLAGS_ALL"
+	],
+	"ESoundGateType": [
+		"SOUNDGATE_TYPE_ROUND",
+		"SOUNDGATE_TYPE_SHARPCORNERS"
+	],
+	"ESoundMaterialType": [
+		"eGeneric",
+		"eFlesh",
+		"eSilent"
+	],
+	"ESpeechPriority": [
+		"SP_AMBIENT",
+		"SP_ALERTED",
+		"SP_PAIN",
+		"SP_ALERTED_IMPORTANT",
+		"SP_COMBAT",
+		"SP_COMBAT_IMPORTANT",
+		"SP_DEATH",
+		"SP_MAX",
+		"SP_COUNT__"
+	],
+	"ESpeed": [
+		"eSpeed_Idle",
+		"eSpeed_Slow",
+		"eSpeed_Normal",
+		"eSpeed_Fast",
+		"eSpeed_Sprint"
+	],
+	"EStandRepositionStrategy": [
+		"SRS_InPlaceRepositioning",
+		"SRS_NoRepositioning"
+	],
+	"EStashpointContainedEntityType": [
+		"PICKUP_NONE",
+		"PICKUP_ITEMS",
+		"PICKUP_OUTFIT",
+		"PICKUP_PICKEDUP"
+	],
 	"EStealthSituation": [
 		"SS_DISGUISE_TAKEN",
 		"SS_DISGUISE_TRESPASSING",
@@ -5473,9 +6389,11 @@
 		"SS_TARGET_EVACUATES",
 		"SS_UNKNOWN_BODY_SPOTTED"
 	],
-
-	"ESubcontrollerInventorySlot": ["eSIS_Invalid", "eSIS_LeftHand", "eSIS_RightHand"],
-
+	"ESubcontrollerInventorySlot": [
+		"eSIS_Invalid",
+		"eSIS_LeftHand",
+		"eSIS_RightHand"
+	],
 	"ESubtitleSpeakerIndicatorType": [
 		"DEFAULT",
 		"NO_INDICATOR",
@@ -5489,11 +6407,17 @@
 		"TEXTONLY_DIRECTOR",
 		"TEXTONLY_EYE"
 	],
-
-	"ESyncEvent": ["eSyncEvent_None", "eSyncEvent_LeftFoot", "eSyncEvent_RightFoot", "eSyncEvent_BothFeet"],
-
-	"ESynchronisedActionState": ["eSAS_INACTIVE", "eSAS_WAITING_TO_EXECUTE", "eSAS_COOLINGDOWN"],
-
+	"ESyncEvent": [
+		"eSyncEvent_None",
+		"eSyncEvent_LeftFoot",
+		"eSyncEvent_RightFoot",
+		"eSyncEvent_BothFeet"
+	],
+	"ESynchronisedActionState": [
+		"eSAS_INACTIVE",
+		"eSAS_WAITING_TO_EXECUTE",
+		"eSAS_COOLINGDOWN"
+	],
 	"ETakeDownAnim": [
 		"eCoverLowOverNarrowCloseFront",
 		"eCoverLowOverNarrowCloseBack",
@@ -5524,21 +6448,42 @@
 		"eChokeChairEndRight90",
 		"eTakeDownAnimLast"
 	],
-
-	"ETakeDownState": ["eTD_Cover", "eTD_Locomotion", "eTD_ChokeLoop", "eTD_ChokeFinish", "eTD_Deactivating", "eTD_Unknown"],
-
-	"ETargetPrintDestination": ["eTPD_Screen", "eTPD_TraceViewer"],
-
-	"ETargetType": ["eTDS_None", "eTDS_LookAtTarget", "eTDS_Spatial", "eTDS_Linked"],
-
-	"ETeamModeId": ["TeamMode_Coop", "TeamMode_Versus"],
-
-	"ETessellationFactorMode": ["TESSELLATIONFACTORMODE_FIXED", "TESSELLATIONFACTORMODE_OBJECT", "TESSELLATIONFACTORMODE_TRIANGLE"],
-
-	"ETessellationMode": ["TESSELLATIONMODE_FLAT", "TESSELLATIONMODE_PHONG"],
-
-	"ETextAlignment": ["TEXT_ALIGN_LEFT", "TEXT_ALIGN_CENTER", "TEXT_ALIGN_RIGHT"],
-
+	"ETakeDownState": [
+		"eTD_Cover",
+		"eTD_Locomotion",
+		"eTD_ChokeLoop",
+		"eTD_ChokeFinish",
+		"eTD_Deactivating",
+		"eTD_Unknown"
+	],
+	"ETargetPrintDestination": [
+		"eTPD_Screen",
+		"eTPD_TraceViewer"
+	],
+	"ETargetType": [
+		"eTDS_None",
+		"eTDS_LookAtTarget",
+		"eTDS_Spatial",
+		"eTDS_Linked"
+	],
+	"ETeamModeId": [
+		"TeamMode_Coop",
+		"TeamMode_Versus"
+	],
+	"ETessellationFactorMode": [
+		"TESSELLATIONFACTORMODE_FIXED",
+		"TESSELLATIONFACTORMODE_OBJECT",
+		"TESSELLATIONFACTORMODE_TRIANGLE"
+	],
+	"ETessellationMode": [
+		"TESSELLATIONMODE_FLAT",
+		"TESSELLATIONMODE_PHONG"
+	],
+	"ETextAlignment": [
+		"TEXT_ALIGN_LEFT",
+		"TEXT_ALIGN_CENTER",
+		"TEXT_ALIGN_RIGHT"
+	],
 	"EThrowType": [
 		"THROW_NONE",
 		"THROW_COIN",
@@ -5551,11 +6496,22 @@
 		"THROW_DEADLY_LIGHT",
 		"THROW_DEADLY_HEAVY"
 	],
-
-	"EThrownCollisionSoundLoudness": ["eLoudness_Default", "eLoudness_Low", "eLoudness_Normal", "eLoudness_Loud"],
-
-	"ETimerEntityCommandType": ["ETECT_Add", "ETECT_Remove", "ETECT_Reset"],
-
+	"EThrownCollisionSoundLoudness": [
+		"eLoudness_Default",
+		"eLoudness_Low",
+		"eLoudness_Normal",
+		"eLoudness_Loud"
+	],
+	"ETimerEntityCommandType": [
+		"ETECT_Add",
+		"ETECT_Remove",
+		"ETECT_Reset"
+	],
+	"ETraceMessageType": [
+		"Message",
+		"Warning",
+		"Error"
+	],
 	"EUIActionGroupIcon": [
 		"EUIAGI_NoIcon",
 		"EUIAGI_GenericTool",
@@ -5583,7 +6539,6 @@
 		"EUIAGI_SpaghettiCan",
 		"EUIAGI_MAX"
 	],
-
 	"EUIBusyOperationId": [
 		"eOperationId_GameSave",
 		"eOperationId_MenuTransition",
@@ -5634,9 +6589,15 @@
 		"eOperationId_Custom_End",
 		"eOperationId_None"
 	],
-
-	"EUIBusyState": ["eBusyState_Saving", "eBusyState_Saving_Failed", "eBusyState_Saving_Success", "eBusyState_Online_Connecting", "eBusyState_Loading", "eBusyState_Fetching", "eBusyState_None"],
-
+	"EUIBusyState": [
+		"eBusyState_Saving",
+		"eBusyState_Saving_Failed",
+		"eBusyState_Saving_Success",
+		"eBusyState_Online_Connecting",
+		"eBusyState_Loading",
+		"eBusyState_Fetching",
+		"eBusyState_None"
+	],
 	"EUIGamepadButtonID": [
 		"FaceButtonBottom",
 		"FaceButtonTop",
@@ -5666,7 +6627,287 @@
 		"ButtonHome",
 		"ButtonAssistant"
 	],
-
+	"EUIIconLibrary": [
+		"NONE",
+		"addedtolist",
+		"addtolist",
+		"ammo",
+		"ammunition",
+		"arcademode",
+		"arrowdown",
+		"arrowleft",
+		"arrowright",
+		"arrowup",
+		"assaultrifle",
+		"audio",
+		"background",
+		"benchmarks",
+		"blank",
+		"bulletdancer",
+		"carrieditem",
+		"carriedweapon",
+		"challenge",
+		"challenge_category_assassination",
+		"challenge_category_discovery",
+		"challenge_category_feats",
+		"challenge_category_item",
+		"challenge_category_targets",
+		"check",
+		"civilians",
+		"closerange",
+		"completed",
+		"completion",
+		"completionlist",
+		"complication",
+		"complication_optional",
+		"concealedweapon",
+		"container",
+		"contract",
+		"controller",
+		"corrupt",
+		"creation",
+		"credits",
+		"crowdcontrol",
+		"cutscene",
+		"damage",
+		"difficulty",
+		"difficulty1",
+		"difficulty2",
+		"difficulty3",
+		"difficultyeasy",
+		"difficultyhard",
+		"difficultylevel",
+		"difficultynormal",
+		"disguise",
+		"distraction",
+		"download",
+		"downloading",
+		"edit",
+		"elevation",
+		"elusive",
+		"emote",
+		"escalation",
+		"evergreen_camera_caught",
+		"evergreen_camera_destroy",
+		"evergreen_camera_destroy_recorder",
+		"evergreen_check",
+		"evergreen_contracts",
+		"evergreen_dead_body_disposal",
+		"evergreen_dead_body_disposal_timed",
+		"evergreen_destination_not_owned",
+		"evergreen_do_not_get_spotted",
+		"evergreen_do_not_initiate_combat",
+		"evergreen_do_not_take_any_damage",
+		"evergreen_failed",
+		"evergreen_gamemode",
+		"evergreen_gear",
+		"evergreen_gearcost",
+		"evergreen_gearcost_1",
+		"evergreen_gearcost_2",
+		"evergreen_gearcost_3",
+		"evergreen_gearcost_4",
+		"evergreen_gearcost_5",
+		"evergreen_gearcost_6",
+		"evergreen_gearcost_7",
+		"evergreen_gearcost_8",
+		"evergreen_gearcost_9",
+		"evergreen_item_removed_from_safehouse_wall",
+		"evergreen_kill_method_accident",
+		"evergreen_kill_method_accident_burn",
+		"evergreen_kill_method_assault_rifle",
+		"evergreen_kill_method_axe",
+		"evergreen_kill_method_drown",
+		"evergreen_kill_method_electric",
+		"evergreen_kill_method_explosive",
+		"evergreen_kill_method_fiber_wire",
+		"evergreen_kill_method_headshots_only",
+		"evergreen_kill_method_melee",
+		"evergreen_kill_method_oil_puddle",
+		"evergreen_kill_method_pistol",
+		"evergreen_kill_method_pistol_silenced",
+		"evergreen_kill_method_poison",
+		"evergreen_kill_method_push",
+		"evergreen_kill_method_shotgun",
+		"evergreen_kill_method_smg",
+		"evergreen_kill_method_sniper",
+		"evergreen_kill_method_throw",
+		"evergreen_kill_method_unarmed",
+		"evergreen_kill_method_wallbang",
+		"evergreen_kill_method_water_puddle",
+		"evergreen_merces",
+		"evergreen_mules",
+		"evergreen_no_bodies_found",
+		"evergreen_no_compromised_disguises",
+		"evergreen_no_disguise_change",
+		"evergreen_no_lockpick",
+		"evergreen_no_missed_shots",
+		"evergreen_only_kill_targets",
+		"evergreen_optin_killmethod",
+		"evergreen_optin_showdown",
+		"evergreen_optin_silentassassin",
+		"evergreen_optin_speedrun",
+		"evergreen_pacify_raremelee",
+		"evergreen_payout",
+		"evergreen_safe",
+		"evergreen_safehouse_cosmetic",
+		"evergreen_safehouse_unlock",
+		"evergreen_search_locate",
+		"evergreen_showdown_mission",
+		"evergreen_suppliers",
+		"evergreen_tags",
+		"evergreen_target",
+		"exit",
+		"explosive",
+		"explosives",
+		"extendedmag",
+		"extendedmag_1",
+		"extendedmag_2",
+		"extendedmag_3",
+		"extendedmag_4",
+		"eye_tracking",
+		"failed",
+		"fastreload",
+		"fastreload_1",
+		"fastreload_2",
+		"fastreload_3",
+		"fastreload_4",
+		"favoritecontracts",
+		"featured",
+		"fiberwire",
+		"firearm",
+		"fixed",
+		"flashback",
+		"frisk",
+		"fullauto",
+		"game",
+		"gamehud",
+		"gear",
+		"goonline",
+		"graphics",
+		"hailstorm",
+		"hidden",
+		"highpressure",
+		"ica",
+		"info",
+		"intel",
+		"inventory",
+		"ioiaccount",
+		"key",
+		"kill",
+		"knockdown",
+		"language",
+		"leaderboard",
+		"leaderboardfriends",
+		"livetilenews",
+		"load",
+		"loadout",
+		"location",
+		"locked",
+		"longrange",
+		"lookup",
+		"map",
+		"marksman",
+		"marksman_1",
+		"marksman_2",
+		"marksman_3",
+		"marksman_4",
+		"masteryunlocked",
+		"melee",
+		"mission",
+		"mostplayed",
+		"mousekeyboard",
+		"mycontracts",
+		"myhistory",
+		"nextlevel",
+		"nodus",
+		"npc",
+		"nvidia",
+		"objective",
+		"onemanarmy",
+		"online",
+		"opportunitycompleted",
+		"opportunitydisabled",
+		"opportunitydiscovered",
+		"opportunityfailed",
+		"opportunitysearch",
+		"opportunitytracked",
+		"opportunityundiscovered",
+		"outbreak",
+		"piercing",
+		"pistol",
+		"planning",
+		"play",
+		"pointshooting",
+		"poison",
+		"profile",
+		"publish",
+		"questitem",
+		"quit",
+		"rateoffire",
+		"rateoffire_1",
+		"rateoffire_2",
+		"rateoffire_3",
+		"rateoffire_4",
+		"realtutorial",
+		"remote",
+		"replay",
+		"reset",
+		"resetback",
+		"save",
+		"saveauto",
+		"savedisabled",
+		"savemanual",
+		"search",
+		"security",
+		"settings",
+		"shop",
+		"shotgun",
+		"silent",
+		"smg",
+		"sniperrifle",
+		"stable",
+		"stable_1",
+		"stable_2",
+		"stable_3",
+		"stable_4",
+		"starting",
+		"stashpointempty",
+		"stashpointfull",
+		"stats",
+		"steadyaim",
+		"steadyaim_1",
+		"steadyaim_2",
+		"steadyaim_3",
+		"steadyaim_4",
+		"story",
+		"subsonic",
+		"suitcase",
+		"suppressor",
+		"tacticalshock",
+		"tag",
+		"target",
+		"timed",
+		"titaniumcomposite",
+		"toggleleft",
+		"toggleright",
+		"tool",
+		"trashbin",
+		"tutorial",
+		"unlocked",
+		"usercreated",
+		"variable",
+		"versatilescope",
+		"versatilescope_1",
+		"versatilescope_2",
+		"versatilescope_3",
+		"versatilescope_4",
+		"versatilescopeextended",
+		"versus",
+		"vr",
+		"warning",
+		"weapon",
+		"witness"
+	],
 	"EUIOpenVRComponentArchetypeID": [
 		"ButtonL",
 		"ButtonR",
@@ -5687,9 +6928,12 @@
 		"BumperL",
 		"BumperR"
 	],
-
-	"EUIOpenVRPressDirection": ["North", "South", "East", "West"],
-
+	"EUIOpenVRPressDirection": [
+		"North",
+		"South",
+		"East",
+		"West"
+	],
 	"EUbitusRequest": [
 		"EUR_DEVICE_LANGUAGE",
 		"EUR_DEVICE_MODE",
@@ -5708,7 +6952,11 @@
 		"EUR_PAUSE_GAME",
 		"EUR_RESUME_GAME"
 	],
-
+	"EVRConfig360CameraAnchor": [
+		"EVRCCA_360FacingCameraAnchor",
+		"EVRCCA_FixedFacingCameraAnchor",
+		"EVRCCA_KeepCurrent"
+	],
 	"EVRConfigAnimationMode": [
 		"EVRCAM_FullAnimation",
 		"EVRCAM_FullAnimationFreeze",
@@ -5718,13 +6966,21 @@
 		"EVRCAM_RemoveFullBodyAndGroundMotion",
 		"EVRCAM_KeepCurrentMode"
 	],
-
-	"EVRConfigCameraRotationAllowed": ["EVRCCRA_RotationEnabled", "EVRCCRA_RotationDisabled", "EVRCCRA_KeepCurrent"],
-
-	"EVRConfigCapsuleGridSize": ["EVRCCGS_RegularGrid", "EVRCCGS_SmallGrid"],
-
-	"EVRConfigCinemaMode": ["EVRCCM_CinemaModeEnabled60FPS", "EVRCCM_CinemaModeEnabled", "EVRCCM_CinemaModeDisabled", "EVRCCM_KeepCurrent"],
-
+	"EVRConfigCameraRotationAllowed": [
+		"EVRCCRA_RotationEnabled",
+		"EVRCCRA_RotationDisabled",
+		"EVRCCRA_KeepCurrent"
+	],
+	"EVRConfigCapsuleGridSize": [
+		"EVRCCGS_RegularGrid",
+		"EVRCCGS_SmallGrid"
+	],
+	"EVRConfigCinemaMode": [
+		"EVRCCM_CinemaModeEnabled60FPS",
+		"EVRCCM_CinemaModeEnabled",
+		"EVRCCM_CinemaModeDisabled",
+		"EVRCCM_KeepCurrent"
+	],
 	"EVRConfigCustomEvent": [
 		"EVRCCE_ClosetInside",
 		"EVRCCE_ClosetExiting",
@@ -5773,23 +7029,50 @@
 		"EVRCCE_TeleportStart",
 		"EVRCCE_TeleportEnd"
 	],
-
-	"EVRConfigHeadAnchorMode": ["EVRCHAM_HeadBone", "EVRCHAM_CapsuleBased", "EVRCHAM_CapsuleFree", "EVRCHAM_CapsuleGrid", "EVRCHAM_LockPosition", "EVRCHAM_KeepCurrent"],
-
-	"EVRConfigRotationType": ["EVRCRT_None", "EVRCRT_Lock", "EVRCRT_Offset"],
-
-	"EVRHUDHandedness": ["ON_LEFT_HAND", "ON_RIGHT_HAND"],
-
-	"EVRIKElement": ["EVRIKE_LeftHand", "EVRIKE_RightHand", "EVRIKE_Pelvis", "EVRIKE_Spine"],
-
-	"EVRIKElementMode": ["EVRIKEM_Enabled", "EVRIKEM_Disabled", "EVRIKEM_KeepCurrent"],
-
-	"EVRRenderDeviceType": ["RENDER_VR_DEVICE_TYPE_DUMMY", "RENDER_VR_DEVICE_TYPE_OCULUS", "RENDER_VR_DEVICE_TYPE_PSVR", "RENDER_VR_DEVICE_TYPE_OPENVR", "RENDER_VR_DEVICE_TYPE_COUNT"],
-
-	"EVRRenderingMode": ["VR_RENDER_MODE_2D_SCREEN", "VR_RENDER_MODE_STEREO_3D"],
-
-	"EValueUpdateStrategy": ["UPDATE_STRATEGY_REPLACE", "UPDATE_STRATEGY_ADD_TO", "UPDATE_STRATEGY_MULTIPLY"],
-
+	"EVRConfigHeadAnchorMode": [
+		"EVRCHAM_HeadBone",
+		"EVRCHAM_CapsuleBased",
+		"EVRCHAM_CapsuleFree",
+		"EVRCHAM_CapsuleGrid",
+		"EVRCHAM_LockPosition",
+		"EVRCHAM_KeepCurrent"
+	],
+	"EVRConfigRotationType": [
+		"EVRCRT_None",
+		"EVRCRT_Lock",
+		"EVRCRT_Offset"
+	],
+	"EVRHUDHandedness": [
+		"ON_LEFT_HAND",
+		"ON_RIGHT_HAND"
+	],
+	"EVRIKElement": [
+		"EVRIKE_LeftHand",
+		"EVRIKE_RightHand",
+		"EVRIKE_Pelvis",
+		"EVRIKE_Spine"
+	],
+	"EVRIKElementMode": [
+		"EVRIKEM_Enabled",
+		"EVRIKEM_Disabled",
+		"EVRIKEM_KeepCurrent"
+	],
+	"EVRRenderDeviceType": [
+		"RENDER_VR_DEVICE_TYPE_DUMMY",
+		"RENDER_VR_DEVICE_TYPE_OCULUS",
+		"RENDER_VR_DEVICE_TYPE_PSVR",
+		"RENDER_VR_DEVICE_TYPE_OPENVR",
+		"RENDER_VR_DEVICE_TYPE_COUNT"
+	],
+	"EVRRenderingMode": [
+		"VR_RENDER_MODE_2D_SCREEN",
+		"VR_RENDER_MODE_STEREO_3D"
+	],
+	"EValueUpdateStrategy": [
+		"UPDATE_STRATEGY_REPLACE",
+		"UPDATE_STRATEGY_ADD_TO",
+		"UPDATE_STRATEGY_MULTIPLY"
+	],
 	"EVictimMovementType": [
 		"eVictimMovementNone",
 		"eVictimMovementPullVictimFromWindow",
@@ -5805,9 +7088,11 @@
 		"eVictimMovementCloseCombat",
 		"eVictimMovementLast"
 	],
-
-	"EViewportLock": ["VPL_None", "VPL_Rectangular", "VPL_Rectangular_AvoidMinimapOverlap"],
-
+	"EViewportLock": [
+		"VPL_None",
+		"VPL_Rectangular",
+		"VPL_Rectangular_AvoidMinimapOverlap"
+	],
 	"EVirtualPlatformID": [
 		"DEFAULT",
 		"__SUB",
@@ -5829,7 +7114,6 @@
 		"VR_PS5",
 		"__SYSTEM"
 	],
-
 	"EVolumeTriggerEntityTypeFlags": [
 		"VTET_Hitman",
 		"VTET_ActorAlive",
@@ -5842,7 +7126,6 @@
 		"VTET_Item",
 		"VTET_SpatialVisible"
 	],
-
 	"EVsGenericEvent": [
 		"eVSGE_MATCH_WON",
 		"eVSGE_MATCH_LOST",
@@ -5866,13 +7149,32 @@
 		"eVSGE_OPPONENT_SCOPES_TARGET",
 		"eVSGE_MAX"
 	],
-
-	"EWaypointRotationAlignment": ["RA_NONE", "RA_LOOSE", "RA_EXACT"],
-
-	"EWeaponAnimationCategory": ["eWAC_Undefined", "eWAC_Pistol", "eWAC_Revolver", "eWAC_SMG_2H", "eWAC_SMG_1H", "eWAC_Rifle", "eWAC_Sniper", "eWAC_Shotgun_Pump", "eWAC_Shotgun_Semi"],
-
-	"EWeaponSpecialSituation": ["WSS_NORMAL", "WSS_BAREHANDS", "WSS_EXPLOSION", "WSS_ACCIDENT", "WSS_NPC_FRIENDLY_FIRE", "WSS_EXECUTE_PISTOL", "WSS_ANY_WEAPON", "WSS_INVISIBLE"],
-
+	"EWaypointRotationAlignment": [
+		"RA_NONE",
+		"RA_LOOSE",
+		"RA_EXACT"
+	],
+	"EWeaponAnimationCategory": [
+		"eWAC_Undefined",
+		"eWAC_Pistol",
+		"eWAC_Revolver",
+		"eWAC_SMG_2H",
+		"eWAC_SMG_1H",
+		"eWAC_Rifle",
+		"eWAC_Sniper",
+		"eWAC_Shotgun_Pump",
+		"eWAC_Shotgun_Semi"
+	],
+	"EWeaponSpecialSituation": [
+		"WSS_NORMAL",
+		"WSS_BAREHANDS",
+		"WSS_EXPLOSION",
+		"WSS_ACCIDENT",
+		"WSS_NPC_FRIENDLY_FIRE",
+		"WSS_EXECUTE_PISTOL",
+		"WSS_ANY_WEAPON",
+		"WSS_INVISIBLE"
+	],
 	"EWeaponUpgradeIcon": [
 		"WEAPON_UPGRADE_ICON_NONE",
 		"WEAPON_UPGRADE_ICON_SILENCER",
@@ -5890,55 +7192,176 @@
 		"WEAPON_UPGRADE_ICON_MAGNUM",
 		"WEAPON_UPGRADE_ICON_STOCK"
 	],
-
-	"EWeaponUpgradeUse": ["eWUU_PrimaryOnly", "eWUU_SecondaryOnly", "eWUU_AllFireModes"],
-
-	"GameLobbyState": ["GLS_None", "GLS_InHud", "GLS_CreatingLobby", "GLS_JoiningLobby", "GLS_ConnectToLobby", "GLS_ConnectingLobby", "GLS_InLobby", "GLS_LeavingLobby", "GLS_InGame"],
-
-	"ICameraEntity.EProjectionType": ["ePerspectiveRH", "eOrtogonalRH", "eCustom"],
-
-	"ICloset.EClosetType": ["eTypeClosetNormal", "eTypeClosetCake", "eTypeClosetDumpster", "eTypeClosetLast"],
-
-	"IContractEvaluationContextListener.EListenerType": ["eDEFAULT", "eOBJECTIVECOUNTER", "eFORCEUPDATE", "eCUSTOM", "eINTERNAL", "eCHALLENGECOUNTER", "eCHALLENGETREE", "eTOGGLE", "eMATCHARRAYS"],
-
-	"IContractObjective.Category": ["PRIMARY", "SECONDARY", "CONDITION"],
-
-	"IContractObjective.ObjectiveType": ["KILL", "SETPIECE", "CUSTOMKILL", "CUSTOM"],
-
-	"IContractObjective.SCounterData.ECounterType": ["eDEFAULT", "ePERCENTAGE"],
-
-	"IContractObjective.State": ["IN_PROGRESS", "COMPLETED", "FAILED"],
-
-	"IContractObjective.Type": ["CONTRACT_OBJ_EVENT_BASED", "CONTRACT_OBJ_SM_BASED"],
-
-	"IHM5Door.ECPDoorLockType": ["CPDLT_NORMAL_LOCK", "CPDLT_PUSH_BAR_PAD_LOCK"],
-
-	"IHM5Door.EInitialState": ["IS_CLOSED", "IS_OPEN", "IS_OPEN_IN", "IS_OPEN_OUT"],
-
-	"IHM5Door.EOpenDir": ["OD_AWAY", "OD_TOWARS", "OD_IN", "OD_OUT"],
-
-	"IHM5Door.EOpenMode": ["OM_TWO_WAY", "OM_OPEN_POS_SIDE_ONLY", "OM_OPEN_NEG_SIDE_ONLY", "OM_DISABLED"],
-
-	"IHM5Door.eCloseMode": ["CM_AUTOCLOSE", "CM_MANUALCLOSE", "CM_NEVERCLOSE"],
-
-	"IItemWeapon.EDeadlyThrowType": ["DEADLYTHROW_NONE", "DEADLYTHROW_LIGHT", "DEADLYTHROW_HEAVY"],
-
-	"ILightEntity.EFrameIndexStrategy": ["WRAP", "CLAMP"],
-
-	"ILightEntity.ELightType": ["LT_DIRECTIONAL", "LT_ENVIRONMENT", "LT_OMNI", "LT_SPOT", "LT_SQUARESPOT", "LT_CAPSULE", "LT_AREA_QUAD"],
-
-	"ILightEntity.ERoomLightFlow": ["AUTOMATIC", "LOCAL", "ALLROOMS"],
-
-	"IRenderCompositorEntity.EMode": ["eSourceA", "eSourceB", "eLayered", "eAlphaLayered"],
-
-	"IRenderCompositorEntity.EViewportAnchor": ["eFill", "eTopLeft", "eTopRight", "eBottomLeft", "eBottomRight"],
-
-	"IRenderMaterialEntity.EModifierOperation": ["eLeave", "eReplace", "eModulate", "eAdd", "eColor"],
-
-	"IRoomEntity.EReasoningGridImportance": ["RGI_NoGrid", "RGI_Low", "RGI_Normal", "RGI_High", "RGI_Extreme"],
-
-	"IScatterContainerEntity.EBrushType": ["BRUSH_SQUARE", "BRUSH_CIRCLE"],
-
+	"EWeaponUpgradeUse": [
+		"eWUU_PrimaryOnly",
+		"eWUU_SecondaryOnly",
+		"eWUU_AllFireModes"
+	],
+	"GameLobbyState": [
+		"GLS_None",
+		"GLS_InHud",
+		"GLS_CreatingLobby",
+		"GLS_JoiningLobby",
+		"GLS_ConnectToLobby",
+		"GLS_ConnectingLobby",
+		"GLS_InLobby",
+		"GLS_LeavingLobby",
+		"GLS_InGame"
+	],
+	"ICameraEntity.EProjectionType": [
+		"ePerspectiveRH",
+		"eOrtogonalRH",
+		"eCustom"
+	],
+	"ICloset.EClosetType": [
+		"eTypeClosetNormal",
+		"eTypeClosetCake",
+		"eTypeClosetDumpster",
+		"eTypeClosetLast"
+	],
+	"IContractEvaluationContextListener.EListenerType": [
+		"eDEFAULT",
+		"eOBJECTIVECOUNTER",
+		"eFORCEUPDATE",
+		"eCUSTOM",
+		"eINTERNAL",
+		"eCHALLENGECOUNTER",
+		"eCHALLENGETREE",
+		"eTOGGLE",
+		"eMATCHARRAYS"
+	],
+	"IContractObjective.Category": [
+		"PRIMARY",
+		"SECONDARY",
+		"CONDITION"
+	],
+	"IContractObjective.ObjectiveType": [
+		"KILL",
+		"SETPIECE",
+		"CUSTOMKILL",
+		"CUSTOM"
+	],
+	"IContractObjective.SCounterData.ECounterType": [
+		"eDEFAULT",
+		"ePERCENTAGE"
+	],
+	"IContractObjective.State": [
+		"IN_PROGRESS",
+		"COMPLETED",
+		"FAILED"
+	],
+	"IContractObjective.Type": [
+		"CONTRACT_OBJ_EVENT_BASED",
+		"CONTRACT_OBJ_SM_BASED"
+	],
+	"IEvergreenTerritoryDefinition.EDestination": [
+		"AmbroseIsland",
+		"Bangkok",
+		"Berlin",
+		"Chongqing",
+		"Colorado",
+		"Dartmoor",
+		"Dubai",
+		"HavenIsland",
+		"HawkesBay",
+		"Hokkaido",
+		"IsleOfSgail",
+		"Marrakesh",
+		"Mendoza",
+		"Miami",
+		"Mumbai",
+		"NewYork",
+		"Paris",
+		"SantaFortuna",
+		"Sapienza",
+		"WhittletonCreek"
+	],
+	"IEvergreenTerritoryStatus.EVisited": [
+		"NotVisited",
+		"VisitedAndWon",
+		"VisitedAndLost"
+	],
+	"IHM5Door.ECPDoorLockType": [
+		"CPDLT_NORMAL_LOCK",
+		"CPDLT_PUSH_BAR_PAD_LOCK"
+	],
+	"IHM5Door.EInitialState": [
+		"IS_CLOSED",
+		"IS_OPEN",
+		"IS_OPEN_IN",
+		"IS_OPEN_OUT"
+	],
+	"IHM5Door.EOpenDir": [
+		"OD_AWAY",
+		"OD_TOWARS",
+		"OD_IN",
+		"OD_OUT"
+	],
+	"IHM5Door.EOpenMode": [
+		"OM_TWO_WAY",
+		"OM_OPEN_POS_SIDE_ONLY",
+		"OM_OPEN_NEG_SIDE_ONLY",
+		"OM_DISABLED"
+	],
+	"IHM5Door.eCloseMode": [
+		"CM_AUTOCLOSE",
+		"CM_MANUALCLOSE",
+		"CM_NEVERCLOSE"
+	],
+	"IItemWeapon.EDeadlyThrowType": [
+		"DEADLYTHROW_NONE",
+		"DEADLYTHROW_LIGHT",
+		"DEADLYTHROW_HEAVY"
+	],
+	"ILightEntity.EFrameIndexStrategy": [
+		"WRAP",
+		"CLAMP"
+	],
+	"ILightEntity.ELightType": [
+		"LT_DIRECTIONAL",
+		"LT_ENVIRONMENT",
+		"LT_OMNI",
+		"LT_SPOT",
+		"LT_SQUARESPOT",
+		"LT_CAPSULE",
+		"LT_AREA_QUAD"
+	],
+	"ILightEntity.ERoomLightFlow": [
+		"AUTOMATIC",
+		"LOCAL",
+		"ALLROOMS"
+	],
+	"IRenderCompositorEntity.EMode": [
+		"eSourceA",
+		"eSourceB",
+		"eLayered",
+		"eAlphaLayered"
+	],
+	"IRenderCompositorEntity.EViewportAnchor": [
+		"eFill",
+		"eTopLeft",
+		"eTopRight",
+		"eBottomLeft",
+		"eBottomRight"
+	],
+	"IRenderMaterialEntity.EModifierOperation": [
+		"eLeave",
+		"eReplace",
+		"eModulate",
+		"eAdd",
+		"eColor"
+	],
+	"IRoomEntity.EReasoningGridImportance": [
+		"RGI_NoGrid",
+		"RGI_Low",
+		"RGI_Normal",
+		"RGI_High",
+		"RGI_Extreme"
+	],
+	"IScatterContainerEntity.EBrushType": [
+		"BRUSH_SQUARE",
+		"BRUSH_CIRCLE"
+	],
 	"IScatterContainerEntity.ECanvasClearMode": [
 		"CLEAR_ALL",
 		"CLEAR_INTENSITY",
@@ -5949,11 +7372,19 @@
 		"CLEAR_SETINTENSITYVALUEANDMATERIAL",
 		"CLEAR_SETMATERIALKEEPINTENSITYVALUE"
 	],
-
-	"IScatterContainerEntity.ECanvasSize": ["SIZE_128", "SIZE_256", "SIZE_512", "SIZE_1024", "SIZE_2048", "SIZE_4096"],
-
-	"IScatterContainerEntity.EResizeMode": ["MODE_CLEAR", "MODE_KEEPASCENTER", "MODE_SCALE"],
-
+	"IScatterContainerEntity.ECanvasSize": [
+		"SIZE_128",
+		"SIZE_256",
+		"SIZE_512",
+		"SIZE_1024",
+		"SIZE_2048",
+		"SIZE_4096"
+	],
+	"IScatterContainerEntity.EResizeMode": [
+		"MODE_CLEAR",
+		"MODE_KEEPASCENTER",
+		"MODE_SCALE"
+	],
 	"InputControlNamesp.eHM5InputAction": [
 		"eIAButtonFaceDown_Downedge",
 		"eIAButtonFaceDown_FastTap",
@@ -6189,7 +7620,6 @@
 		"eIAKBMLookVertical",
 		"eIActionsNUM"
 	],
-
 	"InputControlNamesp.eHM5InputActionID": [
 		"eIDButtonFaceDown",
 		"eIDButtonFaceLeft",
@@ -6214,7 +7644,6 @@
 		"eIDKeyboard",
 		"eID_INVALID"
 	],
-
 	"InputControlNamesp.eHM5InputActionType": [
 		"eTypeGet",
 		"eTypeHold",
@@ -6232,7 +7661,6 @@
 		"eTypeRELATIVE",
 		"eTYPE_INVALID"
 	],
-
 	"JSONTemplate.ETemplateType": [
 		"ETT_BASE",
 		"ETT_DATA_VALUE",
@@ -6247,6 +7675,7 @@
 		"ETT_PARENTHESIS",
 		"ETT_FORMATSTRING",
 		"ETT_FORMATINT",
+		"ETT_FORMATNUMBER",
 		"ETT_INTCLAMP",
 		"ETT_FORMATPUBLICID",
 		"ETT_ISNULL",
@@ -6276,6 +7705,7 @@
 		"ETT_STORE",
 		"ETT_IS_DISC_RELEASE",
 		"ETT_ISDEBUG",
+		"ETT_INPUTCONTROLLERTYPE",
 		"ETT_IS_CONTROLLER_AVAILABLE",
 		"ETT_IS_KEYBOARD_AVAILABLE",
 		"ETT_IS_VR_DEVICE_AVAILABLE",
@@ -6287,6 +7717,7 @@
 		"ETT_UI_OPTION_VALUE",
 		"ETT_UI_OPTION_DEFAULT_VALUE",
 		"ETT_UI_OPTION_DEBUG_VALUE",
+		"ETT_UI_OPTION_AVAILABLE",
 		"ETT_UI_OPTION_AVAILABLE_DISPLAY_RESOLUTIONS",
 		"ETT_UI_OPTION_AVAILABLE_DISPLAY_FULLSCREEN",
 		"ETT_UI_OPTION_AVAILABLE_MOTION_BLUR",
@@ -6316,9 +7747,12 @@
 		"ETT_HDRGAMMAVALUERANGEMAX",
 		"ETT_HDRGAMMAVALUESTEP",
 		"ETT_ISDLSSAVAILABLE",
+		"ETT_ISXESSAVAILABLE",
+		"ETT_ISXESSINSTALLED",
 		"ETT_ISHDRAVAILABLE",
 		"ETT_ISHDRRENDERING",
-		"ETT_ISVRSAVAILABLE",
+		"ETT_ISRAYTRACINGAVAILABLE",
+		"ETT_VARIABLERATESHADINGTIER",
 		"ETT_ITEM",
 		"ETT_REPOSITORY",
 		"ETT_ISONLINE",
@@ -6349,6 +7783,7 @@
 		"ETT_SAVEGAMES",
 		"ETT_AVAILABILITY_OF_RESOURCES",
 		"ETT_AVAILABILITY_OF_CONTRACT",
+		"ETT_AVAILABILITY_OF_USER_CENTRIC_CONTRACT",
 		"ETT_AS3DATE",
 		"ETT_IOIACCOUNT_STATUS",
 		"ETT_ISCONTRACT_IN_PLAYLIST",
@@ -6370,11 +7805,12 @@
 		"ETT_DATABINDING_ROOT",
 		"ETT_ALLOWED_UNLOCKABLES",
 		"ETT_HAS_FRAMERATE_OPTION",
+		"ETT_MENU_DATAPROVIDER",
+		"ETT_INTERACTIONINDICATOR",
 		"ETT_NVIDIAHIGHLIGHTSAVAILABLE",
 		"ETT_NVIDIAHIGHLIGHTSHASHIGHLIGHTS",
 		"ETT_DEBUG_ALLHITMANSUITS"
 	],
-
 	"MenuWeaponUpgradeData.EUpgradeAction": [
 		"EUPGRADE_ACTION_NONE",
 		"EUPGRADE_ACTION_INSTALL",
@@ -6385,7 +7821,6 @@
 		"EUPGRADE_ACTION_UNEQUIP_WEAPON",
 		"EUPGRADE_ACTION_CLEAR_LEVELS"
 	],
-
 	"Network.OrderingChannel": [
 		"SYSTEM_INTERNAL",
 		"PLAYER_INPUT",
@@ -6403,9 +7838,13 @@
 		"MISC",
 		"MAX_CHANNELS"
 	],
-
-	"Network.PacketPriority": ["IMMEDIATE_PRIORITY", "HIGH_PRIORITY", "MEDIUM_PRIORITY", "LOW_PRIORITY", "NUMBER_OF_PRIORITIES"],
-
+	"Network.PacketPriority": [
+		"IMMEDIATE_PRIORITY",
+		"HIGH_PRIORITY",
+		"MEDIUM_PRIORITY",
+		"LOW_PRIORITY",
+		"NUMBER_OF_PRIORITIES"
+	],
 	"Network.PacketReliability": [
 		"UNRELIABLE",
 		"UNRELIABLE_SEQUENCED",
@@ -6417,25 +7856,56 @@
 		"RELIABLE_ORDERED_WITH_ACK_RECEIPT",
 		"NUMBER_OF_RELIABILITIES"
 	],
-
-	"ReverbFidelity": ["Low", "Medium", "High"],
-
-	"SActorSoundDefs.EDefinition": ["_NoSound"],
-
-	"SDoorSoundDefs.EDefinition": ["DoorOpen", "DoorClose", "DoorSlam", "DoorOpenStop"],
-
-	"SFootIKEventData.EFoot": ["eLeft", "eRight", "eBoth"],
-
-	"STestStruct.ETestEnum": ["ETomato", "EPotato"],
-
-	"SUITestData.ETestEnum": ["ETestEnum_Value_One", "ETestEnum_Value_Two", "ETestEnum_Value_Three"],
-
-	"SniperControllerConditionType": ["SCCT_Enabled", "SCCT_PrecisionAim"],
-
-	"SoundPlayState": ["ePlaying", "eLoopBreaking", "eStopping"],
-
-	"TeleportActionType": ["STAY", "TELEPORT", "LEAVE_CROWD"],
-
+	"ReverbFidelity": [
+		"Low",
+		"Medium",
+		"High"
+	],
+	"SActorSoundDefs.EDefinition": [
+		"_NoSound"
+	],
+	"SDoorSoundDefs.EDefinition": [
+		"DoorOpen",
+		"DoorClose",
+		"DoorSlam",
+		"DoorOpenStop"
+	],
+	"SFootIKEventData.EFoot": [
+		"eLeft",
+		"eRight",
+		"eBoth"
+	],
+	"STestStruct.ETestEnum": [
+		"ETomato",
+		"EPotato"
+	],
+	"SUITestData.ETestEnum": [
+		"ETestEnum_Value_One",
+		"ETestEnum_Value_Two",
+		"ETestEnum_Value_Three"
+	],
+	"SniperControllerConditionType": [
+		"SCCT_Enabled",
+		"SCCT_PrecisionAim"
+	],
+	"SoundPlayState": [
+		"ePlaying",
+		"eLoopBreaking",
+		"eStopping"
+	],
+	"String_Comperator_Poll.EEvaluationType": [
+		"EQUAL",
+		"NOT_EQUAL",
+		"LESS",
+		"LESS_OR_EQUAL",
+		"HIGHER",
+		"HIGHER_OR_EQUAL"
+	],
+	"TeleportActionType": [
+		"STAY",
+		"TELEPORT",
+		"LEAVE_CROWD"
+	],
 	"UIMapLayer.EUIMapLayerID": [
 		"eUIMLI_UNSPECIFIED",
 		"eUIMLI_STAIRCASE",
@@ -6453,7 +7923,6 @@
 		"eUIMLI_OPPONENT",
 		"eUIMLI_HERO"
 	],
-
 	"WebSocketUtils.ECloseStatus": [
 		"eCS_NORMAL",
 		"eCS_GOINGAWAY",
@@ -6469,79 +7938,214 @@
 		"eCS_INTERNALSRVERR",
 		"eCS_TLSHANDSHAKE"
 	],
-
-	"WebSocketUtils.EOpCode": ["eCONTINUATION", "eTEXT", "eBINARY", "eCLOSE", "ePING", "ePONG", "eNONE"],
-
-	"ZAIPerceptibleEntity.EReactionBehaviorMode": ["FullBehavior", "StopOnInvestigate", "StopOnReacted"],
-
-	"ZAISoundEvent.ELoudness": ["EAISEL_Default", "EAISEL_VeryLow", "EAISEL_Low", "EAISEL_Normal", "EAISEL_Loud", "EAISEL_VeryLoud"],
-
-	"ZAT2Controller.EFoot": ["FOOT_LEFT", "FOOT_RIGHT"],
-
-	"ZAT2Controller.EFootstepsMovementType": ["MOVEMENT_WALKING", "MOVEMENT_WALKING_SLIDING", "MOVEMENT_RUNNING", "MOVEMENT_STANDING"],
-
-	"ZActBehaviorEntity.EApproachAlignment": ["AA_STRICT", "AA_LOOSE"],
-
-	"ZActBehaviorEntity.EMovementType": ["MT_WALK", "MT_SNAP", "MT_IGNORE_POSITION"],
-
-	"ZActBehaviorEntity.ERotationAlignment": ["RA_NONE", "RA_LOOSE", "RA_EXACT"],
-
-	"ZActBehaviorEntity.EState": ["UNDEFINED", "IDLE", "STOPPING", "PREPARING", "MOVING", "ENTERING", "RUNNING", "TIMEDOUT", "COMPLETE"],
-
-	"ZActDurationCondition.EState": ["MOVING", "ENTERING", "PLAYING", "STOPPING"],
-
-	"ZActStateCondition.EState": ["MOVING", "ENTERING", "PLAYING"],
-
-	"ZActorAccessoryItemCondition.EConditionTypes": ["ECT_HasInPool", "ECT_HasAttached"],
-
-	"ZActorBoneAttachEntity.EResetMode": ["eAtBoneOrigin", "eKeepOffset"],
-
-	"ZActorDebugEntity.EActorDebugColor": ["EDC_BLACK", "EDC_DARK_RED", "EDC_RED", "EDC_DARK_GREEN", "EDC_GREEN", "EDC_DARK_BLUE", "EDC_DARK_PINK", "EDC_BLUE", "EDC_PINK", "EDC_WHITE"],
-
-	"ZActorInstanceEntity.EFFXMode": ["eFFX_MODE_DISABLE", "eFFX_MODE_OVERWRITE"],
-
-	"ZActorKeywordCondition.EEvaluationType": ["ALL", "NONE", "ANY", "ANY_TRUE_IF_NO_REQS"],
-
-	"ZActorKnowledgeCondition.EEvaluationType": ["ALL", "ANY"],
-
-	"ZActorPicker.EKeywordEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZActorPickerEffectDrama.EEffectPhaseAction": ["EPA_START", "EPA_LEAVE"],
-
-	"ZActorPickerEffectTemplate.EEffectPhaseAction": ["EPA_NONE", "EPA_START_TEMPLATE", "EPA_STOP_TEMPLATE"],
-
-	"ZActorPickerEffectTrack.EEffectPhaseAction": ["EPA_ATTACH", "EPA_DETACH"],
-
-	"ZActorPickerFilterGroup.EEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZActorPickerFilterKeyword.EEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZActorProviderFilterKeyword.EEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZActorTensionEntity.ETensionCheckMode": ["ETCM_INSIDE_VOLUME_OR_LIST", "ETCM_INSIDE_VOLUME_AND_LIST"],
-
-	"ZApproachOrder.EApproachStyle": ["AS_AUTO", "AS_SPRINT", "AS_JOG", "AS_WALK"],
-
-	"ZAudioSequenceTrack.EPlaybackTarget": ["eNone", "eTargetEntityAudioPlayer", "eTargetEntityEmitter", "ePreviewEmitter"],
-
-	"ZAvoidDangerousAreaGroup.EAvoidDangerousAreaGroupState": ["IGS_SelectDestination", "IGS_Move", "IGS_Jump", "IGS_Wait", "IGS_Completed", "IGS_Max"],
-
-	"ZBoneAttachEntity.EResetMode": ["eAtBoneOrigin", "eKeepOffset"],
-
-	"ZBoneWeightRotationEntity.eRotationAxises": ["AXIS_X", "AXIS_Y", "AXIS_Z"],
-
-	"ZBoxReflectionEntity.EBoundsType": ["eBox", "eRoom"],
-
-	"ZBoxReflectionEntity.EType": ["eLocal", "eFallback"],
-
-	"ZCameraConeTriggerEntity.EAlignment": ["X_POSITIVE", "Y_POSITIVE", "Z_POSITIVE", "X_NEGATIVE", "Y_NEGATIVE", "Z_NEGATIVE"],
-
-	"ZCameraPlaneTriggerEntity.EAlignment": ["XY", "XZ", "YZ"],
-
-	"ZCausalNodeEntity.ECauseEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZCautiousBackupGroup.EGroupState": ["GS_DistanceField", "GS_SendBackup", "GS_Waiting", "GS_Completed"],
-
+	"WebSocketUtils.EOpCode": [
+		"eCONTINUATION",
+		"eTEXT",
+		"eBINARY",
+		"eCLOSE",
+		"ePING",
+		"ePONG",
+		"eNONE"
+	],
+	"ZAIPerceptibleEntity.EReactionBehaviorMode": [
+		"FullBehavior",
+		"StopOnInvestigate",
+		"StopOnReacted"
+	],
+	"ZAISoundEvent.ELoudness": [
+		"EAISEL_Default",
+		"EAISEL_VeryLow",
+		"EAISEL_Low",
+		"EAISEL_Normal",
+		"EAISEL_Loud",
+		"EAISEL_VeryLoud"
+	],
+	"ZAT2Controller.EFoot": [
+		"FOOT_LEFT",
+		"FOOT_RIGHT"
+	],
+	"ZAT2Controller.EFootstepsMovementType": [
+		"MOVEMENT_WALKING",
+		"MOVEMENT_WALKING_SLIDING",
+		"MOVEMENT_RUNNING",
+		"MOVEMENT_STANDING"
+	],
+	"ZActBehaviorEntity.EApproachAlignment": [
+		"AA_STRICT",
+		"AA_LOOSE"
+	],
+	"ZActBehaviorEntity.EMovementType": [
+		"MT_WALK",
+		"MT_SNAP",
+		"MT_IGNORE_POSITION"
+	],
+	"ZActBehaviorEntity.ERotationAlignment": [
+		"RA_NONE",
+		"RA_LOOSE",
+		"RA_EXACT"
+	],
+	"ZActBehaviorEntity.EState": [
+		"UNDEFINED",
+		"IDLE",
+		"STOPPING",
+		"PREPARING",
+		"MOVING",
+		"ENTERING",
+		"RUNNING",
+		"TIMEDOUT",
+		"COMPLETE"
+	],
+	"ZActDurationCondition.EState": [
+		"MOVING",
+		"ENTERING",
+		"PLAYING",
+		"STOPPING"
+	],
+	"ZActStateCondition.EState": [
+		"MOVING",
+		"ENTERING",
+		"PLAYING"
+	],
+	"ZActorAccessoryItemCondition.EConditionTypes": [
+		"ECT_HasInPool",
+		"ECT_HasAttached"
+	],
+	"ZActorBoneAttachEntity.EResetMode": [
+		"eAtBoneOrigin",
+		"eKeepOffset"
+	],
+	"ZActorDebugEntity.EActorDebugColor": [
+		"EDC_BLACK",
+		"EDC_DARK_RED",
+		"EDC_RED",
+		"EDC_DARK_GREEN",
+		"EDC_GREEN",
+		"EDC_DARK_BLUE",
+		"EDC_DARK_PINK",
+		"EDC_BLUE",
+		"EDC_PINK",
+		"EDC_WHITE"
+	],
+	"ZActorInstanceEntity.EFFXMode": [
+		"eFFX_MODE_DISABLE",
+		"eFFX_MODE_OVERWRITE"
+	],
+	"ZActorKeywordCondition.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY",
+		"ANY_TRUE_IF_NO_REQS"
+	],
+	"ZActorKnowledgeCondition.EEvaluationType": [
+		"ALL",
+		"ANY"
+	],
+	"ZActorPicker.EKeywordEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZActorPickerEffectDrama.EEffectPhaseAction": [
+		"EPA_START",
+		"EPA_LEAVE"
+	],
+	"ZActorPickerEffectTemplate.EEffectPhaseAction": [
+		"EPA_NONE",
+		"EPA_START_TEMPLATE",
+		"EPA_STOP_TEMPLATE"
+	],
+	"ZActorPickerEffectTrack.EEffectPhaseAction": [
+		"EPA_ATTACH",
+		"EPA_DETACH"
+	],
+	"ZActorPickerFilterGroup.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZActorPickerFilterKeyword.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZActorProviderFilterKeyword.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZActorTensionEntity.ETensionCheckMode": [
+		"ETCM_INSIDE_VOLUME_OR_LIST",
+		"ETCM_INSIDE_VOLUME_AND_LIST"
+	],
+	"ZApproachOrder.EApproachStyle": [
+		"AS_AUTO",
+		"AS_SPRINT",
+		"AS_JOG",
+		"AS_WALK"
+	],
+	"ZAudioSequenceTrack.EPlaybackTarget": [
+		"eNone",
+		"eTargetEntityAudioPlayer",
+		"eTargetEntityEmitter",
+		"ePreviewEmitter"
+	],
+	"ZAvoidDangerousAreaGroup.EAvoidDangerousAreaGroupState": [
+		"IGS_SelectDestination",
+		"IGS_Move",
+		"IGS_Jump",
+		"IGS_Wait",
+		"IGS_Completed",
+		"IGS_Max"
+	],
+	"ZBoneAttachEntity.EResetMode": [
+		"eAtBoneOrigin",
+		"eKeepOffset"
+	],
+	"ZBoneWeightRotationEntity.eRotationAxises": [
+		"AXIS_X",
+		"AXIS_Y",
+		"AXIS_Z"
+	],
+	"ZBoxReflectionEntity.EBoundsType": [
+		"eBox",
+		"eRoom"
+	],
+	"ZBoxReflectionEntity.EType": [
+		"eLocal",
+		"eFallback"
+	],
+	"ZCameraConeTriggerEntity.EAlignment": [
+		"X_POSITIVE",
+		"Y_POSITIVE",
+		"Z_POSITIVE",
+		"X_NEGATIVE",
+		"Y_NEGATIVE",
+		"Z_NEGATIVE"
+	],
+	"ZCameraPlaneAlignedTriggerEntity.EAlignment": [
+		"X_POSITIVE",
+		"Y_POSITIVE",
+		"Z_POSITIVE",
+		"X_NEGATIVE",
+		"Y_NEGATIVE",
+		"Z_NEGATIVE"
+	],
+	"ZCameraPlaneTriggerEntity.EAlignment": [
+		"XY",
+		"XZ",
+		"YZ"
+	],
+	"ZCausalNodeEntity.ECauseEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZCautiousBackupGroup.EGroupState": [
+		"GS_DistanceField",
+		"GS_SendBackup",
+		"GS_Waiting",
+		"GS_Completed"
+	],
 	"ZCautiousInvestigateGroup.EApproachOrderState": [
 		"AOS_RequestHuntApproachNode",
 		"AOS_RequestLeaderApproachNode",
@@ -6550,9 +8154,14 @@
 		"AOS_Ready",
 		"AOS_NoApproachNode"
 	],
-
-	"ZCautiousInvestigateGroup.EAssistantState": ["AS_Waiting", "AS_CalculateFields", "AS_RequestNode", "AS_Moving", "AS_Investigating", "AS_Max"],
-
+	"ZCautiousInvestigateGroup.EAssistantState": [
+		"AS_Waiting",
+		"AS_CalculateFields",
+		"AS_RequestNode",
+		"AS_Moving",
+		"AS_Investigating",
+		"AS_Max"
+	],
 	"ZCautiousInvestigateGroup.EInvestigateGroupState": [
 		"IGS_FindAssistant",
 		"IGS_PreAcknowledge",
@@ -6564,21 +8173,52 @@
 		"IGS_Completed",
 		"IGS_Max"
 	],
-
-	"ZCautiousSearchGroup.EAssistantState": ["AS_CalculateFields", "AS_RequestNode", "AS_Approach", "AS_Approaching", "AS_Act", "AS_Acting"],
-
-	"ZCautiousSearchGroup.ESearchGroupState": ["SGS_Acknowledge", "SGS_Approach", "SGS_Approaching", "SGS_Waiting", "SGS_Completed"],
-
-	"ZChannelKeywordCondition.EEvaluationType": ["ALL", "NONE", "ANY", "ANY_TRUE_IF_NO_REQS"],
-
-	"ZCharacterSpeakCondition.EState": ["Started", "Playing", "PlayingAndAudible", "Completed", "SubsSeenAndCompleted", "Failed", "Stopped"],
-
-	"ZConditionListEntity.EEvaluationType": ["ALL_TRUE", "ANY_TRUE"],
-
-	"ZContextKillGuide.EContextKillType": ["eCKT_TOILET_DROWN", "eCKT_SNAP_AND_TOSS", "eCKT_PUSH", "eCKT_NO_ANIMATION", "eCKT_END"],
-
-	"ZContextKillGuide.EEvaluationType": ["ALL", "NONE", "ANY"],
-
+	"ZCautiousSearchGroup.EAssistantState": [
+		"AS_CalculateFields",
+		"AS_RequestNode",
+		"AS_Approach",
+		"AS_Approaching",
+		"AS_Act",
+		"AS_Acting"
+	],
+	"ZCautiousSearchGroup.ESearchGroupState": [
+		"SGS_Acknowledge",
+		"SGS_Approach",
+		"SGS_Approaching",
+		"SGS_Waiting",
+		"SGS_Completed"
+	],
+	"ZChannelKeywordCondition.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY",
+		"ANY_TRUE_IF_NO_REQS"
+	],
+	"ZCharacterSpeakCondition.EState": [
+		"Started",
+		"Playing",
+		"PlayingAndAudible",
+		"Completed",
+		"SubsSeenAndCompleted",
+		"Failed",
+		"Stopped"
+	],
+	"ZConditionListEntity.EEvaluationType": [
+		"ALL_TRUE",
+		"ANY_TRUE"
+	],
+	"ZContextKillGuide.EContextKillType": [
+		"eCKT_TOILET_DROWN",
+		"eCKT_SNAP_AND_TOSS",
+		"eCKT_PUSH",
+		"eCKT_NO_ANIMATION",
+		"eCKT_END"
+	],
+	"ZContextKillGuide.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
 	"ZContractObjectiveHudHintEntity.EObjectiveHintIcon": [
 		"eNone",
 		"eSuitcase",
@@ -6599,15 +8239,27 @@
 		"eMissionObjective",
 		"eExitMissionIcon"
 	],
-
-	"ZCoverPlane.ECoverSize": ["eLowCover", "eMediumCover", "eHighCover"],
-
-	"ZCoverPlane.ECoverType": ["eCoverOnly", "eCoverAndRail", "eRailOnly"],
-
-	"ZCrowdActorEntity.ECharacterSoundType": ["eSoundType_Male", "eSoundType_Female", "eSoundType_Female_Heels"],
-
-	"ZDeadBodySituation.ESituationFlavor": ["SF_None", "SF_Unconscious", "SF_DeadBody", "SF_Accident"],
-
+	"ZCoverPlane.ECoverSize": [
+		"eLowCover",
+		"eMediumCover",
+		"eHighCover"
+	],
+	"ZCoverPlane.ECoverType": [
+		"eCoverOnly",
+		"eCoverAndRail",
+		"eRailOnly"
+	],
+	"ZCrowdActorEntity.ECharacterSoundType": [
+		"eSoundType_Male",
+		"eSoundType_Female",
+		"eSoundType_Female_Heels"
+	],
+	"ZDeadBodySituation.ESituationFlavor": [
+		"SF_None",
+		"SF_Unconscious",
+		"SF_DeadBody",
+		"SF_Accident"
+	],
 	"ZDebugGizmoEntity.EDrawLayer": [
 		"DL_DEFAULT",
 		"DL_LIGHT",
@@ -6631,7 +8283,6 @@
 		"DL_SOUND_PARTITIONING",
 		"DL_UI"
 	],
-
 	"ZDebugHM5GameTimeMultiplierEnt.eTMLDReason": [
 		"eTMLDR_HintMessages",
 		"eTMLDR_Sequence",
@@ -6642,7 +8293,6 @@
 		"eTMLDR_ActionKillLastEnemyInCheckPoint",
 		"eTMLDR_NOTSET"
 	],
-
 	"ZDebugSpatialEntity.EDrawLayer": [
 		"DL_DEFAULT",
 		"DL_LIGHT",
@@ -6665,37 +8315,224 @@
 		"DL_SOUND_PARTITIONING",
 		"DL_UI"
 	],
-
-	"ZDebugTextEntity.EHorizontalAlignment": ["HA_CENTER", "HA_LEFT", "HA_RIGHT"],
-
-	"ZDebugTextEntity.EVerticalAlignment": ["VA_CENTER", "VA_TOP", "VA_BOTTOM"],
-
-	"ZDecalControllerEntity.ERotationType": ["eRotationDisable", "eRotationAlignRay", "eRotationRandom"],
-
-	"ZDecalControllerEntity.EScaleType": ["eScaleDisable", "eScaleUniform", "eScaleY"],
-
-	"ZDetectedInPrivateGroup.EInvestigateGroupState": ["IGS_Delay", "IGS_Talk", "IGS_Move", "IGS_Wait", "IGS_Completed", "IGS_Max"],
-
-	"ZDistanceCondition.ECompareMethod": ["CM_GreaterOrEqualThan", "CM_LessThan"],
-
-	"ZDistanceCondition.EObjectType": ["DT_ToCam", "DT_ToPlayer"],
-
-	"ZDramaSituationEntity.EReentryBehavior": ["RB_CONTINUE", "RB_TERMINATE", "RB_RESTART", "RB_RECASTANDRESTART", "RB_RECASTANDCONTINUE"],
-
-	"ZEntityPropertyReplica.EReplicationStrategy": ["REP_ALL_PROPERTIES", "REP_ALL_EXCEPT", "REP_ONLY_SPECIFIC"],
-
-	"ZEscortSituation2Entity.EEscortState": ["EES_Idle", "EES_Evaluate", "EES_Escorting", "EES_Searching", "EES_Intermediate"],
-
-	"ZEscortSituation2Entity.ETargetState": ["ETS_Unknown", "ETS_NoTarget", "ETS_RunningActBehavior", "ETS_RunningDummyBehavior", "ETS_RunningOtherBehavior", "ETS_Dead", "ETS_TargetIsHitman"],
-
-	"ZEscortSituationEntity.EEscortState": ["EES_Idle", "EES_Evaluate", "EES_Escorting", "EES_Searching", "EES_Intermediate"],
-
-	"ZEscortSituationEntity.ETargetState": ["ETS_Unknown", "ETS_NoTarget", "ETS_RunningActBehavior", "ETS_RunningDummyBehavior", "ETS_RunningOtherBehavior", "ETS_Dead", "ETS_TargetIsHitman"],
-
-	"ZFriskSuspectGroup.EAssistantState": ["AS_Waiting", "AS_Approach", "AS_Approaching", "AS_Covering"],
-
-	"ZFriskSuspectGroup.EHitmanGreetState": ["HGS_NotGreeted", "HGS_Greeted", "HGS_ShrugOff"],
-
+	"ZDebugTextEntity.EHorizontalAlignment": [
+		"HA_CENTER",
+		"HA_LEFT",
+		"HA_RIGHT"
+	],
+	"ZDebugTextEntity.EVerticalAlignment": [
+		"VA_CENTER",
+		"VA_TOP",
+		"VA_BOTTOM"
+	],
+	"ZDecalControllerEntity.ERotationType": [
+		"eRotationDisable",
+		"eRotationAlignRay",
+		"eRotationRandom"
+	],
+	"ZDecalControllerEntity.EScaleType": [
+		"eScaleDisable",
+		"eScaleUniform",
+		"eScaleY"
+	],
+	"ZDetectedInPrivateGroup.EInvestigateGroupState": [
+		"IGS_Delay",
+		"IGS_Talk",
+		"IGS_Move",
+		"IGS_Wait",
+		"IGS_Completed",
+		"IGS_Max"
+	],
+	"ZDistanceCondition.ECompareMethod": [
+		"CM_GreaterOrEqualThan",
+		"CM_LessThan"
+	],
+	"ZDistanceCondition.EObjectType": [
+		"DT_ToCam",
+		"DT_ToPlayer"
+	],
+	"ZDramaSituationEntity.EReentryBehavior": [
+		"RB_CONTINUE",
+		"RB_TERMINATE",
+		"RB_RESTART",
+		"RB_RECASTANDRESTART",
+		"RB_RECASTANDCONTINUE"
+	],
+	"ZEntityPropertyReplica.EReplicationStrategy": [
+		"REP_ALL_PROPERTIES",
+		"REP_ALL_EXCEPT",
+		"REP_ONLY_SPECIFIC"
+	],
+	"ZEscortSituation2Entity.EEscortState": [
+		"EES_Idle",
+		"EES_Evaluate",
+		"EES_Escorting",
+		"EES_Searching",
+		"EES_Intermediate"
+	],
+	"ZEscortSituation2Entity.ETargetState": [
+		"ETS_Unknown",
+		"ETS_NoTarget",
+		"ETS_RunningActBehavior",
+		"ETS_RunningDummyBehavior",
+		"ETS_RunningOtherBehavior",
+		"ETS_Dead",
+		"ETS_TargetIsHitman"
+	],
+	"ZEscortSituationEntity.EEscortState": [
+		"EES_Idle",
+		"EES_Evaluate",
+		"EES_Escorting",
+		"EES_Searching",
+		"EES_Intermediate"
+	],
+	"ZEscortSituationEntity.ETargetState": [
+		"ETS_Unknown",
+		"ETS_NoTarget",
+		"ETS_RunningActBehavior",
+		"ETS_RunningDummyBehavior",
+		"ETS_RunningOtherBehavior",
+		"ETS_Dead",
+		"ETS_TargetIsHitman"
+	],
+	"ZEvergreenCampaignDefinitionPollInt.EQuery": [
+		"DifficultyRank",
+		"Deposit",
+		"PayoutBase",
+		"NumTerritories"
+	],
+	"ZEvergreenCampaignDefinitionPollString.EQuery": [
+		"LeaderCodename",
+		"Biography"
+	],
+	"ZEvergreenCampaignStatusPollInt.EQuery": [
+		"DifficultyRank",
+		"Deposit",
+		"PayoutBase",
+		"NumTerritories"
+	],
+	"ZEvergreenCampaignStatusPollString.EQuery": [
+		"LeaderCodename",
+		"Biography"
+	],
+	"ZEvergreenGearWallMenuEntryAddOn.EItemRarity": [
+		"SAFEHOUSEONLY",
+		"NONE",
+		"COMMON",
+		"RARE",
+		"EPIC",
+		"LEGENDARY"
+	],
+	"ZEvergreenIntelWallDataProvider.EAgenda": [
+		"Unknown",
+		"HandoverMeeting",
+		"BusinessMeeting",
+		"SecretMeeting",
+		"NoMeeting"
+	],
+	"ZEvergreenIntelWallDataProvider.ELook": [
+		"Unknown",
+		"Glasses",
+		"Earrings",
+		"Necklace",
+		"Watch",
+		"Hat",
+		"Tattoo",
+		"BlackHair",
+		"BrownHair",
+		"BlondeHair",
+		"GreyHair",
+		"RedHair",
+		"NoHair"
+	],
+	"ZEvergreenIntelWallDataProvider.ETell": [
+		"Unknown",
+		"Smoker",
+		"Allergic",
+		"SweetTooth",
+		"Bookworm",
+		"Nervous",
+		"Dehydrated",
+		"Foodie"
+	],
+	"ZEvergreenLocationIntelDataProvider.EVisited": [
+		"NotVisited",
+		"VisitedAndWon",
+		"VisitedAndLost"
+	],
+	"ZEvergreenMenuCondition.EQuery": [
+		"IS_OPENING",
+		"IS_OPEN",
+		"IS_OPENING_OR_OPEN",
+		"IS_CLOSING",
+		"IS_CLOSED",
+		"IS_PROCESSING_INPUT",
+		"IS_ZOOMED_IN",
+		"IS_ZOOMED_OUT"
+	],
+	"ZEvergreenMenuCounterScrollEntity.EAxis2DMouse": [
+		"X",
+		"Y",
+		"XInverted",
+		"YInverted"
+	],
+	"ZEvergreenMenuCounterScrollEntity.EAxis3DSpace": [
+		"X",
+		"Y",
+		"Z"
+	],
+	"ZEvergreenMenuEntryCondition.EQuery": [
+		"IS_SELECTED",
+		"IS_SELECTED_AND_ZOOMED_OUT",
+		"IS_SELECTED_AND_ZOOMED_IN"
+	],
+	"ZEvergreenMenuEntryEntity.ECursorShape": [
+		"AUTO",
+		"FLAT",
+		"CYLINDER",
+		"SPHERE",
+		"NONE"
+	],
+	"ZEvergreenMenuEntryPromptButtonAction.EInputTrigger": [
+		"ACCEPT",
+		"CANCEL",
+		"ACTION_X",
+		"ACTION_Y"
+	],
+	"ZEvergreenMenuGlobalCondition.EQuery": [
+		"IS_ANY_MENU_OPEN",
+		"IS_ANY_MENU_PROCESSING_INPUT",
+		"IS_ANY_MENU_SUPPRESSING_SPATIAL_ICONS"
+	],
+	"ZEvergreenMenuValueFloatQuery.EQuery": [
+		"OPEN_ANIM_PROGRESS",
+		"ZOOM_ANIM_PROGRESS"
+	],
+	"ZEvergreenMenuValueVector3Query.EQuery": [
+		"CENTER_OF_SELECTED_ENTITY"
+	],
+	"ZEvergreenVitalInfoEntity.EVitalInfoType": [
+		"Assassin",
+		"Lookout",
+		"Territory",
+		"PrestigeObjective"
+	],
+	"ZEvergreenWorldMapTerritoryDataProvider.EVisited": [
+		"NotVisited",
+		"VisitedAndWon",
+		"VisitedAndLost"
+	],
+	"ZFriskSuspectGroup.EAssistantState": [
+		"AS_Waiting",
+		"AS_Approach",
+		"AS_Approaching",
+		"AS_Covering"
+	],
+	"ZFriskSuspectGroup.EHitmanGreetState": [
+		"HGS_NotGreeted",
+		"HGS_Greeted",
+		"HGS_ShrugOff"
+	],
 	"ZGetHelpGroup.EInvestigateGroupState": [
 		"IGS_Acknowledge",
 		"IGS_WaitForAckDialog",
@@ -6708,19 +8545,44 @@
 		"IGS_Completed",
 		"IGS_Max"
 	],
-
-	"ZHM5AgilityEventConsumer.EEvent": ["EAE_LEFTHAND", "EAE_RIGHTHAND", "EAE_LEFTLEG", "EAE_RIGHTLEG"],
-
-	"ZHM5Animator.EBoneAnimator": ["BA_ANIMATION", "BA_RAGDOLL", "BA_BLENDING", "BA_POWEREDRAGDOLL", "BA_POSE"],
-
-	"ZHM5BodyContainer.EBCAnimSet": ["BC_CONTAINER_STANDARD", "BC_CONTAINER_WOODCHIPPER", "BC_CAR_STANDARD_TRUNK", "BC_CONTAINER_CLOSET", "BC_CONTAINER_LAUNDRYCHUTE"],
-
-	"ZHM5BodyContainer.EBCBodyMode": ["BC_1_VICTIM", "BC_2_VICTIMS", "BC_1_VICTIM_FLUSHABLE", "BC_1_VICTIM_AUTOFLUSHABLE"],
-
-	"ZHM5BodyContainer.EBCState": ["BC_CLOSED", "BC_OPEN", "BC_FLUSH", "BC_OPENING", "BC_CLOSING", "BC_FLUSHING"],
-
-	"ZHM5BodyContainer.eBCCloseMode": ["BC_AUTOCLOSE", "BC_MANUALCLOSE"],
-
+	"ZHM5AgilityEventConsumer.EEvent": [
+		"EAE_LEFTHAND",
+		"EAE_RIGHTHAND",
+		"EAE_LEFTLEG",
+		"EAE_RIGHTLEG"
+	],
+	"ZHM5Animator.EBoneAnimator": [
+		"BA_ANIMATION",
+		"BA_RAGDOLL",
+		"BA_BLENDING",
+		"BA_POWEREDRAGDOLL",
+		"BA_POSE"
+	],
+	"ZHM5BodyContainer.EBCAnimSet": [
+		"BC_CONTAINER_STANDARD",
+		"BC_CONTAINER_WOODCHIPPER",
+		"BC_CAR_STANDARD_TRUNK",
+		"BC_CONTAINER_CLOSET",
+		"BC_CONTAINER_LAUNDRYCHUTE"
+	],
+	"ZHM5BodyContainer.EBCBodyMode": [
+		"BC_1_VICTIM",
+		"BC_2_VICTIMS",
+		"BC_1_VICTIM_FLUSHABLE",
+		"BC_1_VICTIM_AUTOFLUSHABLE"
+	],
+	"ZHM5BodyContainer.EBCState": [
+		"BC_CLOSED",
+		"BC_OPEN",
+		"BC_FLUSH",
+		"BC_OPENING",
+		"BC_CLOSING",
+		"BC_FLUSHING"
+	],
+	"ZHM5BodyContainer.eBCCloseMode": [
+		"BC_AUTOCLOSE",
+		"BC_MANUALCLOSE"
+	],
 	"ZHM5BodySoundEventConsumer.EAnimSoundBody": [
 		"eHM5AnimSoundBody_Buttocks",
 		"eHM5AnimSoundBody_Back",
@@ -6738,13 +8600,29 @@
 		"eHM5AnimSoundBody_RollFwd",
 		"eHM5AnimSoundBody_RollSide"
 	],
-
-	"ZHM5ContextActionEntity.EInteraction": ["eIT_RotateLeftStick", "eIT_AutoComplete", "eIT_NoInteraction"],
-
-	"ZHM5CrowdGenericEventConsumer.EEvent": ["eFootstep", "eClothRustle", "ePushReaction", "ePanic", "eGeneric00", "eGeneric01", "eGeneric02", "eGeneric03"],
-
-	"ZHM5DynamicRayCastEntity.ECollideType": ["eAll", "eStaticOnly", "eDynamicOnly", "eBaseCharacter", "eHitman", "eActor"],
-
+	"ZHM5ContextActionEntity.EInteraction": [
+		"eIT_RotateLeftStick",
+		"eIT_AutoComplete",
+		"eIT_NoInteraction"
+	],
+	"ZHM5CrowdGenericEventConsumer.EEvent": [
+		"eFootstep",
+		"eClothRustle",
+		"ePushReaction",
+		"ePanic",
+		"eGeneric00",
+		"eGeneric01",
+		"eGeneric02",
+		"eGeneric03"
+	],
+	"ZHM5DynamicRayCastEntity.ECollideType": [
+		"eAll",
+		"eStaticOnly",
+		"eDynamicOnly",
+		"eBaseCharacter",
+		"eHitman",
+		"eActor"
+	],
 	"ZHM5FaceFXReactionEventConsumer.EEvent": [
 		"eHitByBullet",
 		"eFireRegularWeapon",
@@ -6757,7 +8635,6 @@
 		"eCoverDodgebulletRight",
 		"eReactToExplosion"
 	],
-
 	"ZHM5FaceFXSpecificEventConsumer.EEvent": [
 		"eNone",
 		"eGetInCombatCoverExhalation",
@@ -6768,9 +8645,10 @@
 		"eCloseCombatStainedGroan",
 		"eCloseCombatSilentKillShush"
 	],
-
-	"ZHM5ForceCover.EFaceDirection": ["eFaceLeft", "eFaceRight"],
-
+	"ZHM5ForceCover.EFaceDirection": [
+		"eFaceLeft",
+		"eFaceRight"
+	],
 	"ZHM5GameTimeMultiplierEntity.eTMLDReason": [
 		"eTMLDR_HintMessages",
 		"eTMLDR_Sequence",
@@ -6781,17 +8659,43 @@
 		"eTMLDR_ActionKillLastEnemyInCheckPoint",
 		"eTMLDR_NOTSET"
 	],
-
-	"ZHM5GenericEventConsumer.EEvent": ["eGeneric00", "eGeneric01", "eGeneric02", "eGeneric03", "eGeneric04", "eGeneric05", "eGeneric06", "eGeneric07"],
-
-	"ZHM5HIKEventConsumer.EBlend": ["eBlendIn", "eBlendOut", "eInstantOn", "eInstantOff"],
-
-	"ZHM5HIKEventConsumer.EEffector": ["eLeftHand", "eRightHand"],
-
-	"ZHM5HitmanHealthModifier.EHealthDrainType": ["eRemoveHealthInstantly", "eDecreaseHealthToValue"],
-
-	"ZHM5HitmanHealthModifier.EHealthValue": ["eHealth0", "eHealth10", "eHealth20", "eHealth30", "eHealth40", "eHealth50", "eHealth60", "eHealth70", "eHealth80", "eHealth90", "eHealth100"],
-
+	"ZHM5GenericEventConsumer.EEvent": [
+		"eGeneric00",
+		"eGeneric01",
+		"eGeneric02",
+		"eGeneric03",
+		"eGeneric04",
+		"eGeneric05",
+		"eGeneric06",
+		"eGeneric07"
+	],
+	"ZHM5HIKEventConsumer.EBlend": [
+		"eBlendIn",
+		"eBlendOut",
+		"eInstantOn",
+		"eInstantOff"
+	],
+	"ZHM5HIKEventConsumer.EEffector": [
+		"eLeftHand",
+		"eRightHand"
+	],
+	"ZHM5HitmanHealthModifier.EHealthDrainType": [
+		"eRemoveHealthInstantly",
+		"eDecreaseHealthToValue"
+	],
+	"ZHM5HitmanHealthModifier.EHealthValue": [
+		"eHealth0",
+		"eHealth10",
+		"eHealth20",
+		"eHealth30",
+		"eHealth40",
+		"eHealth50",
+		"eHealth60",
+		"eHealth70",
+		"eHealth80",
+		"eHealth90",
+		"eHealth100"
+	],
 	"ZHM5IndicatorManager.EIndicatorType": [
 		"eActorAmbient",
 		"eActorAlertedLow",
@@ -6804,11 +8708,16 @@
 		"eContractExit",
 		"eEasterActor"
 	],
-
-	"ZHM5Item.EKeywordEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZHM5Item.EUseTypes": ["EUT_CantUse", "EUT_Toggle", "EUT_TurnOn"],
-
+	"ZHM5Item.EKeywordEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZHM5Item.EUseTypes": [
+		"EUT_CantUse",
+		"EUT_Toggle",
+		"EUT_TurnOn"
+	],
 	"ZHM5ItemInteractionEventConsumer.EHM5SoundItemInteractionEvent": [
 		"EIIE_ItemImpactBack",
 		"EIIE_ItemImpactFront",
@@ -6820,13 +8729,19 @@
 		"EIIE_ItemSoundGeneric02",
 		"EIIE_ItemSoundGeneric03"
 	],
-
-	"ZHM5LedgeMount.EFaceDirection": ["eFaceFront", "eFaceLeft", "eFaceRight"],
-
-	"ZHM5LedgeMount.ELedgeEndState": ["eHang", "eStand"],
-
-	"ZHM5ValueEntity_bool.EForwardRule": ["eAlways", "eValueChanged"],
-
+	"ZHM5LedgeMount.EFaceDirection": [
+		"eFaceFront",
+		"eFaceLeft",
+		"eFaceRight"
+	],
+	"ZHM5LedgeMount.ELedgeEndState": [
+		"eHang",
+		"eStand"
+	],
+	"ZHM5ValueEntity_bool.EForwardRule": [
+		"eAlways",
+		"eValueChanged"
+	],
 	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioClass": [
 		"eWBC_AudioClass_AssaultRifle",
 		"eWBC_AudioClass_Pistol",
@@ -6834,7 +8749,6 @@
 		"eWBC_AudioClass_SMG",
 		"eWBC_AudioClass_SniperRifle"
 	],
-
 	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioExoticType": [
 		"eWBC_AudioExoticType_MiniPistol",
 		"eWBC_AudioExoticType_OneHandSpinReloadShotgun",
@@ -6843,11 +8757,17 @@
 		"eWBC_AudioExoticType_ShootingRange_NPCAssaultRifle",
 		"eWBC_AudioExoticType_None"
 	],
-
-	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioFamily": ["eWBC_AudioFamily_Exotics", "eWBC_AudioFamily_Heavy", "eWBC_AudioFamily_Light", "eWBC_AudioFamily_NPC", "eWBC_AudioFamily_Standard"],
-
-	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioFireType": ["eWBC_AudioFireType_Full_Automatic", "eWBC_AudioFireType_Single"],
-
+	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioFamily": [
+		"eWBC_AudioFamily_Exotics",
+		"eWBC_AudioFamily_Heavy",
+		"eWBC_AudioFamily_Light",
+		"eWBC_AudioFamily_NPC",
+		"eWBC_AudioFamily_Standard"
+	],
+	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioFireType": [
+		"eWBC_AudioFireType_Full_Automatic",
+		"eWBC_AudioFireType_Single"
+	],
 	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioHeadTailType": [
 		"eWBC_AudioHeadTailType_DryFire",
 		"eWBC_AudioHeadTailType_Normal",
@@ -6855,17 +8775,31 @@
 		"eWBC_AudioHeadTailType_Silenced",
 		"eWBC_AudioHeadTailType_SilencedSweetener"
 	],
-
-	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioImpactType": ["eWBC_AudioImpactType_Normal", "eWBC_AudioImpactType_Sweetener"],
-
-	"ZHM5WeaponEventConsumer.EAnimWeapon": ["eHM5Weapon_HideClip", "eHM5Weapon_ShowClip", "eHM5Weapon_SpawnPhysicsClip", "eHM5Weapon_EjectCartridge"],
-
-	"ZHUDCamera3DControllerEntity.EMode": ["Auto", "Mode2D", "Mode3D"],
-
-	"ZHUDCamera3DControllerEntity.ESpace": ["View", "Camera", "Player", "World"],
-
-	"ZHUDCamera3DControllerEntity.EType": ["Menu", "HUD"],
-
+	"ZHM5WeaponBasicConfigEntity.EWeaponBasicConfigAudioImpactType": [
+		"eWBC_AudioImpactType_Normal",
+		"eWBC_AudioImpactType_Sweetener"
+	],
+	"ZHM5WeaponEventConsumer.EAnimWeapon": [
+		"eHM5Weapon_HideClip",
+		"eHM5Weapon_ShowClip",
+		"eHM5Weapon_SpawnPhysicsClip",
+		"eHM5Weapon_EjectCartridge"
+	],
+	"ZHUDCamera3DControllerEntity.EMode": [
+		"Auto",
+		"Mode2D",
+		"Mode3D"
+	],
+	"ZHUDCamera3DControllerEntity.ESpace": [
+		"View",
+		"Camera",
+		"Player",
+		"World"
+	],
+	"ZHUDCamera3DControllerEntity.EType": [
+		"Menu",
+		"HUD"
+	],
 	"ZHUDOccluderTriggerEntity.EOccluderTestBit": [
 		"PhysX_Far",
 		"Crowd_Far",
@@ -6879,13 +8813,21 @@
 		"PhysX_UpperRight",
 		"LateralShift"
 	],
-
-	"ZHUDOutfitWidgetControllerEntity.EVisibilityPolicy": ["INITIALLY_HIDDEN_POPUP_ON_CHANGE", "DONT_TOUCH"],
-
-	"ZHUDTimerInstance.ETimeFormatChoice": ["YES", "NO", "AUTO"],
-
-	"ZHUDUIRoot.EHUDVisibility": ["eHV_INSTANT_OFF", "eHV_FADE_OUT", "eHV_FADE_IN", "eHV_INSTANT_ON"],
-
+	"ZHUDOutfitWidgetControllerEntity.EVisibilityPolicy": [
+		"INITIALLY_HIDDEN_POPUP_ON_CHANGE",
+		"DONT_TOUCH"
+	],
+	"ZHUDTimerInstance.ETimeFormatChoice": [
+		"YES",
+		"NO",
+		"AUTO"
+	],
+	"ZHUDUIRoot.EHUDVisibility": [
+		"eHV_INSTANT_OFF",
+		"eHV_FADE_OUT",
+		"eHV_FADE_IN",
+		"eHV_INSTANT_ON"
+	],
 	"ZHUDWorldSpatialAttachEntity.EOrientation": [
 		"ROTATE_WITH_SPATIAL",
 		"LOOK_AT_CAMERA_POSITION",
@@ -6895,33 +8837,87 @@
 		"ALIGN_WITH_VIEW_PLANE",
 		"ALIGN_WITH_VIEW_PLANE_HORIZ_ONLY"
 	],
-
-	"ZHeroBoneAttachEntity.EResetMode": ["eAtBoneOrigin", "eKeepOffset"],
-
-	"ZHeroEscortSituation2Entity.EEscortState": ["EES_Idle", "EES_Evaluate", "EES_Escorting", "EES_Intermediate", "EES_OutOfRange"],
-
-	"ZHeroEscortSituation2Entity.ETargetState": ["ETS_Unknown", "ETS_NoTarget", "ETS_RunningActBehavior", "ETS_RunningDummyBehavior", "ETS_RunningOtherBehavior", "ETS_Dead", "ETS_TargetIsHitman"],
-
-	"ZHeroEscortSituationEntity.EEscortState": ["EES_Idle", "EES_Evaluate", "EES_Escorting", "EES_Intermediate", "EES_OutOfRange"],
-
-	"ZHeroEscortSituationEntity.ETargetState": ["ETS_Unknown", "ETS_NoTarget", "ETS_RunningActBehavior", "ETS_RunningDummyBehavior", "ETS_RunningOtherBehavior", "ETS_Dead", "ETS_TargetIsHitman"],
-
-	"ZHeroInventoryAction.EEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZHeroKeywordCondition.EEvaluationType": ["ALL", "NONE", "ANY", "ANY_TRUE_IF_NO_REQS"],
-
-	"ZHitmanLocomotionQuery.EEvaluationType": ["ALL", "ANY"],
-
-	"ZHttpUrl.EVerb": ["eNONE", "eGET", "ePOST", "ePUT", "eHEAD"],
-
-	"ZInputListenerActorPool.eInputListenerButtons": ["EILB_UP", "EILB_LEFT", "EILB_DOWN", "EILB_RIGHT"],
-
-	"ZInputListenerAxisEntity.eInputListenerAxes": ["EILA_HORIZONTAL", "EILA_VERTICAL", "EILA_TRIGGER_1", "EILA_TRIGGER_2"],
-
-	"ZInputListenerButtonEntity.eInputListenerButtons": ["EILB_UP", "EILB_LEFT", "EILB_DOWN", "EILB_RIGHT", "EILB_AIM", "EILB_TRIGGER"],
-
-	"ZInputListenerDpadEntity.eInputListenerDpad": ["EILDP_UP", "EILDP_LEFT", "EILDP_DOWN", "EILDP_RIGHT"],
-
+	"ZHeroBoneAttachEntity.EResetMode": [
+		"eAtBoneOrigin",
+		"eKeepOffset"
+	],
+	"ZHeroEscortSituation2Entity.EEscortState": [
+		"EES_Idle",
+		"EES_Evaluate",
+		"EES_Escorting",
+		"EES_Intermediate",
+		"EES_OutOfRange"
+	],
+	"ZHeroEscortSituation2Entity.ETargetState": [
+		"ETS_Unknown",
+		"ETS_NoTarget",
+		"ETS_RunningActBehavior",
+		"ETS_RunningDummyBehavior",
+		"ETS_RunningOtherBehavior",
+		"ETS_Dead",
+		"ETS_TargetIsHitman"
+	],
+	"ZHeroEscortSituationEntity.EEscortState": [
+		"EES_Idle",
+		"EES_Evaluate",
+		"EES_Escorting",
+		"EES_Intermediate",
+		"EES_OutOfRange"
+	],
+	"ZHeroEscortSituationEntity.ETargetState": [
+		"ETS_Unknown",
+		"ETS_NoTarget",
+		"ETS_RunningActBehavior",
+		"ETS_RunningDummyBehavior",
+		"ETS_RunningOtherBehavior",
+		"ETS_Dead",
+		"ETS_TargetIsHitman"
+	],
+	"ZHeroInventoryAction.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZHeroKeywordCondition.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY",
+		"ANY_TRUE_IF_NO_REQS"
+	],
+	"ZHitmanLocomotionQuery.EEvaluationType": [],
+	"ZHttpUrl.EVerb": [
+		"eNONE",
+		"eGET",
+		"ePOST",
+		"ePUT",
+		"eHEAD"
+	],
+	"ZInputListenerActorPool.eInputListenerButtons": [
+		"EILB_UP",
+		"EILB_LEFT",
+		"EILB_DOWN",
+		"EILB_RIGHT"
+	],
+	"ZInputListenerAxisEntity.eInputListenerAxes": [
+		"EILA_HORIZONTAL",
+		"EILA_VERTICAL",
+		"EILA_TRIGGER_1",
+		"EILA_TRIGGER_2"
+	],
+	"ZInputListenerButtonEntity.eInputListenerButtons": [
+		"EILB_UP",
+		"EILB_LEFT",
+		"EILB_DOWN",
+		"EILB_RIGHT",
+		"EILB_AIM",
+		"EILB_TRIGGER"
+	],
+	"ZInputListenerDpadEntity.eInputListenerDpad": [
+		"EILDP_UP",
+		"EILDP_LEFT",
+		"EILDP_DOWN",
+		"EILDP_RIGHT"
+	],
 	"ZInteractionData.EFilterResult": [
 		"EFR_REQUESTED",
 		"EFR_ENABLE_INTERACTION",
@@ -6939,7 +8935,6 @@
 		"EFR_REJECTED_INVALIDDATA",
 		"EFR_REJECTED_PRIORITY"
 	],
-
 	"ZInteractionEventConsumer.EEvent": [
 		"eActivate",
 		"eRH_Place",
@@ -6961,45 +8956,127 @@
 		"eSoundEvent03",
 		"eSoundEvent04"
 	],
-
-	"ZInteractionGuideData.EDirection": ["UP", "DOWN", "LEFT", "RIGHT"],
-
-	"ZInvestigateCautiousSituation.EBystanderState": ["BS_SelectCandidate", "BS_SelectPoint", "BS_SearchDangerField"],
-
-	"ZInvestigateCautiousSituation.ESituationState": ["SS_Main", "SS_StandDownPending", "SS_StandDown"],
-
-	"ZInvestigateDisguiseGroup.EState": ["eInit", "eGuardBanter", "eAcknowledge", "eMain", "eSearch", "eMoveback", "eStandDown", "eEscalate", "eDone"],
-
-	"ZItemSpawner.EPhysicsMode": ["EPM_DEFINED_BY_ITEM", "EPM_DYNAMIC", "EPM_SLEEPING", "EPM_KINEMATIC"],
-
-	"ZKeywordCondition.EEvaluationType": ["ALL", "NONE", "ANY", "ANY_TRUE_IF_NO_REQS", "EQUAL", "GREATER", "LESS"],
-
-	"ZLeadEscortSituationEntity.EEscortState": ["EES_Idle", "EES_Evaluate", "EES_Escorting", "EES_Intermediate"],
-
-	"ZLeadEscortSituationEntity.ETargetState": ["ETS_Unknown", "ETS_NoTarget", "ETS_RunningActBehavior", "ETS_RunningDummyBehavior", "ETS_RunningOtherBehavior", "ETS_Dead", "ETS_TargetIsHitman"],
-
-	"ZLogicMultipleGate.EGateType": ["eFireEveryTime", "eFirePortOnce", "eFireOnce"],
-
-	"ZLookAtLogic.EAxisSelect": ["eX", "eX_NEG", "eY", "eY_NEG", "eZ", "eZ_NEG"],
-
-	"ZMenuSliderNavigationEntity.ESliderInputMode": ["E_HORIZONTAL", "E_VERTICAL"],
-
-	"ZMinimapDirectionProvider.EAxis": ["X_POSITIVE", "X_NEGATIVE", "Y_POSITIVE", "Y_NEGATIVE", "Z_POSITIVE", "Z_NEGATIVE"],
-
-	"ZMinimapDirectionProvider.EProviderType": ["NAVIGATION", "HERO_MARKER"],
-
-	"ZMirrorEntity.EMirrorQuality": ["QUALITY_LOW", "QUALITY_MEDIUM", "QUALITY_HIGH", "QUALITY_LEAVE"],
-
-	"ZModalDialogCondition.EPriorityBit": ["Critical", "GDPRConsent", "MultiplayerSystem", "Disconnect", "System", "Normal", "Low"],
-
-	"ZMoveToOrder.EMoveSpeed": ["MS_AUTO", "MS_SPRINT", "MS_JOG", "MS_WALK"],
-
-	"ZMoveToPositionBehaviorEntity.EApproachAlignment": ["AA_STRICT", "AA_LOOSE"],
-
-	"ZMoveToPositionBehaviorEntity.EMovementType": ["MT_WALK", "MT_SNAP", "MT_IGNORE_POSITION"],
-
-	"ZMoveToPositionBehaviorEntity.ERotationAlignment": ["RA_NONE", "RA_LOOSE", "RA_EXACT"],
-
+	"ZInteractionGuideData.EDirection": [
+		"UP",
+		"DOWN",
+		"LEFT",
+		"RIGHT"
+	],
+	"ZInvestigateCautiousSituation.EBystanderState": [
+		"BS_SelectCandidate",
+		"BS_SelectPoint",
+		"BS_SearchDangerField"
+	],
+	"ZInvestigateCautiousSituation.ESituationState": [
+		"SS_Main",
+		"SS_StandDownPending",
+		"SS_StandDown"
+	],
+	"ZInvestigateDisguiseGroup.EState": [
+		"eInit",
+		"eGuardBanter",
+		"eAcknowledge",
+		"eMain",
+		"eSearch",
+		"eMoveback",
+		"eStandDown",
+		"eEscalate",
+		"eDone"
+	],
+	"ZItemSpawner.EPhysicsMode": [
+		"EPM_DEFINED_BY_ITEM",
+		"EPM_DYNAMIC",
+		"EPM_SLEEPING",
+		"EPM_KINEMATIC"
+	],
+	"ZKeywordCondition.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY",
+		"ANY_TRUE_IF_NO_REQS",
+		"EQUAL",
+		"GREATER",
+		"LESS"
+	],
+	"ZLeadEscortSituationEntity.EEscortState": [
+		"EES_Idle",
+		"EES_Evaluate",
+		"EES_Escorting",
+		"EES_Intermediate"
+	],
+	"ZLeadEscortSituationEntity.ETargetState": [
+		"ETS_Unknown",
+		"ETS_NoTarget",
+		"ETS_RunningActBehavior",
+		"ETS_RunningDummyBehavior",
+		"ETS_RunningOtherBehavior",
+		"ETS_Dead",
+		"ETS_TargetIsHitman"
+	],
+	"ZLogicMultipleGate.EGateType": [
+		"eFireEveryTime",
+		"eFirePortOnce",
+		"eFireOnce"
+	],
+	"ZLookAtLogic.EAxisSelect": [
+		"eX",
+		"eX_NEG",
+		"eY",
+		"eY_NEG",
+		"eZ",
+		"eZ_NEG"
+	],
+	"ZMenuSliderNavigationEntity.ESliderInputMode": [
+		"E_HORIZONTAL",
+		"E_VERTICAL"
+	],
+	"ZMinimapDirectionProvider.EAxis": [
+		"X_POSITIVE",
+		"X_NEGATIVE",
+		"Y_POSITIVE",
+		"Y_NEGATIVE",
+		"Z_POSITIVE",
+		"Z_NEGATIVE"
+	],
+	"ZMinimapDirectionProvider.EProviderType": [
+		"NAVIGATION",
+		"HERO_MARKER"
+	],
+	"ZMirrorEntity.EMirrorQuality": [
+		"QUALITY_LOW",
+		"QUALITY_MEDIUM",
+		"QUALITY_HIGH",
+		"QUALITY_LEAVE"
+	],
+	"ZModalDialogCondition.EPriorityBit": [
+		"Critical",
+		"GDPRConsent",
+		"MultiplayerSystem",
+		"Disconnect",
+		"System",
+		"Normal",
+		"Low"
+	],
+	"ZMoveToOrder.EMoveSpeed": [
+		"MS_AUTO",
+		"MS_SPRINT",
+		"MS_JOG",
+		"MS_WALK"
+	],
+	"ZMoveToPositionBehaviorEntity.EApproachAlignment": [
+		"AA_STRICT",
+		"AA_LOOSE"
+	],
+	"ZMoveToPositionBehaviorEntity.EMovementType": [
+		"MT_WALK",
+		"MT_SNAP",
+		"MT_IGNORE_POSITION"
+	],
+	"ZMoveToPositionBehaviorEntity.ERotationAlignment": [
+		"RA_NONE",
+		"RA_LOOSE",
+		"RA_EXACT"
+	],
 	"ZOnlineManager.EError": [
 		"eNONE",
 		"eGENERAL",
@@ -7015,6 +9092,7 @@
 		"eAUTHENTICATION_STEAM_GENERAL",
 		"eAUTHENTICATION_EPIC_GENERAL",
 		"eAUTHENTICATION_IZUMO_GENERAL",
+		"eAUTHENTICATION_GOG_GENERAL",
 		"eAUTHENTICATION_PSN_GENERAL",
 		"eAUTHENTICATION_PSN_NP_CHECK",
 		"eAUTHENTICATION_PSN_ACCOUNT_COLLISION",
@@ -7028,6 +9106,7 @@
 		"eENTITLEMENTS",
 		"ePROFILE",
 		"eGAME_SESSION",
+		"eCLIENT_OUTDATED",
 		"eGENERAL_SERVER_ERROR",
 		"eGENERAL_SERVER_BUSY",
 		"eGENERAL_CLIENT_ERROR",
@@ -7039,9 +9118,11 @@
 		"eCANCELLED",
 		"eERROR_MAX"
 	],
-
-	"ZOnlineManager.EIoiAccountState": ["eMISSING", "eUNCONFIRMED", "eCONFIRMED"],
-
+	"ZOnlineManager.EIoiAccountState": [
+		"eMISSING",
+		"eUNCONFIRMED",
+		"eCONFIRMED"
+	],
 	"ZOnlineManager.EState": [
 		"eTRIGGER_FLOW",
 		"eOFFLINE",
@@ -7089,31 +9170,76 @@
 		"ePLATFORM_SESSION_RECONNECT",
 		"eSTATE_MAX"
 	],
-
-	"ZOperatorBool.EEvaluationType": ["ALL", "NONE", "ANY"],
-
-	"ZPIPMessageEntity.EIcon": ["IconStart", "MagnifyingGlass", "ArrowRight", "ExclamationMark", "Target", "SurveillanceCamera", "Concealed", "QuestionMark", "IconEnd"],
-
-	"ZPathfinderDebugEntity.EDebugTestType": ["PATHFINDER", "TRACELINE", "MAP_LOCATION", "REGION_MASK_WITHIN_RADIUS"],
-
-	"ZPatrolBehaviorEntity.EMovementType": ["MT_WALK", "MT_SNAP", "MT_IGNORE_POSITION"],
-
-	"ZPatrolBehaviorEntity.ERotationAlignment": ["RA_NONE", "RA_LOOSE", "RA_EXACT"],
-
-	"ZPhotoModeMenuDataProvider.EMenuEntryType": ["Toggle", "Slider", "List"],
-
-	"ZPointOfInterestEntity.EPOIType": ["ePOIT_Invalid", "ePOIT_Glance", "ePOIT_Inspect", "ePOIT_Stare"],
-
-	"ZPreferenceItemEntity.EBoolOptions": ["EBO_INVERTVERTICAL", "EBO_FIXEDMAP"],
-
-	"ZRagdollAttacherEntity.EResetMode": ["eAtBoneOrigin", "eKeepOffset"],
-
-	"ZRecoverUnconsciousGroup.EInvestigateGroupState": ["IGS_InitialState", "IGS_WaitingForVictim", "IGS_Recovering", "IGS_Relocating", "IGS_Reporting", "IGS_Completed", "IGS_Max"],
-
-	"ZRenderPostfilterParametersEntity.EDOFBlurType": ["eFastest", "eLowRezLensBlur", "eLowRezLensBlurSoft", "eHighRezLensBlur"],
-
-	"ZRenderPostfilterParametersEntity.EHDRAdaptationType": ["eMedian", "eGeometricMean"],
-
+	"ZOperatorBool.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY"
+	],
+	"ZPIPMessageEntity.EIcon": [
+		"IconStart",
+		"MagnifyingGlass",
+		"ArrowRight",
+		"ExclamationMark",
+		"Target",
+		"SurveillanceCamera",
+		"Concealed",
+		"QuestionMark",
+		"IconEnd"
+	],
+	"ZPathfinderDebugEntity.EDebugTestType": [
+		"PATHFINDER",
+		"TRACELINE",
+		"MAP_LOCATION",
+		"REGION_MASK_WITHIN_RADIUS"
+	],
+	"ZPatrolBehaviorEntity.EMovementType": [
+		"MT_WALK",
+		"MT_SNAP",
+		"MT_IGNORE_POSITION"
+	],
+	"ZPatrolBehaviorEntity.ERotationAlignment": [
+		"RA_NONE",
+		"RA_LOOSE",
+		"RA_EXACT"
+	],
+	"ZPhotoModeMenuDataProvider.EMenuEntryType": [
+		"Toggle",
+		"Slider",
+		"List"
+	],
+	"ZPointOfInterestEntity.EPOIType": [
+		"ePOIT_Invalid",
+		"ePOIT_Glance",
+		"ePOIT_Inspect",
+		"ePOIT_Stare"
+	],
+	"ZPreferenceItemEntity.EBoolOptions": [
+		"EBO_INVERTVERTICAL",
+		"EBO_FIXEDMAP"
+	],
+	"ZRagdollAttacherEntity.EResetMode": [
+		"eAtBoneOrigin",
+		"eKeepOffset"
+	],
+	"ZRecoverUnconsciousGroup.EInvestigateGroupState": [
+		"IGS_InitialState",
+		"IGS_WaitingForVictim",
+		"IGS_Recovering",
+		"IGS_Relocating",
+		"IGS_Reporting",
+		"IGS_Completed",
+		"IGS_Max"
+	],
+	"ZRenderPostfilterParametersEntity.EDOFBlurType": [
+		"eFastest",
+		"eLowRezLensBlur",
+		"eLowRezLensBlurSoft",
+		"eHighRezLensBlur"
+	],
+	"ZRenderPostfilterParametersEntity.EHDRAdaptationType": [
+		"eMedian",
+		"eGeometricMean"
+	],
 	"ZRenderPostfilterParametersEntity.EHDRGlareType": [
 		"eCamera",
 		"eNatural",
@@ -7127,13 +9253,22 @@
 		"eCinecamVerticalSlits",
 		"eCinecamHorizontalSlits"
 	],
-
-	"ZRenderPostfilterParametersEntity.EHDRToneMapType": ["eLinear", "eReinhardRGB", "eFilmicRGB"],
-
-	"ZScreenplay.EState": ["State_Idle", "State_Running", "State_Paused", "State_Failed", "State_Done"],
-
-	"ZSecuritySystemCameraConfiguration.ECameraEscalationSituations": ["eCES_Arrest", "eCES_Combat"],
-
+	"ZRenderPostfilterParametersEntity.EHDRToneMapType": [
+		"eLinear",
+		"eReinhardRGB",
+		"eFilmicRGB"
+	],
+	"ZScreenplay.EState": [
+		"State_Idle",
+		"State_Running",
+		"State_Paused",
+		"State_Failed",
+		"State_Done"
+	],
+	"ZSecuritySystemCameraConfiguration.ECameraEscalationSituations": [
+		"eCES_Arrest",
+		"eCES_Combat"
+	],
 	"ZSequenceEntity.ECommand": [
 		"COMMAND_START",
 		"COMMAND_ENABLE_PREVIEW",
@@ -7152,25 +9287,56 @@
 		"COMMAND_PREVIEW_LOOPED",
 		"COMMAND_CLEAR"
 	],
-
-	"ZSequenceEntity.ELetterBoxAspect": ["LETTERBOXASPECT_WIDESCREEN", "LETTERBOXASPECT_CINEMASCOPE"],
-
-	"ZSetUIControlDisplayInfoEntity.EProjectionOp": ["NoOp", "SetPerspective"],
-
-	"ZSetUIControlDisplayInfoEntity.EVisibilityOp": ["NoOp", "SetTrue", "SetFalse"],
-
-	"ZSetVisibleEntity.StartBehavior": ["SB_Nothing", "SB_MakeVisible", "SB_MakeInvisible"],
-
-	"ZSmuggleSituationEntity.ESmuggleState": ["ESS_Idle", "ESS_Evaluate", "ESS_FindJob", "ESS_OnRouteToLocation", "ESS_PickingUp", "ESS_PuttingDown", "ESS_OnABreak"],
-
-	"ZSniperCombatGroup.EGroupState": ["IGS_WaitingForActors", "IGS_Move", "IGS_Siege", "IGS_Completed", "IGS_Max"],
-
-	"ZSniperCombatSituation.ESituationState": ["SS_Main", "SS_StandDown", "SS_InvalidSituation"],
-
-	"ZSoundAmbienceGroup.ESoundCollisionType": ["SCT_Box", "SCT_Cylinder", "SCT_Sphere", "SCT_Volume"],
-
-	"ZSpatialEntity.ERoomBehaviour": ["ROOM_STATIC", "ROOM_DYNAMIC", "ROOM_STATIC_OUTSIDE_CLIENT"],
-
+	"ZSequenceEntity.ELetterBoxAspect": [
+		"LETTERBOXASPECT_WIDESCREEN",
+		"LETTERBOXASPECT_CINEMASCOPE"
+	],
+	"ZSetUIControlDisplayInfoEntity.EProjectionOp": [
+		"NoOp",
+		"SetPerspective"
+	],
+	"ZSetUIControlDisplayInfoEntity.EVisibilityOp": [
+		"NoOp",
+		"SetTrue",
+		"SetFalse"
+	],
+	"ZSetVisibleEntity.StartBehavior": [
+		"SB_Nothing",
+		"SB_MakeVisible",
+		"SB_MakeInvisible"
+	],
+	"ZSmuggleSituationEntity.ESmuggleState": [
+		"ESS_Idle",
+		"ESS_Evaluate",
+		"ESS_FindJob",
+		"ESS_OnRouteToLocation",
+		"ESS_PickingUp",
+		"ESS_PuttingDown",
+		"ESS_OnABreak"
+	],
+	"ZSniperCombatGroup.EGroupState": [
+		"IGS_WaitingForActors",
+		"IGS_Move",
+		"IGS_Siege",
+		"IGS_Completed",
+		"IGS_Max"
+	],
+	"ZSniperCombatSituation.ESituationState": [
+		"SS_Main",
+		"SS_StandDown",
+		"SS_InvalidSituation"
+	],
+	"ZSoundAmbienceGroup.ESoundCollisionType": [
+		"SCT_Box",
+		"SCT_Cylinder",
+		"SCT_Sphere",
+		"SCT_Volume"
+	],
+	"ZSpatialEntity.ERoomBehaviour": [
+		"ROOM_STATIC",
+		"ROOM_DYNAMIC",
+		"ROOM_STATIC_OUTSIDE_CLIENT"
+	],
 	"ZStandOffSituation.EDialogState": [
 		"eDS_ReportTarget",
 		"eDS_ArrestReason",
@@ -7182,19 +9348,37 @@
 		"eDS_StopWait",
 		"eDS_Done"
 	],
-
-	"ZStandOffSituation.ESituationState": ["SS_Uncertain", "SS_Main", "SS_Arresting", "SS_GetHelp", "SS_Escalate", "SS_Investigate", "SS_GetHelpFromFleeingCivilian"],
-
-	"ZStateControllerEntity.WrapMode": ["WM_Loop", "WM_Clamp"],
-
-	"ZSubtitleSpeakerAliasEntity.EApplicabilityBit": ["Realtime", "PreRendered"],
-
-	"ZTestGroupPath.EModifierType": ["EMT_PushCorners", "EMT_PushCornersAlt"],
-
-	"ZTrackDollyControllerQueryEntity.ETrackPointQueryType": ["Closest", "ClosestNext", "ClosestPrevious"],
-
-	"ZTrespassingSituation.ESituationState": ["SS_Main", "SS_StandDown", "SS_Escalate"],
-
+	"ZStandOffSituation.ESituationState": [
+		"SS_Uncertain",
+		"SS_Main",
+		"SS_Arresting",
+		"SS_GetHelp",
+		"SS_Escalate",
+		"SS_Investigate",
+		"SS_GetHelpFromFleeingCivilian"
+	],
+	"ZStateControllerEntity.WrapMode": [
+		"WM_Loop",
+		"WM_Clamp"
+	],
+	"ZSubtitleSpeakerAliasEntity.EApplicabilityBit": [
+		"Realtime",
+		"PreRendered"
+	],
+	"ZTestGroupPath.EModifierType": [
+		"EMT_PushCorners",
+		"EMT_PushCornersAlt"
+	],
+	"ZTrackDollyControllerQueryEntity.ETrackPointQueryType": [
+		"Closest",
+		"ClosestNext",
+		"ClosestPrevious"
+	],
+	"ZTrespassingSituation.ESituationState": [
+		"SS_Main",
+		"SS_StandDown",
+		"SS_Escalate"
+	],
 	"ZUIControlEntity.EAlignment": [
 		"TopLeft",
 		"TopCenter",
@@ -7213,9 +9397,12 @@
 		"StretchVerticalCenter",
 		"StretchVerticalRight"
 	],
-
-	"ZUIControlEntity.EScaleMode": ["Manual", "ResolutionScale", "ResolutionScaleAspect", "ResolutionScaleAspectFill"],
-
+	"ZUIControlEntity.EScaleMode": [
+		"Manual",
+		"ResolutionScale",
+		"ResolutionScaleAspect",
+		"ResolutionScaleAspectFill"
+	],
 	"ZUIControlLayoutLegacyAspect.EAlignmentType": [
 		"E_ALIGNMENT_TYPE_Center",
 		"E_ALIGNMENT_TYPE_TopCenter",
@@ -7227,7 +9414,6 @@
 		"E_ALIGNMENT_TYPE_BottomLeft",
 		"E_ALIGNMENT_TYPE_BottomRight"
 	],
-
 	"ZUIControlLayoutLegacyAspect.ELayoutMode": [
 		"E_LAYOUT_MODE_Absolute",
 		"E_LAYOUT_MODE_Proportional",
@@ -7237,47 +9423,158 @@
 		"E_LAYOUT_MODE_Proportional_Scale_MaintainAspect",
 		"E_LAYOUT_MODE_Proportional_Scale_MaintainAspect_Fill"
 	],
-
-	"ZUIFlowLayoutEntity.EFlowType": ["E_FLOW_TYPE_HORIZONTAL", "E_FLOW_TYPE_VERTICAL"],
-
-	"ZUIListNavigationEntity.ENavigationInputMode": ["E_MODE_UP_DOWN", "E_MODE_LEFT_RIGHT", "E_MODE_PGPREV_PGNEXT", "E_MODE_SMART_2D"],
-
-	"ZUIPerformanceTestMetricsCollectorEntity.EVsyncPolicy": ["None", "ForceOff", "Force60", "Force30"],
-
-	"ZUISplashHintDataProviderEntity.ESplashHintType": ["SHT_GlobalHint", "SHT_TutorialHint", "SHT_ControlHint"],
-
-	"ZUISubtitleDataProvider.EAlignment": ["ALIGN_BOTTOM", "ALIGN_TOP"],
-
-	"ZUISubtitleSpeakerCinematicModeOverrideEntity.EMode": ["Gameplay", "Cinematic"],
-
-	"ZUISubtitleSpeakerDefaultIconEntity.EEmitterType": ["Audio2D", "Volumetric"],
-
-	"ZVRCameraEntity.EEye": ["eLeftEye", "eRightEye"],
-
-	"ZVRCameraEntity.ETurnMode": ["eSmooth", "eSnap", "eSmoothSnap"],
-
-	"ZVRHUDWristAlignmentController.EAxis": ["X_AXIS", "Y_AXIS", "Z_AXIS"],
-
-	"ZValueBool_Operation.EEvaluationType": ["ALL", "NONE", "ANY", "NOT_ALL", "ALL_EQUAL", "ONE_TRUE"],
-
-	"ZValueBool_OperationRecalc.EEvaluationType": ["ALL", "NONE", "ANY", "NOT_ALL", "ALL_EQUAL", "ONE_TRUE"],
-
-	"ZValueBool_Operation_Signal.EEvaluationType": ["ALL", "NONE", "ANY", "NOT_ALL", "ALL_EQUAL", "ONE_TRUE"],
-
-	"ZValueInt_Comparator.EEvaluationType": ["EQUAL", "NOT_EQUAL", "LESS", "LESS_OR_EQUAL", "HIGHER", "HIGHER_OR_EQUAL"],
-
-	"ZValueInt_Comparator_Poll.EEvaluationType": ["EQUAL", "NOT_EQUAL", "LESS", "LESS_OR_EQUAL", "HIGHER", "HIGHER_OR_EQUAL"],
-
-	"ZValueInt_Evaluation.EEvaluationType": ["EQUAL", "NOT_EQUAL", "LESS", "LESS_OR_EQUAL", "HIGHER", "HIGHER_OR_EQUAL"],
-
-	"ZVsTargetPicker.ETargetSelectionType": ["eTST_Random", "eTST_Fair", "eTST_Max"],
-
-	"ZWaveformGeneratorEntity.ECurveType": ["CURVE_TYPE_SINE", "CURVE_TYPE_SQUARE", "CURVE_TYPE_TRIANGLE", "CURVE_TYPE_SAWTOOTH", "CURVE_TYPE_REVERSE_SAWTOOTH"],
-
-	"ZWaypointEntity.EMovementType": ["MT_WALK", "MT_WALK_IF_NOT_IN_SEQUENCE", "MT_SNAP", "MT_IGNORE_POSITION"],
-
-	"ZWorldUIElementInstanceBase.EVisibility": ["EVIS_ALWAYS", "EVIS_POSY", "EVIS_NEGY", "EVIS_POSX", "EVIS_NEGX"],
-
+	"ZUIControlPositionLayoutFlowListAspect.EFlowMode": [
+		"Fill",
+		"Fit"
+	],
+	"ZUIControlPositionLayoutListBaseAspect.EDirection": [
+		"Vertical",
+		"Horizontal",
+		"VerticalReversed",
+		"HorizontalReversed"
+	],
+	"ZUIControlPositionLayoutListBaseAspect.EItemSizeMode": [
+		"BiggestChild",
+		"Fit",
+		"Override"
+	],
+	"ZUIControlSizeLayoutScaleboxAspect.EContentSizeMode": [
+		"BiggestChild",
+		"ChildBoundingBox",
+		"Override"
+	],
+	"ZUIControlSizeLayoutScaleboxAspect.EScaleboxMode": [
+		"Fill",
+		"Fit",
+		"FitX",
+		"FitY"
+	],
+	"ZUIFlowLayoutEntity.EFlowType": [
+		"E_FLOW_TYPE_HORIZONTAL",
+		"E_FLOW_TYPE_VERTICAL"
+	],
+	"ZUIGlobalSubtitleCondition.ESpatialType": [
+		"Any",
+		"Audio2D",
+		"Volumetric",
+		"Point"
+	],
+	"ZUIListNavigationEntity.ENavigationInputMode": [
+		"E_MODE_UP_DOWN",
+		"E_MODE_LEFT_RIGHT",
+		"E_MODE_PGPREV_PGNEXT",
+		"E_MODE_SMART_2D"
+	],
+	"ZUIPerformanceTestMetricsCollectorEntity.EVsyncPolicy": [
+		"None",
+		"ForceOff",
+		"Force60",
+		"Force30"
+	],
+	"ZUISplashHintDataProviderEntity.ESplashHintType": [
+		"SHT_GlobalHint",
+		"SHT_TutorialHint",
+		"SHT_ControlHint"
+	],
+	"ZUISubtitleDataProvider.EAlignment": [
+		"ALIGN_BOTTOM",
+		"ALIGN_TOP"
+	],
+	"ZUISubtitleSpeakerCinematicModeOverrideEntity.EMode": [
+		"Gameplay",
+		"Cinematic"
+	],
+	"ZUISubtitleSpeakerDefaultIconEntity.EEmitterType": [
+		"Audio2D",
+		"Volumetric"
+	],
+	"ZVRCameraEntity.EEye": [
+		"eLeftEye",
+		"eRightEye"
+	],
+	"ZVRCameraEntity.ETurnMode": [
+		"eSmooth",
+		"eSnap",
+		"eSmoothSnap"
+	],
+	"ZVRHUDWristAlignmentController.EAxis": [
+		"X_AXIS",
+		"Y_AXIS",
+		"Z_AXIS"
+	],
+	"ZValueBool_Operation.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY",
+		"NOT_ALL",
+		"ALL_EQUAL",
+		"ONE_TRUE"
+	],
+	"ZValueBool_OperationRecalc.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY",
+		"NOT_ALL",
+		"ALL_EQUAL",
+		"ONE_TRUE"
+	],
+	"ZValueBool_Operation_Signal.EEvaluationType": [
+		"ALL",
+		"NONE",
+		"ANY",
+		"NOT_ALL",
+		"ALL_EQUAL",
+		"ONE_TRUE"
+	],
+	"ZValueInt_Comparator.EEvaluationType": [
+		"EQUAL",
+		"NOT_EQUAL",
+		"LESS",
+		"LESS_OR_EQUAL",
+		"HIGHER",
+		"HIGHER_OR_EQUAL"
+	],
+	"ZValueInt_Comparator_Poll.EEvaluationType": [
+		"EQUAL",
+		"NOT_EQUAL",
+		"LESS",
+		"LESS_OR_EQUAL",
+		"HIGHER",
+		"HIGHER_OR_EQUAL"
+	],
+	"ZValueInt_Evaluation.EEvaluationType": [
+		"EQUAL",
+		"NOT_EQUAL",
+		"LESS",
+		"LESS_OR_EQUAL",
+		"HIGHER",
+		"HIGHER_OR_EQUAL"
+	],
+	"ZVsTargetPicker.ETargetSelectionType": [
+		"eTST_Random",
+		"eTST_Fair",
+		"eTST_Max"
+	],
+	"ZWaveformGeneratorEntity.ECurveType": [
+		"CURVE_TYPE_SINE",
+		"CURVE_TYPE_SQUARE",
+		"CURVE_TYPE_TRIANGLE",
+		"CURVE_TYPE_SAWTOOTH",
+		"CURVE_TYPE_REVERSE_SAWTOOTH"
+	],
+	"ZWaypointEntity.EMovementType": [
+		"MT_WALK",
+		"MT_WALK_IF_NOT_IN_SEQUENCE",
+		"MT_SNAP",
+		"MT_IGNORE_POSITION"
+	],
+	"ZWorldUIElementInstanceBase.EVisibility": [
+		"EVIS_ALWAYS",
+		"EVIS_POSY",
+		"EVIS_NEGY",
+		"EVIS_POSX",
+		"EVIS_NEGX"
+	],
 	"_EUIOptionKey": [
 		"UI_OPTION_GAME_VIBRATION",
 		"UI_OPTION_GAME_ADAPTIVE_FEEDBACK",
@@ -7290,6 +9587,7 @@
 		"UI_OPTION_GAME_INVERT_Y",
 		"UI_OPTION_GAME_CONTROL_SCHEME",
 		"UI_OPTION_GAME_FAST_TARGET",
+		"UI_OPTION_GAME_ALLOW_CAMERA_SWITCH",
 		"UI_OPTION_GAME_DIFFICULTY",
 		"UI_OPTION_GAME_TRIGGER_SHOOT",
 		"UI_OPTION_GAME_SWITCH_SNEAK_AND_CAMERA",
@@ -7341,6 +9639,14 @@
 		"UI_OPTION_GAME_AUTOSAVE",
 		"UI_OPTION_GAME_AUTOSAVE_VR",
 		"UI_OPTION_GAME_AUTOSAVE_HUD",
+		"UI_OPTION_GAME_AID_WALK_SPEED_TOGGLE",
+		"UI_OPTION_GAME_AID_INSTINCT_ACTIVATION_TOGGLE",
+		"UI_OPTION_GAME_AID_PRECISION_AIM_TOGGLE",
+		"UI_OPTION_GAME_AID_ITEM_PLACEMENT_TOGGLE",
+		"UI_OPTION_GAME_FREELANCER_ALERTED_TERRITORY",
+		"UI_OPTION_GAME_FREELANCER_ASSASSIN_PROXIMITY",
+		"UI_OPTION_GAME_FREELANCER_LOOKOUT_PROXIMITY",
+		"UI_OPTION_GAME_FREELANCER_MERCES_INDICATOR",
 		"UI_OPTION_SOUND_VOLUME_MASTER",
 		"UI_OPTION_SOUND_VOLUME_EFFECTS",
 		"UI_OPTION_SOUND_VOLUME_MUSIC",
@@ -7353,6 +9659,7 @@
 		"UI_OPTION_SOUND_DYNAMIC_RANGE_MODE_VR",
 		"UI_OPTION_GRAPHICS_SUBTITLES",
 		"UI_OPTION_GRAPHICS_SUBTITLES_SIZE",
+		"UI_OPTION_GRAPHICS_SUBTITLES_BGALPHA",
 		"UI_OPTION_GRAPHICS_SUBTITLES_VR",
 		"UI_OPTION_GRAPHICS_SUBTITLES_SIZE_VR",
 		"UI_OPTION_GRAPHICS_SUBTITLES_SPEAKER",
@@ -7388,9 +9695,16 @@
 		"UI_OPTION_GRAPHICS_SIMULATION_QUALITY",
 		"UI_OPTION_GRAPHICS_SSR",
 		"UI_OPTION_GRAPHICS_VRS",
-		"UI_OPTION_GRAPHICS_DLSS_MODE",
+		"UI_OPTION_GRAPHICS_ATMOSPHERIC_QUALITY",
 		"UI_OPTION_GRAPHICS_SUPER_SAMPLING",
 		"UI_OPTION_GRAPHICS_GAMMA",
+		"UI_OPTION_GRAPHICS_REFLEX",
+		"UI_OPTION_GRAPHICS_DLSSG",
+		"UI_OPTION_GRAPHICS_RT_ENABLED",
+		"UI_OPTION_GRAPHICS_RT_SHADOW_QUALITY",
+		"UI_OPTION_GRAPHICS_RT_REFLECTION_QUALITY",
+		"UI_OPTION_GRAPHICS_SSAA_METHOD",
+		"UI_OPTION_GRAPHICS_SSAA_QUALITY",
 		"UI_OPTION_GRAPHICS_FRAMERATE_LIMIT",
 		"UI_OPTION_GSM_AUTHORITY_END_MARKER",
 		"UI_OPTION_GRAPHICS_HDR_GAMMA",
@@ -7409,9 +9723,12 @@
 		"UI_OPTION_VR_LEFT_HAND_FOLLOW_RIGHT",
 		"UI_OPTION_VR_SAFE_AREA_ENABLED"
 	],
-
-	"eActionRewardType": ["AR_None", "AR_QuestItem", "AR_Keycard", "AR_Key"],
-
+	"eActionRewardType": [
+		"AR_None",
+		"AR_QuestItem",
+		"AR_Keycard",
+		"AR_Key"
+	],
 	"eAmmoType": [
 		"eAmmoGun",
 		"eAmmoRevolver",
@@ -7425,12 +9742,15 @@
 		"eAmmoHarmless",
 		"eAmmoLightPistol",
 		"eAmmoDartTranquilizer",
+		"eAmmoDartEmetic",
 		"eAmmoShotgunBeanbag",
 		"eUnknownAmmoType"
 	],
-
-	"eBurstPatternType": ["eEBP_None", "eEBP_Circular3Rings", "eEBP_Box"],
-
+	"eBurstPatternType": [
+		"eEBP_None",
+		"eEBP_Circular3Rings",
+		"eEBP_Box"
+	],
 	"eContractSessionStartError": [
 		"ERROR_NONE",
 		"ERROR_MISSING_CONTENT",
@@ -7442,7 +9762,14 @@
 		"ERROR_ALREADY_STARTING",
 		"ERROR_UNKNOWN"
 	],
-
+	"eEvergreenItemRarity": [
+		"SAFEHOUSEONLY",
+		"NONE",
+		"COMMON",
+		"RARE",
+		"EPIC",
+		"LEGENDARY"
+	],
 	"eHitmanPermissionReason": [
 		"eHPReason_ALLReasons",
 		"eHPReason_MovementContext",
@@ -7455,15 +9782,29 @@
 		"eHPReason_InstinctBlendIn",
 		"eHPReason_FocusInteraction"
 	],
-
-	"eHolsterAbility": ["eUndecided", "eHolsteringAllowed", "eHolsterTemporarilyOnly", "eHolsterSecondaryOnly", "eHolsterQuestStorage", "eCanNotBeHolstered"],
-
-	"eItemHands": ["IH_NONE", "IH_ONEHANDED", "IH_TWOHANDED"],
-
-	"eItemRarity": ["ITEMRARITY_COMMON", "ITEMRARITY_UNCOMMON", "ITEMRARITY_RARE"],
-
-	"eItemSize": ["ITEMSIZE_SMALL", "ITEMSIZE_MEDIUM", "ITEMSIZE_LARGE"],
-
+	"eHolsterAbility": [
+		"eUndecided",
+		"eHolsteringAllowed",
+		"eHolsterTemporarilyOnly",
+		"eHolsterSecondaryOnly",
+		"eHolsterQuestStorage",
+		"eCanNotBeHolstered"
+	],
+	"eItemHands": [
+		"IH_NONE",
+		"IH_ONEHANDED",
+		"IH_TWOHANDED"
+	],
+	"eItemRarity": [
+		"ITEMRARITY_COMMON",
+		"ITEMRARITY_UNCOMMON",
+		"ITEMRARITY_RARE"
+	],
+	"eItemSize": [
+		"ITEMSIZE_SMALL",
+		"ITEMSIZE_MEDIUM",
+		"ITEMSIZE_LARGE"
+	],
 	"eItemType": [
 		"eCC_FireExtinguisher_01",
 		"eCC_Knife",
@@ -7563,14 +9904,40 @@
 		"eOther_Camera",
 		"eUnknownItemType"
 	],
-
-	"eParticleEmitterBoxEntity_SpawnModes": ["BOX_SPAWNMODE_INSIDE", "BOX_SPAWNMODE_EDGE", "BOX_SPAWNMODE_FACE", "BOX_SPAWNMODE_ELLIPSOID_INSIDE", "BOX_SPAWNMODE_ELLIPSOID"],
-
-	"eParticleEmitterMeshEntity_SpawnModes": ["MESH_SPAWNMODE_VERTEX", "MESH_SPAWNMODE_EDGE", "MESH_SPAWNMODE_FACE"],
-
-	"eVRFadeType": ["FadeToGame", "FadeToBlack", "FadeToGame_HighPriority", "FadeToBlack_HighPriority", "CutToGame", "CutToBlack", "KeepCurrent"],
-
-	"eWeaponOperation": ["WO_SEMI_AUTO", "WO_FULL_AUTO"],
-
-	"eWeaponType": ["WT_HANDGUN", "WT_SLOWGUN", "WT_ASSAULTRIFLE", "WT_SMG", "WT_SNIPER", "WT_RPG", "WT_KNIFE", "WT_SHOTGUN", "WT_SPOTTER"]
+	"eParticleEmitterBoxEntity_SpawnModes": [
+		"BOX_SPAWNMODE_INSIDE",
+		"BOX_SPAWNMODE_EDGE",
+		"BOX_SPAWNMODE_FACE",
+		"BOX_SPAWNMODE_ELLIPSOID_INSIDE",
+		"BOX_SPAWNMODE_ELLIPSOID"
+	],
+	"eParticleEmitterMeshEntity_SpawnModes": [
+		"MESH_SPAWNMODE_VERTEX",
+		"MESH_SPAWNMODE_EDGE",
+		"MESH_SPAWNMODE_FACE"
+	],
+	"eVRFadeType": [
+		"FadeToGame",
+		"FadeToBlack",
+		"FadeToGame_HighPriority",
+		"FadeToBlack_HighPriority",
+		"CutToGame",
+		"CutToBlack",
+		"KeepCurrent"
+	],
+	"eWeaponOperation": [
+		"WO_SEMI_AUTO",
+		"WO_FULL_AUTO"
+	],
+	"eWeaponType": [
+		"WT_HANDGUN",
+		"WT_SLOWGUN",
+		"WT_ASSAULTRIFLE",
+		"WT_SMG",
+		"WT_SNIPER",
+		"WT_RPG",
+		"WT_KNIFE",
+		"WT_SHOTGUN",
+		"WT_SPOTTER"
+	]
 }

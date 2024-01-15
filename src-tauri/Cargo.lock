@@ -167,6 +167,7 @@ dependencies = [
  "rand 0.8.5",
  "registry",
  "reqwest",
+ "rfd",
  "rpkg-rs",
  "serde",
  "serde-smile",

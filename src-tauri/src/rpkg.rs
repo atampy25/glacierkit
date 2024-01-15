@@ -1,17 +1,15 @@
 use std::{
 	collections::HashMap,
 	fs::File,
-	io::{Cursor, Read, Seek, SeekFrom},
-	path::{Path, PathBuf}
+	io::{Read, Seek, SeekFrom},
+	path::PathBuf
 };
 
 use anyhow::{anyhow, bail, Context, Result};
-use binrw::BinReaderExt;
 use fn_error_context::context;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lz4::block::decompress_to_buffer;
-use memmap2::Mmap;
 use quickentity_rs::{
 	convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn,
 	qn_structs::Entity,
@@ -19,11 +17,7 @@ use quickentity_rs::{
 };
 use rpkg_rs::{
 	encryption::md5_engine::Md5Engine,
-	misc::ini_file::IniFile,
-	runtime::resource::{
-		package_manager::PackageManager, resource_container::ResourceContainer, resource_package::ResourcePackage,
-		runtime_resource_id::RuntimeResourceID
-	}
+	runtime::resource::{resource_package::ResourcePackage, runtime_resource_id::RuntimeResourceID}
 };
 use tokio::sync::RwLock;
 use tryvial::try_fn;

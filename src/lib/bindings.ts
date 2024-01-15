@@ -106,7 +106,7 @@ ref: Ref;
  * The constant value accompanying this reference.
  */
 value: SimpleProperty }
-export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeGFEPath"; data: string | null }
+export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean }
 /**
  * A simple property.
  * 

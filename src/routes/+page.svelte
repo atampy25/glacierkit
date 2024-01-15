@@ -69,7 +69,6 @@
 		id: string
 		name: string
 		editor: ReturnType<typeof getEditor>
-		file: string | null
 		unsaved: boolean
 	}[] = []
 
@@ -126,7 +125,6 @@
 									{
 										id: request.data.data.id,
 										name: request.data.data.name,
-										file: request.data.data.file,
 										unsaved: false,
 										editor: getEditor(request.data.data.editor_type)
 									}
@@ -231,15 +229,13 @@
 												icon={Save}
 												iconDescription="Save"
 												on:click={async () => {
-													if (tab.file) {
-														await event({
-															type: "global",
-															data: {
-																type: "saveTab",
-																data: tab.id
-															}
-														})
-													}
+													await event({
+														type: "global",
+														data: {
+															type: "saveTab",
+															data: tab.id
+														}
+													})
 												}}
 											/>
 										{/if}
