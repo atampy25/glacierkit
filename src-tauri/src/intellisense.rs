@@ -4,7 +4,7 @@ use std::{
 	sync::Arc
 };
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{bail, Context, Ok, Result};
 use fn_error_context::context;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -23,7 +23,10 @@ use crate::{
 	entity::get_local_reference,
 	game_detection::GameVersion,
 	material::{get_material_properties, MaterialProperty, MaterialPropertyData},
-	resourcelib::{h2016_convert_cppt, h2_convert_cppt, h3_convert_cppt},
+	resourcelib::{
+		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2_convert_cppt, h2_convert_dswb, h3_convert_cppt,
+		h3_convert_dswb
+	},
 	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
 
@@ -35,7 +38,7 @@ pub struct Intellisense {
 	pub cppt_pins: HashMap<String, (Vec<String>, Vec<String>)>,
 
 	/// Property type as number -> String version
-	pub uicb_prop_types: HashMap<u32, String>,
+	pub uicb_prop_types: HashMap<u8, String>,
 
 	pub matt_properties: Arc<RwLock<HashMap<String, Vec<MaterialProperty>>>>,
 
@@ -362,7 +365,48 @@ impl Intellisense {
 							found.push((prop_name, prop_type, default_val, false));
 						}
 
-					// TODO: Read UICB
+						for entry in convert_uicb(
+							&extract_latest_resource(
+								resource_packages,
+								hash_list_mapping,
+								&extract_latest_metadata(resource_packages, hash_list_mapping, &factory)?
+									.hash_reference_data
+									.into_iter()
+									.find(|x| {
+										hash_list_mapping
+											.get(&normalise_to_hash(x.hash.to_owned()))
+											.map(|(x, _)| x == "UICB")
+											.unwrap_or(false)
+									})
+									.context("No blueprint dependency on UICT")?
+									.hash
+							)?
+							.1
+						)?
+						.m_aPins
+						{
+							// Property
+							if entry.m_nUnk00 == 0 {
+								let prop_type = self
+									.uicb_prop_types
+									.get(&entry.m_nUnk01)
+									.context("Unknown UICB property type")?;
+
+								// We can't get the actual default values, if there are any, so we just use sensible defaults
+								found.push((
+									entry.m_sName,
+									prop_type.into(),
+									match prop_type.as_ref() {
+										"int32" => to_value(0)?,
+										"float32" => to_value(0)?,
+										"ZString" => to_value("")?,
+										"bool" => to_value(false)?,
+										_ => bail!("UICB property types has unknown type")
+									},
+									false
+								));
+							}
+						}
 					} else if self.all_matts.contains(&factory) {
 						// All materials have the properties of ZRenderMaterialEntity
 						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
@@ -683,7 +727,33 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 
-				// TODO: Read UICB
+					for entry in convert_uicb(
+						&extract_latest_resource(
+							resource_packages,
+							hash_list_mapping,
+							&extract_latest_metadata(resource_packages, hash_list_mapping, &factory)?
+								.hash_reference_data
+								.into_iter()
+								.find(|x| {
+									hash_list_mapping
+										.get(&normalise_to_hash(x.hash.to_owned()))
+										.map(|(x, _)| x == "UICB")
+										.unwrap_or(false)
+								})
+								.context("No blueprint dependency on UICT")?
+								.hash
+						)?
+						.1
+					)?
+					.m_aPins
+					{
+						// Pin
+						if entry.m_nUnk00 == 1 {
+							// Can't tell if they're input or output pins, since I have no idea what the unk01 value means for pins
+							input.push(entry.m_sName.to_owned());
+							output.push(entry.m_sName);
+						}
+					}
 				} else if self.all_matts.contains(&factory) {
 					// All materials have the pins of ZRenderMaterialEntity
 					let cppt_data = self.cppt_pins.get("00B4B11DA327CAD0").context("No such CPPT in pins")?;
@@ -701,7 +771,33 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 
-				// TODO: Read switch group data
+					let wswt_meta = extract_latest_metadata(resource_packages, hash_list_mapping, &factory)?;
+
+					let dswb_hash = &wswt_meta
+						.hash_reference_data
+						.iter()
+						.find(|x| {
+							hash_list_mapping
+								.get(&normalise_to_hash(x.hash.to_owned()))
+								.map(|(x, _)| x == "DSWB" || x == "WSWB")
+								.unwrap_or(false)
+						})
+						.context("No blueprint dependency on WSWT")?
+						.hash;
+
+					let dswb_data = match game_version {
+						GameVersion::H1 => h2016_convert_dswb(
+							&extract_latest_resource(resource_packages, hash_list_mapping, dswb_hash)?.1
+						)?,
+						GameVersion::H2 => h2_convert_dswb(
+							&extract_latest_resource(resource_packages, hash_list_mapping, dswb_hash)?.1
+						)?,
+						GameVersion::H3 => h3_convert_dswb(
+							&extract_latest_resource(resource_packages, hash_list_mapping, dswb_hash)?.1
+						)?
+					};
+
+					input.extend(dswb_data.m_aSwitches);
 				} else {
 					let extracted = extract_entity(
 						resource_packages,

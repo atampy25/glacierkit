@@ -203,7 +203,6 @@ pub fn h3_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SwitchGroup {
 	pub m_aSwitches: Vec<String>
 }
@@ -215,6 +214,54 @@ pub fn h3_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
 
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("DSWB")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SwitchGroup")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UIControlData {
+	// ResourceLib thinks everything is a pin for some reason
+	pub m_aPins: Vec<UIControlDataEntry>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UIControlDataEntry {
+	pub m_nUnk00: u8,
+	pub m_nUnk01: u8,
+	pub m_sName: String
+}
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib UICB")]
+pub fn convert_uicb(data: &[u8]) -> Result<UIControlData> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM3_GetConverterForResource(CString::new("UICB")?.as_ptr());
 
 		if converter.is_null() {
 			bail!("Couldn't get ResourceLib converter")
@@ -415,6 +462,41 @@ pub fn h2_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
 }
 
 #[try_fn]
+#[context("Couldn't convert binary data to ResourceLib DSWB")]
+pub fn h2_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM2_GetConverterForResource(CString::new("DSWB")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SwitchGroup")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
+#[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
 pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory2016> {
 	let _lock = CONVERTER_MUTEX.lock();
@@ -578,6 +660,41 @@ pub fn h2016_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
 			.context("Couldn't convert CStr to str")?
 		)
 		.context("Couldn't deserialise returned JsonString as SCppEntity")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib DSWB")]
+pub fn h2016_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM2016_GetConverterForResource(CString::new("DSWB")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SwitchGroup")?;
 
 		(*converter).FreeJsonString.unwrap()(json_string);
 
