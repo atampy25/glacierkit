@@ -10,6 +10,8 @@
 	import enums from "./enums.json"
 	import { event } from "$lib/utils"
 	import { listen } from "@tauri-apps/api/event"
+	import { Modal } from "carbon-components-svelte"
+	import GraphRenderer from "./GraphRenderer.svelte"
 
 	let el: HTMLDivElement = null!
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
@@ -25,6 +27,9 @@
 
 	let decorationsToCheck: [string, string][] = []
 	let localRefEntityIDs: string[] = []
+
+	let showCurvePreview = false
+	let curveToPreview: [number, number, number, number, number, number, number, number][] | null = null
 
 	const baseIntellisenseSchema = merge(cloneDeep(baseSchema), {
 		$ref: "#/definitions/SubEntity",
@@ -223,9 +228,17 @@
 			editor.getModel()?.dispose()
 		}
 
+		const showPreviewCurveCondition = editor.createContextKey<boolean>("showPreviewCurveCondition", false)
 		const showFollowReferenceCondition = editor.createContextKey<boolean>("showFollowReferenceCondition", false)
 
 		editor.onDidChangeCursorPosition((e) => {
+			let entData
+			try {
+				entData = JSON.parse(editor.getValue())
+			} catch {
+				return
+			}
+
 			let word: string | undefined | false
 			try {
 				word = editor.getModel()!.getWordAtPosition(e.position)?.word
@@ -234,9 +247,31 @@
 			}
 
 			if (!word) {
+				showPreviewCurveCondition.set(false)
+			} else {
+				showPreviewCurveCondition.set(entData.properties && entData.properties[word] && entData.properties[word].type === "ZCurve")
+			}
+
+			if (!word) {
 				showFollowReferenceCondition.set(false)
 			} else {
 				showFollowReferenceCondition.set(localRefEntityIDs.includes(word))
+			}
+		})
+
+		editor.addAction({
+			id: "preview-curve",
+			label: "Preview curve",
+			contextMenuGroupId: "navigation",
+			contextMenuOrder: 0,
+			keybindings: [],
+			precondition: "showPreviewCurveCondition",
+			run: async (ed) => {
+				const propertyName = editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
+
+				curveToPreview = JSON.parse(editor.getValue()).properties[propertyName].value.data
+
+				showCurvePreview = true
 			}
 		})
 
@@ -490,6 +525,12 @@
 {#if entityID === null}
 	<p>Select an entity on the left to edit it here.</p>
 {/if}
+
+<Modal passiveModal bind:open={showCurvePreview} modalHeading="Curve preview">
+	{#if curveToPreview}
+		<GraphRenderer {curveToPreview} />
+	{/if}
+</Modal>
 
 <style>
 	:global(.monacoDecorationGray) {
