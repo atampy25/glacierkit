@@ -4,11 +4,14 @@
 #![allow(non_snake_case)]
 #![feature(try_blocks)]
 #![feature(try_find)]
+#![allow(clippy::type_complexity)]
+#![feature(let_chains)]
 
 pub mod entity;
 pub mod event_handling;
 pub mod game_detection;
 pub mod hash_list;
+pub mod intellisense;
 pub mod model;
 pub mod resourcelib;
 pub mod rpkg;
@@ -36,6 +39,7 @@ use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
 use indexmap::IndexMap;
+use intellisense::Intellisense;
 use itertools::Itertools;
 use memmap2::Mmap;
 use model::{
@@ -65,7 +69,7 @@ use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
 use uuid::Uuid;
-use velcro::vec;
+use velcro::{hash_map, vec};
 use walkdir::WalkDir;
 
 const HASH_LIST_VERSION_ENDPOINT: &str =
@@ -118,7 +122,8 @@ fn main() {
 				fs_watcher: None.into(),
 				editor_states: RwLock::new(HashMap::new()).into(),
 				resource_packages: None.into(),
-				cached_entities: RwLock::new(HashMap::new()).into()
+				cached_entities: RwLock::new(HashMap::new()).into(),
+				intellisense: None.into()
 			});
 
 			Ok(())
@@ -231,7 +236,8 @@ fn event(app: AppHandle, event: Event) {
 												.load()
 												.as_ref()
 												.map(|x| x.settings.load().game_install.is_some())
-												.unwrap_or(false)
+												.unwrap_or(false) && let Some(hash_list) =
+												app_state.hash_list.load().as_ref()
 											{
 												let mut entity = extract_entity(
 													app_state
@@ -261,7 +267,7 @@ fn event(app: AppHandle, event: Event) {
 														})?
 														.context("No such game install")?
 														.version,
-													app_state.hash_list.load().as_ref().unwrap(),
+													hash_list,
 													&patch.factory_hash
 												)
 												.await?;
@@ -693,11 +699,7 @@ fn event(app: AppHandle, event: Event) {
 									.find(|x| x.path == *install)
 									.context("No such game install as specified in project.json")?;
 
-								let game_flag = match install.version {
-									GameVersion::H1 => 0b000010,
-									GameVersion::H2 => 0b000100,
-									GameVersion::H3 => 0b001000
-								};
+								let game_flag = install.version.hash_list_flag();
 
 								if let Some(x) = app_state.hash_list.load().deref() {
 									send_request(
@@ -809,6 +811,88 @@ fn event(app: AppHandle, event: Event) {
 								}
 
 								app_state.resource_packages.store(Some(resource_packages.into()));
+
+								if let Some(hash_list) = app_state.hash_list.load().as_ref() {
+									let game_version = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| {
+											Ok::<_, Error>(
+												x.path
+													== *app_state
+														.project
+														.load()
+														.as_ref()
+														.unwrap()
+														.settings
+														.load()
+														.game_install
+														.as_ref()
+														.unwrap()
+														.as_path()
+											)
+										})?
+										.context("No such game install")?
+										.version;
+
+									app_state.intellisense.store(Some(
+										Intellisense {
+											cppt_properties: RwLock::new(HashMap::new()).into(),
+											cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
+											uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
+												.unwrap(),
+											all_cppts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "CPPT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_asets: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "ASET"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_uicts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "UICT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_matts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "MATT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_wswts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "WSWT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect()
+										}
+										.into()
+									));
+								}
+							} else {
+								app_state.resource_packages.store(None);
+								app_state.intellisense.store(None);
 							}
 
 							send_request(
@@ -1068,7 +1152,57 @@ fn event(app: AppHandle, event: Event) {
 									)))
 								)?;
 
-								// TODO: intellisense
+								if let Some(intellisense) = app_state.intellisense.load().as_ref()
+									&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let game_version = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| {
+											Ok::<_, Error>(
+												x.path
+													== *app_state
+														.project
+														.load()
+														.as_ref()
+														.unwrap()
+														.settings
+														.load()
+														.game_install
+														.as_ref()
+														.unwrap()
+														.as_path()
+											)
+										})?
+										.context("No such game install")?
+										.version;
+
+									let task = start_task(&app, "Gathering intellisense data")?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::UpdateIntellisense {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												properties: intellisense
+													.get_properties(
+														resource_packages,
+														&app_state.cached_entities,
+														hash_list,
+														game_version,
+														entity,
+														&id,
+														true
+													)
+													.await?
+											}
+										)))
+									)?;
+
+									finish_task(&app, task)?;
+								}
 							}
 
 							EntityTreeEvent::Create { editor_id, id, content } => {
@@ -1857,6 +1991,85 @@ fn event(app: AppHandle, event: Event) {
 									}
 								}
 							}
+						}
+
+						if let Some(hash_list) = app_state.hash_list.load().as_ref() {
+							let game_version = app_state
+								.game_installs
+								.iter()
+								.try_find(|x| {
+									Ok::<_, Error>(
+										x.path
+											== *app_state
+												.project
+												.load()
+												.as_ref()
+												.unwrap()
+												.settings
+												.load()
+												.game_install
+												.as_ref()
+												.unwrap()
+												.as_path()
+									)
+								})?
+								.context("No such game install")?
+								.version;
+
+							app_state.intellisense.store(Some(
+								Intellisense {
+									cppt_properties: RwLock::new(HashMap::new()).into(),
+									cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
+									uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
+										.unwrap(),
+									all_cppts: hash_list
+										.entries
+										.iter()
+										.filter(|x| {
+											(x.game_flags & game_version.hash_list_flag()
+												== game_version.hash_list_flag()) && x.resource_type == "CPPT"
+										})
+										.map(|x| x.hash.to_owned())
+										.collect(),
+									all_asets: hash_list
+										.entries
+										.iter()
+										.filter(|x| {
+											(x.game_flags & game_version.hash_list_flag()
+												== game_version.hash_list_flag()) && x.resource_type == "ASET"
+										})
+										.map(|x| x.hash.to_owned())
+										.collect(),
+									all_uicts: hash_list
+										.entries
+										.iter()
+										.filter(|x| {
+											(x.game_flags & game_version.hash_list_flag()
+												== game_version.hash_list_flag()) && x.resource_type == "UICT"
+										})
+										.map(|x| x.hash.to_owned())
+										.collect(),
+									all_matts: hash_list
+										.entries
+										.iter()
+										.filter(|x| {
+											(x.game_flags & game_version.hash_list_flag()
+												== game_version.hash_list_flag()) && x.resource_type == "MATT"
+										})
+										.map(|x| x.hash.to_owned())
+										.collect(),
+									all_wswts: hash_list
+										.entries
+										.iter()
+										.filter(|x| {
+											(x.game_flags & game_version.hash_list_flag()
+												== game_version.hash_list_flag()) && x.resource_type == "WSWT"
+										})
+										.map(|x| x.hash.to_owned())
+										.collect()
+								}
+								.into()
+							));
 						}
 
 						send_request(

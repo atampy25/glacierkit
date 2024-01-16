@@ -37,6 +37,16 @@ pub enum GameVersion {
 	H3
 }
 
+impl GameVersion {
+	pub fn hash_list_flag(&self) -> u8 {
+		match self {
+			Self::H1 => 0b000010,
+			Self::H2 => 0b000100,
+			Self::H3 => 0b001000
+		}
+	}
+}
+
 #[try_fn]
 #[context("Couldn't detect installed games")]
 pub fn detect_installs() -> Result<Vec<GameInstall>> {

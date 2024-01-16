@@ -5,7 +5,8 @@ use anyhow::{bail, Context, Result};
 use fn_error_context::context;
 use lazy_static::lazy_static;
 use quickentity_rs::rt_2016_structs::{RTBlueprint2016, RTFactory2016};
-use quickentity_rs::rt_structs::{RTBlueprint, RTFactory};
+use quickentity_rs::rt_structs::{RTBlueprint, RTFactory, SEntityTemplateProperty};
+use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
 
 mod bindings_2;
@@ -159,6 +160,48 @@ pub fn h3_convert_blueprint_to_binary(data: &RTBlueprint) -> Result<Vec<u8>> {
 	}
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SCppEntity {
+	pub blueprint_index_in_resource_header: i32,
+	pub property_values: Vec<SEntityTemplateProperty>
+}
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib CPPT")]
+pub fn h3_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM3_GetConverterForResource(CString::new("CPPT")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SCppEntity")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
 pub fn h2_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory> {
@@ -296,6 +339,41 @@ pub fn h2_convert_blueprint_to_binary(data: &RTBlueprint) -> Result<Vec<u8>> {
 }
 
 #[try_fn]
+#[context("Couldn't convert binary data to ResourceLib CPPT")]
+pub fn h2_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM2_GetConverterForResource(CString::new("CPPT")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SCppEntity")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
+#[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
 pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory2016> {
 	let _lock = CONVERTER_MUTEX.lock();
@@ -426,6 +504,41 @@ pub fn h2016_convert_blueprint_to_binary(data: &RTBlueprint2016) -> Result<Vec<u
 		let res = std::slice::from_raw_parts((*resource_mem).ResourceData.cast(), (*resource_mem).DataSize).to_owned();
 
 		(*generator).FreeResourceMem.unwrap()(resource_mem);
+
+		res
+	}
+}
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib CPPT")]
+pub fn h2016_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM2016_GetConverterForResource(CString::new("CPPT")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SCppEntity")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
 
 		res
 	}

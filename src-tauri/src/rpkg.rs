@@ -39,11 +39,7 @@ pub fn extract_latest_resource(
 	hash_list: &HashList,
 	resource: &str
 ) -> Result<(ResourceMeta, Vec<u8>)> {
-	let resource = if resource.starts_with('0') {
-		resource.to_owned()
-	} else {
-		format!("{:0>16X}", Md5Engine::compute(&resource.to_lowercase()))
-	};
+	let resource = normalise_to_hash(resource);
 
 	let resource_id = RuntimeResourceID {
 		id: u64::from_str_radix(&resource, 16)?
@@ -143,6 +139,76 @@ pub fn extract_latest_resource(
 	bail!("Couldn't find the resource in any RPKG");
 }
 
+/// Get the metadata of the latest copy of a resource by its hash or path. Faster than fully extracting the resource.
+#[context("Couldn't extract metadata for resource {}", resource)]
+pub fn extract_latest_metadata(
+	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	hash_list: &HashList,
+	resource: &str
+) -> Result<ResourceMeta> {
+	let resource = normalise_to_hash(resource);
+
+	let resource_id = RuntimeResourceID {
+		id: u64::from_str_radix(&resource, 16)?
+	};
+
+	let hash_list_mapping = hash_list
+		.entries
+		.iter()
+		.map(|x| {
+			(
+				x.hash.to_owned(),
+				if x.path.is_empty() {
+					None
+				} else {
+					Some(x.path.to_owned())
+				}
+			)
+		})
+		.collect::<HashMap<_, _>>();
+
+	for (rpkg_path, rpkg) in resource_packages {
+		if let Some((resource_header, offset_info)) = rpkg
+			.resource_entries
+			.iter()
+			.enumerate()
+			.find(|(_, entry)| entry.runtime_resource_id == resource_id)
+			.map(|(index, entry)| (rpkg.resource_metadata.get(index).unwrap(), entry))
+		{
+			return Ok(ResourceMeta {
+				hash_offset: offset_info.data_offset,
+				hash_size: offset_info.compressed_size_and_is_scrambled_flag,
+				hash_size_final: resource_header.data_size,
+				hash_value: offset_info.runtime_resource_id.to_hex_string(),
+				hash_size_in_memory: resource_header.system_memory_requirement,
+				hash_size_in_video_memory: resource_header.video_memory_requirement,
+				hash_resource_type: resource_header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
+				hash_reference_data: resource_header
+					.m_references
+					.as_ref()
+					.map(|refs| {
+						refs.reference_flags
+							.iter()
+							.zip(refs.reference_hash.iter())
+							.map(|(flag, hash)| ResourceDependency {
+								flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
+								hash: hash_list_mapping
+									.get(&hash.to_hex_string())
+									.map(|x| x.as_ref().map(|x| x.to_owned()).unwrap_or(hash.to_hex_string()))
+									.unwrap_or(hash.to_hex_string())
+							})
+							.collect()
+					})
+					.unwrap_or(vec![]),
+				hash_reference_table_size: resource_header.references_chunk_size,
+				hash_reference_table_dummy: resource_header.states_chunk_size
+			});
+		}
+	}
+
+	bail!("Couldn't find the resource in any RPKG");
+}
+
 /// Extract an entity by its factory's path or hash.
 #[try_fn]
 #[context("Couldn't extract entity {}", factory_path)]
@@ -209,4 +275,12 @@ pub async fn extract_entity(
 	);
 
 	entity
+}
+
+pub fn normalise_to_hash(hash_or_path: &str) -> String {
+	if hash_or_path.starts_with('0') {
+		hash_or_path.to_owned()
+	} else {
+		format!("{:0>16X}", Md5Engine::compute(&hash_or_path.to_lowercase()))
+	}
 }

@@ -152,6 +152,7 @@ dependencies = [
  "anyhow",
  "arboard 3.3.0",
  "arc-swap",
+ "async-recursion",
  "binrw",
  "brotli-decompressor",
  "fn-error-context",

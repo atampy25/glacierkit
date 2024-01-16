@@ -6,12 +6,13 @@ use notify::RecommendedWatcher;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
 use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use specta::Type;
 use structstruck::strike;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::{entity::ReverseReference, game_detection::GameInstall, hash_list::HashList};
+use crate::{entity::ReverseReference, game_detection::GameInstall, hash_list::HashList, intellisense::Intellisense};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -34,7 +35,8 @@ pub struct AppState {
 	pub fs_watcher: ArcSwapOption<RecommendedWatcher>,
 	pub editor_states: Arc<RwLock<HashMap<Uuid, EditorState>>>,
 	pub resource_packages: ArcSwapOption<IndexMap<PathBuf, ResourcePackage>>,
-	pub cached_entities: Arc<RwLock<HashMap<String, Entity>>>
+	pub cached_entities: Arc<RwLock<HashMap<String, Entity>>>,
+	pub intellisense: ArcSwapOption<Intellisense>
 }
 
 #[derive(Debug)]
@@ -392,7 +394,8 @@ strike! {
 
 					UpdateIntellisense {
 						editor_id: Uuid,
-
+						entity_id: String,
+						properties: Vec<(String, String, Value, bool)>
 					},
 
 					UpdateValidity {
