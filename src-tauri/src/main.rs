@@ -7,12 +7,14 @@
 #![allow(clippy::type_complexity)]
 #![feature(let_chains)]
 #![feature(async_closure)]
+#![feature(cursor_remaining)]
 
 pub mod entity;
 pub mod event_handling;
 pub mod game_detection;
 pub mod hash_list;
 pub mod intellisense;
+pub mod material;
 pub mod model;
 pub mod resourcelib;
 pub mod rpkg;
@@ -42,6 +44,7 @@ use hash_list::HashList;
 use indexmap::IndexMap;
 use intellisense::Intellisense;
 use itertools::Itertools;
+use material::get_material_properties;
 use memmap2::Mmap;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
@@ -59,7 +62,7 @@ use quickentity_rs::{
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
-use rpkg::{extract_entity, hash_list_mapping};
+use rpkg::{extract_entity, extract_latest_resource, hash_list_mapping, normalise_to_hash};
 use rpkg_rs::{
 	misc::ini_file::IniFile,
 	runtime::resource::{package_manager::PackageManager, resource_container::ResourceContainer}
@@ -849,6 +852,7 @@ fn event(app: AppHandle, event: Event) {
 											cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
 											uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
 												.unwrap(),
+											matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
 											all_cppts: hash_list
 												.entries
 												.iter()
@@ -1188,6 +1192,8 @@ fn event(app: AppHandle, event: Event) {
 
 									let task = start_task(&app, "Gathering intellisense data")?;
 
+									let mapping = hash_list_mapping(hash_list);
+
 									send_request(
 										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
@@ -1197,7 +1203,16 @@ fn event(app: AppHandle, event: Event) {
 												properties: intellisense.get_properties(
 													resource_packages,
 													&app_state.cached_entities,
-													&hash_list_mapping(hash_list),
+													&mapping,
+													game_version,
+													entity,
+													&id,
+													true
+												)?,
+												pins: intellisense.get_pins(
+													resource_packages,
+													&app_state.cached_entities,
+													&mapping,
 													game_version,
 													entity,
 													&id,
@@ -2035,6 +2050,7 @@ fn event(app: AppHandle, event: Event) {
 									cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
 									uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
 										.unwrap(),
+									matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
 									all_cppts: hash_list
 										.entries
 										.iter()

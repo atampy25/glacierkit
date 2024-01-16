@@ -395,7 +395,8 @@ strike! {
 					UpdateIntellisense {
 						editor_id: Uuid,
 						entity_id: String,
-						properties: Vec<(String, String, Value, bool)>
+						properties: Vec<(String, String, Value, bool)>,
+						pins: (Vec<String>, Vec<String>)
 					},
 
 					UpdateValidity {

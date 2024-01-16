@@ -36,7 +36,7 @@ use crate::{
 #[context("Couldn't extract resource {}", resource)]
 pub fn extract_latest_resource(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	hash_list_mapping: &HashMap<String, Option<String>>,
+	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
 	resource: &str
 ) -> Result<(ResourceMeta, Vec<u8>)> {
 	let resource = normalise_to_hash(resource.into());
@@ -93,7 +93,7 @@ pub fn extract_latest_resource(
 								flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
 								hash: hash_list_mapping
 									.get(&hash.to_hex_string())
-									.map(|x| x.as_ref().map(|x| x.to_owned()).unwrap_or(hash.to_hex_string()))
+									.map(|(_, x)| x.as_ref().map(|x| x.to_owned()).unwrap_or(hash.to_hex_string()))
 									.unwrap_or(hash.to_hex_string())
 							})
 							.collect()
@@ -128,7 +128,7 @@ pub fn extract_latest_resource(
 #[context("Couldn't extract metadata for resource {}", resource)]
 pub fn extract_latest_metadata(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	hash_list_mapping: &HashMap<String, Option<String>>,
+	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
 	resource: &str
 ) -> Result<ResourceMeta> {
 	let resource = normalise_to_hash(resource.into());
@@ -164,7 +164,7 @@ pub fn extract_latest_metadata(
 								flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
 								hash: hash_list_mapping
 									.get(&hash.to_hex_string())
-									.map(|x| x.as_ref().map(|x| x.to_owned()).unwrap_or(hash.to_hex_string()))
+									.map(|(_, x)| x.as_ref().map(|x| x.to_owned()).unwrap_or(hash.to_hex_string()))
 									.unwrap_or(hash.to_hex_string())
 							})
 							.collect()
@@ -186,7 +186,7 @@ pub fn extract_entity(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
-	hash_list_mapping: &HashMap<String, Option<String>>,
+	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
 	factory_path: &str
 ) -> Result<Entity> {
 	{
@@ -251,18 +251,21 @@ pub fn normalise_to_hash(hash_or_path: String) -> String {
 }
 
 /// Generate a map for use with extract_* functions.
-pub fn hash_list_mapping(hash_list: &HashList) -> HashMap<String, Option<String>> {
+pub fn hash_list_mapping(hash_list: &HashList) -> HashMap<String, (String, Option<String>)> {
 	hash_list
 		.entries
 		.iter()
 		.map(|x| {
 			(
 				x.hash.to_owned(),
-				if x.path.is_empty() {
-					None
-				} else {
-					Some(x.path.to_owned())
-				}
+				(
+					x.resource_type.to_owned(),
+					if x.path.is_empty() {
+						None
+					} else {
+						Some(x.path.to_owned())
+					}
+				)
 			)
 		})
 		.collect()

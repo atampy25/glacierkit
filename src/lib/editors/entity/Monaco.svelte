@@ -255,7 +255,7 @@
 		)
 	})
 
-	function updateIntellisense(data: { properties: [string, string, JsonValue, boolean][] }) {
+	function updateIntellisense(data: { properties: [string, string, JsonValue, boolean][]; pins: [string[], string[]] }) {
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			...monaco.languages.json.jsonDefaults.diagnosticsOptions,
 			schemas: [
@@ -279,9 +279,16 @@
 																type: "string",
 																const: type
 															},
-															value: merge(cloneDeep((propertyTypeSchemas as Record<string, any>)[type] || {}), {
-																default: defaultValue
-															}),
+															value: merge(
+																cloneDeep(
+																	(enums as Record<string, string[]>)[type]
+																		? { enum: (enums as Record<string, string[]>)[type] }
+																		: (propertyTypeSchemas as Record<string, any>)[type] || {}
+																),
+																{
+																	default: defaultValue
+																}
+															),
 															postInit: {
 																type: "boolean",
 																default: postInit
@@ -296,6 +303,54 @@
 													}
 												]
 											})
+										)
+									},
+									events: {
+										properties: Object.fromEntries(
+											data.pins[1].map((a) => [
+												a,
+												{
+													type: "object",
+													additionalProperties: {
+														type: "array",
+														items: {
+															$ref: "#/definitions/RefMaybeConstantValue"
+														}
+													}
+												}
+											])
+										)
+									},
+									inputCopying: {
+										properties: Object.fromEntries(
+											data.pins[0].map((a) => [
+												a,
+												{
+													type: "object",
+													additionalProperties: {
+														type: "array",
+														items: {
+															$ref: "#/definitions/RefMaybeConstantValue"
+														}
+													}
+												}
+											])
+										)
+									},
+									outputCopying: {
+										properties: Object.fromEntries(
+											data.pins[1].map((a) => [
+												a,
+												{
+													type: "object",
+													additionalProperties: {
+														type: "array",
+														items: {
+															$ref: "#/definitions/RefMaybeConstantValue"
+														}
+													}
+												}
+											])
 										)
 									}
 								}
@@ -323,7 +378,10 @@
 			case "updateIntellisense":
 				// Relies on the intellisense request getting processed after the content replacement request but that should be the case, since intellisense is fairly slow
 				if (request.data.entity_id === entityID) {
-					updateIntellisense({ properties: request.data.properties })
+					updateIntellisense({
+						properties: request.data.properties,
+						pins: request.data.pins
+					})
 				}
 				break
 

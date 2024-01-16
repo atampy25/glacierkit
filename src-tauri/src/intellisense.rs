@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use parking_lot::RwLock;
 use quickentity_rs::{
-	qn_structs::{Entity, Ref},
+	qn_structs::{Entity, Ref, RefMaybeConstantValue, RefWithConstantValue},
 	rt_structs::PropertyID,
 	util_structs::ZGuidPropertyValue
 };
@@ -20,7 +20,9 @@ use serde_json::{from_value, json, to_value, Value};
 use tryvial::try_fn;
 
 use crate::{
+	entity::get_local_reference,
 	game_detection::GameVersion,
+	material::{get_material_properties, MaterialProperty, MaterialPropertyData},
 	resourcelib::{h2016_convert_cppt, h2_convert_cppt, h3_convert_cppt},
 	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
@@ -35,6 +37,8 @@ pub struct Intellisense {
 	/// Property type as number -> String version
 	pub uicb_prop_types: HashMap<u32, String>,
 
+	pub matt_properties: Arc<RwLock<HashMap<String, Vec<MaterialProperty>>>>,
+
 	pub all_cppts: HashSet<String>,
 	pub all_asets: HashSet<String>,
 	pub all_uicts: HashSet<String>,
@@ -48,7 +52,7 @@ impl Intellisense {
 	fn get_cppt_properties(
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-		hash_list_mapping: &HashMap<String, Option<String>>,
+		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
 		game_version: GameVersion,
 		cppt: &str
 	) -> Result<HashMap<String, (String, Value)>> {
@@ -210,6 +214,47 @@ impl Intellisense {
 		guard.get(cppt).unwrap().to_owned()
 	}
 
+	#[try_fn]
+	#[context("Couldn't get properties for MATT {}", matt)]
+	fn get_matt_properties(
+		&self,
+		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+		matt: &str
+	) -> Result<Vec<MaterialProperty>> {
+		{
+			if let Some(cached) = self.matt_properties.read().get(matt) {
+				return Ok(cached.to_owned());
+			}
+		}
+
+		let (matt_meta, matt_data) = extract_latest_resource(resource_packages, hash_list_mapping, matt)?;
+
+		let (_, matb_data) = extract_latest_resource(
+			resource_packages,
+			hash_list_mapping,
+			&matt_meta
+				.hash_reference_data
+				.iter()
+				.find(|x| {
+					hash_list_mapping
+						.get(&normalise_to_hash(x.hash.to_owned()))
+						.map(|(x, _)| x == "MATB")
+						.unwrap_or(false)
+				})
+				.unwrap()
+				.hash
+		)?;
+
+		let mut guard = self.matt_properties.write();
+		guard.insert(
+			matt.into(),
+			get_material_properties(&matt_data, &matt_meta, &matb_data)?
+		);
+
+		guard.get(matt).unwrap().to_owned()
+	}
+
 	/// Get the names, types, default values and post-init status of all properties of a given sub-entity.
 	#[try_fn]
 	#[context("Couldn't get properties for sub-entity {} in {}", sub_entity, entity.factory_hash)]
@@ -217,7 +262,7 @@ impl Intellisense {
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 		cached_entities: &RwLock<HashMap<String, Entity>>,
-		hash_list_mapping: &HashMap<String, Option<String>>,
+		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
 		game_version: GameVersion,
 		entity: &Entity,
 		sub_entity: &str,
@@ -329,7 +374,144 @@ impl Intellisense {
 							found.push((prop_name, prop_type, default_val, false));
 						}
 
-					// TODO: Read material info
+						for property in self.get_matt_properties(resource_packages, hash_list_mapping, &factory)? {
+							match property.data {
+								MaterialPropertyData::Texture(texture) => {
+									found.push((
+										property.name.to_owned(),
+										"ZRuntimeResourceID".into(),
+										json!({
+											"resource": texture,
+											"flag": "5F"
+										}),
+										false
+									));
+
+									found.push((format!("{}_enab", property.name), "bool".into(), json!(false), false));
+
+									found.push((
+										format!("{}_dest", property.name),
+										"SEntityTemplateReference".into(),
+										Value::Null,
+										false
+									));
+								}
+
+								MaterialPropertyData::ColorRGB(r, g, b) => {
+									found.push((
+										property.name.to_owned(),
+										"SColorRGB".into(),
+										to_value(format!(
+											"#{:0>2x}{:0>2x}{:0>2x}",
+											(r * 255.0).round() as u8,
+											(g * 255.0).round() as u8,
+											(b * 255.0).round() as u8
+										))?,
+										false
+									));
+
+									found.push((
+										format!("{}_op", property.name),
+										"IRenderMaterialEntity.EModifierOperation".into(),
+										to_value("eLeave")?,
+										false
+									));
+								}
+
+								MaterialPropertyData::ColorRGBA(r, g, b, a) => {
+									found.push((
+										property.name.to_owned(),
+										"SColorRGBA".into(),
+										to_value(format!(
+											"#{:0>2x}{:0>2x}{:0>2x}{:0>2x}",
+											(r * 255.0).round() as u8,
+											(g * 255.0).round() as u8,
+											(b * 255.0).round() as u8,
+											(a * 255.0).round() as u8
+										))?,
+										false
+									));
+
+									found.push((
+										format!("{}_op", property.name),
+										"IRenderMaterialEntity.EModifierOperation".into(),
+										to_value("eLeave")?,
+										false
+									));
+								}
+
+								MaterialPropertyData::Float(val) => {
+									found.push((property.name.to_owned(), "float32".into(), to_value(val)?, false));
+
+									found.push((
+										format!("{}_op", property.name),
+										"IRenderMaterialEntity.EModifierOperation".into(),
+										to_value("eLeave")?,
+										false
+									));
+								}
+
+								MaterialPropertyData::Vector2(x, y) => {
+									found.push((
+										property.name.to_owned(),
+										"SVector2".into(),
+										json!({
+											"x": x,
+											"y": y
+										}),
+										false
+									));
+
+									found.push((
+										format!("{}_op", property.name),
+										"IRenderMaterialEntity.EModifierOperation".into(),
+										to_value("eLeave")?,
+										false
+									));
+								}
+
+								MaterialPropertyData::Vector3(x, y, z) => {
+									found.push((
+										property.name.to_owned(),
+										"SVector2".into(),
+										json!({
+											"x": x,
+											"y": y,
+											"z": z
+										}),
+										false
+									));
+
+									found.push((
+										format!("{}_op", property.name),
+										"IRenderMaterialEntity.EModifierOperation".into(),
+										to_value("eLeave")?,
+										false
+									));
+								}
+
+								MaterialPropertyData::Vector4(x, y, z, w) => {
+									found.push((
+										property.name.to_owned(),
+										"SVector2".into(),
+										json!({
+											"x": x,
+											"y": y,
+											"z": z,
+											"w": w
+										}),
+										false
+									));
+
+									found.push((
+										format!("{}_op", property.name),
+										"IRenderMaterialEntity.EModifierOperation".into(),
+										to_value("eLeave")?,
+										false
+									));
+								}
+							}
+						}
 					} else if self.all_wswts.contains(&factory) {
 						// All switch groups have the properties of ZAudioSwitchEntity
 						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
@@ -369,5 +551,190 @@ impl Intellisense {
 		);
 
 		found
+	}
+
+	/// Get the names of all input and output pins of a given sub-entity.
+	#[try_fn]
+	#[context("Couldn't get pins for sub-entity {} in {}", sub_entity, entity.factory_hash)]
+	pub fn get_pins(
+		&self,
+		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+		cached_entities: &RwLock<HashMap<String, Entity>>,
+		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+		game_version: GameVersion,
+		entity: &Entity,
+		sub_entity: &str,
+		ignore_own: bool
+	) -> Result<(Vec<String>, Vec<String>)> {
+		let targeted = entity.entities.get(sub_entity).context("No such sub-entity")?;
+
+		let mut input = vec![];
+		let mut output = vec![];
+
+		if !ignore_own {
+			input.extend(
+				targeted
+					.input_copying
+					.as_ref()
+					.unwrap_or(&Default::default())
+					.keys()
+					.cloned()
+			);
+
+			output.extend(targeted.events.as_ref().unwrap_or(&Default::default()).keys().cloned());
+
+			output.extend(
+				targeted
+					.output_copying
+					.as_ref()
+					.unwrap_or(&Default::default())
+					.keys()
+					.cloned()
+			);
+		}
+
+		for sub_data in entity.entities.values() {
+			for data in sub_data.events.as_ref().unwrap_or(&Default::default()).values() {
+				for (trigger, refs) in data {
+					for reference in refs {
+						if get_local_reference(match reference {
+							RefMaybeConstantValue::Ref(r) => r,
+							RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue {
+								entity_ref, ..
+							}) => entity_ref
+						})
+						.map(|x| x == sub_entity)
+						.unwrap_or(false)
+						{
+							input.push(trigger.to_owned());
+						}
+					}
+				}
+			}
+
+			for data in sub_data.input_copying.as_ref().unwrap_or(&Default::default()).values() {
+				for (trigger, refs) in data {
+					for reference in refs {
+						if get_local_reference(match reference {
+							RefMaybeConstantValue::Ref(r) => r,
+							RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue {
+								entity_ref, ..
+							}) => entity_ref
+						})
+						.map(|x| x == sub_entity)
+						.unwrap_or(false)
+						{
+							input.push(trigger.to_owned());
+						}
+					}
+				}
+			}
+
+			for data in sub_data.output_copying.as_ref().unwrap_or(&Default::default()).values() {
+				for (propagate, refs) in data {
+					for reference in refs {
+						if get_local_reference(match reference {
+							RefMaybeConstantValue::Ref(r) => r,
+							RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue {
+								entity_ref, ..
+							}) => entity_ref
+						})
+						.map(|x| x == sub_entity)
+						.unwrap_or(false)
+						{
+							output.push(propagate.to_owned());
+						}
+					}
+				}
+			}
+		}
+
+		let (fac_input, fac_output): (Vec<_>, Vec<_>) = {
+			if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
+				extract_latest_metadata(
+					resource_packages,
+					hash_list_mapping,
+					&normalise_to_hash(targeted.factory.to_owned())
+				)?
+				.hash_reference_data
+				.into_iter()
+				.rev()
+				.skip(1)
+				.rev()
+				.map(|x| normalise_to_hash(x.hash))
+				.collect_vec()
+			} else {
+				vec![normalise_to_hash(targeted.factory.to_owned())]
+			}
+		}
+		.into_par_iter()
+		.map(|factory| {
+			Ok({
+				let mut input = vec![];
+				let mut output = vec![];
+
+				if self.all_cppts.contains(&factory) {
+					let cppt_data = self.cppt_pins.get(&factory).context("No such CPPT in pins")?;
+					input.extend(cppt_data.0.to_owned());
+					output.extend(cppt_data.1.to_owned());
+				} else if self.all_uicts.contains(&factory) {
+					// All UI controls have the pins of ZUIControlEntity
+					let cppt_data = self.cppt_pins.get("002C4526CC9753E6").context("No such CPPT in pins")?;
+					input.extend(cppt_data.0.to_owned());
+					output.extend(cppt_data.1.to_owned());
+
+				// TODO: Read UICB
+				} else if self.all_matts.contains(&factory) {
+					// All materials have the pins of ZRenderMaterialEntity
+					let cppt_data = self.cppt_pins.get("00B4B11DA327CAD0").context("No such CPPT in pins")?;
+					input.extend(cppt_data.0.to_owned());
+					output.extend(cppt_data.1.to_owned());
+
+					for property in self.get_matt_properties(resource_packages, hash_list_mapping, &factory)? {
+						if !matches!(property.data, MaterialPropertyData::Texture(_)) {
+							input.push(property.name);
+						}
+					}
+				} else if self.all_wswts.contains(&factory) {
+					// All switch groups have the pins of ZAudioSwitchEntity
+					let cppt_data = self.cppt_pins.get("00797DC916520C4D").context("No such CPPT in pins")?;
+					input.extend(cppt_data.0.to_owned());
+					output.extend(cppt_data.1.to_owned());
+
+				// TODO: Read switch group data
+				} else {
+					let extracted = extract_entity(
+						resource_packages,
+						cached_entities,
+						game_version,
+						hash_list_mapping,
+						&factory
+					)?;
+
+					let found = self.get_pins(
+						resource_packages,
+						cached_entities,
+						hash_list_mapping,
+						game_version,
+						&extracted,
+						&extracted.root_entity,
+						false
+					)?;
+
+					input.extend(found.0);
+					output.extend(found.1);
+				}
+
+				(input, output)
+			})
+		})
+		.collect::<Result<Vec<_>>>()?
+		.into_iter()
+		.unzip();
+
+		input.extend(fac_input.into_iter().flatten());
+		output.extend(fac_output.into_iter().flatten());
+
+		(input, output)
 	}
 }
