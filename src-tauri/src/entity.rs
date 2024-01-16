@@ -14,7 +14,11 @@ use specta::Type;
 use tryvial::try_fn;
 use velcro::vec;
 
-use crate::{game_detection::GameVersion, model::EditorValidity, rpkg::extract_entity};
+use crate::{
+	game_detection::GameVersion,
+	model::EditorValidity,
+	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
+};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -834,6 +838,47 @@ pub fn get_decorations(
 				&Ref::Short(Some(parental_entity.to_owned()))
 			)? {
 				decorations.push(decoration);
+			}
+		}
+	}
+
+	if hash_list_mapping
+		.get(&normalise_to_hash(sub_entity.factory.to_owned()))
+		.map(|(x, _)| x == "MATT")
+		.unwrap_or(false)
+	{
+		if let Some(mati) = extract_latest_metadata(resource_packages, hash_list_mapping, &sub_entity.factory)?
+			.hash_reference_data
+			.into_iter()
+			.find(|x| {
+				hash_list_mapping
+					.get(&normalise_to_hash(x.hash.to_owned()))
+					.map(|(x, _)| x == "MATI")
+					.unwrap_or(false)
+			}) {
+			if let Some(mate) = extract_latest_metadata(resource_packages, hash_list_mapping, &mati.hash)?
+				.hash_reference_data
+				.into_iter()
+				.find(|x| {
+					hash_list_mapping
+						.get(&normalise_to_hash(x.hash.to_owned()))
+						.map(|(x, _)| x == "MATE")
+						.unwrap_or(false)
+				}) {
+				let mate_data = extract_latest_resource(resource_packages, hash_list_mapping, &mate.hash)?.1;
+
+				let mut beginning = mate_data.len() - 1;
+				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {
+					beginning -= 1;
+				}
+
+				decorations.extend(
+					String::from_utf8(mate_data[beginning..mate_data.len() - 1].into())?
+						.split('\x00')
+						.filter(|x| !x.is_empty() && x.trim().chars().all(|x| !x.is_ascii_control()))
+						.map(|x| x.trim().to_owned())
+						.tuples()
+				);
 			}
 		}
 	}
