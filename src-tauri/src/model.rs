@@ -399,6 +399,12 @@ strike! {
 						pins: (Vec<String>, Vec<String>)
 					},
 
+					UpdateDecorations {
+						editor_id: Uuid,
+						entity_id: String,
+						decorations: Vec<(String, String)>
+					},
+
 					UpdateValidity {
 						editor_id: Uuid,
 						validity: EditorValidity

@@ -1,18 +1,20 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use fn_error_context::context;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use parking_lot::RwLock;
 use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};
 use rand::{seq::SliceRandom, thread_rng};
+use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
 use serde::{Deserialize, Serialize};
 use serde_json::from_value;
 use specta::Type;
 use tryvial::try_fn;
 use velcro::vec;
 
-use crate::model::EditorValidity;
+use crate::{game_detection::GameVersion, model::EditorValidity, rpkg::extract_entity};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -550,4 +552,291 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	}
 
 	EditorValidity::Valid
+}
+
+#[try_fn]
+#[context("Couldn't get name of referenced entity {:?}", reference)]
+fn get_ref_decoration(
+	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	cached_entities: &RwLock<HashMap<String, Entity>>,
+	game_version: GameVersion,
+	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+	entity: &Entity,
+	reference: &Ref
+) -> Result<Option<(String, String)>> {
+	if let Some(ent) = get_local_reference(reference) {
+		Some((
+			ent.to_owned(),
+			entity
+				.entities
+				.get(&ent)
+				.context("Referenced local entity doesn't exist")?
+				.name
+				.to_owned()
+		))
+	} else {
+		match reference {
+			Ref::Short(None) => None,
+
+			Ref::Full(reference) => Some((
+				reference.entity_ref.to_owned(),
+				extract_entity(
+					resource_packages,
+					cached_entities,
+					game_version,
+					hash_list_mapping,
+					reference.external_scene.as_ref().unwrap()
+				)?
+				.entities
+				.get(&reference.entity_ref)
+				.context("Referenced entity doesn't exist in external scene")?
+				.name
+				.to_owned()
+			)),
+
+			_ => unreachable!()
+		}
+	}
+}
+
+#[try_fn]
+#[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
+pub fn get_decorations(
+	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	cached_entities: &RwLock<HashMap<String, Entity>>,
+	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+	game_version: GameVersion,
+	sub_entity: &SubEntity,
+	entity: &Entity
+) -> Result<Vec<(String, String)>> {
+	let mut decorations = vec![];
+
+	if let Some(decoration) = get_ref_decoration(
+		resource_packages,
+		cached_entities,
+		game_version,
+		hash_list_mapping,
+		entity,
+		&sub_entity.parent
+	)? {
+		decorations.push(decoration);
+	}
+
+	for property_data in sub_entity.properties.as_ref().unwrap_or(&Default::default()).values() {
+		if property_data.property_type == "SEntityTemplateReference" {
+			if let Some(decoration) = get_ref_decoration(
+				resource_packages,
+				cached_entities,
+				game_version,
+				hash_list_mapping,
+				entity,
+				&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
+			)? {
+				decorations.push(decoration);
+			}
+		} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
+			for reference in
+				from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
+			{
+				if let Some(decoration) = get_ref_decoration(
+					resource_packages,
+					cached_entities,
+					game_version,
+					hash_list_mapping,
+					entity,
+					&reference
+				)? {
+					decorations.push(decoration);
+				}
+			}
+		}
+	}
+
+	for properties in sub_entity
+		.platform_specific_properties
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for property_data in properties.values() {
+			if property_data.property_type == "SEntityTemplateReference" {
+				if let Some(decoration) = get_ref_decoration(
+					resource_packages,
+					cached_entities,
+					game_version,
+					hash_list_mapping,
+					entity,
+					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
+				)? {
+					decorations.push(decoration);
+				}
+			} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
+				for reference in
+					from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
+				{
+					if let Some(decoration) = get_ref_decoration(
+						resource_packages,
+						cached_entities,
+						game_version,
+						hash_list_mapping,
+						entity,
+						&reference
+					)? {
+						decorations.push(decoration);
+					}
+				}
+			}
+		}
+	}
+
+	for triggers in sub_entity.events.as_ref().unwrap_or(&Default::default()).values() {
+		for trigger_entities in triggers.values() {
+			for reference in trigger_entities {
+				let reference = match reference {
+					RefMaybeConstantValue::Ref(x) => x,
+					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
+				};
+
+				if let Some(decoration) = get_ref_decoration(
+					resource_packages,
+					cached_entities,
+					game_version,
+					hash_list_mapping,
+					entity,
+					reference
+				)? {
+					decorations.push(decoration);
+				}
+			}
+		}
+	}
+
+	for propagates in sub_entity
+		.input_copying
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for propagate_entities in propagates.values() {
+			for reference in propagate_entities {
+				let reference = match reference {
+					RefMaybeConstantValue::Ref(x) => x,
+					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
+				};
+
+				if let Some(decoration) = get_ref_decoration(
+					resource_packages,
+					cached_entities,
+					game_version,
+					hash_list_mapping,
+					entity,
+					reference
+				)? {
+					decorations.push(decoration);
+				}
+			}
+		}
+	}
+
+	for propagates in sub_entity
+		.output_copying
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for propagate_entities in propagates.values() {
+			for reference in propagate_entities {
+				let reference = match reference {
+					RefMaybeConstantValue::Ref(x) => x,
+					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
+				};
+
+				if let Some(decoration) = get_ref_decoration(
+					resource_packages,
+					cached_entities,
+					game_version,
+					hash_list_mapping,
+					entity,
+					reference
+				)? {
+					decorations.push(decoration);
+				}
+			}
+		}
+	}
+
+	for aliases in sub_entity
+		.property_aliases
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for alias_data in aliases {
+			if let Some(decoration) = get_ref_decoration(
+				resource_packages,
+				cached_entities,
+				game_version,
+				hash_list_mapping,
+				entity,
+				&alias_data.original_entity
+			)? {
+				decorations.push(decoration);
+			}
+		}
+	}
+
+	for exposed_entity in sub_entity
+		.exposed_entities
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		for reference in &exposed_entity.refers_to {
+			if let Some(decoration) = get_ref_decoration(
+				resource_packages,
+				cached_entities,
+				game_version,
+				hash_list_mapping,
+				entity,
+				reference
+			)? {
+				decorations.push(decoration);
+			}
+		}
+	}
+
+	for referenced_entity in sub_entity
+		.exposed_interfaces
+		.as_ref()
+		.unwrap_or(&Default::default())
+		.values()
+	{
+		if let Some(decoration) = get_ref_decoration(
+			resource_packages,
+			cached_entities,
+			game_version,
+			hash_list_mapping,
+			entity,
+			&Ref::Short(Some(referenced_entity.to_owned()))
+		)? {
+			decorations.push(decoration);
+		}
+	}
+
+	for member_of in sub_entity.subsets.as_ref().unwrap_or(&Default::default()).values() {
+		for parental_entity in member_of {
+			if let Some(decoration) = get_ref_decoration(
+				resource_packages,
+				cached_entities,
+				game_version,
+				hash_list_mapping,
+				entity,
+				&Ref::Short(Some(parental_entity.to_owned()))
+			)? {
+				decorations.push(decoration);
+			}
+		}
+	}
+
+	decorations.into_iter().unique().collect()
 }

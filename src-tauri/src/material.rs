@@ -13,7 +13,7 @@ pub struct MaterialProperty {
 
 #[derive(Clone, Debug)]
 pub enum MaterialPropertyData {
-	Texture(String),
+	Texture(Option<String>),
 	ColorRGB(f32, f32, f32),
 	ColorRGBA(f32, f32, f32, f32),
 	Float(f32),
@@ -79,20 +79,24 @@ pub fn get_material_properties(
 			data: match entry_type {
 				// A texture.
 				1 => {
-					let texture_dependency_index = i32::from_le_bytes({
+					let texture_dependency_index = u32::from_le_bytes({
 						let mut x = [0u8; 4];
 						matt.read_exact(&mut x)?;
 						x
 					});
 
-					MaterialPropertyData::Texture(
-						matt_meta
-							.hash_reference_data
-							.get(usize::try_from(texture_dependency_index)?)
-							.context("No such texture dependency")?
-							.hash
-							.to_owned()
-					)
+					if texture_dependency_index != u32::MAX {
+						MaterialPropertyData::Texture(Some(
+							matt_meta
+								.hash_reference_data
+								.get(usize::try_from(texture_dependency_index)?)
+								.context("No such texture dependency")?
+								.hash
+								.to_owned()
+						))
+					} else {
+						MaterialPropertyData::Texture(None)
+					}
 				}
 
 				// An RGB colour.

@@ -424,10 +424,14 @@ impl Intellisense {
 									found.push((
 										property.name.to_owned(),
 										"ZRuntimeResourceID".into(),
-										json!({
-											"resource": texture,
-											"flag": "5F"
-										}),
+										texture
+											.map(|texture| {
+												json!({
+													"resource": texture,
+													"flag": "5F"
+												})
+											})
+											.unwrap_or(Value::Null),
 										false
 									));
 

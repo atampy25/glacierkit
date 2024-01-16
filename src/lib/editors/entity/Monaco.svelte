@@ -21,6 +21,9 @@
 
 	let destroyFunc = { run: () => {} }
 
+	let decorations: monaco.editor.IEditorDecorationsCollection
+	let decorationsToCheck: [string, string][] = []
+
 	const baseIntellisenseSchema = merge(cloneDeep(baseSchema), {
 		$ref: "#/definitions/SubEntity",
 		definitions: {
@@ -230,29 +233,34 @@
 			]
 		})
 
-		editor.onDidChangeModelContent(
-			debounce(async () => {
-				if (entityID) {
-					await event({
-						type: "editor",
+		decorations = editor.createDecorationsCollection([])
+
+		const debounced = debounce(async (entityID, content) => {
+			if (entityID) {
+				await event({
+					type: "editor",
+					data: {
+						type: "entity",
 						data: {
-							type: "entity",
+							type: "monaco",
 							data: {
-								type: "monaco",
+								type: "updateContent",
 								data: {
-									type: "updateContent",
-									data: {
-										editor_id: editorID,
-										entity_id: entityID,
-										content: editor.getValue({ preserveBOM: true, lineEnding: "\n" })
-									}
+									editor_id: editorID,
+									entity_id: entityID,
+									content
 								}
 							}
 						}
-					})
-				}
-			}, 1000)
-		)
+					}
+				})
+			}
+		}, 1000)
+
+		editor.onDidChangeModelContent(() => {
+			debounced(entityID, editor.getValue({ preserveBOM: true, lineEnding: "\n" }))
+			updateDecorations()
+		})
 	})
 
 	function updateIntellisense(data: { properties: [string, string, JsonValue, boolean][]; pins: [string[], string[]] }) {
@@ -362,6 +370,30 @@
 		})
 	}
 
+	function updateDecorations() {
+		const newDecorations: monaco.editor.IModelDeltaDecoration[] = []
+
+		for (const [no, line] of editor.getValue().split("\n").entries()) {
+			for (const [check, deco] of decorationsToCheck) {
+				if (line.includes(check)) {
+					newDecorations.push({
+						options: {
+							isWholeLine: true,
+							after: {
+								content: " " + deco,
+								cursorStops: monaco.editor.InjectedTextCursorStops.Left,
+								inlineClassName: "monacoDecorationGray"
+							}
+						},
+						range: new monaco.Range(no + 1, 0, no + 1, line.length + 1)
+					})
+				}
+			}
+		}
+
+		decorations.set(newDecorations)
+	}
+
 	export async function handleRequest(request: EntityMonacoRequest) {
 		console.log(`Monaco editor for editor ${editorID} handling request`, request)
 
@@ -385,6 +417,13 @@
 				}
 				break
 
+			case "updateDecorations":
+				if (request.data.entity_id === entityID) {
+					decorationsToCheck = request.data.decorations
+					updateDecorations()
+				}
+				break
+
 			default:
 				request satisfies never
 				break
@@ -404,3 +443,9 @@
 {#if entityID === null}
 	<p>Select an entity on the left to edit it here.</p>
 {/if}
+
+<style>
+	:global(.monacoDecorationGray) {
+		color: #858585 !important;
+	}
+</style>

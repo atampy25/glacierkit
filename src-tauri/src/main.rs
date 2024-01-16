@@ -34,8 +34,8 @@ use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
 use entity::{
-	calculate_reverse_references, check_local_references_exist, get_local_reference, get_recursive_children,
-	CopiedEntityData, ReverseReferenceData
+	calculate_reverse_references, check_local_references_exist, get_decorations, get_local_reference,
+	get_recursive_children, CopiedEntityData, ReverseReferenceData
 };
 use event_handling::entity_tree::{handle_delete, handle_paste};
 use fn_error_context::context;
@@ -1222,6 +1222,24 @@ fn event(app: AppHandle, event: Event) {
 										)))
 									)?;
 
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::UpdateDecorations {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												decorations: get_decorations(
+													resource_packages,
+													&app_state.cached_entities,
+													&mapping,
+													game_version,
+													entity.entities.get(&id).context("No such entity")?,
+													entity
+												)?
+											}
+										)))
+									)?;
+
 									finish_task(&app, task)?;
 								}
 							}
@@ -1413,7 +1431,7 @@ fn event(app: AppHandle, event: Event) {
 								match from_str(&content) {
 									Ok(sub_entity) => match check_local_references_exist(&sub_entity, entity) {
 										Ok(EditorValidity::Valid) => {
-											entity.entities.insert(entity_id, sub_entity);
+											entity.entities.insert(entity_id.to_owned(), sub_entity);
 
 											send_request(
 												&app,
@@ -1432,6 +1450,61 @@ fn event(app: AppHandle, event: Event) {
 													unsaved: true
 												})
 											)?;
+
+											if let Some(intellisense) = app_state.intellisense.load().as_ref()
+												&& let Some(resource_packages) =
+													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
+												app_state.hash_list.load().as_ref()
+											{
+												let game_version = app_state
+													.game_installs
+													.iter()
+													.try_find(|x| {
+														Ok::<_, Error>(
+															x.path
+																== *app_state
+																	.project
+																	.load()
+																	.as_ref()
+																	.unwrap()
+																	.settings
+																	.load()
+																	.game_install
+																	.as_ref()
+																	.unwrap()
+																	.as_path()
+														)
+													})?
+													.context("No such game install")?
+													.version;
+
+												let task = start_task(&app, "Updating decorations")?;
+
+												send_request(
+													&app,
+													Request::Editor(EditorRequest::Entity(
+														EntityEditorRequest::Monaco(
+															EntityMonacoRequest::UpdateDecorations {
+																editor_id: editor_id.to_owned(),
+																entity_id: entity_id.to_owned(),
+																decorations: get_decorations(
+																	resource_packages,
+																	&app_state.cached_entities,
+																	&hash_list_mapping(hash_list),
+																	game_version,
+																	entity
+																		.entities
+																		.get(&entity_id)
+																		.context("No such entity")?,
+																	entity
+																)?
+															}
+														)
+													))
+												)?;
+
+												finish_task(&app, task)?;
+											}
 										}
 
 										Ok(EditorValidity::Invalid(reason)) => {
