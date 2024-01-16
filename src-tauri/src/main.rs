@@ -6,6 +6,7 @@
 #![feature(try_find)]
 #![allow(clippy::type_complexity)]
 #![feature(let_chains)]
+#![feature(async_closure)]
 
 pub mod entity;
 pub mod event_handling;
@@ -56,8 +57,9 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
-use rpkg::extract_entity;
+use rpkg::{extract_entity, hash_list_mapping};
 use rpkg_rs::{
 	misc::ini_file::IniFile,
 	runtime::resource::{package_manager::PackageManager, resource_container::ResourceContainer}
@@ -69,7 +71,7 @@ use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
 use uuid::Uuid;
-use velcro::{hash_map, vec};
+use velcro::vec;
 use walkdir::WalkDir;
 
 const HASH_LIST_VERSION_ENDPOINT: &str =
@@ -122,7 +124,7 @@ fn main() {
 				fs_watcher: None.into(),
 				editor_states: RwLock::new(HashMap::new()).into(),
 				resource_packages: None.into(),
-				cached_entities: RwLock::new(HashMap::new()).into(),
+				cached_entities: parking_lot::RwLock::new(HashMap::new()).into(),
 				intellisense: None.into()
 			});
 
@@ -267,10 +269,9 @@ fn event(app: AppHandle, event: Event) {
 														})?
 														.context("No such game install")?
 														.version,
-													hash_list,
+													&hash_list_mapping(hash_list),
 													&patch.factory_hash
-												)
-												.await?;
+												)?;
 
 												let base = entity.to_owned();
 
@@ -601,10 +602,9 @@ fn event(app: AppHandle, event: Event) {
 									.context("Game install not fully loaded")?,
 								&app_state.cached_entities,
 								game_install_data.version,
-								app_state.hash_list.load().as_ref().unwrap(),
+								&hash_list_mapping(app_state.hash_list.load().as_ref().unwrap()),
 								&hash
-							)
-							.await?;
+							)?;
 
 							// Normalise comments to form used by Deeznuts (single comment for each entity)
 							let mut comments: Vec<CommentEntity> = vec![];
@@ -771,39 +771,47 @@ fn event(app: AppHandle, event: Event) {
 										anyhow!("RPKG error in initialising resource container: {:?}", x)
 									})?;
 
-									for partition in &package_manager.partition_infos {
-										for patch in vec![
-											0,
-											..ResourceContainer::get_patch_indices(
-												&package_manager.runtime_dir,
-												partition.index
-											)
-											.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
-											.iter()
-											.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
-										]
-										.into_iter()
-										.rev()
-										{
-											let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
-												"chunk{}{}.rpkg",
-												partition.index,
-												if patch > 0 {
-													format!("patch{}", patch)
-												} else {
-													"".into()
-												}
-											));
+									for partition in package_manager.partition_infos {
+										resource_packages.extend(
+											vec![
+												0,
+												..ResourceContainer::get_patch_indices(
+													&package_manager.runtime_dir,
+													partition.index
+												)
+												.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
+												.iter()
+												.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
+											]
+											.into_par_iter()
+											.rev()
+											.map(|patch| {
+												anyhow::Ok({
+													let rpkg_path =
+														Path::new(&package_manager.runtime_dir).join(format!(
+															"chunk{}{}.rpkg",
+															partition.index,
+															if patch > 0 {
+																format!("patch{}", patch)
+															} else {
+																"".into()
+															}
+														));
 
-											resource_packages.insert(rpkg_path.to_owned(), {
-												let package_file = File::open(&rpkg_path)?;
+													(rpkg_path.to_owned(), {
+														let package_file = File::open(&rpkg_path)?;
 
-												let mmap = unsafe { Mmap::map(&package_file)? };
-												let mut reader = Cursor::new(&mmap[..]);
+														let mmap = unsafe { Mmap::map(&package_file)? };
+														let mut reader = Cursor::new(&mmap[..]);
 
-												reader.read_ne_args((patch > 0,)).context("Couldn't parse RPKG file")?
-											});
-										}
+														reader
+															.read_ne_args((patch > 0,))
+															.context("Couldn't parse RPKG file")?
+													})
+												})
+											})
+											.collect::<Result<Vec<_>>>()?
+										);
 									}
 								} else {
 									Err(anyhow!("thumbs.dat was missing required properties"))?;
@@ -837,7 +845,7 @@ fn event(app: AppHandle, event: Event) {
 
 									app_state.intellisense.store(Some(
 										Intellisense {
-											cppt_properties: RwLock::new(HashMap::new()).into(),
+											cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
 											cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
 											uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
 												.unwrap(),
@@ -1186,17 +1194,15 @@ fn event(app: AppHandle, event: Event) {
 											EntityMonacoRequest::UpdateIntellisense {
 												editor_id: editor_id.to_owned(),
 												entity_id: id.to_owned(),
-												properties: intellisense
-													.get_properties(
-														resource_packages,
-														&app_state.cached_entities,
-														hash_list,
-														game_version,
-														entity,
-														&id,
-														true
-													)
-													.await?
+												properties: intellisense.get_properties(
+													resource_packages,
+													&app_state.cached_entities,
+													&hash_list_mapping(hash_list),
+													game_version,
+													entity,
+													&id,
+													true
+												)?
 											}
 										)))
 									)?;
@@ -1917,39 +1923,46 @@ fn event(app: AppHandle, event: Event) {
 									.initialize(&mut resource_container)
 									.map_err(|x| anyhow!("RPKG error in initialising resource container: {:?}", x))?;
 
-								for partition in &package_manager.partition_infos {
-									for patch in vec![
-										0,
-										..ResourceContainer::get_patch_indices(
-											&package_manager.runtime_dir,
-											partition.index
-										)
-										.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
-										.iter()
-										.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
-									]
-									.into_iter()
-									.rev()
-									{
-										let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
-											"chunk{}{}.rpkg",
-											partition.index,
-											if patch > 0 {
-												format!("patch{}", patch)
-											} else {
-												"".into()
-											}
-										));
+								for partition in package_manager.partition_infos {
+									resource_packages.extend(
+										vec![
+											0,
+											..ResourceContainer::get_patch_indices(
+												&package_manager.runtime_dir,
+												partition.index
+											)
+											.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
+											.iter()
+											.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
+										]
+										.into_par_iter()
+										.rev()
+										.map(|patch| {
+											anyhow::Ok({
+												let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
+													"chunk{}{}.rpkg",
+													partition.index,
+													if patch > 0 {
+														format!("patch{}", patch)
+													} else {
+														"".into()
+													}
+												));
 
-										resource_packages.insert(rpkg_path.to_owned(), {
-											let package_file = File::open(&rpkg_path)?;
+												(rpkg_path.to_owned(), {
+													let package_file = File::open(&rpkg_path)?;
 
-											let mmap = unsafe { Mmap::map(&package_file)? };
-											let mut reader = Cursor::new(&mmap[..]);
+													let mmap = unsafe { Mmap::map(&package_file)? };
+													let mut reader = Cursor::new(&mmap[..]);
 
-											reader.read_ne_args((patch > 0,)).context("Couldn't parse RPKG file")?
-										});
-									}
+													reader
+														.read_ne_args((patch > 0,))
+														.context("Couldn't parse RPKG file")?
+												})
+											})
+										})
+										.collect::<Result<Vec<_>>>()?
+									);
 								}
 							} else {
 								Err(anyhow!("thumbs.dat was missing required properties"))?;
@@ -2018,7 +2031,7 @@ fn event(app: AppHandle, event: Event) {
 
 							app_state.intellisense.store(Some(
 								Intellisense {
-									cppt_properties: RwLock::new(HashMap::new()).into(),
+									cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
 									cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
 									uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
 										.unwrap(),

@@ -4,24 +4,23 @@ use std::{
 	sync::Arc
 };
 
-use anyhow::{Context, Result};
-use async_recursion::async_recursion;
+use anyhow::{Context, Ok, Result};
 use fn_error_context::context;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use parking_lot::RwLock;
 use quickentity_rs::{
 	qn_structs::{Entity, Ref},
 	rt_structs::PropertyID,
 	util_structs::ZGuidPropertyValue
 };
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
 use serde_json::{from_value, json, to_value, Value};
-use tokio::sync::RwLock;
 use tryvial::try_fn;
 
 use crate::{
 	game_detection::GameVersion,
-	hash_list::HashList,
 	resourcelib::{h2016_convert_cppt, h2_convert_cppt, h3_convert_cppt},
 	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
@@ -46,20 +45,20 @@ pub struct Intellisense {
 impl Intellisense {
 	#[try_fn]
 	#[context("Couldn't get properties for CPPT {}", cppt)]
-	async fn get_cppt_properties(
+	fn get_cppt_properties(
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-		hash_list: &HashList,
+		hash_list_mapping: &HashMap<String, Option<String>>,
 		game_version: GameVersion,
 		cppt: &str
 	) -> Result<HashMap<String, (String, Value)>> {
 		{
-			if let Some(cached) = self.cppt_properties.read().await.get(cppt) {
+			if let Some(cached) = self.cppt_properties.read().get(cppt) {
 				return Ok(cached.to_owned());
 			}
 		}
 
-		let extracted = extract_latest_resource(resource_packages, hash_list, cppt)?;
+		let extracted = extract_latest_resource(resource_packages, hash_list_mapping, cppt)?;
 
 		let cppt_data = match game_version {
 			GameVersion::H1 => h2016_convert_cppt(&extracted.1)?,
@@ -67,7 +66,7 @@ impl Intellisense {
 			GameVersion::H3 => h3_convert_cppt(&extracted.1)?
 		};
 
-		let mut guard = self.cppt_properties.write().await;
+		let mut guard = self.cppt_properties.write();
 		guard.insert(
 			cppt.into(),
 			cppt_data
@@ -214,12 +213,11 @@ impl Intellisense {
 	/// Get the names, types, default values and post-init status of all properties of a given sub-entity.
 	#[try_fn]
 	#[context("Couldn't get properties for sub-entity {} in {}", sub_entity, entity.factory_hash)]
-	#[async_recursion]
-	pub async fn get_properties(
+	pub fn get_properties(
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 		cached_entities: &RwLock<HashMap<String, Entity>>,
-		hash_list: &HashList,
+		hash_list_mapping: &HashMap<String, Option<String>>,
 		game_version: GameVersion,
 		entity: &Entity,
 		sub_entity: &str,
@@ -229,29 +227,43 @@ impl Intellisense {
 
 		let mut found = vec![];
 
-		for (aliased_name, aliases) in targeted.property_aliases.as_ref().unwrap_or(&Default::default()) {
-			for alias in aliases {
-				if let Ref::Short(Some(ent)) = &alias.original_entity {
-					let data = self
-						.get_properties(
-							resource_packages,
-							cached_entities,
-							hash_list,
-							game_version,
-							entity,
-							ent,
-							false
-						)
-						.await?
-						.into_iter()
-						.find(|(x, _, _, _)| *x == alias.original_property)
-						.context("Couldn't find property data for aliased property")?;
+		found.extend(
+			targeted
+				.property_aliases
+				.as_ref()
+				.unwrap_or(&Default::default())
+				.into_par_iter()
+				.map(|(aliased_name, aliases)| {
+					Ok({
+						let mut found = vec![];
+						for alias in aliases {
+							if let Ref::Short(Some(ent)) = &alias.original_entity {
+								if let Some(data) = self
+									.get_properties(
+										resource_packages,
+										cached_entities,
+										hash_list_mapping,
+										game_version,
+										entity,
+										ent,
+										false
+									)?
+									.into_iter()
+									.find(|(x, _, _, _)| *x == alias.original_property)
+								{
+									found.push((aliased_name.to_owned(), data.1, data.2, data.3));
+								}
+								break;
+							}
+						}
 
-					found.push((aliased_name.to_owned(), data.1, data.2, data.3));
-					break;
-				}
-			}
-		}
+						found
+					})
+				})
+				.collect::<Result<Vec<_>>>()?
+				.into_iter()
+				.flatten()
+		);
 
 		if !ignore_own {
 			for (property, property_data) in targeted.properties.as_ref().unwrap_or(&Default::default()) {
@@ -264,73 +276,97 @@ impl Intellisense {
 			}
 		}
 
-		for factory in {
-			if self.all_asets.contains(&normalise_to_hash(&targeted.factory)) {
-				extract_latest_metadata(resource_packages, hash_list, &normalise_to_hash(&targeted.factory))?
+		found.extend(
+			{
+				if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
+					extract_latest_metadata(
+						resource_packages,
+						hash_list_mapping,
+						&normalise_to_hash(targeted.factory.to_owned())
+					)?
 					.hash_reference_data
 					.into_iter()
 					.rev()
 					.skip(1)
 					.rev()
-					.map(|x| x.hash.to_owned())
+					.map(|x| normalise_to_hash(x.hash))
 					.collect_vec()
-			} else {
-				vec![normalise_to_hash(&targeted.factory)]
+				} else {
+					vec![normalise_to_hash(targeted.factory.to_owned())]
+				}
 			}
-		} {
-			if self.all_cppts.contains(&factory) {
-				for (prop_name, (prop_type, default_val)) in self
-					.get_cppt_properties(resource_packages, hash_list, game_version, &factory)
-					.await?
-				{
-					found.push((prop_name, prop_type, default_val, false));
-				}
-			} else if self.all_uicts.contains(&factory) {
-				// All UI controls have the properties of ZUIControlEntity
-				for (prop_name, (prop_type, default_val)) in self
-					.get_cppt_properties(resource_packages, hash_list, game_version, "002C4526CC9753E6")
-					.await?
-				{
-					found.push((prop_name, prop_type, default_val, false));
-				}
+			.into_par_iter()
+			.map(|factory| {
+				Ok({
+					let mut found = vec![];
 
-			// TODO: Read UICB
-			} else if self.all_matts.contains(&factory) {
-				// All materials have the properties of ZRenderMaterialEntity
-				for (prop_name, (prop_type, default_val)) in self
-					.get_cppt_properties(resource_packages, hash_list, game_version, "00B4B11DA327CAD0")
-					.await?
-				{
-					found.push((prop_name, prop_type, default_val, false));
-				}
+					if self.all_cppts.contains(&factory) {
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(resource_packages, hash_list_mapping, game_version, &factory)?
+						{
+							found.push((prop_name, prop_type, default_val, false));
+						}
+					} else if self.all_uicts.contains(&factory) {
+						// All UI controls have the properties of ZUIControlEntity
+						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+							resource_packages,
+							hash_list_mapping,
+							game_version,
+							"002C4526CC9753E6"
+						)? {
+							found.push((prop_name, prop_type, default_val, false));
+						}
 
-			// TODO: Read material info
-			} else if self.all_wswts.contains(&factory) {
-				// All switch groups have the properties of ZAudioSwitchEntity
-				for (prop_name, (prop_type, default_val)) in self
-					.get_cppt_properties(resource_packages, hash_list, game_version, "00797DC916520C4D")
-					.await?
-				{
-					found.push((prop_name, prop_type, default_val, false));
-				}
-			} else {
-				let extracted =
-					extract_entity(resource_packages, cached_entities, game_version, hash_list, &factory).await?;
+					// TODO: Read UICB
+					} else if self.all_matts.contains(&factory) {
+						// All materials have the properties of ZRenderMaterialEntity
+						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+							resource_packages,
+							hash_list_mapping,
+							game_version,
+							"00B4B11DA327CAD0"
+						)? {
+							found.push((prop_name, prop_type, default_val, false));
+						}
 
-				found.extend(
-					self.get_properties(
-						resource_packages,
-						cached_entities,
-						hash_list,
-						game_version,
-						&extracted,
-						&extracted.root_entity,
-						false
-					)
-					.await?
-				);
-			}
-		}
+					// TODO: Read material info
+					} else if self.all_wswts.contains(&factory) {
+						// All switch groups have the properties of ZAudioSwitchEntity
+						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+							resource_packages,
+							hash_list_mapping,
+							game_version,
+							"00797DC916520C4D"
+						)? {
+							found.push((prop_name, prop_type, default_val, false));
+						}
+					} else {
+						let extracted = extract_entity(
+							resource_packages,
+							cached_entities,
+							game_version,
+							hash_list_mapping,
+							&factory
+						)?;
+
+						found.extend(self.get_properties(
+							resource_packages,
+							cached_entities,
+							hash_list_mapping,
+							game_version,
+							&extracted,
+							&extracted.root_entity,
+							false
+						)?);
+					}
+
+					found
+				})
+			})
+			.collect::<Result<Vec<_>>>()?
+			.into_iter()
+			.flatten()
+		);
 
 		found
 	}

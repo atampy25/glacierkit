@@ -55,6 +55,8 @@ lz4 = "1.24.0"
 binrw = "0.13.3"
 rfd = "0.10.0"
 async-recursion = "1.0.5"
+parking_lot = "0.12.1"
+rayon = "1.8.0"
 
 [target.'cfg(linux)'.dependencies]
 fork = "0.1.22"

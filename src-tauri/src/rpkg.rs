@@ -10,6 +10,7 @@ use fn_error_context::context;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lz4::block::decompress_to_buffer;
+use parking_lot::RwLock;
 use quickentity_rs::{
 	convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn,
 	qn_structs::Entity,
@@ -19,7 +20,6 @@ use rpkg_rs::{
 	encryption::md5_engine::Md5Engine,
 	runtime::resource::{resource_package::ResourcePackage, runtime_resource_id::RuntimeResourceID}
 };
-use tokio::sync::RwLock;
 use tryvial::try_fn;
 use velcro::vec;
 
@@ -36,29 +36,14 @@ use crate::{
 #[context("Couldn't extract resource {}", resource)]
 pub fn extract_latest_resource(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	hash_list: &HashList,
+	hash_list_mapping: &HashMap<String, Option<String>>,
 	resource: &str
 ) -> Result<(ResourceMeta, Vec<u8>)> {
-	let resource = normalise_to_hash(resource);
+	let resource = normalise_to_hash(resource.into());
 
 	let resource_id = RuntimeResourceID {
 		id: u64::from_str_radix(&resource, 16)?
 	};
-
-	let hash_list_mapping = hash_list
-		.entries
-		.iter()
-		.map(|x| {
-			(
-				x.hash.to_owned(),
-				if x.path.is_empty() {
-					None
-				} else {
-					Some(x.path.to_owned())
-				}
-			)
-		})
-		.collect::<HashMap<_, _>>();
 
 	for (rpkg_path, rpkg) in resource_packages {
 		if let Some((resource_header, offset_info)) = rpkg
@@ -143,31 +128,16 @@ pub fn extract_latest_resource(
 #[context("Couldn't extract metadata for resource {}", resource)]
 pub fn extract_latest_metadata(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	hash_list: &HashList,
+	hash_list_mapping: &HashMap<String, Option<String>>,
 	resource: &str
 ) -> Result<ResourceMeta> {
-	let resource = normalise_to_hash(resource);
+	let resource = normalise_to_hash(resource.into());
 
 	let resource_id = RuntimeResourceID {
 		id: u64::from_str_radix(&resource, 16)?
 	};
 
-	let hash_list_mapping = hash_list
-		.entries
-		.iter()
-		.map(|x| {
-			(
-				x.hash.to_owned(),
-				if x.path.is_empty() {
-					None
-				} else {
-					Some(x.path.to_owned())
-				}
-			)
-		})
-		.collect::<HashMap<_, _>>();
-
-	for (rpkg_path, rpkg) in resource_packages {
+	for rpkg in resource_packages.values() {
 		if let Some((resource_header, offset_info)) = rpkg
 			.resource_entries
 			.iter()
@@ -212,20 +182,20 @@ pub fn extract_latest_metadata(
 /// Extract an entity by its factory's path or hash.
 #[try_fn]
 #[context("Couldn't extract entity {}", factory_path)]
-pub async fn extract_entity(
+pub fn extract_entity(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
-	hash_list: &HashList,
+	hash_list_mapping: &HashMap<String, Option<String>>,
 	factory_path: &str
 ) -> Result<Entity> {
 	{
-		if let Some(cached) = cached_entities.read().await.get(factory_path) {
+		if let Some(cached) = cached_entities.read().get(factory_path) {
 			return Ok(cached.to_owned());
 		}
 	}
 
-	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, factory_path)?;
+	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list_mapping, factory_path)?;
 
 	let factory =
 		match game_version {
@@ -247,7 +217,7 @@ pub async fn extract_entity(
 		.context("Blueprint referenced in factory does not exist in dependencies")?
 		.hash;
 
-	let (tblu_meta, tblu_data) = extract_latest_resource(resource_packages, hash_list, blueprint_hash)?;
+	let (tblu_meta, tblu_data) = extract_latest_resource(resource_packages, hash_list_mapping, blueprint_hash)?;
 
 	let blueprint = match game_version {
 		GameVersion::H1 => convert_2016_blueprint_to_modern(
@@ -265,22 +235,35 @@ pub async fn extract_entity(
 	let entity = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, true)
 		.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-	cached_entities.write().await.insert(
-		if factory_path.starts_with('0') {
-			factory_path.to_owned()
-		} else {
-			format!("{:0>16X}", Md5Engine::compute(&factory_path.to_lowercase()))
-		},
-		entity.to_owned()
-	);
+	cached_entities
+		.write()
+		.insert(normalise_to_hash(factory_path.into()), entity.to_owned());
 
 	entity
 }
 
-pub fn normalise_to_hash(hash_or_path: &str) -> String {
+pub fn normalise_to_hash(hash_or_path: String) -> String {
 	if hash_or_path.starts_with('0') {
-		hash_or_path.to_owned()
+		hash_or_path
 	} else {
 		format!("{:0>16X}", Md5Engine::compute(&hash_or_path.to_lowercase()))
 	}
+}
+
+/// Generate a map for use with extract_* functions.
+pub fn hash_list_mapping(hash_list: &HashList) -> HashMap<String, Option<String>> {
+	hash_list
+		.entries
+		.iter()
+		.map(|x| {
+			(
+				x.hash.to_owned(),
+				if x.path.is_empty() {
+					None
+				} else {
+					Some(x.path.to_owned())
+				}
+			)
+		})
+		.collect()
 }

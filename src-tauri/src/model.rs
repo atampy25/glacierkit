@@ -35,7 +35,7 @@ pub struct AppState {
 	pub fs_watcher: ArcSwapOption<RecommendedWatcher>,
 	pub editor_states: Arc<RwLock<HashMap<Uuid, EditorState>>>,
 	pub resource_packages: ArcSwapOption<IndexMap<PathBuf, ResourcePackage>>,
-	pub cached_entities: Arc<RwLock<HashMap<String, Entity>>>,
+	pub cached_entities: Arc<parking_lot::RwLock<HashMap<String, Entity>>>,
 	pub intellisense: ArcSwapOption<Intellisense>
 }
 
