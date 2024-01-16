@@ -236,6 +236,11 @@ strike! {
 						editor_id: Uuid,
 						entity_id: String,
 						content: String
+					},
+
+					FollowReference {
+						editor_id: Uuid,
+						reference: String
 					}
 				}),
 
@@ -399,10 +404,11 @@ strike! {
 						pins: (Vec<String>, Vec<String>)
 					},
 
-					UpdateDecorations {
+					UpdateDecorationsAndMonacoInfo {
 						editor_id: Uuid,
 						entity_id: String,
-						decorations: Vec<(String, String)>
+						decorations: Vec<(String, String)>,
+						local_ref_entity_ids: Vec<String>
 					},
 
 					UpdateValidity {

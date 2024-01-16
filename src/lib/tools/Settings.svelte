@@ -12,7 +12,6 @@
 			case "initialise":
 				gameInstalls = request.data.game_installs
 				extractModdedFiles = request.data.settings.extractModdedFiles
-				gfePath = request.data.settings.gameFileExtensionsPath
 				break
 
 			case "changeProjectSettings":
@@ -57,7 +56,6 @@
 	}
 
 	let extractModdedFiles = false
-	let gfePath: string | null = null
 
 	let projectLoaded = false
 

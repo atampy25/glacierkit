@@ -22,7 +22,9 @@
 	let destroyFunc = { run: () => {} }
 
 	let decorations: monaco.editor.IEditorDecorationsCollection
+
 	let decorationsToCheck: [string, string][] = []
+	let localRefEntityIDs: string[] = []
 
 	const baseIntellisenseSchema = merge(cloneDeep(baseSchema), {
 		$ref: "#/definitions/SubEntity",
@@ -221,6 +223,50 @@
 			editor.getModel()?.dispose()
 		}
 
+		const showFollowReferenceCondition = editor.createContextKey<boolean>("showFollowReferenceCondition", false)
+
+		editor.onDidChangeCursorPosition((e) => {
+			let word: string | undefined | false
+			try {
+				word = editor.getModel()!.getWordAtPosition(e.position)?.word
+			} catch {
+				word = false
+			}
+
+			if (!word) {
+				showFollowReferenceCondition.set(false)
+			} else {
+				showFollowReferenceCondition.set(localRefEntityIDs.includes(word))
+			}
+		})
+
+		editor.addAction({
+			id: "follow-reference",
+			label: "Follow reference",
+			contextMenuGroupId: "navigation",
+			contextMenuOrder: 0,
+			keybindings: [monaco.KeyCode.F12],
+			precondition: "showFollowReferenceCondition",
+			run: async (ed) => {
+				await event({
+					type: "editor",
+					data: {
+						type: "entity",
+						data: {
+							type: "monaco",
+							data: {
+								type: "followReference",
+								data: {
+									editor_id: editorID,
+									reference: editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
+								}
+							}
+						}
+					}
+				})
+			}
+		})
+
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			...monaco.languages.json.jsonDefaults.diagnosticsOptions,
 			schemas: [
@@ -417,9 +463,10 @@
 				}
 				break
 
-			case "updateDecorations":
+			case "updateDecorationsAndMonacoInfo":
 				if (request.data.entity_id === entityID) {
 					decorationsToCheck = request.data.decorations
+					localRefEntityIDs = request.data.local_ref_entity_ids
 					updateDecorations()
 				}
 				break

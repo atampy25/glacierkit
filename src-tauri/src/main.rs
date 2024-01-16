@@ -1222,20 +1222,27 @@ fn event(app: AppHandle, event: Event) {
 										)))
 									)?;
 
+									let decorations = get_decorations(
+										resource_packages,
+										&app_state.cached_entities,
+										&hash_list_mapping(hash_list),
+										game_version,
+										entity.entities.get(&id).context("No such entity")?,
+										entity
+									)?;
+
 									send_request(
 										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-											EntityMonacoRequest::UpdateDecorations {
+											EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
 												editor_id: editor_id.to_owned(),
 												entity_id: id.to_owned(),
-												decorations: get_decorations(
-													resource_packages,
-													&app_state.cached_entities,
-													&mapping,
-													game_version,
-													entity.entities.get(&id).context("No such entity")?,
-													entity
-												)?
+												local_ref_entity_ids: decorations
+													.iter()
+													.filter(|(x, _)| entity.entities.contains_key(x))
+													.map(|(x, _)| x.to_owned())
+													.collect(),
+												decorations
 											}
 										)))
 									)?;
@@ -1451,10 +1458,8 @@ fn event(app: AppHandle, event: Event) {
 												})
 											)?;
 
-											if let Some(intellisense) = app_state.intellisense.load().as_ref()
-												&& let Some(resource_packages) =
-													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
-												app_state.hash_list.load().as_ref()
+											if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+												&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 											{
 												let game_version = app_state
 													.game_installs
@@ -1480,24 +1485,28 @@ fn event(app: AppHandle, event: Event) {
 
 												let task = start_task(&app, "Updating decorations")?;
 
+												let decorations = get_decorations(
+													resource_packages,
+													&app_state.cached_entities,
+													&hash_list_mapping(hash_list),
+													game_version,
+													entity.entities.get(&entity_id).context("No such entity")?,
+													entity
+												)?;
+
 												send_request(
 													&app,
 													Request::Editor(EditorRequest::Entity(
 														EntityEditorRequest::Monaco(
-															EntityMonacoRequest::UpdateDecorations {
+															EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
 																editor_id: editor_id.to_owned(),
 																entity_id: entity_id.to_owned(),
-																decorations: get_decorations(
-																	resource_packages,
-																	&app_state.cached_entities,
-																	&hash_list_mapping(hash_list),
-																	game_version,
-																	entity
-																		.entities
-																		.get(&entity_id)
-																		.context("No such entity")?,
-																	entity
-																)?
+																local_ref_entity_ids: decorations
+																	.iter()
+																	.filter(|(x, _)| entity.entities.contains_key(x))
+																	.map(|(x, _)| x.to_owned())
+																	.collect(),
+																decorations
 															}
 														)
 													))
@@ -1550,6 +1559,18 @@ fn event(app: AppHandle, event: Event) {
 										)?;
 									}
 								}
+							}
+
+							EntityMonacoEvent::FollowReference { editor_id, reference } => {
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+										EntityTreeRequest::Select {
+											editor_id,
+											id: Some(reference)
+										}
+									)))
+								)?;
 							}
 						},
 
