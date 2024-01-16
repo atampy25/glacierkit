@@ -9,7 +9,7 @@ use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, Re
 use rand::{seq::SliceRandom, thread_rng};
 use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
 use serde::{Deserialize, Serialize};
-use serde_json::from_value;
+use serde_json::{from_slice, from_value, Value};
 use specta::Type;
 use tryvial::try_fn;
 use velcro::vec;
@@ -615,6 +615,10 @@ pub fn get_decorations(
 ) -> Result<Vec<(String, String)>> {
 	let mut decorations = vec![];
 
+	let repository = from_slice::<Vec<Value>>(
+		&extract_latest_resource(resource_packages, hash_list_mapping, "00204D1AFD76AB13")?.1
+	)?;
+
 	if let Some(decoration) = get_ref_decoration(
 		resource_packages,
 		cached_entities,
@@ -653,6 +657,46 @@ pub fn get_decorations(
 					decorations.push(decoration);
 				}
 			}
+		} else if property_data.property_type == "ZGuid" {
+			let repository_id = from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
+
+			if let Some(repo_item) = repository.iter().try_find(|x| {
+				anyhow::Ok(
+					x.get("ID_")
+						.context("No ID on repository item")?
+						.as_str()
+						.context("ID was not string")?
+						== repository_id
+				)
+			})? {
+				if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+					decorations.push((
+						repository_id,
+						name.as_str().context("Name or CommonName was not string")?.to_owned()
+					));
+				}
+			}
+		} else if property_data.property_type == "TArray<ZGuid>" {
+			for repository_id in
+				from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
+			{
+				if let Some(repo_item) = repository.iter().try_find(|x| {
+					anyhow::Ok(
+						x.get("ID_")
+							.context("No ID on repository item")?
+							.as_str()
+							.context("ID was not string")?
+							== repository_id
+					)
+				})? {
+					if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+						decorations.push((
+							repository_id,
+							name.as_str().context("Name or CommonName was not string")?.to_owned()
+						));
+					}
+				}
+			}
 		}
 	}
 
@@ -687,6 +731,45 @@ pub fn get_decorations(
 						&reference
 					)? {
 						decorations.push(decoration);
+					}
+				}
+			} else if property_data.property_type == "ZGuid" {
+				let repository_id = from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
+
+				if let Some(repo_item) = repository.iter().try_find(|x| {
+					anyhow::Ok(
+						x.get("ID_")
+							.context("No ID on repository item")?
+							.as_str()
+							.context("ID was not string")?
+							== repository_id
+					)
+				})? {
+					if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+						decorations.push((
+							repository_id,
+							name.as_str().context("Name or CommonName was not string")?.to_owned()
+						));
+					}
+				}
+			} else if property_data.property_type == "TArray<ZGuid>" {
+				for repository_id in
+					from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
+				{
+					if let Some(repo_item) = repository.iter().try_find(|x| {
+						anyhow::Ok(
+							x.get("ID_")
+								.context("No ID on repository item")?
+								.as_str()
+								.context("ID was not string")? == repository_id
+						)
+					})? {
+						if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+							decorations.push((
+								repository_id,
+								name.as_str().context("Name or CommonName was not string")?.to_owned()
+							));
+						}
 					}
 				}
 			}
