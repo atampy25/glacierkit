@@ -179,23 +179,23 @@ pub fn extract_latest_metadata(
 	bail!("Couldn't find the resource in any RPKG");
 }
 
-/// Extract an entity by its factory's path or hash.
+/// Extract an entity by its factory's hash (you must normalise paths yourself) and put it in the cache. Returns early if the entity is already cached.
 #[try_fn]
-#[context("Couldn't extract entity {}", factory_path)]
-pub fn extract_entity(
+#[context("Couldn't ensure caching of entity {}", factory_hash)]
+pub fn ensure_entity_in_cache(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
 	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
-	factory_path: &str
-) -> Result<Entity> {
+	factory_hash: &str
+) -> Result<()> {
 	{
-		if let Some(cached) = cached_entities.read().get(factory_path) {
-			return Ok(cached.to_owned());
+		if cached_entities.read().contains_key(factory_hash) {
+			return Ok(());
 		}
 	}
 
-	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list_mapping, factory_path)?;
+	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list_mapping, factory_hash)?;
 
 	let factory =
 		match game_version {
@@ -237,9 +237,7 @@ pub fn extract_entity(
 
 	cached_entities
 		.write()
-		.insert(normalise_to_hash(factory_path.into()), entity.to_owned());
-
-	entity
+		.insert(factory_hash.to_owned(), entity.to_owned());
 }
 
 pub fn normalise_to_hash(hash_or_path: String) -> String {

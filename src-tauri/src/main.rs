@@ -35,9 +35,12 @@ use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
 use entity::{
 	calculate_reverse_references, check_local_references_exist, get_decorations, get_local_reference,
-	get_recursive_children, CopiedEntityData, ReverseReferenceData
+	get_recursive_children, get_ref_decoration, CopiedEntityData, ReverseReferenceData
 };
-use event_handling::entity_tree::{handle_delete, handle_paste};
+use event_handling::{
+	entity_overrides::send_overrides_decorations,
+	entity_tree::{handle_delete, handle_paste}
+};
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
@@ -49,20 +52,20 @@ use memmap2::Mmap;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
 	EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetaPaneRequest,
-	EntityMetadataEvent, EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent,
-	EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent,
-	GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings, Request, SettingsEvent, SettingsRequest,
-	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	EntityMetadataEvent, EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityOverridesEvent,
+	EntityOverridesRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
+	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings,
+	Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
-	apply_patch, generate_patch,
+	apply_patch, convert_to_qn, convert_to_rt, generate_patch,
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
-use rpkg::{extract_entity, extract_latest_resource, hash_list_mapping, normalise_to_hash};
+use rpkg::{ensure_entity_in_cache, extract_latest_resource, hash_list_mapping, normalise_to_hash};
 use rpkg_rs::{
 	misc::ini_file::IniFile,
 	runtime::resource::{package_manager::PackageManager, resource_container::ResourceContainer}
@@ -249,7 +252,7 @@ fn event(app: AppHandle, event: Event) {
 												.unwrap_or(false) && let Some(hash_list) =
 												app_state.hash_list.load().as_ref()
 											{
-												let mut entity = extract_entity(
+												ensure_entity_in_cache(
 													app_state
 														.resource_packages
 														.load()
@@ -260,7 +263,7 @@ fn event(app: AppHandle, event: Event) {
 														.game_installs
 														.iter()
 														.try_find(|x| {
-															Ok::<_, Error>(
+															anyhow::Ok(
 																x.path
 																	== *app_state
 																		.project
@@ -278,8 +281,15 @@ fn event(app: AppHandle, event: Event) {
 														.context("No such game install")?
 														.version,
 													&hash_list_mapping(hash_list),
-													&patch.factory_hash
+													&normalise_to_hash(patch.factory_hash.to_owned())
 												)?;
+
+												let mut entity = app_state
+													.cached_entities
+													.read()
+													.get(&normalise_to_hash(patch.factory_hash.to_owned()))
+													.unwrap()
+													.to_owned();
 
 												let base = entity.to_owned();
 
@@ -575,6 +585,163 @@ fn event(app: AppHandle, event: Event) {
 
 							finish_task(&app, task)?;
 						}
+
+						FileBrowserEvent::NormaliseQNFile { path } => {
+							let extension = path
+								.file_name()
+								.context("No file name")?
+								.to_string_lossy()
+								.split('.')
+								.skip(1)
+								.collect_vec()
+								.join(".");
+
+							match extension.as_ref() {
+								"entity.json" => {
+									let mut entity: Entity =
+										from_slice(&fs::read(&path).context("Couldn't read file")?)
+											.context("Invalid entity")?;
+
+									// Normalise comments to form used by Deeznuts (single comment for each entity)
+									let mut comments: Vec<CommentEntity> = vec![];
+									for comment in entity.comments {
+										if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+											x.text = format!("{}\n\n{}", x.text, comment.text);
+										} else {
+											comments.push(CommentEntity {
+												parent: comment.parent,
+												name: "Notes".into(),
+												text: comment.text
+											});
+										}
+									}
+									entity.comments = comments;
+
+									let (fac, fac_meta, blu, blu_meta) =
+										convert_to_rt(&entity).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+									let reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, true)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+									fs::write(path, to_vec(&reconverted)?)?;
+
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Success,
+											title: "File normalised".into(),
+											subtitle: "The entity file has been re-saved in canonical format.".into()
+										}
+									)?;
+								}
+
+								"entity.patch.json" => {
+									let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
+										.context("Invalid entity")?;
+
+									if app_state
+										.project
+										.load()
+										.as_ref()
+										.map(|x| x.settings.load().game_install.is_some())
+										.unwrap_or(false) && let Some(hash_list) = app_state.hash_list.load().as_ref()
+									{
+										ensure_entity_in_cache(
+											app_state
+												.resource_packages
+												.load()
+												.as_deref()
+												.context("Game install not fully loaded")?,
+											&app_state.cached_entities,
+											app_state
+												.game_installs
+												.iter()
+												.try_find(|x| {
+													anyhow::Ok(
+														x.path
+															== *app_state
+																.project
+																.load()
+																.as_ref()
+																.unwrap()
+																.settings
+																.load()
+																.game_install
+																.as_ref()
+																.unwrap()
+																.as_path()
+													)
+												})?
+												.context("No such game install")?
+												.version,
+											&hash_list_mapping(hash_list),
+											&normalise_to_hash(patch.factory_hash.to_owned())
+										)?;
+
+										let mut entity = app_state
+											.cached_entities
+											.read()
+											.get(&normalise_to_hash(patch.factory_hash.to_owned()))
+											.unwrap()
+											.to_owned();
+
+										let base = entity.to_owned();
+
+										apply_patch(&mut entity, patch, true)
+											.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+										// Normalise comments to form used by Deeznuts (single comment for each entity)
+										let mut comments: Vec<CommentEntity> = vec![];
+										for comment in entity.comments {
+											if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+												x.text = format!("{}\n\n{}", x.text, comment.text);
+											} else {
+												comments.push(CommentEntity {
+													parent: comment.parent,
+													name: "Notes".into(),
+													text: comment.text
+												});
+											}
+										}
+										entity.comments = comments;
+
+										fs::write(
+											path,
+											to_vec(
+												&generate_patch(&base, &entity)
+													.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+											)?
+										)?;
+
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Success,
+												title: "File normalised".into(),
+												subtitle: "The patch file has been re-saved in canonical format."
+													.into()
+											}
+										)?;
+									} else {
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Error,
+												title: "No game selected".into(),
+												subtitle: "You can't normalise patch files without a copy of the game \
+												           selected."
+													.into()
+											}
+										)?;
+									}
+								}
+
+								_ => {
+									Err(anyhow!("Can't normalise non-QN files"))?;
+									panic!();
+								}
+							}
+						}
 					},
 
 					ToolEvent::GameBrowser(event) => match event {
@@ -585,7 +752,7 @@ fn event(app: AppHandle, event: Event) {
 								.game_installs
 								.iter()
 								.try_find(|x| {
-									Ok::<_, Error>(
+									anyhow::Ok(
 										x.path
 											== *app_state
 												.project
@@ -602,7 +769,7 @@ fn event(app: AppHandle, event: Event) {
 								})?
 								.context("No such game install")?;
 
-							let mut entity = extract_entity(
+							ensure_entity_in_cache(
 								app_state
 									.resource_packages
 									.load()
@@ -614,20 +781,7 @@ fn event(app: AppHandle, event: Event) {
 								&hash
 							)?;
 
-							// Normalise comments to form used by Deeznuts (single comment for each entity)
-							let mut comments: Vec<CommentEntity> = vec![];
-							for comment in entity.comments {
-								if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-									x.text = format!("{}\n\n{}", x.text, comment.text);
-								} else {
-									comments.push(CommentEntity {
-										parent: comment.parent,
-										name: "Notes".into(),
-										text: comment.text
-									});
-								}
-							}
-							entity.comments = comments;
+							let entity = app_state.cached_entities.read().get(&hash).unwrap().to_owned();
 
 							let default_tab_name = format!(
 								"{} ({})",
@@ -670,7 +824,7 @@ fn event(app: AppHandle, event: Event) {
 									file: None,
 									data: EditorData::QNPatch {
 										base: Box::new(entity.to_owned()),
-										current: Box::new(entity),
+										current: Box::new(entity.to_owned()),
 										settings: Default::default()
 									}
 								}
@@ -727,7 +881,11 @@ fn event(app: AppHandle, event: Event) {
 												.iter()
 												.filter(|x| x.game_flags & game_flag == game_flag)
 												.filter(|x| x.resource_type == "TEMP")
-												.filter(|x| query.split(' ').all(|y| x.path.contains(y)))
+												.filter(|x| {
+													query.split(' ').all(|y| {
+														x.path.contains(y) || x.hash.contains(y) || x.hint.contains(y)
+													})
+												})
 												.map(|x| GameBrowserEntry {
 													hash: x.hash.to_owned(),
 													path: x.path.to_owned(),
@@ -833,7 +991,7 @@ fn event(app: AppHandle, event: Event) {
 										.game_installs
 										.iter()
 										.try_find(|x| {
-											Ok::<_, Error>(
+											anyhow::Ok(
 												x.path
 													== *app_state
 														.project
@@ -1088,6 +1246,8 @@ fn event(app: AppHandle, event: Event) {
 									}
 								};
 
+								let task = start_task(&app, format!("Selecting {}", id))?;
+
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
@@ -1169,6 +1329,8 @@ fn event(app: AppHandle, event: Event) {
 									)))
 								)?;
 
+								finish_task(&app, task)?;
+
 								if let Some(intellisense) = app_state.intellisense.load().as_ref()
 									&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
@@ -1177,7 +1339,7 @@ fn event(app: AppHandle, event: Event) {
 										.game_installs
 										.iter()
 										.try_find(|x| {
-											Ok::<_, Error>(
+											anyhow::Ok(
 												x.path
 													== *app_state
 														.project
@@ -1409,7 +1571,8 @@ fn event(app: AppHandle, event: Event) {
 												.entities
 												.iter()
 												.filter(|(id, ent)| {
-													format!("{}{}", id, to_string(ent).unwrap()).contains(&query)
+													format!("{}{}", id, to_string(ent).unwrap().to_lowercase())
+														.contains(&query)
 												})
 												.map(|(id, _)| id.to_owned())
 												.collect()
@@ -1446,7 +1609,7 @@ fn event(app: AppHandle, event: Event) {
 										.game_installs
 										.iter()
 										.try_find(|x| {
-											Ok::<_, Error>(
+											anyhow::Ok(
 												x.path
 													== *app_state
 														.project
@@ -1471,13 +1634,18 @@ fn event(app: AppHandle, event: Event) {
 										.map(|(x, _)| x == "TEMP")
 										.unwrap_or(false)
 									{
-										let underlying_entity = extract_entity(
+										ensure_entity_in_cache(
 											resource_packages,
 											&app_state.cached_entities,
 											game_version,
 											&mapping,
-											&sub_entity.factory
+											&normalise_to_hash(sub_entity.factory.to_owned())
 										)?;
+
+										let underlying_entity = app_state.cached_entities.read();
+										let underlying_entity = underlying_entity
+											.get(&normalise_to_hash(sub_entity.factory.to_owned()))
+											.unwrap();
 
 										(
 											intellisense.get_properties(
@@ -1485,7 +1653,7 @@ fn event(app: AppHandle, event: Event) {
 												&app_state.cached_entities,
 												&mapping,
 												game_version,
-												&underlying_entity,
+												underlying_entity,
 												&underlying_entity.root_entity,
 												true
 											)?,
@@ -1494,7 +1662,7 @@ fn event(app: AppHandle, event: Event) {
 												&app_state.cached_entities,
 												&mapping,
 												game_version,
-												&underlying_entity,
+												underlying_entity,
 												&underlying_entity.root_entity,
 												true
 											)?
@@ -1619,14 +1787,16 @@ fn event(app: AppHandle, event: Event) {
 
 												for entity_data in entity.entities.values() {
 													match entity_data.parent {
-														Ref::Full(ref reference) if reference.external_scene.is_none() => {
+														Ref::Full(ref reference)
+															if reference.external_scene.is_none() =>
+														{
 															reverse_parent_refs.insert(reference.entity_ref.to_owned());
 														}
-											
+
 														Ref::Short(Some(ref reference)) => {
 															reverse_parent_refs.insert(reference.to_owned());
 														}
-											
+
 														_ => {}
 													}
 												}
@@ -1677,7 +1847,7 @@ fn event(app: AppHandle, event: Event) {
 														.game_installs
 														.iter()
 														.try_find(|x| {
-															Ok::<_, Error>(
+															anyhow::Ok(
 																x.path
 																	== *app_state
 																		.project
@@ -1956,6 +2126,166 @@ fn event(app: AppHandle, event: Event) {
 								};
 
 								entity.external_scenes = external_scenes;
+							}
+						},
+
+						EntityEditorEvent::Overrides(event) => match event {
+							EntityOverridesEvent::Initialise { editor_id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref entity, .. } => entity,
+									EditorData::QNPatch { ref current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Overrides(
+										EntityOverridesRequest::Initialise {
+											editor_id,
+											property_overrides: {
+												let mut buf = Vec::new();
+												let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+												let mut ser =
+													serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+												entity.property_overrides.serialize(&mut ser)?;
+
+												String::from_utf8(buf)?
+											},
+											override_deletes: {
+												let mut buf = Vec::new();
+												let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+												let mut ser =
+													serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+												entity.override_deletes.serialize(&mut ser)?;
+
+												String::from_utf8(buf)?
+											},
+											pin_connection_overrides: {
+												let mut buf = Vec::new();
+												let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+												let mut ser =
+													serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+												entity.pin_connection_overrides.serialize(&mut ser)?;
+
+												String::from_utf8(buf)?
+											},
+											pin_connection_override_deletes: {
+												let mut buf = Vec::new();
+												let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+												let mut ser =
+													serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+												entity.pin_connection_override_deletes.serialize(&mut ser)?;
+
+												String::from_utf8(buf)?
+											}
+										}
+									)))
+								)?;
+
+								send_overrides_decorations(&app, editor_id, entity)?;
+							}
+
+							EntityOverridesEvent::UpdatePropertyOverrides { editor_id, content } => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								if let Ok(deserialised) = from_str(&content) {
+									if entity.property_overrides != deserialised {
+										entity.property_overrides = deserialised;
+
+										send_overrides_decorations(&app, editor_id, entity)?;
+									}
+								}
+							}
+
+							EntityOverridesEvent::UpdateOverrideDeletes { editor_id, content } => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								if let Ok(deserialised) = from_str(&content) {
+									if entity.override_deletes != deserialised {
+										entity.override_deletes = deserialised;
+
+										send_overrides_decorations(&app, editor_id, entity)?;
+									}
+								}
+							}
+
+							EntityOverridesEvent::UpdatePinConnectionOverrides { editor_id, content } => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								if let Ok(deserialised) = from_str(&content) {
+									if entity.pin_connection_overrides != deserialised {
+										entity.pin_connection_overrides = deserialised;
+
+										send_overrides_decorations(&app, editor_id, entity)?;
+									}
+								}
+							}
+
+							EntityOverridesEvent::UpdatePinConnectionOverrideDeletes { editor_id, content } => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								if let Ok(deserialised) = from_str(&content) {
+									if entity.pin_connection_override_deletes != deserialised {
+										entity.pin_connection_override_deletes = deserialised;
+
+										send_overrides_decorations(&app, editor_id, entity)?;
+									}
+								}
 							}
 						}
 					}
@@ -2335,7 +2665,7 @@ fn event(app: AppHandle, event: Event) {
 								.game_installs
 								.iter()
 								.try_find(|x| {
-									Ok::<_, Error>(
+									anyhow::Ok(
 										x.path
 											== *app_state
 												.project

@@ -7,6 +7,7 @@
 	import { Checkbox } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import Metadata from "./Metadata.svelte"
+	import Overrides from "./Overrides.svelte"
 
 	export let id: string
 
@@ -14,6 +15,7 @@
 	let monaco: Monaco
 	let metaPane: MetaPane
 	let metadata: Metadata
+	let overrides: Overrides
 
 	export async function handleRequest(request: EntityEditorRequest) {
 		console.log(`Entity editor ${id} handling request`, request)
@@ -33,6 +35,10 @@
 
 			case "metadata":
 				metadata.handleRequest(request.data)
+				break
+
+			case "overrides":
+				overrides.handleRequest(request.data)
 				break
 
 			default:
@@ -85,6 +91,9 @@
 	</div>
 	<div style="height: calc(100vh - 11rem)" class:hidden={activeMode !== "Metadata"}>
 		<Metadata editorID={id} bind:this={metadata} />
+	</div>
+	<div style="height: calc(100vh - 11rem)" class:hidden={activeMode !== "Overrides"}>
+		<Overrides editorID={id} bind:this={overrides} />
 	</div>
 	<div style="height: calc(100vh - 11rem)" class:hidden={activeMode !== "Tree"}>
 		<Splitpanes theme="">

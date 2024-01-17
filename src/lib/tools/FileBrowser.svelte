@@ -58,7 +58,7 @@
 			},
 			contextmenu: {
 				select_node: false,
-				items: (rightClickedNode: { original: { folder: boolean } }, c: any) => {
+				items: (rightClickedNode: { id: string; original: { folder: boolean } }, c: any) => {
 					return {
 						...(!rightClickedNode.original.folder
 							? {}
@@ -248,7 +248,67 @@
 									}
 								})
 							}
-						}
+						},
+						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".entity.json")
+							? {}
+							: {
+									normaliseEntity: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Normalise",
+										icon: "fa-solid fa-rotate",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+
+											await event({
+												type: "tool",
+												data: {
+													type: "fileBrowser",
+													data: {
+														type: "normaliseQNFile",
+														data: {
+															path
+														}
+													}
+												}
+											})
+										}
+									}
+								}),
+						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".entity.patch.json")
+							? {}
+							: {
+									normalisePatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Normalise",
+										icon: "fa-solid fa-rotate",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+
+											await event({
+												type: "tool",
+												data: {
+													type: "fileBrowser",
+													data: {
+														type: "normaliseQNFile",
+														data: {
+															path
+														}
+													}
+												}
+											})
+										}
+									}
+								})
 					}
 				}
 			},

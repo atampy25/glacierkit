@@ -122,7 +122,7 @@
 	<ModalHeader title="Error" />
 	<ModalBody>
 		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability.
-		<pre class="mt-2 p-4 bg-neutral-800"><code>{errorModalError}</code></pre>
+		<pre class="mt-2 p-4 bg-neutral-800 overflow-x-auto"><code>{errorModalError}</code></pre>
 	</ModalBody>
 	<ModalFooter danger primaryButtonText="Continue" />
 </ComposedModal>

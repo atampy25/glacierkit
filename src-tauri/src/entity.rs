@@ -17,7 +17,7 @@ use velcro::vec;
 use crate::{
 	game_detection::GameVersion,
 	model::EditorValidity,
-	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
+	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -558,45 +558,39 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	EditorValidity::Valid
 }
 
-#[try_fn]
-#[context("Couldn't get name of referenced entity {:?}", reference)]
-fn get_ref_decoration(
+pub fn get_ref_decoration(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
 	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
 	entity: &Entity,
 	reference: &Ref
-) -> Result<Option<(String, String)>> {
+) -> Option<(String, String)> {
 	if let Some(ent) = get_local_reference(reference) {
-		Some((
-			ent.to_owned(),
-			entity
-				.entities
-				.get(&ent)
-				.context("Referenced local entity doesn't exist")?
-				.name
-				.to_owned()
-		))
+		Some((ent.to_owned(), entity.entities.get(&ent)?.name.to_owned()))
 	} else {
 		match reference {
 			Ref::Short(None) => None,
 
-			Ref::Full(reference) => Some((
-				reference.entity_ref.to_owned(),
-				extract_entity(
+			Ref::Full(reference) => Some((reference.entity_ref.to_owned(), {
+				ensure_entity_in_cache(
 					resource_packages,
 					cached_entities,
 					game_version,
 					hash_list_mapping,
-					reference.external_scene.as_ref().unwrap()
-				)?
-				.entities
-				.get(&reference.entity_ref)
-				.context("Referenced entity doesn't exist in external scene")?
-				.name
-				.to_owned()
-			)),
+					&normalise_to_hash(reference.external_scene.as_ref().unwrap().into())
+				)
+				.ok()?;
+
+				cached_entities
+					.read()
+					.get(&normalise_to_hash(reference.external_scene.as_ref().unwrap().into()))
+					.unwrap()
+					.entities
+					.get(&reference.entity_ref)?
+					.name
+					.to_owned()
+			})),
 
 			_ => unreachable!()
 		}
@@ -626,7 +620,7 @@ pub fn get_decorations(
 		hash_list_mapping,
 		entity,
 		&sub_entity.parent
-	)? {
+	) {
 		decorations.push(decoration);
 	}
 
@@ -639,7 +633,7 @@ pub fn get_decorations(
 				hash_list_mapping,
 				entity,
 				&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-			)? {
+			) {
 				decorations.push(decoration);
 			}
 		} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
@@ -653,7 +647,7 @@ pub fn get_decorations(
 					hash_list_mapping,
 					entity,
 					&reference
-				)? {
+				) {
 					decorations.push(decoration);
 				}
 			}
@@ -715,7 +709,7 @@ pub fn get_decorations(
 					hash_list_mapping,
 					entity,
 					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-				)? {
+				) {
 					decorations.push(decoration);
 				}
 			} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
@@ -729,7 +723,7 @@ pub fn get_decorations(
 						hash_list_mapping,
 						entity,
 						&reference
-					)? {
+					) {
 						decorations.push(decoration);
 					}
 				}
@@ -791,7 +785,7 @@ pub fn get_decorations(
 					hash_list_mapping,
 					entity,
 					reference
-				)? {
+				) {
 					decorations.push(decoration);
 				}
 			}
@@ -818,7 +812,7 @@ pub fn get_decorations(
 					hash_list_mapping,
 					entity,
 					reference
-				)? {
+				) {
 					decorations.push(decoration);
 				}
 			}
@@ -845,7 +839,7 @@ pub fn get_decorations(
 					hash_list_mapping,
 					entity,
 					reference
-				)? {
+				) {
 					decorations.push(decoration);
 				}
 			}
@@ -866,7 +860,7 @@ pub fn get_decorations(
 				hash_list_mapping,
 				entity,
 				&alias_data.original_entity
-			)? {
+			) {
 				decorations.push(decoration);
 			}
 		}
@@ -886,7 +880,7 @@ pub fn get_decorations(
 				hash_list_mapping,
 				entity,
 				reference
-			)? {
+			) {
 				decorations.push(decoration);
 			}
 		}
@@ -905,7 +899,7 @@ pub fn get_decorations(
 			hash_list_mapping,
 			entity,
 			&Ref::Short(Some(referenced_entity.to_owned()))
-		)? {
+		) {
 			decorations.push(decoration);
 		}
 	}
@@ -919,7 +913,7 @@ pub fn get_decorations(
 				hash_list_mapping,
 				entity,
 				&Ref::Short(Some(parental_entity.to_owned()))
-			)? {
+			) {
 				decorations.push(decoration);
 			}
 		}

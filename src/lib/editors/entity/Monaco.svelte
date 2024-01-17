@@ -200,17 +200,6 @@
 	})
 
 	onMount(async () => {
-		// @ts-ignore
-		self.MonacoEnvironment = {
-			getWorker: function (_moduleId: any, label: string) {
-				if (label === "json") {
-					return new jsonWorker()
-				} else {
-					return new editorWorker()
-				}
-			}
-		}
-
 		editor = monaco.editor.create(el, {
 			model: monaco.editor.createModel("Select an entity in the tree to edit it here.", "json", monaco.Uri.parse(`monaco-model://qn-subentity-${editorID}`)),
 			roundedSelection: false,
@@ -305,9 +294,9 @@
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			...monaco.languages.json.jsonDefaults.diagnosticsOptions,
 			schemas: [
-				...monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas!.filter((a) => a.uri !== "monaco-schema://qn-subentity"),
+				...monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas!.filter((a) => a.uri !== `monaco-schema://qn-subentity-${editorID}`),
 				{
-					uri: "monaco-schema://qn-subentity",
+					uri: `monaco-schema://qn-subentity-${editorID}`,
 					fileMatch: ["*subentity*"],
 					schema: baseIntellisenseSchema
 				}
@@ -348,9 +337,9 @@
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			...monaco.languages.json.jsonDefaults.diagnosticsOptions,
 			schemas: [
-				...monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas!.filter((a) => a.uri !== "monaco-schema://qn-subentity"),
+				...monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas!.filter((a) => a.uri !== `monaco-schema://qn-subentity-${editorID}`),
 				{
-					uri: "monaco-schema://qn-subentity",
+					uri: `monaco-schema://qn-subentity-${editorID}`,
 					fileMatch: ["*subentity*"],
 					schema: merge(cloneDeep(baseIntellisenseSchema), {
 						definitions: {

@@ -118,9 +118,9 @@ extraBlueprintDependencies: Dependency[];
  */
 comments: CommentEntity[] }
 
-export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent } | { type: "metadata"; data: EntityMetadataEvent }
+export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent } | { type: "metadata"; data: EntityMetadataEvent } | { type: "overrides"; data: EntityOverridesEvent }
 
-export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest } | { type: "metadata"; data: EntityMetadataRequest }
+export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest } | { type: "metadata"; data: EntityMetadataRequest } | { type: "overrides"; data: EntityOverridesRequest }
 
 export type EntityGeneralEvent = { type: "setShowReverseParentRefs"; data: { editor_id: string; show_reverse_parent_refs: boolean } }
 
@@ -135,6 +135,10 @@ export type EntityMetadataRequest = { type: "initialise"; data: { editor_id: str
 export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "followReference"; data: { editor_id: string; reference: string } }
 
 export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "updateIntellisense"; data: { editor_id: string; entity_id: string; properties: ([string, string, JsonValue, boolean])[]; pins: [string[], string[]] } } | { type: "updateDecorationsAndMonacoInfo"; data: { editor_id: string; entity_id: string; decorations: ([string, string])[]; local_ref_entity_ids: string[] } } | { type: "updateValidity"; data: { editor_id: string; validity: EditorValidity } }
+
+export type EntityOverridesEvent = { type: "initialise"; data: { editor_id: string } } | { type: "updatePropertyOverrides"; data: { editor_id: string; content: string } } | { type: "updateOverrideDeletes"; data: { editor_id: string; content: string } } | { type: "updatePinConnectionOverrides"; data: { editor_id: string; content: string } } | { type: "updatePinConnectionOverrideDeletes"; data: { editor_id: string; content: string } }
+
+export type EntityOverridesRequest = { type: "initialise"; data: { editor_id: string; property_overrides: string; override_deletes: string; pin_connection_overrides: string; pin_connection_override_deletes: string } } | { type: "updateDecorations"; data: { editor_id: string; decorations: ([string, string])[] } }
 
 export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } }
 
@@ -180,7 +184,7 @@ isArray: boolean;
  */
 refersTo: Ref[] }
 
-export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } }
+export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "normaliseQNFile"; data: { path: string } }
 
 export type FileBrowserRequest = { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "select"; data: string | null } | { type: "newTree"; data: { base_path: string; 
 /**

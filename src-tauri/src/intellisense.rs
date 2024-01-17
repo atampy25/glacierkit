@@ -27,7 +27,7 @@ use crate::{
 		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2_convert_cppt, h2_convert_dswb, h3_convert_cppt,
 		h3_convert_dswb
 	},
-	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
+	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
 
 pub struct Intellisense {
@@ -571,20 +571,23 @@ impl Intellisense {
 							found.push((prop_name, prop_type, default_val, false));
 						}
 					} else {
-						let extracted = extract_entity(
+						ensure_entity_in_cache(
 							resource_packages,
 							cached_entities,
 							game_version,
 							hash_list_mapping,
-							&factory
+							&normalise_to_hash(factory.to_owned())
 						)?;
+
+						let extracted = cached_entities.read();
+						let extracted = extracted.get(&normalise_to_hash(factory.to_owned())).unwrap();
 
 						found.extend(self.get_properties(
 							resource_packages,
 							cached_entities,
 							hash_list_mapping,
 							game_version,
-							&extracted,
+							extracted,
 							&extracted.root_entity,
 							false
 						)?);
@@ -803,20 +806,23 @@ impl Intellisense {
 
 					input.extend(dswb_data.m_aSwitches);
 				} else {
-					let extracted = extract_entity(
+					ensure_entity_in_cache(
 						resource_packages,
 						cached_entities,
 						game_version,
 						hash_list_mapping,
-						&factory
+						&normalise_to_hash(factory.to_owned())
 					)?;
+
+					let extracted = cached_entities.read();
+					let extracted = extracted.get(&normalise_to_hash(factory.to_owned())).unwrap();
 
 					let found = self.get_pins(
 						resource_packages,
 						cached_entities,
 						hash_list_mapping,
 						game_version,
-						&extracted,
+						extracted,
 						&extracted.root_entity,
 						false
 					)?;

@@ -147,6 +147,10 @@ strike! {
 				Rename {
 					old_path: PathBuf,
 					new_path: PathBuf
+				},
+
+				NormaliseQNFile {
+					path: PathBuf
 				}
 			}),
 
@@ -290,6 +294,32 @@ strike! {
 					SetExternalScenes {
 						editor_id: Uuid,
 						external_scenes: Vec<String>
+					}
+				}),
+
+				Overrides(pub enum EntityOverridesEvent {
+					Initialise {
+						editor_id: Uuid
+					},
+
+					UpdatePropertyOverrides {
+						editor_id: Uuid,
+						content: String
+					},
+
+					UpdateOverrideDeletes {
+						editor_id: Uuid,
+						content: String
+					},
+
+					UpdatePinConnectionOverrides {
+						editor_id: Uuid,
+						content: String
+					},
+
+					UpdatePinConnectionOverrideDeletes {
+						editor_id: Uuid,
+						content: String
 					}
 				})
 			})
@@ -452,6 +482,21 @@ strike! {
 						root_entity: String,
 						sub_type: SubType,
 						external_scenes: Vec<String>
+					}
+				}),
+
+				Overrides(pub enum EntityOverridesRequest {
+					Initialise {
+						editor_id: Uuid,
+						property_overrides: String,
+						override_deletes: String,
+						pin_connection_overrides: String,
+						pin_connection_override_deletes: String
+					},
+
+					UpdateDecorations {
+						editor_id: Uuid,
+						decorations: Vec<(String, String)>,
 					}
 				})
 			})
