@@ -228,6 +228,11 @@ strike! {
 					Search {
 						editor_id: Uuid,
 						query: String
+					},
+
+					ShowHelpMenu {
+						editor_id: Uuid,
+						entity_id: String
 					}
 				}),
 
@@ -387,6 +392,14 @@ strike! {
 
 						/// The IDs of the entities matching the query
 						results: Vec<String>
+					},
+
+					ShowHelpMenu {
+						editor_id: Uuid,
+						factory: String,
+						input_pins: Vec<String>,
+						output_pins: Vec<String>,
+						default_properties_html: String
 					}
 				}),
 

@@ -811,22 +811,16 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 	entity.entities.extend(paste_data.data.to_owned());
 
 	let mut new_entities = vec![];
-	let mut reverse_parent_refs: HashMap<String, Vec<String>> = HashMap::new();
+	let mut reverse_parent_refs: HashSet<String> = HashSet::new();
 
-	for (entity_id, entity_data) in entity.entities.iter() {
+	for entity_data in entity.entities.values() {
 		match entity_data.parent {
 			Ref::Full(ref reference) if reference.external_scene.is_none() => {
-				reverse_parent_refs
-					.entry(reference.entity_ref.to_owned())
-					.and_modify(|x| x.push(entity_id.to_owned()))
-					.or_insert(vec![entity_id.to_owned()]);
+				reverse_parent_refs.insert(reference.entity_ref.to_owned());
 			}
 
 			Ref::Short(Some(ref reference)) => {
-				reverse_parent_refs
-					.entry(reference.to_owned())
-					.and_modify(|x| x.push(entity_id.to_owned()))
-					.or_insert(vec![entity_id.to_owned()]);
+				reverse_parent_refs.insert(reference.to_owned());
 			}
 
 			_ => {}
@@ -834,7 +828,7 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 	}
 
 	for (entity_id, entity_data) in paste_data.data {
-		let x = reverse_parent_refs.contains_key(&entity_id);
+		let x = reverse_parent_refs.contains(&entity_id);
 		new_entities.push((entity_id, entity_data.parent, entity_data.name, entity_data.factory, x));
 	}
 

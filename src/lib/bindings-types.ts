@@ -136,7 +136,7 @@ export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: stri
 
 export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "updateIntellisense"; data: { editor_id: string; entity_id: string; properties: ([string, string, JsonValue, boolean])[]; pins: [string[], string[]] } } | { type: "updateDecorationsAndMonacoInfo"; data: { editor_id: string; entity_id: string; decorations: ([string, string])[]; local_ref_entity_ids: string[] } } | { type: "updateValidity"; data: { editor_id: string; validity: EditorValidity } }
 
-export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } }
 
 export type EntityTreeRequest = 
 /**
@@ -159,7 +159,7 @@ new_entities: ([string, Ref, string, string, boolean])[] } } | { type: "searchRe
 /**
  * The IDs of the entities matching the query
  */
-results: string[] } }
+results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } }
 
 export type EphemeralQNSettings = { showReverseParentRefs: boolean }
 

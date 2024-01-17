@@ -954,11 +954,12 @@ pub fn get_decorations(
 				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {
 					beginning -= 1;
 				}
+				beginning += 1;
 
 				decorations.extend(
 					String::from_utf8(mate_data[beginning..mate_data.len() - 1].into())?
 						.split('\x00')
-						.filter(|x| !x.is_empty() && x.trim().chars().all(|x| !x.is_ascii_control()))
+						.filter(|x| !x.is_empty() && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
 						.map(|x| x.trim().to_owned())
 						.tuples()
 				);

@@ -23,7 +23,7 @@ pub mod show_in_folder;
 use std::{
 	collections::{HashMap, HashSet},
 	fs::{self, File},
-	io::Cursor,
+	io::{BufReader, Cursor},
 	ops::Deref,
 	path::Path,
 	sync::Arc
@@ -68,8 +68,13 @@ use rpkg_rs::{
 	runtime::resource::{package_manager::PackageManager, resource_container::ResourceContainer}
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, from_str, to_string, to_vec};
+use serde_json::{from_slice, from_str, json, to_string, to_vec};
 use show_in_folder::show_in_folder;
+use syntect::{
+	highlighting::{Theme, ThemeSet},
+	html::highlighted_html_for_string,
+	parsing::SyntaxSet
+};
 use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
@@ -1190,7 +1195,7 @@ fn event(app: AppHandle, event: Event) {
 										.context("No such game install")?
 										.version;
 
-									let task = start_task(&app, "Gathering intellisense data")?;
+									let task = start_task(&app, format!("Gathering intellisense data for {}", id))?;
 
 									let mapping = hash_list_mapping(hash_list);
 
@@ -1414,6 +1419,175 @@ fn event(app: AppHandle, event: Event) {
 
 								finish_task(&app, task)?;
 							}
+
+							EntityTreeEvent::ShowHelpMenu { editor_id, entity_id } => {
+								let task = start_task(&app, format!("Showing help menu for {}", entity_id))?;
+
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref entity, .. } => entity,
+									EditorData::QNPatch { ref current, .. } => current,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+										panic!();
+									}
+								};
+
+								let sub_entity = entity.entities.get(&entity_id).context("No such entity")?;
+
+								if let Some(intellisense) = app_state.intellisense.load().as_ref()
+									&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let game_version = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| {
+											Ok::<_, Error>(
+												x.path
+													== *app_state
+														.project
+														.load()
+														.as_ref()
+														.unwrap()
+														.settings
+														.load()
+														.game_install
+														.as_ref()
+														.unwrap()
+														.as_path()
+											)
+										})?
+										.context("No such game install")?
+										.version;
+
+									let mapping = hash_list_mapping(hash_list);
+
+									let (properties, pins) = if mapping
+										.get(&sub_entity.factory)
+										.map(|(x, _)| x == "TEMP")
+										.unwrap_or(false)
+									{
+										let underlying_entity = extract_entity(
+											resource_packages,
+											&app_state.cached_entities,
+											game_version,
+											&mapping,
+											&sub_entity.factory
+										)?;
+
+										(
+											intellisense.get_properties(
+												resource_packages,
+												&app_state.cached_entities,
+												&mapping,
+												game_version,
+												&underlying_entity,
+												&underlying_entity.root_entity,
+												true
+											)?,
+											intellisense.get_pins(
+												resource_packages,
+												&app_state.cached_entities,
+												&mapping,
+												game_version,
+												&underlying_entity,
+												&underlying_entity.root_entity,
+												true
+											)?
+										)
+									} else {
+										(
+											intellisense.get_properties(
+												resource_packages,
+												&app_state.cached_entities,
+												&mapping,
+												game_version,
+												entity,
+												&entity_id,
+												true
+											)?,
+											intellisense.get_pins(
+												resource_packages,
+												&app_state.cached_entities,
+												&mapping,
+												game_version,
+												entity,
+												&entity_id,
+												true
+											)?
+										)
+									};
+
+									let properties_data_str = {
+										let mut buf = Vec::new();
+										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+										properties
+											.into_iter()
+											.map(|(name, ty, default_val, post_init)| {
+												(
+													name,
+													if post_init {
+														json!({
+															"type": ty,
+															"value": default_val,
+															"postInit": true
+														})
+													} else {
+														json!({
+															"type": ty,
+															"value": default_val
+														})
+													}
+												)
+											})
+											.collect::<HashMap<_, _>>()
+											.serialize(&mut ser)?;
+
+										String::from_utf8(buf)?
+									};
+
+									let ss = SyntaxSet::load_defaults_newlines();
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+											EntityTreeRequest::ShowHelpMenu {
+												editor_id,
+												factory: sub_entity.factory.to_owned(),
+												input_pins: pins.0,
+												output_pins: pins.1,
+												default_properties_html: highlighted_html_for_string(
+													&properties_data_str,
+													&ss,
+													ss.find_syntax_by_extension("json").unwrap(),
+													&ThemeSet::load_from_reader(&mut BufReader::new(Cursor::new(
+														include_bytes!("../assets/vs-dark.tmTheme")
+													)))?
+												)?
+											}
+										)))
+									)?;
+								} else {
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Error,
+											title: "Help menu unavailable".into(),
+											subtitle: "A copy of the game hasn't been selected, or the hash list is \
+											           unavailable."
+												.into()
+										}
+									)?;
+								}
+
+								finish_task(&app, task)?;
+							}
 						},
 
 						EntityEditorEvent::Monaco(event) => match event {
@@ -1438,81 +1612,122 @@ fn event(app: AppHandle, event: Event) {
 								match from_str(&content) {
 									Ok(sub_entity) => match check_local_references_exist(&sub_entity, entity) {
 										Ok(EditorValidity::Valid) => {
-											entity.entities.insert(entity_id.to_owned(), sub_entity);
-
-											send_request(
-												&app,
-												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-													EntityMonacoRequest::UpdateValidity {
-														editor_id,
-														validity: EditorValidity::Valid
-													}
-												)))
-											)?;
-
-											send_request(
-												&app,
-												Request::Global(GlobalRequest::SetTabUnsaved {
-													id: editor_id,
-													unsaved: true
-												})
-											)?;
-
-											if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
-												&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+											if sub_entity
+												!= *entity.entities.get(&entity_id).context("No such sub-entity")?
 											{
-												let game_version = app_state
-													.game_installs
-													.iter()
-													.try_find(|x| {
-														Ok::<_, Error>(
-															x.path
-																== *app_state
-																	.project
-																	.load()
-																	.as_ref()
-																	.unwrap()
-																	.settings
-																	.load()
-																	.game_install
-																	.as_ref()
-																	.unwrap()
-																	.as_path()
-														)
-													})?
-													.context("No such game install")?
-													.version;
+												let mut reverse_parent_refs: HashSet<String> = HashSet::new();
 
-												let task = start_task(&app, "Updating decorations")?;
+												for entity_data in entity.entities.values() {
+													match entity_data.parent {
+														Ref::Full(ref reference) if reference.external_scene.is_none() => {
+															reverse_parent_refs.insert(reference.entity_ref.to_owned());
+														}
+											
+														Ref::Short(Some(ref reference)) => {
+															reverse_parent_refs.insert(reference.to_owned());
+														}
+											
+														_ => {}
+													}
+												}
 
-												let decorations = get_decorations(
-													resource_packages,
-													&app_state.cached_entities,
-													&hash_list_mapping(hash_list),
-													game_version,
-													entity.entities.get(&entity_id).context("No such entity")?,
-													entity
+												send_request(
+													&app,
+													Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+														EntityTreeRequest::NewItems {
+															editor_id,
+															new_entities: vec![(
+																entity_id.to_owned(),
+																sub_entity.parent.to_owned(),
+																sub_entity.name.to_owned(),
+																sub_entity.factory.to_owned(),
+																reverse_parent_refs.contains(&entity_id)
+															)]
+														}
+													)))
 												)?;
+
+												entity.entities.insert(entity_id.to_owned(), sub_entity);
 
 												send_request(
 													&app,
 													Request::Editor(EditorRequest::Entity(
 														EntityEditorRequest::Monaco(
-															EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
-																editor_id: editor_id.to_owned(),
-																entity_id: entity_id.to_owned(),
-																local_ref_entity_ids: decorations
-																	.iter()
-																	.filter(|(x, _)| entity.entities.contains_key(x))
-																	.map(|(x, _)| x.to_owned())
-																	.collect(),
-																decorations
+															EntityMonacoRequest::UpdateValidity {
+																editor_id,
+																validity: EditorValidity::Valid
 															}
 														)
 													))
 												)?;
 
-												finish_task(&app, task)?;
+												send_request(
+													&app,
+													Request::Global(GlobalRequest::SetTabUnsaved {
+														id: editor_id,
+														unsaved: true
+													})
+												)?;
+
+												if let Some(resource_packages) =
+													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
+													app_state.hash_list.load().as_ref()
+												{
+													let game_version = app_state
+														.game_installs
+														.iter()
+														.try_find(|x| {
+															Ok::<_, Error>(
+																x.path
+																	== *app_state
+																		.project
+																		.load()
+																		.as_ref()
+																		.unwrap()
+																		.settings
+																		.load()
+																		.game_install
+																		.as_ref()
+																		.unwrap()
+																		.as_path()
+															)
+														})?
+														.context("No such game install")?
+														.version;
+
+													let task = start_task(&app, "Updating decorations")?;
+
+													let decorations = get_decorations(
+														resource_packages,
+														&app_state.cached_entities,
+														&hash_list_mapping(hash_list),
+														game_version,
+														entity.entities.get(&entity_id).context("No such entity")?,
+														entity
+													)?;
+
+													send_request(
+														&app,
+														Request::Editor(EditorRequest::Entity(
+															EntityEditorRequest::Monaco(
+																EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
+																	editor_id: editor_id.to_owned(),
+																	entity_id: entity_id.to_owned(),
+																	local_ref_entity_ids: decorations
+																		.iter()
+																		.filter(|(x, _)| {
+																			entity.entities.contains_key(x)
+																		})
+																		.map(|(x, _)| x.to_owned())
+																		.collect(),
+																	decorations
+																}
+															)
+														))
+													)?;
+
+													finish_task(&app, task)?;
+												}
 											}
 										}
 

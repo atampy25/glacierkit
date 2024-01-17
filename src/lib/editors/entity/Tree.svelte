@@ -3,7 +3,7 @@
 	import "jstree"
 	import { onMount } from "svelte"
 	import type { EntityTreeRequest, Ref } from "$lib/bindings-types"
-	import { Search } from "carbon-components-svelte"
+	import { Modal, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { changeReferenceToLocalEntity, genRandHex, getReferencedLocalEntity } from "./utils"
@@ -37,6 +37,12 @@
 
 	// Gets around having to use JS for search
 	let entitiesToShowOnSearch: Set<string> = new Set()
+
+	let helpMenuOpen = false
+	let helpMenuFactory = ""
+	let helpMenuInputs: string[] = []
+	let helpMenuOutputs: string[] = []
+	let helpMenuDefaultPropertiesHTML = ""
 
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
@@ -112,9 +118,6 @@
 											// If it's a folder it might move to the top
 											tree.move_node(selected_node.id, selected_node.parent, getPositionOfNode(selected_node.parent, selected_node.text, selected_node.original.folder))
 
-											// Add the entity ID to the displayed name
-											tree.rename_node(node, `${node.text} (${node.id})`)
-
 											await event({
 												type: "editor",
 												data: {
@@ -128,7 +131,7 @@
 																id: newEntityID,
 																content: {
 																	parent: selected_node.id,
-																	name: "New Entity",
+																	name: node.text,
 																	factory: "[modules:/zentity.class].pc_entitytype",
 																	blueprint: "[modules:/zentity.class].pc_entityblueprint"
 																}
@@ -137,6 +140,9 @@
 													}
 												}
 											})
+
+											// Add the entity ID to the displayed name
+											tree.rename_node(node, `${node.text} (${node.id})`)
 										})
 									}
 								)
@@ -311,6 +317,34 @@
 
 								await clipboard.writeText(selected_node.id)
 							}
+						},
+						help: {
+							separator_before: false,
+							separator_after: false,
+							_disabled: false,
+							label: "Help",
+							icon: "far fa-circle-question",
+							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+								const tree = jQuery.jstree!.reference(b.reference)
+								const selected_node = tree.get_node(b.reference)
+
+								await event({
+									type: "editor",
+									data: {
+										type: "entity",
+										data: {
+											type: "tree",
+											data: {
+												type: "showHelpMenu",
+												data: {
+													editor_id: editorID,
+													entity_id: selected_node.id
+												}
+											}
+										}
+									}
+								})
+							}
 						}
 					}
 				}
@@ -410,6 +444,14 @@
 			case "searchResults":
 				entitiesToShowOnSearch = new Set(request.data.results)
 				tree.search("dummy")
+				break
+
+			case "showHelpMenu":
+				helpMenuFactory = request.data.factory
+				helpMenuInputs = request.data.input_pins
+				helpMenuOutputs = request.data.output_pins
+				helpMenuDefaultPropertiesHTML = request.data.default_properties_html
+				helpMenuOpen = true
 				break
 
 			default:
@@ -631,3 +673,35 @@
 
 <Search placeholder="Filter..." icon={Filter} size="lg" on:change={searchInput} />
 <div id={elemID} class="flex-grow overflow-auto" />
+
+<Modal bind:open={helpMenuOpen} modalHeading="Help for {helpMenuFactory}" passiveModal>
+	<div class="grid grid-cols-2 gap-4">
+		<div>
+			<h2>Default properties</h2>
+			<div class="w-full overflow-x-auto rounded-sm bg-[#1e1e1e] p-2">
+				<code>{@html helpMenuDefaultPropertiesHTML}</code>
+			</div>
+		</div>
+		<div>
+			<h2>Pins</h2>
+
+			{#if helpMenuInputs.length}
+				<h3>Inputs</h3>
+				<div class="mt-1 flex flex-row gap-2 flex-wrap">
+					{#each helpMenuInputs as pin}
+						<div class="inline-flex items-center p-2 rounded-sm bg-neutral-800">{pin}</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if helpMenuOutputs.length}
+				<h3 class:mt-2={helpMenuInputs.length}>Outputs</h3>
+				<div class="mt-1 flex flex-row gap-2 flex-wrap">
+					{#each helpMenuOutputs as pin}
+						<div class="inline-flex items-center p-2 rounded-sm bg-neutral-800">{pin}</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	</div>
+</Modal>
