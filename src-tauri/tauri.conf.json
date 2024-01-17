@@ -7,7 +7,7 @@
 		"distDir": "../build"
 	},
 	"package": {
-		"productName": "Mod Studio",
+		"productName": "Deeznuts",
 		"version": "1.0.0"
 	},
 	"tauri": {
@@ -23,7 +23,7 @@
 			},
 			"externalBin": [],
 			"icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-			"identifier": "app.modstudio",
+			"identifier": "app.deeznuts",
 			"longDescription": "",
 			"macOS": {
 				"entitlements": null,
@@ -52,7 +52,7 @@
 				"fullscreen": false,
 				"height": 720,
 				"resizable": true,
-				"title": "Mod Studio",
+				"title": "Deeznuts",
 				"width": 1280,
 				"decorations": false
 			}
