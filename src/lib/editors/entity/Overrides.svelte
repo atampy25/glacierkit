@@ -87,16 +87,16 @@
 			}}>Pin connection override deletes</div
 		>
 	</div>
-	<div style="height: calc(100vh - 15rem)" class:hidden={activeMode !== "propertyOverrides"}>
+	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "propertyOverrides"}>
 		<OverrideMonaco {editorID} mode="propertyOverrides" bind:this={propertyOverrideEditor} />
 	</div>
-	<div style="height: calc(100vh - 15rem)" class:hidden={activeMode !== "overrideDeletes"}>
+	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "overrideDeletes"}>
 		<OverrideMonaco {editorID} mode="overrideDeletes" bind:this={overrideDeleteEditor} />
 	</div>
-	<div style="height: calc(100vh - 15rem)" class:hidden={activeMode !== "pinConnectionOverrides"}>
+	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "pinConnectionOverrides"}>
 		<OverrideMonaco {editorID} mode="pinConnectionOverrides" bind:this={pinConnectionOverrideEditor} />
 	</div>
-	<div style="height: calc(100vh - 15rem)" class:hidden={activeMode !== "pinConnectionOverrideDeletes"}>
+	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "pinConnectionOverrideDeletes"}>
 		<OverrideMonaco {editorID} mode="pinConnectionOverrideDeletes" bind:this={pinConnectionOverrideDeleteEditor} />
 	</div>
 </div>

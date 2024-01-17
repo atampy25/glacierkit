@@ -151,6 +151,14 @@ strike! {
 
 				NormaliseQNFile {
 					path: PathBuf
+				},
+
+				ConvertEntityToPatch {
+					path: PathBuf
+				},
+
+				ConvertPatchToEntity {
+					path: PathBuf
 				}
 			}),
 

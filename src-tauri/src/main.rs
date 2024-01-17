@@ -59,11 +59,16 @@ use model::{
 };
 use notify::Watcher;
 use quickentity_rs::{
-	apply_patch, convert_to_qn, convert_to_rt, generate_patch,
+	apply_patch, convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn, convert_to_rt,
+	generate_patch,
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use resourcelib::{
+	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
+	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
+};
 use rfd::AsyncFileDialog;
 use rpkg::{ensure_entity_in_cache, extract_latest_resource, hash_list_mapping, normalise_to_hash};
 use rpkg_rs::{
@@ -615,13 +620,14 @@ fn event(app: AppHandle, event: Event) {
 											});
 										}
 									}
-									entity.comments = comments;
 
 									let (fac, fac_meta, blu, blu_meta) =
 										convert_to_rt(&entity).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-									let reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, true)
+									let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, true)
 										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+									reconverted.comments = comments;
 
 									fs::write(path, to_vec(&reconverted)?)?;
 
@@ -740,6 +746,255 @@ fn event(app: AppHandle, event: Event) {
 									Err(anyhow!("Can't normalise non-QN files"))?;
 									panic!();
 								}
+							}
+						}
+
+						FileBrowserEvent::ConvertEntityToPatch { path } => {
+							if app_state
+								.project
+								.load()
+								.as_ref()
+								.map(|x| x.settings.load().game_install.is_some())
+								.unwrap_or(false) && let Some(hash_list) = app_state.hash_list.load().as_ref()
+							{
+								let mut entity: Entity = from_slice(&fs::read(&path).context("Couldn't read file")?)
+									.context("Invalid entity")?;
+
+								// Normalise comments to form used by Deeznuts (single comment for each entity)
+								let mut comments: Vec<CommentEntity> = vec![];
+								for comment in entity.comments {
+									if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+										x.text = format!("{}\n\n{}", x.text, comment.text);
+									} else {
+										comments.push(CommentEntity {
+											parent: comment.parent,
+											name: "Notes".into(),
+											text: comment.text
+										});
+									}
+								}
+								entity.comments = comments;
+
+								let resource_packages = app_state.resource_packages.load();
+								let resource_packages =
+									resource_packages.as_deref().context("Game install not fully loaded")?;
+
+								let game_version = app_state
+									.game_installs
+									.iter()
+									.try_find(|x| {
+										anyhow::Ok(
+											x.path
+												== *app_state
+													.project
+													.load()
+													.as_ref()
+													.unwrap()
+													.settings
+													.load()
+													.game_install
+													.as_ref()
+													.unwrap()
+													.as_path()
+										)
+									})?
+									.context("No such game install")?
+									.version;
+
+								// `ensure_entity_in_cache` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
+								let (temp_meta, temp_data) = extract_latest_resource(
+									resource_packages,
+									&hash_list_mapping(hash_list),
+									&normalise_to_hash(entity.factory_hash.to_owned())
+								)?;
+
+								let factory = match game_version {
+									GameVersion::H1 => convert_2016_factory_to_modern(
+										&h2016_convert_binary_to_factory(&temp_data)
+											.context("Couldn't convert binary data to ResourceLib factory")?
+									),
+
+									GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
+										.context("Couldn't convert binary data to ResourceLib factory")?,
+
+									GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
+										.context("Couldn't convert binary data to ResourceLib factory")?
+								};
+
+								let blueprint_hash = &temp_meta
+									.hash_reference_data
+									.get(factory.blueprint_index_in_resource_header as usize)
+									.context("Blueprint referenced in factory does not exist in dependencies")?
+									.hash;
+
+								let (tblu_meta, tblu_data) = extract_latest_resource(
+									resource_packages,
+									&hash_list_mapping(hash_list),
+									blueprint_hash
+								)?;
+
+								let blueprint = match game_version {
+									GameVersion::H1 => convert_2016_blueprint_to_modern(
+										&h2016_convert_binary_to_blueprint(&tblu_data)
+											.context("Couldn't convert binary data to ResourceLib blueprint")?
+									),
+
+									GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
+										.context("Couldn't convert binary data to ResourceLib blueprint")?,
+
+									GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data)
+										.context("Couldn't convert binary data to ResourceLib blueprint")?
+								};
+
+								let base = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
+									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+								fs::write(
+									{
+										let mut x = path.to_owned();
+										x.pop();
+										x.push(
+											path.file_name()
+												.context("No file name")?
+												.to_string_lossy()
+												.replace(".entity.json", ".entity.patch.json")
+										);
+										x
+									},
+									to_vec(
+										&generate_patch(&base, &entity)
+											.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+									)?
+								)?;
+
+								fs::remove_file(&path)?;
+
+								send_notification(
+									&app,
+									Notification {
+										kind: NotificationKind::Success,
+										title: "File converted to patch".into(),
+										subtitle: "The entity.json file has been converted into a patch file.".into()
+									}
+								)?;
+							} else {
+								send_notification(
+									&app,
+									Notification {
+										kind: NotificationKind::Error,
+										title: "No game selected".into(),
+										subtitle: "You can't convert between entity and patch without a copy of the \
+										           game selected."
+											.into()
+									}
+								)?;
+							}
+						}
+
+						FileBrowserEvent::ConvertPatchToEntity { path } => {
+							let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
+								.context("Invalid entity")?;
+
+							if app_state
+								.project
+								.load()
+								.as_ref()
+								.map(|x| x.settings.load().game_install.is_some())
+								.unwrap_or(false) && let Some(hash_list) = app_state.hash_list.load().as_ref()
+							{
+								ensure_entity_in_cache(
+									app_state
+										.resource_packages
+										.load()
+										.as_deref()
+										.context("Game install not fully loaded")?,
+									&app_state.cached_entities,
+									app_state
+										.game_installs
+										.iter()
+										.try_find(|x| {
+											anyhow::Ok(
+												x.path
+													== *app_state
+														.project
+														.load()
+														.as_ref()
+														.unwrap()
+														.settings
+														.load()
+														.game_install
+														.as_ref()
+														.unwrap()
+														.as_path()
+											)
+										})?
+										.context("No such game install")?
+										.version,
+									&hash_list_mapping(hash_list),
+									&normalise_to_hash(patch.factory_hash.to_owned())
+								)?;
+
+								let mut entity = app_state
+									.cached_entities
+									.read()
+									.get(&normalise_to_hash(patch.factory_hash.to_owned()))
+									.unwrap()
+									.to_owned();
+
+								apply_patch(&mut entity, patch, true)
+									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+								// Normalise comments to form used by Deeznuts (single comment for each entity)
+								let mut comments: Vec<CommentEntity> = vec![];
+								for comment in entity.comments {
+									if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+										x.text = format!("{}\n\n{}", x.text, comment.text);
+									} else {
+										comments.push(CommentEntity {
+											parent: comment.parent,
+											name: "Notes".into(),
+											text: comment.text
+										});
+									}
+								}
+								entity.comments = comments;
+
+								fs::write(
+									{
+										let mut x = path.to_owned();
+										x.pop();
+										x.push(
+											path.file_name()
+												.context("No file name")?
+												.to_string_lossy()
+												.replace(".entity.patch.json", ".entity.json")
+										);
+										x
+									},
+									to_vec(&entity)?
+								)?;
+
+								fs::remove_file(&path)?;
+
+								send_notification(
+									&app,
+									Notification {
+										kind: NotificationKind::Success,
+										title: "File converted to entity.json".into(),
+										subtitle: "The patch file has been converted into an entity.json file.".into()
+									}
+								)?;
+							} else {
+								send_notification(
+									&app,
+									Notification {
+										kind: NotificationKind::Error,
+										title: "No game selected".into(),
+										subtitle: "You can't convert between entity and patch without a copy of the \
+										           game selected."
+											.into()
+									}
+								)?;
 							}
 						}
 					},
