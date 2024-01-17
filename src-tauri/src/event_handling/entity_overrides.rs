@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use arc_swap::ArcSwap;
 use fn_error_context::context;
 use quickentity_rs::qn_structs::{Entity, Ref};
 use serde_json::{from_slice, from_value, Value};
@@ -9,7 +10,7 @@ use uuid::Uuid;
 use crate::{
 	entity::get_ref_decoration,
 	finish_task,
-	model::{AppState, EditorRequest, EntityEditorRequest, EntityOverridesRequest, Request},
+	model::{AppSettings, AppState, EditorRequest, EntityEditorRequest, EntityOverridesRequest, Request},
 	rpkg::{extract_latest_resource, hash_list_mapping},
 	send_request, start_task
 };
@@ -18,29 +19,16 @@ use crate::{
 #[context("Couldn't get overrides decorations for {}", entity.factory_hash)]
 pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Entity) -> Result<()> {
 	let app_state = app.state::<AppState>();
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
 
 	if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
 		let game_version = app_state
 			.game_installs
 			.iter()
-			.try_find(|x| {
-				anyhow::Ok(
-					x.path
-						== *app_state
-							.project
-							.load()
-							.as_ref()
-							.unwrap()
-							.settings
-							.load()
-							.game_install
-							.as_ref()
-							.unwrap()
-							.as_path()
-				)
-			})?
+			.try_find(|x| anyhow::Ok(x.path == *install))?
 			.context("No such game install")?
 			.version;
 

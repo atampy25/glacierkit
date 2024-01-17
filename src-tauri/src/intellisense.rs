@@ -214,7 +214,7 @@ impl Intellisense {
 				.collect::<Result<_>>()?
 		);
 
-		guard.get(cppt).unwrap().to_owned()
+		guard.get(cppt).expect("We just added it").to_owned()
 	}
 
 	#[try_fn]
@@ -245,7 +245,7 @@ impl Intellisense {
 						.map(|(x, _)| x == "MATB")
 						.unwrap_or(false)
 				})
-				.unwrap()
+				.context("MATT has no MATB dependency")?
 				.hash
 		)?;
 
@@ -255,10 +255,12 @@ impl Intellisense {
 			get_material_properties(&matt_data, &matt_meta, &matb_data)?
 		);
 
-		guard.get(matt).unwrap().to_owned()
+		guard.get(matt).expect("We just added it").to_owned()
 	}
 
 	/// Get the names, types, default values and post-init status of all properties of a given sub-entity.
+	///
+	/// Will deadlock if a read or write lock is already held on `cached_entities`.
 	#[try_fn]
 	#[context("Couldn't get properties for sub-entity {} in {}", sub_entity, entity.factory_hash)]
 	pub fn get_properties(
@@ -579,15 +581,18 @@ impl Intellisense {
 							&normalise_to_hash(factory.to_owned())
 						)?;
 
-						let extracted = cached_entities.read();
-						let extracted = extracted.get(&normalise_to_hash(factory.to_owned())).unwrap();
+						let extracted = cached_entities
+							.read()
+							.get(&normalise_to_hash(factory.to_owned()))
+							.expect("Ensured")
+							.to_owned();
 
 						found.extend(self.get_properties(
 							resource_packages,
 							cached_entities,
 							hash_list_mapping,
 							game_version,
-							extracted,
+							&extracted,
 							&extracted.root_entity,
 							false
 						)?);
@@ -814,15 +819,18 @@ impl Intellisense {
 						&normalise_to_hash(factory.to_owned())
 					)?;
 
-					let extracted = cached_entities.read();
-					let extracted = extracted.get(&normalise_to_hash(factory.to_owned())).unwrap();
+					let extracted = cached_entities
+						.read()
+						.get(&normalise_to_hash(factory.to_owned()))
+						.expect("Ensured")
+						.to_owned();
 
 					let found = self.get_pins(
 						resource_packages,
 						cached_entities,
 						hash_list_mapping,
 						game_version,
-						extracted,
+						&extracted,
 						&extracted.root_entity,
 						false
 					)?;

@@ -1,7 +1,7 @@
 {
 	"$schema": "../node_modules/@tauri-apps/cli/schema.json",
 	"build": {
-		"beforeBuildCommand": "yarn build",
+		"beforeBuildCommand": "yarn build && cmd /c copyThings.bat",
 		"beforeDevCommand": "yarn dev",
 		"devPath": "http://localhost:5173",
 		"distDir": "../build"
@@ -32,7 +32,7 @@
 				"providerShortName": null,
 				"signingIdentity": null
 			},
-			"resources": [],
+			"resources": ["ResourceLib_HM2016.dll", "ResourceLib_HM2.dll", "ResourceLib_HM3.dll"],
 			"shortDescription": "",
 			"targets": "all",
 			"windows": {

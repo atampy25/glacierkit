@@ -35,7 +35,7 @@ use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
 use entity::{
 	calculate_reverse_references, check_local_references_exist, get_decorations, get_local_reference,
-	get_recursive_children, get_ref_decoration, CopiedEntityData, ReverseReferenceData
+	get_recursive_children, CopiedEntityData, ReverseReferenceData
 };
 use event_handling::{
 	entity_overrides::send_overrides_decorations,
@@ -47,7 +47,6 @@ use hash_list::HashList;
 use indexmap::IndexMap;
 use intellisense::Intellisense;
 use itertools::Itertools;
-use material::get_material_properties;
 use memmap2::Mmap;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
@@ -78,11 +77,7 @@ use rpkg_rs::{
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, json, to_string, to_vec};
 use show_in_folder::show_in_folder;
-use syntect::{
-	highlighting::{Theme, ThemeSet},
-	html::highlighted_html_for_string,
-	parsing::SyntaxSet
-};
+use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
 use tauri::{async_runtime, AppHandle, Manager};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
@@ -102,10 +97,16 @@ fn main() {
 			tauri_specta::ts::builder().commands(tauri_specta::collect_commands![event, show_in_folder]);
 
 		#[cfg(debug_assertions)]
-		let specta_builder = specta_builder.path("../src/lib/bindings.ts");
+		let specta_builder = if Path::new("../src/lib").is_dir() {
+			specta_builder.path("../src/lib/bindings.ts")
+		} else {
+			specta_builder
+		};
 
 		#[cfg(debug_assertions)]
-		specta::export::ts("../src/lib/bindings-types.ts").unwrap();
+		if Path::new("../src/lib").is_dir() {
+			specta::export::ts("../src/lib/bindings-types.ts").expect("Failed to export types");
+		}
 
 		specta_builder.into_plugin()
 	};
@@ -113,7 +114,7 @@ fn main() {
 	tauri::Builder::default()
 		.plugin(specta)
 		.setup(|app| {
-			let app_data_path = app.path_resolver().app_data_dir().unwrap();
+			let app_data_path = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
 			let mut invalid = true;
 			if let Ok(read) = fs::read(app_data_path.join("settings.json")) {
@@ -125,13 +126,17 @@ fn main() {
 
 			if invalid {
 				let settings = AppSettings::default();
-				fs::create_dir_all(&app_data_path).unwrap();
-				fs::write(app_data_path.join("settings.json"), to_vec(&settings).unwrap()).unwrap();
+				fs::create_dir_all(&app_data_path).expect("Couldn't create app data dir");
+				fs::write(
+					app_data_path.join("settings.json"),
+					to_vec(&settings).expect("Couldn't serialise default app settings")
+				)
+				.expect("Couldn't write default app settings");
 				app.manage(ArcSwap::new(settings.into()));
 			}
 
 			app.manage(AppState {
-				game_installs: detect_installs().unwrap(),
+				game_installs: detect_installs().expect("Couldn't detect game installs"),
 				project: None.into(),
 				hash_list: fs::read(app_data_path.join("hash_list.sml"))
 					.ok()
@@ -147,7 +152,7 @@ fn main() {
 			Ok(())
 		})
 		.run(tauri::generate_context!())
-		.expect("error while running tauri application");
+		.expect("Couldn't run Tauri application");
 }
 
 #[tauri::command]
@@ -249,13 +254,8 @@ fn event(app: AppHandle, event: Event) {
 												from_slice(&fs::read(&path).context("Couldn't read file")?)
 													.context("Invalid entity")?;
 
-											if app_state
-												.project
-												.load()
-												.as_ref()
-												.map(|x| x.settings.load().game_install.is_some())
-												.unwrap_or(false) && let Some(hash_list) =
-												app_state.hash_list.load().as_ref()
+											if let Some(install) = app_settings.load().game_install.as_ref()
+												&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 											{
 												ensure_entity_in_cache(
 													app_state
@@ -267,22 +267,7 @@ fn event(app: AppHandle, event: Event) {
 													app_state
 														.game_installs
 														.iter()
-														.try_find(|x| {
-															anyhow::Ok(
-																x.path
-																	== *app_state
-																		.project
-																		.load()
-																		.as_ref()
-																		.unwrap()
-																		.settings
-																		.load()
-																		.game_install
-																		.as_ref()
-																		.unwrap()
-																		.as_path()
-															)
-														})?
+														.try_find(|x| anyhow::Ok(x.path == *install))?
 														.context("No such game install")?
 														.version,
 													&hash_list_mapping(hash_list),
@@ -343,6 +328,13 @@ fn event(app: AppHandle, event: Event) {
 													})
 												)?;
 											} else {
+												send_request(
+													&app,
+													Request::Tool(ToolRequest::FileBrowser(
+														FileBrowserRequest::Select(None)
+													))
+												)?;
+
 												send_notification(
 													&app,
 													Notification {
@@ -592,6 +584,11 @@ fn event(app: AppHandle, event: Event) {
 						}
 
 						FileBrowserEvent::NormaliseQNFile { path } => {
+							let task = start_task(
+								&app,
+								format!("Normalising {}", path.file_name().unwrap().to_string_lossy())
+							)?;
+
 							let extension = path
 								.file_name()
 								.context("No file name")?
@@ -620,6 +617,7 @@ fn event(app: AppHandle, event: Event) {
 											});
 										}
 									}
+									entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
 
 									let (fac, fac_meta, blu, blu_meta) =
 										convert_to_rt(&entity).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
@@ -645,12 +643,8 @@ fn event(app: AppHandle, event: Event) {
 									let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 										.context("Invalid entity")?;
 
-									if app_state
-										.project
-										.load()
-										.as_ref()
-										.map(|x| x.settings.load().game_install.is_some())
-										.unwrap_or(false) && let Some(hash_list) = app_state.hash_list.load().as_ref()
+									if let Some(install) = app_settings.load().game_install.as_ref()
+										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 									{
 										ensure_entity_in_cache(
 											app_state
@@ -662,22 +656,7 @@ fn event(app: AppHandle, event: Event) {
 											app_state
 												.game_installs
 												.iter()
-												.try_find(|x| {
-													anyhow::Ok(
-														x.path
-															== *app_state
-																.project
-																.load()
-																.as_ref()
-																.unwrap()
-																.settings
-																.load()
-																.game_install
-																.as_ref()
-																.unwrap()
-																.as_path()
-													)
-												})?
+												.try_find(|x| anyhow::Ok(x.path == *install))?
 												.context("No such game install")?
 												.version,
 											&hash_list_mapping(hash_list),
@@ -709,12 +688,20 @@ fn event(app: AppHandle, event: Event) {
 												});
 											}
 										}
-										entity.comments = comments;
+										entity.comments = vec![];
+
+										let (fac, fac_meta, blu, blu_meta) = convert_to_rt(&entity)
+											.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+										let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, true)
+											.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+										reconverted.comments = comments;
 
 										fs::write(
 											path,
 											to_vec(
-												&generate_patch(&base, &entity)
+												&generate_patch(&base, &reconverted)
 													.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
 											)?
 										)?;
@@ -747,15 +734,13 @@ fn event(app: AppHandle, event: Event) {
 									panic!();
 								}
 							}
+
+							finish_task(&app, task)?;
 						}
 
 						FileBrowserEvent::ConvertEntityToPatch { path } => {
-							if app_state
-								.project
-								.load()
-								.as_ref()
-								.map(|x| x.settings.load().game_install.is_some())
-								.unwrap_or(false) && let Some(hash_list) = app_state.hash_list.load().as_ref()
+							if let Some(install) = app_settings.load().game_install.as_ref()
+								&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 							{
 								let mut entity: Entity = from_slice(&fs::read(&path).context("Couldn't read file")?)
 									.context("Invalid entity")?;
@@ -782,22 +767,7 @@ fn event(app: AppHandle, event: Event) {
 								let game_version = app_state
 									.game_installs
 									.iter()
-									.try_find(|x| {
-										anyhow::Ok(
-											x.path
-												== *app_state
-													.project
-													.load()
-													.as_ref()
-													.unwrap()
-													.settings
-													.load()
-													.game_install
-													.as_ref()
-													.unwrap()
-													.as_path()
-										)
-									})?
+									.try_find(|x| anyhow::Ok(x.path == *install))?
 									.context("No such game install")?
 									.version;
 
@@ -895,12 +865,8 @@ fn event(app: AppHandle, event: Event) {
 							let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 								.context("Invalid entity")?;
 
-							if app_state
-								.project
-								.load()
-								.as_ref()
-								.map(|x| x.settings.load().game_install.is_some())
-								.unwrap_or(false) && let Some(hash_list) = app_state.hash_list.load().as_ref()
+							if let Some(install) = app_settings.load().game_install.as_ref()
+								&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 							{
 								ensure_entity_in_cache(
 									app_state
@@ -912,22 +878,7 @@ fn event(app: AppHandle, event: Event) {
 									app_state
 										.game_installs
 										.iter()
-										.try_find(|x| {
-											anyhow::Ok(
-												x.path
-													== *app_state
-														.project
-														.load()
-														.as_ref()
-														.unwrap()
-														.settings
-														.load()
-														.game_install
-														.as_ref()
-														.unwrap()
-														.as_path()
-											)
-										})?
+										.try_find(|x| anyhow::Ok(x.path == *install))?
 										.context("No such game install")?
 										.version,
 									&hash_list_mapping(hash_list),
@@ -1007,20 +958,7 @@ fn event(app: AppHandle, event: Event) {
 								.game_installs
 								.iter()
 								.try_find(|x| {
-									anyhow::Ok(
-										x.path
-											== *app_state
-												.project
-												.load()
-												.as_ref()
-												.context("No project loaded")?
-												.settings
-												.load()
-												.game_install
-												.as_ref()
-												.context("No game install selected")?
-												.as_path()
-									)
+									anyhow::Ok(x.path == *app_settings.load().game_install.as_ref().unwrap())
 								})?
 								.context("No such game install")?;
 
@@ -1100,16 +1038,7 @@ fn event(app: AppHandle, event: Event) {
 						GameBrowserEvent::Search(query) => {
 							let task = start_task(&app, format!("Searching game files for {}", query))?;
 
-							if let Some(install) = app_state
-								.project
-								.load()
-								.as_ref()
-								.unwrap()
-								.settings
-								.load()
-								.game_install
-								.as_ref()
-							{
+							if let Some(install) = app_settings.load().game_install.as_ref() {
 								let install = app_state
 									.game_installs
 									.iter()
@@ -1162,15 +1091,20 @@ fn event(app: AppHandle, event: Event) {
 								&app,
 								Request::Tool(ToolRequest::Settings(SettingsRequest::Initialise {
 									game_installs: app_state.game_installs.to_owned(),
-									settings: (*app_settings.inner().load_full()).to_owned()
+									settings: (*app_settings.load_full()).to_owned()
 								}))
 							)?;
-						}
 
-						SettingsEvent::ChangeGameInstall(path) => {
 							let task = start_task(&app, "Loading game files")?;
 
-							if let Some(path) = path.as_ref() {
+							if let Some(path) = app_settings.load().game_install.as_ref() {
+								let game_version = app_state
+									.game_installs
+									.iter()
+									.try_find(|x| anyhow::Ok(x.path == *path))?
+									.context("No such game install")?
+									.version;
+
 								let mut thumbs = IniFile::new();
 								thumbs
 									.load(&path.join("thumbs.dat").to_string_lossy())
@@ -1210,8 +1144,237 @@ fn event(app: AppHandle, event: Event) {
 												anyhow::Ok({
 													let rpkg_path =
 														Path::new(&package_manager.runtime_dir).join(format!(
-															"chunk{}{}.rpkg",
-															partition.index,
+															"{}{}{}.rpkg",
+															match game_version {
+																GameVersion::H1 | GameVersion::H2 =>
+																	if partition.index > 0 {
+																		"dlc"
+																	} else {
+																		"chunk"
+																	},
+
+																GameVersion::H3 => "chunk"
+															},
+															match game_version {
+																GameVersion::H1 | GameVersion::H2 =>
+																	if partition.index > 0 {
+																		partition.index - 1 // H1/H2 go chunk0, dlc0, dlc1
+																	} else {
+																		partition.index
+																	},
+																GameVersion::H3 => partition.index
+															},
+															if patch > 0 {
+																format!("patch{}", patch)
+															} else {
+																"".into()
+															}
+														));
+
+													(rpkg_path.to_owned(), {
+														let package_file = File::open(&rpkg_path)?;
+
+														let mmap = unsafe { Mmap::map(&package_file)? };
+														let mut reader = Cursor::new(&mmap[..]);
+
+														reader
+															.read_ne_args((patch > 0,))
+															.context("Couldn't parse RPKG file")?
+													})
+												})
+											})
+											.collect::<Result<Vec<_>>>()?
+										);
+									}
+								} else {
+									Err(anyhow!("thumbs.dat was missing required properties"))?;
+									panic!();
+								}
+
+								app_state.resource_packages.store(Some(resource_packages.into()));
+							}
+
+							finish_task(&app, task)?;
+
+							let task = start_task(&app, "Acquiring latest hash list")?;
+
+							let current_version = app_state.hash_list.load().as_ref().map(|x| x.version).unwrap_or(0);
+
+							if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await {
+								if let Ok(data) = data.text().await {
+									let new_version = data
+										.trim()
+										.parse::<u16>()
+										.context("Online hash list version wasn't a number")?;
+
+									if current_version < new_version {
+										if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
+											if let Ok(data) = data.bytes().await {
+												let hash_list = HashList::from_slice(&data)?;
+
+												fs::write(
+													app.path_resolver()
+														.app_data_dir()
+														.context("Couldn't get app data dir")?
+														.join("hash_list.sml"),
+													serde_smile::to_vec(&hash_list).unwrap()
+												)
+												.unwrap();
+
+												app_state.hash_list.store(Some(hash_list.into()));
+											}
+										}
+									}
+								}
+							}
+
+							if let Some(install) = app_settings.load().game_install.as_ref() {
+								if let Some(hash_list) = app_state.hash_list.load().as_ref() {
+									let game_version = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| anyhow::Ok(x.path == *install))?
+										.context("No such game install")?
+										.version;
+
+									app_state.intellisense.store(Some(
+										Intellisense {
+											cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+											cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
+											uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
+												.unwrap(),
+											matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+											all_cppts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "CPPT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_asets: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "ASET"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_uicts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "UICT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_matts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "MATT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect(),
+											all_wswts: hash_list
+												.entries
+												.iter()
+												.filter(|x| {
+													(x.game_flags & game_version.hash_list_flag()
+														== game_version.hash_list_flag()) && x.resource_type == "WSWT"
+												})
+												.map(|x| x.hash.to_owned())
+												.collect()
+										}
+										.into()
+									));
+								}
+							}
+
+							send_request(
+								&app,
+								Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
+									app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
+								)))
+							)?;
+
+							finish_task(&app, task)?;
+						}
+
+						SettingsEvent::ChangeGameInstall(path) => {
+							let task = start_task(&app, "Loading game files")?;
+
+							if let Some(path) = path.as_ref() {
+								let game_version = app_state
+									.game_installs
+									.iter()
+									.try_find(|x| anyhow::Ok(x.path == *path))?
+									.context("No such game install")?
+									.version;
+
+								let mut thumbs = IniFile::new();
+								thumbs
+									.load(&path.join("thumbs.dat").to_string_lossy())
+									.map_err(|x| anyhow!("RPKG error in parsing thumbs.dat: {:?}", x))?;
+
+								let mut resource_packages = IndexMap::new();
+
+								if let (Ok(proj_path), Ok(relative_runtime_path)) = (
+									thumbs.get_value("application", "PROJECT_PATH"),
+									thumbs.get_value("application", "RUNTIME_PATH")
+								) {
+									let mut package_manager = PackageManager::new(
+										&path.join(proj_path).join(relative_runtime_path).to_string_lossy()
+									);
+
+									let mut resource_container = ResourceContainer::default();
+
+									package_manager.initialize(&mut resource_container).map_err(|x| {
+										anyhow!("RPKG error in initialising resource container: {:?}", x)
+									})?;
+
+									for partition in package_manager.partition_infos {
+										resource_packages.extend(
+											vec![
+												0,
+												..ResourceContainer::get_patch_indices(
+													&package_manager.runtime_dir,
+													partition.index
+												)
+												.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
+												.iter()
+												.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
+											]
+											.into_par_iter()
+											.rev()
+											.map(|patch| {
+												anyhow::Ok({
+													let rpkg_path =
+														Path::new(&package_manager.runtime_dir).join(format!(
+															"{}{}{}.rpkg",
+															match game_version {
+																GameVersion::H1 | GameVersion::H2 =>
+																	if partition.index > 0 {
+																		"dlc"
+																	} else {
+																		"chunk"
+																	},
+
+																GameVersion::H3 => "chunk"
+															},
+															match game_version {
+																GameVersion::H1 | GameVersion::H2 =>
+																	if partition.index > 0 {
+																		partition.index - 1 // H1/H2 go chunk0, dlc0, dlc1
+																	} else {
+																		partition.index
+																	},
+																GameVersion::H3 => partition.index
+															},
 															if patch > 0 {
 																format!("patch{}", patch)
 															} else {
@@ -1245,22 +1408,7 @@ fn event(app: AppHandle, event: Event) {
 									let game_version = app_state
 										.game_installs
 										.iter()
-										.try_find(|x| {
-											anyhow::Ok(
-												x.path
-													== *app_state
-														.project
-														.load()
-														.as_ref()
-														.unwrap()
-														.settings
-														.load()
-														.game_install
-														.as_ref()
-														.unwrap()
-														.as_path()
-											)
-										})?
+										.try_find(|x| anyhow::Ok(x.path == *path))?
 										.context("No such game install")?
 										.version;
 
@@ -1325,17 +1473,24 @@ fn event(app: AppHandle, event: Event) {
 								app_state.intellisense.store(None);
 							}
 
+							let mut settings = (*app_settings.load_full()).to_owned();
+							settings.game_install = path;
+							fs::write(
+								app.path_resolver()
+									.app_data_dir()
+									.context("Couldn't get app data dir")?
+									.join("settings.json"),
+								to_vec(&settings).unwrap()
+							)
+							.unwrap();
+							app_settings.store(settings.into());
+
 							send_request(
 								&app,
-								Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(path.is_some())))
+								Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
+									app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
+								)))
 							)?;
-
-							if let Some(project) = app_state.project.load().deref() {
-								let mut settings = (*project.settings.load_full()).to_owned();
-								settings.game_install = path;
-								fs::write(project.path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
-								project.settings.store(settings.into());
-							}
 
 							finish_task(&app, task)?;
 						}
@@ -1589,26 +1744,12 @@ fn event(app: AppHandle, event: Event) {
 								if let Some(intellisense) = app_state.intellisense.load().as_ref()
 									&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
 								{
 									let game_version = app_state
 										.game_installs
 										.iter()
-										.try_find(|x| {
-											anyhow::Ok(
-												x.path
-													== *app_state
-														.project
-														.load()
-														.as_ref()
-														.unwrap()
-														.settings
-														.load()
-														.game_install
-														.as_ref()
-														.unwrap()
-														.as_path()
-											)
-										})?
+										.try_find(|x| anyhow::Ok(x.path == *install))?
 										.context("No such game install")?
 										.version;
 
@@ -1859,26 +2000,12 @@ fn event(app: AppHandle, event: Event) {
 								if let Some(intellisense) = app_state.intellisense.load().as_ref()
 									&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
 								{
 									let game_version = app_state
 										.game_installs
 										.iter()
-										.try_find(|x| {
-											anyhow::Ok(
-												x.path
-													== *app_state
-														.project
-														.load()
-														.as_ref()
-														.unwrap()
-														.settings
-														.load()
-														.game_install
-														.as_ref()
-														.unwrap()
-														.as_path()
-											)
-										})?
+										.try_find(|x| anyhow::Ok(x.path == *install))?
 										.context("No such game install")?
 										.version;
 
@@ -2096,27 +2223,13 @@ fn event(app: AppHandle, event: Event) {
 
 												if let Some(resource_packages) =
 													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
-													app_state.hash_list.load().as_ref()
+													app_state.hash_list.load().as_ref() && let Some(install) =
+													app_settings.load().game_install.as_ref()
 												{
 													let game_version = app_state
 														.game_installs
 														.iter()
-														.try_find(|x| {
-															anyhow::Ok(
-																x.path
-																	== *app_state
-																		.project
-																		.load()
-																		.as_ref()
-																		.unwrap()
-																		.settings
-																		.load()
-																		.game_install
-																		.as_ref()
-																		.unwrap()
-																		.as_path()
-															)
-														})?
+														.try_find(|x| anyhow::Ok(x.path == *install))?
 														.context("No such game install")?
 														.version;
 
@@ -2805,202 +2918,6 @@ fn event(app: AppHandle, event: Event) {
 							}
 							.into()
 						));
-
-						finish_task(&app, task)?;
-
-						let task = start_task(&app, "Loading game files")?;
-
-						if let Some(path) = settings.game_install.as_ref() {
-							let mut thumbs = IniFile::new();
-							thumbs
-								.load(&path.join("thumbs.dat").to_string_lossy())
-								.map_err(|x| anyhow!("RPKG error in parsing thumbs.dat: {:?}", x))?;
-
-							let mut resource_packages = IndexMap::new();
-
-							if let (Ok(proj_path), Ok(relative_runtime_path)) = (
-								thumbs.get_value("application", "PROJECT_PATH"),
-								thumbs.get_value("application", "RUNTIME_PATH")
-							) {
-								let mut package_manager = PackageManager::new(
-									&path.join(proj_path).join(relative_runtime_path).to_string_lossy()
-								);
-
-								let mut resource_container = ResourceContainer::default();
-
-								package_manager
-									.initialize(&mut resource_container)
-									.map_err(|x| anyhow!("RPKG error in initialising resource container: {:?}", x))?;
-
-								for partition in package_manager.partition_infos {
-									resource_packages.extend(
-										vec![
-											0,
-											..ResourceContainer::get_patch_indices(
-												&package_manager.runtime_dir,
-												partition.index
-											)
-											.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
-											.iter()
-											.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
-										]
-										.into_par_iter()
-										.rev()
-										.map(|patch| {
-											anyhow::Ok({
-												let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
-													"chunk{}{}.rpkg",
-													partition.index,
-													if patch > 0 {
-														format!("patch{}", patch)
-													} else {
-														"".into()
-													}
-												));
-
-												(rpkg_path.to_owned(), {
-													let package_file = File::open(&rpkg_path)?;
-
-													let mmap = unsafe { Mmap::map(&package_file)? };
-													let mut reader = Cursor::new(&mmap[..]);
-
-													reader
-														.read_ne_args((patch > 0,))
-														.context("Couldn't parse RPKG file")?
-												})
-											})
-										})
-										.collect::<Result<Vec<_>>>()?
-									);
-								}
-							} else {
-								Err(anyhow!("thumbs.dat was missing required properties"))?;
-								panic!();
-							}
-
-							app_state.resource_packages.store(Some(resource_packages.into()));
-						}
-
-						finish_task(&app, task)?;
-
-						let task = start_task(&app, "Acquiring latest hash list")?;
-
-						let current_version = app_state.hash_list.load().as_ref().map(|x| x.version).unwrap_or(0);
-
-						if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await {
-							if let Ok(data) = data.text().await {
-								let new_version = data
-									.trim()
-									.parse::<u16>()
-									.context("Online hash list version wasn't a number")?;
-
-								if current_version < new_version {
-									if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
-										if let Ok(data) = data.bytes().await {
-											let hash_list = HashList::from_slice(&data)?;
-
-											fs::write(
-												app.path_resolver()
-													.app_data_dir()
-													.context("Couldn't get app data dir")?
-													.join("hash_list.sml"),
-												serde_smile::to_vec(&hash_list).unwrap()
-											)
-											.unwrap();
-
-											app_state.hash_list.store(Some(hash_list.into()));
-										}
-									}
-								}
-							}
-						}
-
-						if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-							let game_version = app_state
-								.game_installs
-								.iter()
-								.try_find(|x| {
-									anyhow::Ok(
-										x.path
-											== *app_state
-												.project
-												.load()
-												.as_ref()
-												.unwrap()
-												.settings
-												.load()
-												.game_install
-												.as_ref()
-												.unwrap()
-												.as_path()
-									)
-								})?
-								.context("No such game install")?
-								.version;
-
-							app_state.intellisense.store(Some(
-								Intellisense {
-									cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-									cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
-									uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json"))
-										.unwrap(),
-									matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-									all_cppts: hash_list
-										.entries
-										.iter()
-										.filter(|x| {
-											(x.game_flags & game_version.hash_list_flag()
-												== game_version.hash_list_flag()) && x.resource_type == "CPPT"
-										})
-										.map(|x| x.hash.to_owned())
-										.collect(),
-									all_asets: hash_list
-										.entries
-										.iter()
-										.filter(|x| {
-											(x.game_flags & game_version.hash_list_flag()
-												== game_version.hash_list_flag()) && x.resource_type == "ASET"
-										})
-										.map(|x| x.hash.to_owned())
-										.collect(),
-									all_uicts: hash_list
-										.entries
-										.iter()
-										.filter(|x| {
-											(x.game_flags & game_version.hash_list_flag()
-												== game_version.hash_list_flag()) && x.resource_type == "UICT"
-										})
-										.map(|x| x.hash.to_owned())
-										.collect(),
-									all_matts: hash_list
-										.entries
-										.iter()
-										.filter(|x| {
-											(x.game_flags & game_version.hash_list_flag()
-												== game_version.hash_list_flag()) && x.resource_type == "MATT"
-										})
-										.map(|x| x.hash.to_owned())
-										.collect(),
-									all_wswts: hash_list
-										.entries
-										.iter()
-										.filter(|x| {
-											(x.game_flags & game_version.hash_list_flag()
-												== game_version.hash_list_flag()) && x.resource_type == "WSWT"
-										})
-										.map(|x| x.hash.to_owned())
-										.collect()
-								}
-								.into()
-							));
-						}
-
-						send_request(
-							&app,
-							Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
-								settings.game_install.is_some() && app_state.hash_list.load().is_some()
-							)))
-						)?;
 
 						finish_task(&app, task)?;
 					}

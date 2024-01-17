@@ -75,6 +75,10 @@
 		switch (request.type) {
 			case "setEnabled":
 				enabled = request.data
+				if (!enabled) {
+					tree.settings!.core.data = []
+					tree.refresh()
+				}
 				break
 
 			case "newTree":

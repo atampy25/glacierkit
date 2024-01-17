@@ -12,11 +12,11 @@
 			case "initialise":
 				gameInstalls = request.data.game_installs
 				extractModdedFiles = request.data.settings.extractModdedFiles
+				selectedGameInstall = request.data.settings.gameInstall || null
 				break
 
 			case "changeProjectSettings":
 				projectLoaded = true
-				selectedGameInstall = request.data.gameInstall || null
 				break
 
 			default:
@@ -75,41 +75,15 @@
 			</span>
 		</TooltipIcon>
 	</div>
-
-	<h4 class="mt-4">Project settings</h4>
-	{#if projectLoaded}
-		<p>Game</p>
-		<div class="mt-1 flex flex-wrap gap-2">
-			{#each gameInstalls as gameInstall}
-				<div
-					class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-					class:border-2={selectedGameInstall === gameInstall.path}
-					on:click={async () => {
-						selectedGameInstall = gameInstall.path
-
-						await event({
-							type: "tool",
-							data: {
-								type: "settings",
-								data: {
-									type: "changeGameInstall",
-									data: gameInstall.path
-								}
-							}
-						})
-					}}
-				>
-					<div>
-						<div class="font-bold mb-2">{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})</div>
-						<span>{gameInstall.path}</span>
-					</div>
-				</div>
-			{/each}
+	
+	<p>Game</p>
+	<div class="mt-1 flex flex-wrap gap-2">
+		{#each gameInstalls as gameInstall}
 			<div
 				class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-				class:border-2={selectedGameInstall === null}
+				class:border-2={selectedGameInstall === gameInstall.path}
 				on:click={async () => {
-					selectedGameInstall = null
+					selectedGameInstall = gameInstall.path
 
 					await event({
 						type: "tool",
@@ -117,15 +91,43 @@
 							type: "settings",
 							data: {
 								type: "changeGameInstall",
-								data: null
+								data: gameInstall.path
 							}
 						}
 					})
 				}}
 			>
-				<p>No game</p>
+				<div>
+					<div class="font-bold mb-2">{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})</div>
+					<span>{gameInstall.path}</span>
+				</div>
 			</div>
+		{/each}
+		<div
+			class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
+			class:border-2={selectedGameInstall === null}
+			on:click={async () => {
+				selectedGameInstall = null
+
+				await event({
+					type: "tool",
+					data: {
+						type: "settings",
+						data: {
+							type: "changeGameInstall",
+							data: null
+						}
+					}
+				})
+			}}
+		>
+			<p>No game</p>
 		</div>
+	</div>
+
+	<h4 class="mt-4">Project settings</h4>
+	{#if projectLoaded}
+		<p>There are no project settings (yet)</p>
 	{:else}
 		<p>No project loaded</p>
 	{/if}

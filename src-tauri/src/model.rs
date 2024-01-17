@@ -17,13 +17,15 @@ use crate::{entity::ReverseReference, game_detection::GameInstall, hash_list::Ha
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
-	pub extract_modded_files: bool
+	pub extract_modded_files: bool,
+	pub game_install: Option<PathBuf>
 }
 
 impl Default for AppSettings {
 	fn default() -> Self {
 		Self {
-			extract_modded_files: false
+			extract_modded_files: false,
+			game_install: None
 		}
 	}
 }
@@ -86,13 +88,11 @@ pub struct Project {
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ProjectSettings {
-	pub game_install: Option<PathBuf>
-}
+pub struct ProjectSettings {}
 
 impl Default for ProjectSettings {
 	fn default() -> Self {
-		Self { game_install: None }
+		Self {}
 	}
 }
 
