@@ -16,6 +16,7 @@ use velcro::vec;
 
 use crate::{
 	game_detection::GameVersion,
+	hash_list::HashList,
 	model::EditorValidity,
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
@@ -361,7 +362,7 @@ pub fn random_entity_id() -> String {
 	let mut id = String::from("cafe");
 
 	for _ in 0..14 {
-		id.push(*digits.choose(&mut thread_rng()).unwrap());
+		id.push(*digits.choose(&mut thread_rng()).expect("Slice is not empty"));
 	}
 
 	id
@@ -592,7 +593,7 @@ pub fn get_ref_decoration(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
-	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+	hash_list: &HashList,
 	entity: &Entity,
 	reference: &Ref
 ) -> Option<(String, String)> {
@@ -607,15 +608,17 @@ pub fn get_ref_decoration(
 					resource_packages,
 					cached_entities,
 					game_version,
-					hash_list_mapping,
-					&normalise_to_hash(reference.external_scene.as_ref().unwrap().into())
+					hash_list,
+					&normalise_to_hash(reference.external_scene.as_ref().expect("Not a local reference").into())
 				)
 				.ok()?;
 
 				cached_entities
 					.read()
-					.get(&normalise_to_hash(reference.external_scene.as_ref().unwrap().into()))
-					.unwrap()
+					.get(&normalise_to_hash(
+						reference.external_scene.as_ref().expect("Not a local reference").into()
+					))
+					.expect("Ensured")
 					.entities
 					.get(&reference.entity_ref)?
 					.name
@@ -632,22 +635,21 @@ pub fn get_ref_decoration(
 pub fn get_decorations(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
-	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+	hash_list: &HashList,
 	game_version: GameVersion,
 	sub_entity: &SubEntity,
 	entity: &Entity
 ) -> Result<Vec<(String, String)>> {
 	let mut decorations = vec![];
 
-	let repository = from_slice::<Vec<Value>>(
-		&extract_latest_resource(resource_packages, hash_list_mapping, "00204D1AFD76AB13")?.1
-	)?;
+	let repository =
+		from_slice::<Vec<Value>>(&extract_latest_resource(resource_packages, hash_list, "00204D1AFD76AB13")?.1)?;
 
 	if let Some(decoration) = get_ref_decoration(
 		resource_packages,
 		cached_entities,
 		game_version,
-		hash_list_mapping,
+		hash_list,
 		entity,
 		&sub_entity.parent
 	) {
@@ -660,7 +662,7 @@ pub fn get_decorations(
 				resource_packages,
 				cached_entities,
 				game_version,
-				hash_list_mapping,
+				hash_list,
 				entity,
 				&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
 			) {
@@ -674,7 +676,7 @@ pub fn get_decorations(
 					resource_packages,
 					cached_entities,
 					game_version,
-					hash_list_mapping,
+					hash_list,
 					entity,
 					&reference
 				) {
@@ -736,7 +738,7 @@ pub fn get_decorations(
 					resource_packages,
 					cached_entities,
 					game_version,
-					hash_list_mapping,
+					hash_list,
 					entity,
 					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
 				) {
@@ -750,7 +752,7 @@ pub fn get_decorations(
 						resource_packages,
 						cached_entities,
 						game_version,
-						hash_list_mapping,
+						hash_list,
 						entity,
 						&reference
 					) {
@@ -812,7 +814,7 @@ pub fn get_decorations(
 					resource_packages,
 					cached_entities,
 					game_version,
-					hash_list_mapping,
+					hash_list,
 					entity,
 					reference
 				) {
@@ -839,7 +841,7 @@ pub fn get_decorations(
 					resource_packages,
 					cached_entities,
 					game_version,
-					hash_list_mapping,
+					hash_list,
 					entity,
 					reference
 				) {
@@ -866,7 +868,7 @@ pub fn get_decorations(
 					resource_packages,
 					cached_entities,
 					game_version,
-					hash_list_mapping,
+					hash_list,
 					entity,
 					reference
 				) {
@@ -887,7 +889,7 @@ pub fn get_decorations(
 				resource_packages,
 				cached_entities,
 				game_version,
-				hash_list_mapping,
+				hash_list,
 				entity,
 				&alias_data.original_entity
 			) {
@@ -907,7 +909,7 @@ pub fn get_decorations(
 				resource_packages,
 				cached_entities,
 				game_version,
-				hash_list_mapping,
+				hash_list,
 				entity,
 				reference
 			) {
@@ -926,7 +928,7 @@ pub fn get_decorations(
 			resource_packages,
 			cached_entities,
 			game_version,
-			hash_list_mapping,
+			hash_list,
 			entity,
 			&Ref::Short(Some(referenced_entity.to_owned()))
 		) {
@@ -940,7 +942,7 @@ pub fn get_decorations(
 				resource_packages,
 				cached_entities,
 				game_version,
-				hash_list_mapping,
+				hash_list,
 				entity,
 				&Ref::Short(Some(parental_entity.to_owned()))
 			) {
@@ -949,30 +951,33 @@ pub fn get_decorations(
 		}
 	}
 
-	if hash_list_mapping
+	if hash_list
+		.entries
 		.get(&normalise_to_hash(sub_entity.factory.to_owned()))
-		.map(|(x, _)| x == "MATT")
+		.map(|entry| entry.resource_type == "MATT")
 		.unwrap_or(false)
 	{
-		if let Some(mati) = extract_latest_metadata(resource_packages, hash_list_mapping, &sub_entity.factory)?
+		if let Some(mati) = extract_latest_metadata(resource_packages, hash_list, &sub_entity.factory)?
 			.hash_reference_data
 			.into_iter()
 			.find(|x| {
-				hash_list_mapping
+				hash_list
+					.entries
 					.get(&normalise_to_hash(x.hash.to_owned()))
-					.map(|(x, _)| x == "MATI")
+					.map(|entry| entry.resource_type == "MATI")
 					.unwrap_or(false)
 			}) {
-			if let Some(mate) = extract_latest_metadata(resource_packages, hash_list_mapping, &mati.hash)?
+			if let Some(mate) = extract_latest_metadata(resource_packages, hash_list, &mati.hash)?
 				.hash_reference_data
 				.into_iter()
 				.find(|x| {
-					hash_list_mapping
+					hash_list
+						.entries
 						.get(&normalise_to_hash(x.hash.to_owned()))
-						.map(|(x, _)| x == "MATE")
+						.map(|entry| entry.resource_type == "MATE")
 						.unwrap_or(false)
 				}) {
-				let mate_data = extract_latest_resource(resource_packages, hash_list_mapping, &mate.hash)?.1;
+				let mate_data = extract_latest_resource(resource_packages, hash_list, &mate.hash)?.1;
 
 				let mut beginning = mate_data.len() - 1;
 				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {

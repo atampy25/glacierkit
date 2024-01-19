@@ -11,7 +11,7 @@ use crate::{
 	entity::get_ref_decoration,
 	finish_task,
 	model::{AppSettings, AppState, EditorRequest, EntityEditorRequest, EntityOverridesRequest, Request},
-	rpkg::{extract_latest_resource, hash_list_mapping},
+	rpkg::extract_latest_resource,
 	send_request, start_task
 };
 
@@ -34,10 +34,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 
 		let task = start_task(app, "Updating override decorations")?;
 
-		let mapping = hash_list_mapping(hash_list);
-
 		let repository =
-			from_slice::<Vec<Value>>(&extract_latest_resource(resource_packages, &mapping, "00204D1AFD76AB13")?.1)?;
+			from_slice::<Vec<Value>>(&extract_latest_resource(resource_packages, hash_list, "00204D1AFD76AB13")?.1)?;
 
 		let mut decorations = vec![];
 
@@ -47,7 +45,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 					resource_packages,
 					&app_state.cached_entities,
 					game_version,
-					&mapping,
+					hash_list,
 					entity,
 					reference
 				) {
@@ -61,7 +59,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 						resource_packages,
 						&app_state.cached_entities,
 						game_version,
-						&mapping,
+						hash_list,
 						entity,
 						&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
 					) {
@@ -75,7 +73,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 							resource_packages,
 							&app_state.cached_entities,
 							game_version,
-							&mapping,
+							hash_list,
 							entity,
 							&reference
 						) {
@@ -130,7 +128,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				resource_packages,
 				&app_state.cached_entities,
 				game_version,
-				&mapping,
+				hash_list,
 				entity,
 				reference
 			) {
@@ -143,7 +141,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				resource_packages,
 				&app_state.cached_entities,
 				game_version,
-				&mapping,
+				hash_list,
 				entity,
 				&pin_connection_override.from_entity
 			) {
@@ -154,7 +152,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				resource_packages,
 				&app_state.cached_entities,
 				game_version,
-				&mapping,
+				hash_list,
 				entity,
 				&pin_connection_override.to_entity
 			) {
@@ -167,7 +165,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				resource_packages,
 				&app_state.cached_entities,
 				game_version,
-				&mapping,
+				hash_list,
 				entity,
 				&pin_connection_override_delete.from_entity
 			) {
@@ -178,7 +176,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				resource_packages,
 				&app_state.cached_entities,
 				game_version,
-				&mapping,
+				hash_list,
 				entity,
 				&pin_connection_override_delete.to_entity
 			) {

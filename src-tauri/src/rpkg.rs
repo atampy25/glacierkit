@@ -36,7 +36,7 @@ use crate::{
 #[context("Couldn't extract resource {}", resource)]
 pub fn extract_latest_resource(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+	hash_list: &HashList,
 	resource: &str
 ) -> Result<(ResourceMeta, Vec<u8>)> {
 	let resource = normalise_to_hash(resource.into());
@@ -91,9 +91,16 @@ pub fn extract_latest_resource(
 							.zip(refs.reference_hash.iter())
 							.map(|(flag, hash)| ResourceDependency {
 								flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
-								hash: hash_list_mapping
+								hash: hash_list
+									.entries
 									.get(&hash.to_hex_string())
-									.map(|(_, x)| x.as_ref().map(|x| x.to_owned()).unwrap_or(hash.to_hex_string()))
+									.map(|entry| {
+										entry
+											.path
+											.as_ref()
+											.map(|x| x.to_owned())
+											.unwrap_or(hash.to_hex_string())
+									})
 									.unwrap_or(hash.to_hex_string())
 							})
 							.collect()
@@ -128,7 +135,7 @@ pub fn extract_latest_resource(
 #[context("Couldn't extract metadata for resource {}", resource)]
 pub fn extract_latest_metadata(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+	hash_list: &HashList,
 	resource: &str
 ) -> Result<ResourceMeta> {
 	let resource = normalise_to_hash(resource.into());
@@ -162,9 +169,16 @@ pub fn extract_latest_metadata(
 							.zip(refs.reference_hash.iter())
 							.map(|(flag, hash)| ResourceDependency {
 								flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
-								hash: hash_list_mapping
+								hash: hash_list
+									.entries
 									.get(&hash.to_hex_string())
-									.map(|(_, x)| x.as_ref().map(|x| x.to_owned()).unwrap_or(hash.to_hex_string()))
+									.map(|entry| {
+										entry
+											.path
+											.as_ref()
+											.map(|x| x.to_owned())
+											.unwrap_or(hash.to_hex_string())
+									})
 									.unwrap_or(hash.to_hex_string())
 							})
 							.collect()
@@ -186,7 +200,7 @@ pub fn ensure_entity_in_cache(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
-	hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+	hash_list: &HashList,
 	factory_hash: &str
 ) -> Result<()> {
 	{
@@ -195,7 +209,7 @@ pub fn ensure_entity_in_cache(
 		}
 	}
 
-	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list_mapping, factory_hash)?;
+	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, factory_hash)?;
 
 	let factory =
 		match game_version {
@@ -217,7 +231,7 @@ pub fn ensure_entity_in_cache(
 		.context("Blueprint referenced in factory does not exist in dependencies")?
 		.hash;
 
-	let (tblu_meta, tblu_data) = extract_latest_resource(resource_packages, hash_list_mapping, blueprint_hash)?;
+	let (tblu_meta, tblu_data) = extract_latest_resource(resource_packages, hash_list, blueprint_hash)?;
 
 	let blueprint = match game_version {
 		GameVersion::H1 => convert_2016_blueprint_to_modern(
@@ -246,25 +260,4 @@ pub fn normalise_to_hash(hash_or_path: String) -> String {
 	} else {
 		format!("{:0>16X}", Md5Engine::compute(&hash_or_path.to_lowercase()))
 	}
-}
-
-/// Generate a map for use with extract_* functions.
-pub fn hash_list_mapping(hash_list: &HashList) -> HashMap<String, (String, Option<String>)> {
-	hash_list
-		.entries
-		.iter()
-		.map(|x| {
-			(
-				x.hash.to_owned(),
-				(
-					x.resource_type.to_owned(),
-					if x.path.is_empty() {
-						None
-					} else {
-						Some(x.path.to_owned())
-					}
-				)
-			)
-		})
-		.collect()
 }

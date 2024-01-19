@@ -22,6 +22,7 @@ use tryvial::try_fn;
 use crate::{
 	entity::get_local_reference,
 	game_detection::GameVersion,
+	hash_list::HashList,
 	material::{get_material_properties, MaterialProperty, MaterialPropertyData},
 	resourcelib::{
 		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2_convert_cppt, h2_convert_dswb, h3_convert_cppt,
@@ -55,7 +56,7 @@ impl Intellisense {
 	fn get_cppt_properties(
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+		hash_list: &HashList,
 		game_version: GameVersion,
 		cppt: &str
 	) -> Result<HashMap<String, (String, Value)>> {
@@ -65,7 +66,7 @@ impl Intellisense {
 			}
 		}
 
-		let extracted = extract_latest_resource(resource_packages, hash_list_mapping, cppt)?;
+		let extracted = extract_latest_resource(resource_packages, hash_list, cppt)?;
 
 		let cppt_data = match game_version {
 			GameVersion::H1 => h2016_convert_cppt(&extracted.1)?,
@@ -222,7 +223,7 @@ impl Intellisense {
 	fn get_matt_properties(
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+		hash_list: &HashList,
 		matt: &str
 	) -> Result<Vec<MaterialProperty>> {
 		{
@@ -231,18 +232,19 @@ impl Intellisense {
 			}
 		}
 
-		let (matt_meta, matt_data) = extract_latest_resource(resource_packages, hash_list_mapping, matt)?;
+		let (matt_meta, matt_data) = extract_latest_resource(resource_packages, hash_list, matt)?;
 
 		let (_, matb_data) = extract_latest_resource(
 			resource_packages,
-			hash_list_mapping,
+			hash_list,
 			&matt_meta
 				.hash_reference_data
 				.iter()
 				.find(|x| {
-					hash_list_mapping
+					hash_list
+						.entries
 						.get(&normalise_to_hash(x.hash.to_owned()))
-						.map(|(x, _)| x == "MATB")
+						.map(|entry| entry.resource_type == "MATB")
 						.unwrap_or(false)
 				})
 				.context("MATT has no MATB dependency")?
@@ -267,7 +269,7 @@ impl Intellisense {
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 		cached_entities: &RwLock<HashMap<String, Entity>>,
-		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
 		sub_entity: &str,
@@ -292,7 +294,7 @@ impl Intellisense {
 									.get_properties(
 										resource_packages,
 										cached_entities,
-										hash_list_mapping,
+										hash_list,
 										game_version,
 										entity,
 										ent,
@@ -331,7 +333,7 @@ impl Intellisense {
 				if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
 					extract_latest_metadata(
 						resource_packages,
-						hash_list_mapping,
+						hash_list,
 						&normalise_to_hash(targeted.factory.to_owned())
 					)?
 					.hash_reference_data
@@ -352,32 +354,30 @@ impl Intellisense {
 
 					if self.all_cppts.contains(&factory) {
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list_mapping, game_version, &factory)?
+							self.get_cppt_properties(resource_packages, hash_list, game_version, &factory)?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 					} else if self.all_uicts.contains(&factory) {
 						// All UI controls have the properties of ZUIControlEntity
-						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
-							resource_packages,
-							hash_list_mapping,
-							game_version,
-							"002C4526CC9753E6"
-						)? {
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(resource_packages, hash_list, game_version, "002C4526CC9753E6")?
+						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 
 						for entry in convert_uicb(
 							&extract_latest_resource(
 								resource_packages,
-								hash_list_mapping,
-								&extract_latest_metadata(resource_packages, hash_list_mapping, &factory)?
+								hash_list,
+								&extract_latest_metadata(resource_packages, hash_list, &factory)?
 									.hash_reference_data
 									.into_iter()
 									.find(|x| {
-										hash_list_mapping
+										hash_list
+											.entries
 											.get(&normalise_to_hash(x.hash.to_owned()))
-											.map(|(x, _)| x == "UICB")
+											.map(|entry| entry.resource_type == "UICB")
 											.unwrap_or(false)
 									})
 									.context("No blueprint dependency on UICT")?
@@ -411,16 +411,13 @@ impl Intellisense {
 						}
 					} else if self.all_matts.contains(&factory) {
 						// All materials have the properties of ZRenderMaterialEntity
-						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
-							resource_packages,
-							hash_list_mapping,
-							game_version,
-							"00B4B11DA327CAD0"
-						)? {
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(resource_packages, hash_list, game_version, "00B4B11DA327CAD0")?
+						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 
-						for property in self.get_matt_properties(resource_packages, hash_list_mapping, &factory)? {
+						for property in self.get_matt_properties(resource_packages, hash_list, &factory)? {
 							match property.data {
 								MaterialPropertyData::Texture(texture) => {
 									found.push((
@@ -564,12 +561,9 @@ impl Intellisense {
 						}
 					} else if self.all_wswts.contains(&factory) {
 						// All switch groups have the properties of ZAudioSwitchEntity
-						for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
-							resource_packages,
-							hash_list_mapping,
-							game_version,
-							"00797DC916520C4D"
-						)? {
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(resource_packages, hash_list, game_version, "00797DC916520C4D")?
+						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 					} else {
@@ -577,7 +571,7 @@ impl Intellisense {
 							resource_packages,
 							cached_entities,
 							game_version,
-							hash_list_mapping,
+							hash_list,
 							&normalise_to_hash(factory.to_owned())
 						)?;
 
@@ -590,7 +584,7 @@ impl Intellisense {
 						found.extend(self.get_properties(
 							resource_packages,
 							cached_entities,
-							hash_list_mapping,
+							hash_list,
 							game_version,
 							&extracted,
 							&extracted.root_entity,
@@ -616,7 +610,7 @@ impl Intellisense {
 		&self,
 		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 		cached_entities: &RwLock<HashMap<String, Entity>>,
-		hash_list_mapping: &HashMap<String, (String, Option<String>)>,
+		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
 		sub_entity: &str,
@@ -709,7 +703,7 @@ impl Intellisense {
 			if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
 				extract_latest_metadata(
 					resource_packages,
-					hash_list_mapping,
+					hash_list,
 					&normalise_to_hash(targeted.factory.to_owned())
 				)?
 				.hash_reference_data
@@ -742,14 +736,15 @@ impl Intellisense {
 					for entry in convert_uicb(
 						&extract_latest_resource(
 							resource_packages,
-							hash_list_mapping,
-							&extract_latest_metadata(resource_packages, hash_list_mapping, &factory)?
+							hash_list,
+							&extract_latest_metadata(resource_packages, hash_list, &factory)?
 								.hash_reference_data
 								.into_iter()
 								.find(|x| {
-									hash_list_mapping
+									hash_list
+										.entries
 										.get(&normalise_to_hash(x.hash.to_owned()))
-										.map(|(x, _)| x == "UICB")
+										.map(|entry| entry.resource_type == "UICB")
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on UICT")?
@@ -772,7 +767,7 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 
-					for property in self.get_matt_properties(resource_packages, hash_list_mapping, &factory)? {
+					for property in self.get_matt_properties(resource_packages, hash_list, &factory)? {
 						if !matches!(property.data, MaterialPropertyData::Texture(_)) {
 							input.push(property.name);
 						}
@@ -783,30 +778,31 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 
-					let wswt_meta = extract_latest_metadata(resource_packages, hash_list_mapping, &factory)?;
+					let wswt_meta = extract_latest_metadata(resource_packages, hash_list, &factory)?;
 
 					let dswb_hash = &wswt_meta
 						.hash_reference_data
 						.iter()
 						.find(|x| {
-							hash_list_mapping
+							hash_list
+								.entries
 								.get(&normalise_to_hash(x.hash.to_owned()))
-								.map(|(x, _)| x == "DSWB" || x == "WSWB")
+								.map(|entry| entry.resource_type == "DSWB" || entry.resource_type == "WSWB")
 								.unwrap_or(false)
 						})
 						.context("No blueprint dependency on WSWT")?
 						.hash;
 
 					let dswb_data = match game_version {
-						GameVersion::H1 => h2016_convert_dswb(
-							&extract_latest_resource(resource_packages, hash_list_mapping, dswb_hash)?.1
-						)?,
-						GameVersion::H2 => h2_convert_dswb(
-							&extract_latest_resource(resource_packages, hash_list_mapping, dswb_hash)?.1
-						)?,
-						GameVersion::H3 => h3_convert_dswb(
-							&extract_latest_resource(resource_packages, hash_list_mapping, dswb_hash)?.1
-						)?
+						GameVersion::H1 => {
+							h2016_convert_dswb(&extract_latest_resource(resource_packages, hash_list, dswb_hash)?.1)?
+						}
+						GameVersion::H2 => {
+							h2_convert_dswb(&extract_latest_resource(resource_packages, hash_list, dswb_hash)?.1)?
+						}
+						GameVersion::H3 => {
+							h3_convert_dswb(&extract_latest_resource(resource_packages, hash_list, dswb_hash)?.1)?
+						}
 					};
 
 					input.extend(dswb_data.m_aSwitches);
@@ -815,7 +811,7 @@ impl Intellisense {
 						resource_packages,
 						cached_entities,
 						game_version,
-						hash_list_mapping,
+						hash_list,
 						&normalise_to_hash(factory.to_owned())
 					)?;
 
@@ -828,7 +824,7 @@ impl Intellisense {
 					let found = self.get_pins(
 						resource_packages,
 						cached_entities,
-						hash_list_mapping,
+						hash_list,
 						game_version,
 						&extracted,
 						&extracted.root_entity,

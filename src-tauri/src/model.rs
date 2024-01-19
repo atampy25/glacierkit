@@ -100,8 +100,8 @@ impl Default for ProjectSettings {
 #[serde(rename_all = "camelCase")]
 pub struct GameBrowserEntry {
 	pub hash: String,
-	pub path: String,
-	pub hint: String
+	pub path: Option<String>,
+	pub hint: Option<String>
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]

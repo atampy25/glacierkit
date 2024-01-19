@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
+use enumset::EnumSetType;
 use fn_error_context::context;
 use itertools::Itertools;
 use registry::{Data, Hive, Security};
@@ -29,22 +30,12 @@ pub struct GameInstall {
 	pub path: PathBuf
 }
 
-#[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Copy)]
+#[derive(Type, Serialize, Deserialize, Debug, PartialOrd, Ord, Hash, EnumSetType)]
 #[serde(rename_all = "camelCase")]
 pub enum GameVersion {
 	H1,
 	H2,
 	H3
-}
-
-impl GameVersion {
-	pub fn hash_list_flag(&self) -> u8 {
-		match self {
-			Self::H1 => 0b000010,
-			Self::H2 => 0b000100,
-			Self::H3 => 0b001000
-		}
-	}
 }
 
 #[try_fn]

@@ -1,25 +1,44 @@
-use std::io::Read;
+use std::{collections::HashMap, io::Read};
 
 use anyhow::{Context, Result};
+use enumset::EnumSet;
 use fn_error_context::context;
 use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
 
+use crate::game_detection::GameVersion;
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct HashList {
+pub struct DeserialisedHashList {
 	pub version: u16,
-	pub entries: Vec<Entry>
+	pub entries: Vec<DeserialisedEntry>
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Entry {
+pub struct DeserialisedEntry {
 	pub resource_type: String,
 	pub hash: String,
 	pub path: String,
 	pub hint: String,
 	pub game_flags: u8
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HashList {
+	pub version: u16,
+	pub entries: HashMap<String, HashData>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HashData {
+	pub resource_type: String,
+	pub path: Option<String>,
+	pub hint: Option<String>,
+	pub games: EnumSet<GameVersion>
 }
 
 impl HashList {
@@ -32,12 +51,46 @@ impl HashList {
 			.read_to_end(&mut decompressed)
 			.context("Decompression failed")?;
 
-		let mut hash_list: HashList = serde_smile::from_slice(&decompressed).context("Deserialisation failed")?;
+		let mut hash_list: DeserialisedHashList =
+			serde_smile::from_slice(&decompressed).context("Deserialisation failed")?;
 
 		hash_list
 			.entries
 			.sort_by_cached_key(|x| format!("{}{}{}", x.path, x.hint, x.hash));
 
-		hash_list
+		HashList {
+			version: hash_list.version,
+			entries: hash_list
+				.entries
+				.into_iter()
+				.map(|entry| {
+					(
+						entry.hash,
+						HashData {
+							resource_type: entry.resource_type,
+							path: (!entry.path.is_empty()).then_some(entry.path),
+							hint: (!entry.hint.is_empty()).then_some(entry.hint),
+							games: {
+								let mut games = EnumSet::new();
+
+								if entry.game_flags & 0b000010 == 0b000010 {
+									games.insert(GameVersion::H1);
+								}
+
+								if entry.game_flags & 0b000100 == 0b000100 {
+									games.insert(GameVersion::H2);
+								}
+
+								if entry.game_flags & 0b001000 == 0b001000 {
+									games.insert(GameVersion::H3);
+								}
+
+								games
+							}
+						}
+					)
+				})
+				.collect()
+		}
 	}
 }
