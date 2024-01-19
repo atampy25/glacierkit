@@ -4337,16 +4337,19 @@ dependencies = [
 name = "rpkg-rs"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "binrw",
  "hitman-xtea",
+ "itertools 0.12.0",
+ "lz4",
  "md5",
  "memmap2 0.7.1",
  "modular-bitfield",
+ "pathdiff",
  "rayon",
  "regex",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

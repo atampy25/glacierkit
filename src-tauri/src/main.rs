@@ -71,7 +71,7 @@ use resourcelib::{
 use rfd::AsyncFileDialog;
 use rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
 use rpkg_rs::{
-	misc::ini_file::IniFile,
+	misc::ini_file_system::IniFileSystem,
 	runtime::resource::{package_manager::PackageManager, resource_container::ResourceContainer}
 };
 use serde::{Deserialize, Serialize};
@@ -1104,10 +1104,8 @@ fn event(app: AppHandle, event: Event) {
 									.context("No such game install")?
 									.version;
 
-								let mut thumbs = IniFile::new();
-								thumbs
-									.load(&path.join("thumbs.dat").to_string_lossy())
-									.map_err(|x| anyhow!("RPKG error in parsing thumbs.dat: {:?}", x))?;
+								let mut thumbs = IniFileSystem::new();
+								thumbs.load(&path.join("thumbs.dat"))?;
 
 								let mut resource_packages = IndexMap::new();
 
@@ -1115,9 +1113,8 @@ fn event(app: AppHandle, event: Event) {
 									thumbs.get_value("application", "PROJECT_PATH"),
 									thumbs.get_value("application", "RUNTIME_PATH")
 								) {
-									let mut package_manager = PackageManager::new(
-										&path.join(proj_path).join(relative_runtime_path).to_string_lossy()
-									);
+									let mut package_manager =
+										PackageManager::new(&path.join(proj_path).join(relative_runtime_path));
 
 									let mut resource_container = ResourceContainer::default();
 
@@ -1305,10 +1302,8 @@ fn event(app: AppHandle, event: Event) {
 									.context("No such game install")?
 									.version;
 
-								let mut thumbs = IniFile::new();
-								thumbs
-									.load(&path.join("thumbs.dat").to_string_lossy())
-									.map_err(|x| anyhow!("RPKG error in parsing thumbs.dat: {:?}", x))?;
+								let mut thumbs = IniFileSystem::new();
+								thumbs.load(&path.join("thumbs.dat"))?;
 
 								let mut resource_packages = IndexMap::new();
 
@@ -1316,9 +1311,8 @@ fn event(app: AppHandle, event: Event) {
 									thumbs.get_value("application", "PROJECT_PATH"),
 									thumbs.get_value("application", "RUNTIME_PATH")
 								) {
-									let mut package_manager = PackageManager::new(
-										&path.join(proj_path).join(relative_runtime_path).to_string_lossy()
-									);
+									let mut package_manager =
+										PackageManager::new(&path.join(proj_path).join(relative_runtime_path));
 
 									let mut resource_container = ResourceContainer::default();
 
