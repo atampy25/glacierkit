@@ -656,6 +656,23 @@ pub fn get_decorations(
 		decorations.push(decoration);
 	}
 
+	// Hint decoration for unknown paths
+	if sub_entity.factory.starts_with('0') {
+		if let Some(entry) = hash_list.entries.get(&sub_entity.factory) {
+			if let Some(hint) = entry.hint.as_ref() {
+				decorations.push((sub_entity.factory.to_owned(), hint.to_owned()));
+			}
+		}
+	}
+
+	if sub_entity.blueprint.starts_with('0') {
+		if let Some(entry) = hash_list.entries.get(&sub_entity.blueprint) {
+			if let Some(hint) = entry.hint.as_ref() {
+				decorations.push((sub_entity.blueprint.to_owned(), hint.to_owned()));
+			}
+		}
+	}
+
 	for property_data in sub_entity.properties.as_ref().unwrap_or(&Default::default()).values() {
 		if property_data.property_type == "SEntityTemplateReference" {
 			if let Some(decoration) = get_ref_decoration(
@@ -720,6 +737,50 @@ pub fn get_decorations(
 							repository_id,
 							name.as_str().context("Name or CommonName was not string")?.to_owned()
 						));
+					}
+				}
+			}
+		} else if property_data.property_type == "ZRuntimeResourceID" {
+			let res = if let Some(obj) = property_data.value.as_object() {
+				obj.get("resource")
+					.context("No resource property on object ZRuntimeResourceID")?
+					.as_str()
+					.context("Resource was not string")?
+			} else {
+				property_data
+					.value
+					.as_str()
+					.context("ZRuntimeResourceID value was neither string nor object")?
+			};
+
+			if res.starts_with('0') {
+				if let Some(entry) = hash_list.entries.get(res) {
+					if let Some(hint) = entry.hint.as_ref() {
+						decorations.push((res.to_owned(), hint.to_owned()));
+					}
+				}
+			}
+		} else if property_data.property_type == "TArray<ZRuntimeResourceID>" {
+			for val in from_value::<Vec<Value>>(property_data.value.to_owned())
+				.context("TArray<ZRuntimeResourceID> was not an array")?
+			{
+				let res = if let Some(obj) = val.as_object() {
+					obj.get("resource")
+						.context("No resource property on object ZRuntimeResourceID")?
+						.as_str()
+						.context("Resource was not string")?
+				} else {
+					property_data
+						.value
+						.as_str()
+						.context("ZRuntimeResourceID value was neither string nor object")?
+				};
+
+				if res.starts_with('0') {
+					if let Some(entry) = hash_list.entries.get(res) {
+						if let Some(hint) = entry.hint.as_ref() {
+							decorations.push((res.to_owned(), hint.to_owned()));
+						}
 					}
 				}
 			}
@@ -795,6 +856,50 @@ pub fn get_decorations(
 								repository_id,
 								name.as_str().context("Name or CommonName was not string")?.to_owned()
 							));
+						}
+					}
+				}
+			} else if property_data.property_type == "ZRuntimeResourceID" {
+				let res = if let Some(obj) = property_data.value.as_object() {
+					obj.get("resource")
+						.context("No resource property on object ZRuntimeResourceID")?
+						.as_str()
+						.context("Resource was not string")?
+				} else {
+					property_data
+						.value
+						.as_str()
+						.context("ZRuntimeResourceID value was neither string nor object")?
+				};
+
+				if res.starts_with('0') {
+					if let Some(entry) = hash_list.entries.get(res) {
+						if let Some(hint) = entry.hint.as_ref() {
+							decorations.push((res.to_owned(), hint.to_owned()));
+						}
+					}
+				}
+			} else if property_data.property_type == "TArray<ZRuntimeResourceID>" {
+				for val in from_value::<Vec<Value>>(property_data.value.to_owned())
+					.context("TArray<ZRuntimeResourceID> was not an array")?
+				{
+					let res = if let Some(obj) = val.as_object() {
+						obj.get("resource")
+							.context("No resource property on object ZRuntimeResourceID")?
+							.as_str()
+							.context("Resource was not string")?
+					} else {
+						property_data
+							.value
+							.as_str()
+							.context("ZRuntimeResourceID value was neither string nor object")?
+					};
+
+					if res.starts_with('0') {
+						if let Some(entry) = hash_list.entries.get(res) {
+							if let Some(hint) = entry.hint.as_ref() {
+								decorations.push((res.to_owned(), hint.to_owned()));
+							}
 						}
 					}
 				}
