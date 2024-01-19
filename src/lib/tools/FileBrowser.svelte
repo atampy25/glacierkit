@@ -430,7 +430,7 @@
 
 		switch (request.type) {
 			case "create":
-				if (!request.data.path.endsWith("project.json")) {
+				if (!request.data.path.endsWith("project.json") && !pathToID[request.data.path]) {
 					pathToID[request.data.path] = v4()
 					tree.create_node(
 						pathToID[request.data.path.split(sep).slice(0, -1).join(sep)],
@@ -456,7 +456,7 @@
 				break
 
 			case "rename":
-				if (!(request.data.old_path.endsWith("project.json") || request.data.new_path.endsWith("project.json"))) {
+				if (!(request.data.old_path.endsWith("project.json") || request.data.new_path.endsWith("project.json")) && pathToID[request.data.old_path]) {
 					if (request.data.old_path.split(sep).slice(0, -1).join(sep) === request.data.new_path.split(sep).slice(0, -1).join(sep)) {
 						tree.rename_node(tree.get_node(pathToID[request.data.old_path]), request.data.new_path.at(-1)!)
 					} else {

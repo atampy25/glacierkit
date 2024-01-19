@@ -65,7 +65,9 @@
 		})
 
 		jQuery("#" + elemID).on("refresh.jstree", () => {
-			tree.open_all()
+			if (tree.settings!.core.data.length < 500) {
+				tree.open_all()
+			}
 		})
 	})
 
@@ -98,7 +100,6 @@
 		const addedFolders = new Set()
 
 		for (const entry of entries) {
-			// TODO: Display items with unknown paths
 			if (entry.path) {
 				const path = /\[(.*)\]\.pc_entity/.exec(entry.path)!
 
@@ -124,6 +125,14 @@
 					parent: path[1].split("/").slice(0, -1).join("/"),
 					icon: "fa-regular fa-file",
 					text: path[1].split("/").at(-1),
+					folder: false
+				})
+			} else {
+				tree.settings!.core.data.push({
+					id: entry.hash,
+					parent: "#",
+					icon: "fa-regular fa-file",
+					text: entry.hint || entry.hash,
 					folder: false
 				})
 			}

@@ -746,11 +746,10 @@ pub fn get_decorations(
 					.context("No resource property on object ZRuntimeResourceID")?
 					.as_str()
 					.context("Resource was not string")?
+			} else if let Some(x) = property_data.value.as_str() {
+				x
 			} else {
-				property_data
-					.value
-					.as_str()
-					.context("ZRuntimeResourceID value was neither string nor object")?
+				""
 			};
 
 			if res.starts_with('0') {
@@ -769,11 +768,10 @@ pub fn get_decorations(
 						.context("No resource property on object ZRuntimeResourceID")?
 						.as_str()
 						.context("Resource was not string")?
+				} else if let Some(x) = val.as_str() {
+					x
 				} else {
-					property_data
-						.value
-						.as_str()
-						.context("ZRuntimeResourceID value was neither string nor object")?
+					""
 				};
 
 				if res.starts_with('0') {
@@ -865,11 +863,10 @@ pub fn get_decorations(
 						.context("No resource property on object ZRuntimeResourceID")?
 						.as_str()
 						.context("Resource was not string")?
+				} else if let Some(x) = property_data.value.as_str() {
+					x
 				} else {
-					property_data
-						.value
-						.as_str()
-						.context("ZRuntimeResourceID value was neither string nor object")?
+					""
 				};
 
 				if res.starts_with('0') {
@@ -888,11 +885,10 @@ pub fn get_decorations(
 							.context("No resource property on object ZRuntimeResourceID")?
 							.as_str()
 							.context("Resource was not string")?
+					} else if let Some(x) = val.as_str() {
+						x
 					} else {
-						property_data
-							.value
-							.as_str()
-							.context("ZRuntimeResourceID value was neither string nor object")?
+						""
 					};
 
 					if res.starts_with('0') {
