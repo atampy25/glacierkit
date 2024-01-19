@@ -270,7 +270,7 @@ fn event(app: AppHandle, event: Event) {
 														.try_find(|x| anyhow::Ok(x.path == *install))?
 														.context("No such game install")?
 														.version,
-													&hash_list,
+													hash_list,
 													&normalise_to_hash(patch.factory_hash.to_owned())
 												)?;
 
@@ -659,7 +659,7 @@ fn event(app: AppHandle, event: Event) {
 												.try_find(|x| anyhow::Ok(x.path == *install))?
 												.context("No such game install")?
 												.version,
-											&hash_list,
+											hash_list,
 											&normalise_to_hash(patch.factory_hash.to_owned())
 										)?;
 
@@ -774,7 +774,7 @@ fn event(app: AppHandle, event: Event) {
 								// `ensure_entity_in_cache` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
 								let (temp_meta, temp_data) = extract_latest_resource(
 									resource_packages,
-									&hash_list,
+									hash_list,
 									&normalise_to_hash(entity.factory_hash.to_owned())
 								)?;
 
@@ -798,7 +798,7 @@ fn event(app: AppHandle, event: Event) {
 									.hash;
 
 								let (tblu_meta, tblu_data) =
-									extract_latest_resource(resource_packages, &hash_list, blueprint_hash)?;
+									extract_latest_resource(resource_packages, hash_list, blueprint_hash)?;
 
 								let blueprint = match game_version {
 									GameVersion::H1 => convert_2016_blueprint_to_modern(
@@ -878,7 +878,7 @@ fn event(app: AppHandle, event: Event) {
 										.try_find(|x| anyhow::Ok(x.path == *install))?
 										.context("No such game install")?
 										.version,
-									&hash_list,
+									hash_list,
 									&normalise_to_hash(patch.factory_hash.to_owned())
 								)?;
 
@@ -967,7 +967,7 @@ fn event(app: AppHandle, event: Event) {
 									.context("Game install not fully loaded")?,
 								&app_state.cached_entities,
 								game_install_data.version,
-								&app_state
+								app_state
 									.hash_list
 									.load()
 									.as_ref()
@@ -1060,8 +1060,8 @@ fn event(app: AppHandle, event: Event) {
 											entries: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(install.version))
-												.filter(|(hash, entry)| entry.resource_type == "TEMP")
+												.filter(|(_, entry)| entry.games.contains(install.version))
+												.filter(|(_, entry)| entry.resource_type == "TEMP")
 												.filter(|(hash, entry)| {
 													query.split(' ').all(|y| {
 														entry.path.as_deref().unwrap_or("").contains(y)
@@ -1246,37 +1246,37 @@ fn event(app: AppHandle, event: Event) {
 											all_cppts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "CPPT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "CPPT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_asets: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "ASET")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "ASET")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_uicts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "UICT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "UICT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_matts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "MATT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "MATT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_wswts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "WSWT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "WSWT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect()
 										}
 										.into()
@@ -1411,37 +1411,37 @@ fn event(app: AppHandle, event: Event) {
 											all_cppts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "CPPT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "CPPT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_asets: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "ASET")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "ASET")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_uicts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "UICT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "UICT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_matts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "MATT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "MATT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect(),
 											all_wswts: hash_list
 												.entries
 												.iter()
-												.filter(|(hash, entry)| entry.games.contains(game_version))
-												.filter(|(hash, entry)| entry.resource_type == "WSWT")
-												.map(|(hash, entry)| hash.to_owned())
+												.filter(|(_, entry)| entry.games.contains(game_version))
+												.filter(|(_, entry)| entry.resource_type == "WSWT")
+												.map(|(hash, _)| hash.to_owned())
 												.collect()
 										}
 										.into()
@@ -1743,7 +1743,7 @@ fn event(app: AppHandle, event: Event) {
 												properties: intellisense.get_properties(
 													resource_packages,
 													&app_state.cached_entities,
-													&hash_list,
+													hash_list,
 													game_version,
 													entity,
 													&id,
@@ -1752,7 +1752,7 @@ fn event(app: AppHandle, event: Event) {
 												pins: intellisense.get_pins(
 													resource_packages,
 													&app_state.cached_entities,
-													&hash_list,
+													hash_list,
 													game_version,
 													entity,
 													&id,
@@ -1765,7 +1765,7 @@ fn event(app: AppHandle, event: Event) {
 									let decorations = get_decorations(
 										resource_packages,
 										&app_state.cached_entities,
-										&hash_list,
+										hash_list,
 										game_version,
 										entity.entities.get(&id).context("No such entity")?,
 										entity
@@ -1996,7 +1996,7 @@ fn event(app: AppHandle, event: Event) {
 											resource_packages,
 											&app_state.cached_entities,
 											game_version,
-											&hash_list,
+											hash_list,
 											&normalise_to_hash(sub_entity.factory.to_owned())
 										)?;
 
@@ -2009,7 +2009,7 @@ fn event(app: AppHandle, event: Event) {
 											intellisense.get_properties(
 												resource_packages,
 												&app_state.cached_entities,
-												&hash_list,
+												hash_list,
 												game_version,
 												underlying_entity,
 												&underlying_entity.root_entity,
@@ -2018,7 +2018,7 @@ fn event(app: AppHandle, event: Event) {
 											intellisense.get_pins(
 												resource_packages,
 												&app_state.cached_entities,
-												&hash_list,
+												hash_list,
 												game_version,
 												underlying_entity,
 												&underlying_entity.root_entity,
@@ -2030,7 +2030,7 @@ fn event(app: AppHandle, event: Event) {
 											intellisense.get_properties(
 												resource_packages,
 												&app_state.cached_entities,
-												&hash_list,
+												hash_list,
 												game_version,
 												entity,
 												&entity_id,
@@ -2039,7 +2039,7 @@ fn event(app: AppHandle, event: Event) {
 											intellisense.get_pins(
 												resource_packages,
 												&app_state.cached_entities,
-												&hash_list,
+												hash_list,
 												game_version,
 												entity,
 												&entity_id,
@@ -2214,7 +2214,7 @@ fn event(app: AppHandle, event: Event) {
 													let decorations = get_decorations(
 														resource_packages,
 														&app_state.cached_entities,
-														&hash_list,
+														hash_list,
 														game_version,
 														entity.entities.get(&entity_id).context("No such entity")?,
 														entity
