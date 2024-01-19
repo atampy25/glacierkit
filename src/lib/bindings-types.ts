@@ -209,7 +209,7 @@ externalScene: string | null;
  */
 exposedEntity?: string | null }
 
-export type GameBrowserEntry = { hash: string; path: string; hint: string }
+export type GameBrowserEntry = { hash: string; path: string | null; hint: string | null }
 
 export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: string }
 
