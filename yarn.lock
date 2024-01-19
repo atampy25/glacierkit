@@ -727,6 +727,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/mousetrap@npm:^1":
+  version: 1.6.15
+  resolution: "@types/mousetrap@npm:1.6.15"
+  checksum: 6aec93b46cdf6d23b1b61990e199edb35d84bd032309ebfd8daf94f4ad78806155730059a83229b04b3754ddb2593fd5490ce3186b921a9db2098ea589c9f1ad
+  languageName: node
+  linkType: hard
+
 "@types/pug@npm:^2.0.6":
   version: 2.0.10
   resolution: "@types/pug@npm:2.0.10"
@@ -2572,6 +2579,7 @@ __metadata:
     "@types/jstree": "npm:^3"
     "@types/lodash": "npm:^4"
     "@types/md5": "npm:^2"
+    "@types/mousetrap": "npm:^1"
     "@types/uuid": "npm:^9"
     "@typescript-eslint/eslint-plugin": "npm:^6.0.0"
     "@typescript-eslint/parser": "npm:^6.0.0"
@@ -2587,6 +2595,7 @@ __metadata:
     lodash: "npm:^4.17.21"
     md5: "npm:^2.3.0"
     monaco-editor: "npm:^0.45.0"
+    mousetrap: "npm:^1.6.5"
     postcss: "npm:^8.4.32"
     prettier: "npm:^3.1.1"
     prettier-plugin-svelte: "npm:^3.1.2"
@@ -2605,6 +2614,13 @@ __metadata:
   version: 0.45.0
   resolution: "monaco-editor@npm:0.45.0"
   checksum: 77b1522dbbf06b582f143a7be22f48ad82e5cade3f22c26fc19086446e473c720b2147f8a1ac6edf2172abf5d6bc92a5e858f62fb60df8617f8532f1fa1119ab
+  languageName: node
+  linkType: hard
+
+"mousetrap@npm:^1.6.5":
+  version: 1.6.5
+  resolution: "mousetrap@npm:1.6.5"
+  checksum: 5c361bdbbff3966fd58d70f39b9fe1f8e32c78f3ce65989d83af7aad32a3a95313ce835a8dd8a55cb5de9eeb7c1f0c2b9048631a3073b5606241589e8fc0ba53
   languageName: node
   linkType: hard
 

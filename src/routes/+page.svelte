@@ -19,6 +19,7 @@
 	import EntityEditor from "$lib/editors/entity/EntityEditor.svelte"
 	import TextSelection from "carbon-icons-svelte/lib/TextSelection.svelte"
 	import TextTransformer from "$lib/tools/TextTransformer.svelte"
+	import { shortcut } from "$lib/shortcut"
 
 	const tools = {
 		FileBrowser: {
@@ -175,6 +176,24 @@
 		}
 	})
 </script>
+
+<svelte:window
+	use:shortcut={{
+		key: "s",
+		control: true,
+		callback: async () => {
+			if (activeTab && tabs.find((a) => a.id === activeTab)?.unsaved) {
+				await event({
+					type: "global",
+					data: {
+						type: "saveTab",
+						data: activeTab
+					}
+				})
+			}
+		}
+	}}
+/>
 
 <div class="h-full w-full flex">
 	<div class="w-14 bg-neutral-900 flex flex-col">
