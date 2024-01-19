@@ -258,6 +258,11 @@ strike! {
 					FollowReference {
 						editor_id: Uuid,
 						reference: String
+					},
+
+					OpenFactory {
+						editor_id: Uuid,
+						factory: String
 					}
 				}),
 

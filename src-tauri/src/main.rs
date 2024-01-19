@@ -2325,6 +2325,96 @@ fn event(app: AppHandle, event: Event) {
 										)))
 									)?;
 								}
+
+								EntityMonacoEvent::OpenFactory { factory, .. } => {
+									if let Some(install) = app_settings.load().game_install.as_ref()
+										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+										&& let Some(resource_packages) = app_state.resource_packages.load().as_deref()
+									{
+										let factory = normalise_to_hash(factory);
+
+										let task = start_task(&app, format!("Loading entity {}", factory))?;
+
+										let game_install_data = app_state
+											.game_installs
+											.iter()
+											.try_find(|x| anyhow::Ok(x.path == *install))?
+											.context("No such game install")?;
+
+										ensure_entity_in_cache(
+											resource_packages,
+											&app_state.cached_entities,
+											game_install_data.version,
+											hash_list,
+											&factory
+										)?;
+
+										let entity = app_state.cached_entities.read().get(&factory).unwrap().to_owned();
+
+										let default_tab_name = format!(
+											"{} ({})",
+											entity
+												.entities
+												.get(&entity.root_entity)
+												.context("Root entity doesn't exist")?
+												.name,
+											factory
+										);
+
+										let tab_name = if let Some(entry) = hash_list.entries.get(&factory) {
+											if let Some(path) = entry.path.as_ref() {
+												path.replace("].pc_entitytype", "")
+													.replace("].pc_entitytemplate", "")
+													.split('/')
+													.last()
+													.map(|x| x.to_owned())
+													.unwrap_or(default_tab_name)
+											} else if let Some(hint) = entry.hint.as_ref() {
+												format!("{} ({})", hint, factory)
+											} else {
+												default_tab_name
+											}
+										} else {
+											default_tab_name
+										};
+
+										let id = Uuid::new_v4();
+
+										app_state.editor_states.write().await.insert(
+											id.to_owned(),
+											EditorState {
+												file: None,
+												data: EditorData::QNPatch {
+													base: Box::new(entity.to_owned()),
+													current: Box::new(entity.to_owned()),
+													settings: Default::default()
+												}
+											}
+										);
+
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::CreateTab {
+												id,
+												name: tab_name,
+												editor_type: EditorType::QNPatch
+											})
+										)?;
+
+										finish_task(&app, task)?;
+									} else {
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Error,
+												title: "No game selected".into(),
+												subtitle: "You can't open game files without a copy of the game \
+												           selected."
+													.into()
+											}
+										)?;
+									}
+								}
 							},
 
 							EntityEditorEvent::MetaPane(event) => match event {

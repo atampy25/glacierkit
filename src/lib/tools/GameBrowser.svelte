@@ -132,7 +132,7 @@
 					id: entry.hash,
 					parent: "#",
 					icon: "fa-regular fa-file",
-					text: entry.hint || entry.hash,
+					text: entry.hint ? `${entry.hint} (${entry.hash})` : entry.hash,
 					folder: false
 				})
 			}

@@ -132,7 +132,7 @@ export type EntityMetadataEvent = { type: "initialise"; data: { editor_id: strin
 
 export type EntityMetadataRequest = { type: "initialise"; data: { editor_id: string; factory_hash: string; blueprint_hash: string; root_entity: string; sub_type: SubType; external_scenes: string[] } }
 
-export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "followReference"; data: { editor_id: string; reference: string } }
+export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "followReference"; data: { editor_id: string; reference: string } } | { type: "openFactory"; data: { editor_id: string; factory: string } }
 
 export type EntityMonacoRequest = { type: "replaceContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "updateIntellisense"; data: { editor_id: string; entity_id: string; properties: ([string, string, JsonValue, boolean])[]; pins: [string[], string[]] } } | { type: "updateDecorationsAndMonacoInfo"; data: { editor_id: string; entity_id: string; decorations: ([string, string])[]; local_ref_entity_ids: string[] } } | { type: "updateValidity"; data: { editor_id: string; validity: EditorValidity } }
 

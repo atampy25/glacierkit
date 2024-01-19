@@ -219,6 +219,7 @@
 
 		const showPreviewCurveCondition = editor.createContextKey<boolean>("showPreviewCurveCondition", false)
 		const showFollowReferenceCondition = editor.createContextKey<boolean>("showFollowReferenceCondition", false)
+		const showOpenFactoryCondition = editor.createContextKey<boolean>("showOpenFactoryCondition", false)
 
 		editor.onDidChangeCursorPosition((e) => {
 			let entData
@@ -246,6 +247,8 @@
 			} else {
 				showFollowReferenceCondition.set(localRefEntityIDs.includes(word))
 			}
+
+			showOpenFactoryCondition.set(editor.getModel()!.getLineContent(e.position.lineNumber).includes(`"factory":`))
 		})
 
 		editor.addAction({
@@ -283,6 +286,33 @@
 								data: {
 									editor_id: editorID,
 									reference: editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
+								}
+							}
+						}
+					}
+				})
+			}
+		})
+
+		editor.addAction({
+			id: "open-factory",
+			label: "Open factory in new tab",
+			contextMenuGroupId: "navigation",
+			contextMenuOrder: 0,
+			keybindings: [monaco.KeyCode.F12],
+			precondition: "showOpenFactoryCondition",
+			run: async (ed) => {
+				await event({
+					type: "editor",
+					data: {
+						type: "entity",
+						data: {
+							type: "monaco",
+							data: {
+								type: "openFactory",
+								data: {
+									editor_id: editorID,
+									factory: JSON.parse(editor.getValue()).factory
 								}
 							}
 						}
