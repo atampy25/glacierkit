@@ -340,7 +340,7 @@ strike! {
 
 		Global(pub enum GlobalEvent {
 			LoadWorkspace(PathBuf),
-			SelectTab(Uuid),
+			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid)
 		})
@@ -527,7 +527,8 @@ strike! {
 			SetTabUnsaved {
 				id: Uuid,
 				unsaved: bool
-			}
+			},
+			RemoveTab(Uuid)
 		})
 	}
 }

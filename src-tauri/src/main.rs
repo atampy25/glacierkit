@@ -257,15 +257,11 @@ fn event(app: AppHandle, event: Event) {
 													from_slice(&fs::read(&path).context("Couldn't read file")?)
 														.context("Invalid entity")?;
 
-												if let Some(install) = app_settings.load().game_install.as_ref()
+												if let Some(resource_packages) = app_state.resource_packages.load().as_ref()&&let Some(install) = app_settings.load().game_install.as_ref()
 													&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 												{
 													ensure_entity_in_cache(
-														app_state
-															.resource_packages
-															.load()
-															.as_deref()
-															.context("Game install not fully loaded")?,
+														resource_packages,
 														&app_state.cached_entities,
 														app_state
 															.game_installs
@@ -647,15 +643,12 @@ fn event(app: AppHandle, event: Event) {
 										let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 											.context("Invalid entity")?;
 
-										if let Some(install) = app_settings.load().game_install.as_ref()
+										if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+											&& let Some(install) = app_settings.load().game_install.as_ref()
 											&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 										{
 											ensure_entity_in_cache(
-												app_state
-													.resource_packages
-													.load()
-													.as_deref()
-													.context("Game install not fully loaded")?,
+												resource_packages,
 												&app_state.cached_entities,
 												app_state
 													.game_installs
@@ -745,7 +738,7 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							FileBrowserEvent::ConvertEntityToPatch { path } => {
-								if let Some(install) = app_settings.load().game_install.as_ref()
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()&&let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
 									let mut entity: Entity =
@@ -766,10 +759,6 @@ fn event(app: AppHandle, event: Event) {
 										}
 									}
 									entity.comments = comments;
-
-									let resource_packages = app_state.resource_packages.load();
-									let resource_packages =
-										resource_packages.as_deref().context("Game install not fully loaded")?;
 
 									let game_version = app_state
 										.game_installs
@@ -870,15 +859,10 @@ fn event(app: AppHandle, event: Event) {
 								let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 									.context("Invalid entity")?;
 
-								if let Some(install) = app_settings.load().game_install.as_ref()
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()&&let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
-									ensure_entity_in_cache(
-										app_state
-											.resource_packages
-											.load()
-											.as_deref()
-											.context("Game install not fully loaded")?,
+									ensure_entity_in_cache(resource_packages,
 										&app_state.cached_entities,
 										app_state
 											.game_installs
@@ -973,7 +957,7 @@ fn event(app: AppHandle, event: Event) {
 										.resource_packages
 										.load()
 										.as_deref()
-										.context("Game install not fully loaded")?,
+										.expect("Game install not loaded but game browser is available"),
 									&app_state.cached_entities,
 									game_install_data.version,
 									app_state
@@ -1672,6 +1656,16 @@ fn event(app: AppHandle, event: Event) {
 										)))
 									)?;
 
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::UpdateValidity {
+												editor_id,
+												validity: EditorValidity::Valid
+											}
+										)))
+									)?;
+
 									let reverse_refs = calculate_reverse_references(entity)?
 										.remove(&id)
 										.context("No such entity")?;
@@ -1775,6 +1769,10 @@ fn event(app: AppHandle, event: Event) {
 												}
 											)))
 										)?;
+
+										finish_task(&app, task)?;
+
+										let task = start_task(&app, format!("Computing decorations for {}", id))?;
 
 										let decorations = get_decorations(
 											resource_packages,
@@ -3024,20 +3022,27 @@ fn event(app: AppHandle, event: Event) {
 						}
 
 						GlobalEvent::SelectTab(tab) => {
-							if let Some(file) = app_state
-								.editor_states
-								.read()
-								.await
-								.get(&tab)
-								.context("No such editor")?
-								.file
-								.as_ref()
-							{
+							if let Some(tab) = tab {
+								if let Some(file) = app_state
+									.editor_states
+									.read()
+									.await
+									.get(&tab)
+									.context("No such editor")?
+									.file
+									.as_ref()
+								{
+									send_request(
+										&app,
+										Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(Some(
+											file.to_owned()
+										))))
+									)?;
+								}
+							} else {
 								send_request(
 									&app,
-									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(Some(
-										file.to_owned()
-									))))
+									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
 								)?;
 							}
 						}
@@ -3056,6 +3061,8 @@ fn event(app: AppHandle, event: Event) {
 									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
 								)?;
 							}
+
+							send_request(&app, Request::Global(GlobalRequest::RemoveTab(tab)))?;
 						}
 
 						GlobalEvent::SaveTab(tab) => {

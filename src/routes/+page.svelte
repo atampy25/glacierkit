@@ -144,6 +144,19 @@
 								activeTab = request.data.data
 								break
 
+							case "removeTab":
+								tabs = tabs.filter((a) => a.id !== request.data.data)
+								activeTab = tabs.at(-1)?.id || null
+
+								void event({
+									type: "global",
+									data: {
+										type: "selectTab",
+										data: activeTab
+									}
+								})
+								break
+
 							default:
 								request.data satisfies never
 								break
@@ -193,6 +206,21 @@
 			}
 		}
 	}}
+	use:shortcut={{
+		key: "w",
+		control: true,
+		callback: async () => {
+			if (activeTab) {
+				await event({
+					type: "global",
+					data: {
+						type: "removeTab",
+						data: activeTab
+					}
+				})
+			}
+		}
+	}}
 />
 
 <div class="h-full w-full flex">
@@ -227,16 +255,18 @@
 								<div
 									class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
 									class:border-b={activeTab === tab.id}
-									on:click={async () => {
-										activeTab = tab.id
+									on:click|self={async () => {
+										if (activeTab !== tab.id) {
+											activeTab = tab.id
 
-										await event({
-											type: "global",
-											data: {
-												type: "selectTab",
-												data: tab.id
-											}
-										})
+											await event({
+												type: "global",
+												data: {
+													type: "selectTab",
+													data: tab.id
+												}
+											})
+										}
 									}}
 								>
 									{tab.name}
@@ -246,7 +276,7 @@
 												kind="ghost"
 												size="field"
 												icon={Save}
-												iconDescription="Save"
+												iconDescription="Save (CTRL-S)"
 												on:click={async () => {
 													await event({
 														type: "global",
@@ -262,11 +292,8 @@
 											kind="ghost"
 											size="field"
 											icon={Close}
-											iconDescription="Close"
+											iconDescription="Close (CTRL-W)"
 											on:click={async () => {
-												tabs = tabs.filter((a) => a.id !== tab.id)
-												activeTab = null
-
 												await event({
 													type: "global",
 													data: {

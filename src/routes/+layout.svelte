@@ -92,6 +92,7 @@
 
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			validate: true,
+			enableSchemaRequest: true,
 			schemas: [
 				{
 					uri: "monaco-schema://manifest",
