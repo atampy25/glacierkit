@@ -223,6 +223,85 @@
 			}
 		}
 	}}
+	use:shortcut={{
+		key: "Tab",
+		control: true,
+		callback: async () => {
+			if (activeTab) {
+				activeTab = tabs[(tabs.findIndex((a) => a.id === activeTab) + 1) % tabs.length].id
+			} else {
+				activeTab = tabs[0].id
+			}
+
+			await event({
+				type: "global",
+				data: {
+					type: "selectTab",
+					data: activeTab
+				}
+			})
+		}
+	}}
+	use:shortcut={{
+		key: "PageDown",
+		control: true,
+		callback: async () => {
+			if (activeTab) {
+				activeTab = tabs[(tabs.findIndex((a) => a.id === activeTab) + 1) % tabs.length].id
+			} else {
+				activeTab = tabs[0].id
+			}
+
+			await event({
+				type: "global",
+				data: {
+					type: "selectTab",
+					data: activeTab
+				}
+			})
+		}
+	}}
+	use:shortcut={{
+		key: "Tab",
+		control: true,
+		shift: true,
+		callback: async () => {
+			if (activeTab) {
+				const nextLeft = tabs.findIndex((a) => a.id === activeTab) - 1
+				activeTab = tabs[nextLeft >= 0 ? nextLeft : tabs.length - 1].id
+			} else {
+				activeTab = tabs[0].id
+			}
+
+			await event({
+				type: "global",
+				data: {
+					type: "selectTab",
+					data: activeTab
+				}
+			})
+		}
+	}}
+	use:shortcut={{
+		key: "PageUp",
+		control: true,
+		callback: async () => {
+			if (activeTab) {
+				const nextLeft = tabs.findIndex((a) => a.id === activeTab) - 1
+				activeTab = tabs[nextLeft >= 0 ? nextLeft : tabs.length - 1].id
+			} else {
+				activeTab = tabs[0].id
+			}
+
+			await event({
+				type: "global",
+				data: {
+					type: "selectTab",
+					data: activeTab
+				}
+			})
+		}
+	}}
 />
 
 <div class="h-full w-full flex">
