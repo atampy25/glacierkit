@@ -331,7 +331,11 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		app,
 		Notification {
 			kind: NotificationKind::Info,
-			title: format!("Deleted {} entities", entities_to_delete.len()),
+			title: format!(
+				"Deleted {} entit{}",
+				entities_to_delete.len(),
+				if entities_to_delete.len() == 1 { "y" } else { "ies" }
+			),
 			subtitle: format!(
 				"The entity, its children and {} reference{} have been deleted",
 				refs_deleted,

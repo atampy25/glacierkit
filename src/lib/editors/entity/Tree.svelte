@@ -206,24 +206,30 @@
 
 								tree.is_selected(selected_node) ? tree.delete_node(tree.get_selected()) : tree.delete_node(selected_node)
 
-								tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some((a: any) => a.parent == selected_node.id)
-								tree.get_node(selected_node.parent).original.folder =
-									tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
-									tree.get_node(selected_node.parent).original.hasReverseParentRefs
-
-								// Reclassify parent as not folder if necessary
-								tree.set_icon(
-									selected_node.parent,
-									tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								if (selected_node.parent !== "#") {
+									tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some((a: any) => a.parent == selected_node.id)
+									tree.get_node(selected_node.parent).original.folder =
+										tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
 										tree.get_node(selected_node.parent).original.hasReverseParentRefs
-										? "fa-regular fa-folder"
-										: icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))
-											? icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))![1]
-											: "fa-regular fa-file"
-								)
 
-								// If it's no longer a folder it might move down
-								tree.move_node(selected_node.id, selected_node.parent, getPositionOfNode(selected_node.parent, selected_node.text, selected_node.original.folder))
+									// Reclassify parent as not folder if necessary
+									tree.set_icon(
+										selected_node.parent,
+										tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+											tree.get_node(selected_node.parent).original.hasReverseParentRefs
+											? "fa-regular fa-folder"
+											: icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))
+												? icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))![1]
+												: "fa-regular fa-file"
+									)
+
+									// If it's no longer a folder it might move down
+									tree.move_node(
+										selected_node.parent,
+										tree.get_node(selected_node.parent).parent,
+										getPositionOfNode(tree.get_node(selected_node.parent).parent, tree.get_node(selected_node.parent).text, tree.get_node(selected_node.parent).original.folder)
+									)
+								}
 
 								await event({
 									type: "editor",

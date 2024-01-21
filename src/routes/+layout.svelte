@@ -209,7 +209,7 @@
 
 						if (data.platformSpecificProperties) {
 							for (const platformData of Object.values(data.platformSpecificProperties) as Record<string, Property>[]) {
-								for (const propertyData of platformData) {
+								for (const propertyData of Object.values(platformData)) {
 									if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
 										const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
 										const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
@@ -289,7 +289,7 @@
 		}
 	})
 
-	let windowTitle = "Deeznuts"
+	let windowTitle = ""
 
 	let errorModalOpen = false
 	let errorModalError = ""
