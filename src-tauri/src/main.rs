@@ -1647,7 +1647,21 @@ fn event(app: AppHandle, event: Event) {
 									send_request(
 										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-											EntityTreeRequest::NewTree { editor_id, entities }
+											EntityTreeRequest::NewTree {
+												editor_id: editor_id.to_owned(),
+												entities
+											}
+										)))
+									)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+											EntityTreeRequest::SetTemplates {
+												editor_id,
+												templates: from_slice(include_bytes!("../assets/templates.json"))
+													.unwrap()
+											}
 										)))
 									)?;
 								}
@@ -1797,7 +1811,7 @@ fn event(app: AppHandle, event: Event) {
 														game_version,
 														entity,
 														&id,
-														true
+														false
 													)?
 												}
 											)))
@@ -1961,7 +1975,13 @@ fn event(app: AppHandle, event: Event) {
 								}
 
 								EntityTreeEvent::Paste { editor_id, parent_id } => {
-									handle_paste(&app, editor_id, parent_id).await?;
+									handle_paste(
+										&app,
+										editor_id,
+										parent_id,
+										from_str::<CopiedEntityData>(&Clipboard::new()?.get_text()?)?
+									)
+									.await?;
 								}
 
 								EntityTreeEvent::Search { editor_id, query } => {
@@ -2058,7 +2078,7 @@ fn event(app: AppHandle, event: Event) {
 													game_version,
 													underlying_entity,
 													&underlying_entity.root_entity,
-													true
+													false
 												)?,
 												intellisense.get_pins(
 													resource_packages,
@@ -2067,7 +2087,7 @@ fn event(app: AppHandle, event: Event) {
 													game_version,
 													underlying_entity,
 													&underlying_entity.root_entity,
-													true
+													false
 												)?
 											)
 										} else {
@@ -2158,6 +2178,14 @@ fn event(app: AppHandle, event: Event) {
 									}
 
 									finish_task(&app, task)?;
+								}
+
+								EntityTreeEvent::UseTemplate {
+									editor_id,
+									parent_id,
+									template
+								} => {
+									handle_paste(&app, editor_id, parent_id, template).await?;
 								}
 							},
 

@@ -13,6 +13,11 @@ return await TAURI_INVOKE("plugin:tauri-specta|show_in_folder", { path });
 
 /** user-defined types **/
 
+export type CopiedEntityData = { 
+/**
+ * Which entity has been copied (and should be parented to the selection when pasting).
+ */
+rootEntity: string; data: { [key in string]: SubEntity } }
 export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent }
 export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent } | { type: "metadata"; data: EntityMetadataEvent } | { type: "overrides"; data: EntityOverridesEvent }
 export type EntityGeneralEvent = { type: "setShowReverseParentRefs"; data: { editor_id: string; show_reverse_parent_refs: boolean } }
@@ -20,7 +25,7 @@ export type EntityMetaPaneEvent = { type: "jumpToReference"; data: { editor_id: 
 export type EntityMetadataEvent = { type: "initialise"; data: { editor_id: string } } | { type: "setFactoryHash"; data: { editor_id: string; factory_hash: string } } | { type: "setBlueprintHash"; data: { editor_id: string; blueprint_hash: string } } | { type: "setRootEntity"; data: { editor_id: string; root_entity: string } } | { type: "setSubType"; data: { editor_id: string; sub_type: SubType } } | { type: "setExternalScenes"; data: { editor_id: string; external_scenes: string[] } }
 export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "followReference"; data: { editor_id: string; reference: string } } | { type: "openFactory"; data: { editor_id: string; factory: string } }
 export type EntityOverridesEvent = { type: "initialise"; data: { editor_id: string } } | { type: "updatePropertyOverrides"; data: { editor_id: string; content: string } } | { type: "updateOverrideDeletes"; data: { editor_id: string; content: string } } | { type: "updatePinConnectionOverrides"; data: { editor_id: string; content: string } } | { type: "updatePinConnectionOverrideDeletes"; data: { editor_id: string; content: string } }
-export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } } | { type: "useTemplate"; data: { editor_id: string; parent_id: string; template: CopiedEntityData } }
 export type Event = { type: "tool"; data: ToolEvent } | { type: "editor"; data: EditorEvent } | { type: "global"; data: GlobalEvent }
 /**
  * An exposed entity.

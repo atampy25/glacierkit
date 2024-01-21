@@ -2,7 +2,7 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { EntityTreeRequest, Ref } from "$lib/bindings-types"
+	import type { EntityTreeRequest, PastableTemplate, Ref } from "$lib/bindings-types"
 	import { Modal, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
@@ -43,6 +43,8 @@
 	let helpMenuInputs: string[] = []
 	let helpMenuOutputs: string[] = []
 	let helpMenuDefaultPropertiesHTML = ""
+
+	let templates: PastableTemplate[] = []
 
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
@@ -305,6 +307,47 @@
 								}
 							}
 						},
+						templates: {
+							separator_before: true,
+							separator_after: false,
+							label: "Templates",
+							icon: "fa-solid fa-shapes",
+							action: false,
+							submenu: Object.fromEntries(
+								templates.map((template) => [
+									`template${template.name.replace(" ", "")}`,
+									{
+										separator_before: false,
+										_disabled: false,
+										separator_after: false,
+										label: template.name,
+										icon: template.icon,
+										action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											await event({
+												type: "editor",
+												data: {
+													type: "entity",
+													data: {
+														type: "tree",
+														data: {
+															type: "useTemplate",
+															data: {
+																editor_id: editorID,
+																parent_id: selected_node.id,
+																template: template.pasteData
+															}
+														}
+													}
+												}
+											})
+										}
+									}
+								])
+							)
+						},
 						copyID: {
 							separator_before: false,
 							separator_after: false,
@@ -452,6 +495,10 @@
 				helpMenuOutputs = request.data.output_pins
 				helpMenuDefaultPropertiesHTML = request.data.default_properties_html
 				helpMenuOpen = true
+				break
+
+			case "setTemplates":
+				templates = request.data.templates
 				break
 
 			default:

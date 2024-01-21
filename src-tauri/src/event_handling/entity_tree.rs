@@ -352,10 +352,13 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 
 #[try_fn]
 #[context("Couldn't handle paste event")]
-pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -> Result<()> {
+pub async fn handle_paste(
+	app: &AppHandle,
+	editor_id: Uuid,
+	parent_id: String,
+	mut paste_data: CopiedEntityData
+) -> Result<()> {
 	let app_state = app.state::<AppState>();
-
-	let mut paste_data = from_str::<CopiedEntityData>(&Clipboard::new()?.get_text()?)?;
 
 	let task = start_task(
 		app,
@@ -875,7 +878,7 @@ pub async fn handle_paste(app: &AppHandle, editor_id: Uuid, parent_id: String) -
 				kind: NotificationKind::Info,
 				title: "Added external scenes".into(),
 				subtitle: format!(
-					"{} external scene{} been added to the entity to ensure that copied references work.",
+					"{} external scene{} been added to the entity to ensure that pasted references work.",
 					added_external_scenes,
 					if added_external_scenes > 1 { "s have" } else { " has" }
 				)

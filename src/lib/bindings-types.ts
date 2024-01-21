@@ -140,7 +140,7 @@ export type EntityOverridesEvent = { type: "initialise"; data: { editor_id: stri
 
 export type EntityOverridesRequest = { type: "initialise"; data: { editor_id: string; property_overrides: string; override_deletes: string; pin_connection_overrides: string; pin_connection_override_deletes: string } } | { type: "updateDecorations"; data: { editor_id: string; decorations: ([string, string])[] } }
 
-export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } } | { type: "useTemplate"; data: { editor_id: string; parent_id: string; template: CopiedEntityData } }
 
 export type EntityTreeRequest = 
 /**
@@ -163,7 +163,7 @@ new_entities: ([string, Ref, string, string, boolean])[] } } | { type: "searchRe
 /**
  * The IDs of the entities matching the query
  */
-results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } }
+results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } } | { type: "setTemplates"; data: { editor_id: string; templates: PastableTemplate[] } }
 
 export type EphemeralQNSettings = { showReverseParentRefs: boolean }
 
@@ -234,6 +234,8 @@ type: string;
  * The value of the property.
  */
 value: JsonValue }
+
+export type PastableTemplate = { name: string; icon: string; pasteData: CopiedEntityData }
 
 export type Patch = { 
 /**

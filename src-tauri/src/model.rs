@@ -12,7 +12,12 @@ use structstruck::strike;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::{entity::ReverseReference, game_detection::GameInstall, hash_list::HashList, intellisense::Intellisense};
+use crate::{
+	entity::{CopiedEntityData, ReverseReference},
+	game_detection::GameInstall,
+	hash_list::HashList,
+	intellisense::Intellisense
+};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -127,6 +132,14 @@ pub enum EditorType {
 pub enum EditorValidity {
 	Valid,
 	Invalid(String)
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PastableTemplate {
+	pub name: String,
+	pub icon: String,
+	pub paste_data: CopiedEntityData
 }
 
 strike! {
@@ -245,6 +258,12 @@ strike! {
 					ShowHelpMenu {
 						editor_id: Uuid,
 						entity_id: String
+					},
+
+					UseTemplate {
+						editor_id: Uuid,
+						parent_id: String,
+						template: CopiedEntityData
 					}
 				}),
 
@@ -443,6 +462,11 @@ strike! {
 						input_pins: Vec<String>,
 						output_pins: Vec<String>,
 						default_properties_html: String
+					},
+
+					SetTemplates {
+						editor_id: Uuid,
+						templates: Vec<PastableTemplate>
 					}
 				}),
 
