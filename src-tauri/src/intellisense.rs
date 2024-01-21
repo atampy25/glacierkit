@@ -25,8 +25,8 @@ use crate::{
 	hash_list::HashList,
 	material::{get_material_properties, MaterialProperty, MaterialPropertyData},
 	resourcelib::{
-		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2_convert_cppt, h2_convert_dswb, h3_convert_cppt,
-		h3_convert_dswb
+		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2016_convert_ecpb, h2_convert_cppt, h2_convert_dswb,
+		h2_convert_ecpb, h3_convert_cppt, h3_convert_dswb, h3_convert_ecpb, EExtendedPropertyType
 	},
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
@@ -47,7 +47,9 @@ pub struct Intellisense {
 	pub all_asets: HashSet<String>,
 	pub all_uicts: HashSet<String>,
 	pub all_matts: HashSet<String>,
-	pub all_wswts: HashSet<String>
+	pub all_wswts: HashSet<String>,
+	pub all_ecpts: HashSet<String>,
+	pub all_aibxs: HashSet<String>
 }
 
 impl Intellisense {
@@ -562,6 +564,72 @@ impl Intellisense {
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
+					} else if self.all_ecpts.contains(&factory) {
+						// All extended CPP entities have the properties of ZMaterialOverwriteAspect
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(resource_packages, hash_list, game_version, "00D3003AAA7B3817")?
+						{
+							found.push((prop_name, prop_type, default_val, false));
+						}
+
+						let ecpb_data = extract_latest_resource(
+							resource_packages,
+							hash_list,
+							&extract_latest_metadata(resource_packages, hash_list, &factory)?
+								.hash_reference_data
+								.into_iter()
+								.find(|x| {
+									hash_list
+										.entries
+										.get(&normalise_to_hash(x.hash.to_owned()))
+										.map(|entry| entry.resource_type == "ECPB")
+										.unwrap_or(false)
+								})
+								.context("No blueprint dependency on ECPT")?
+								.hash
+						)?
+						.1;
+
+						let ecpb_data = match game_version {
+							GameVersion::H1 => h2016_convert_ecpb(&ecpb_data)?,
+							GameVersion::H2 => h2_convert_ecpb(&ecpb_data)?,
+							GameVersion::H3 => h3_convert_ecpb(&ecpb_data)?
+						};
+
+						for entry in ecpb_data.properties {
+							found.push((
+								entry.property_name,
+								match entry.property_type {
+									EExtendedPropertyType::TYPE_RESOURCEPTR => "ZRuntimeResourceID",
+									EExtendedPropertyType::TYPE_INT32 => "int32",
+									EExtendedPropertyType::TYPE_UINT32 => "uint32",
+									EExtendedPropertyType::TYPE_FLOAT => "float32",
+									EExtendedPropertyType::TYPE_STRING => "ZString",
+									EExtendedPropertyType::TYPE_BOOL => "bool",
+									EExtendedPropertyType::TYPE_ENTITYREF => "SEntityTemplateReference",
+									EExtendedPropertyType::TYPE_VARIANT => "ZVariant"
+								}
+								.into(),
+								match entry.property_type {
+									EExtendedPropertyType::TYPE_RESOURCEPTR => Value::Null,
+									EExtendedPropertyType::TYPE_INT32 => to_value(0)?,
+									EExtendedPropertyType::TYPE_UINT32 => to_value(0)?,
+									EExtendedPropertyType::TYPE_FLOAT => to_value(0)?,
+									EExtendedPropertyType::TYPE_STRING => Value::String("".into()),
+									EExtendedPropertyType::TYPE_BOOL => Value::Bool(false),
+									EExtendedPropertyType::TYPE_ENTITYREF => Value::Null,
+									EExtendedPropertyType::TYPE_VARIANT => Value::Null
+								},
+								false
+							));
+						}
+					} else if self.all_aibxs.contains(&factory) {
+						// All behaviour trees have the properties of ZBehaviorTreeEntity
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(resource_packages, hash_list, game_version, "0028607138892D70")?
+						{
+							found.push((prop_name, prop_type, default_val, false));
+						}
 					} else {
 						match ensure_entity_in_cache(
 							resource_packages,
@@ -912,6 +980,77 @@ impl Intellisense {
 						return Ok(Some((prop_type, default_val, false)));
 					}
 				}
+			} else if self.all_ecpts.contains(&factory) {
+				// All extended CPP entities have the properties of ZMaterialOverwriteAspect
+				for (prop_name, (prop_type, default_val)) in
+					self.get_cppt_properties(resource_packages, hash_list, game_version, "00D3003AAA7B3817")?
+				{
+					if prop_name == property_to_find {
+						return Ok(Some((prop_type, default_val, false)));
+					}
+				}
+
+				let ecpb_data = extract_latest_resource(
+					resource_packages,
+					hash_list,
+					&extract_latest_metadata(resource_packages, hash_list, &factory)?
+						.hash_reference_data
+						.into_iter()
+						.find(|x| {
+							hash_list
+								.entries
+								.get(&normalise_to_hash(x.hash.to_owned()))
+								.map(|entry| entry.resource_type == "ECPB")
+								.unwrap_or(false)
+						})
+						.context("No blueprint dependency on ECPT")?
+						.hash
+				)?
+				.1;
+
+				let ecpb_data = match game_version {
+					GameVersion::H1 => h2016_convert_ecpb(&ecpb_data)?,
+					GameVersion::H2 => h2_convert_ecpb(&ecpb_data)?,
+					GameVersion::H3 => h3_convert_ecpb(&ecpb_data)?
+				};
+
+				for entry in ecpb_data.properties {
+					if entry.property_name == property_to_find {
+						return Ok(Some((
+							match entry.property_type {
+								EExtendedPropertyType::TYPE_RESOURCEPTR => "ZRuntimeResourceID",
+								EExtendedPropertyType::TYPE_INT32 => "int32",
+								EExtendedPropertyType::TYPE_UINT32 => "uint32",
+								EExtendedPropertyType::TYPE_FLOAT => "float32",
+								EExtendedPropertyType::TYPE_STRING => "ZString",
+								EExtendedPropertyType::TYPE_BOOL => "bool",
+								EExtendedPropertyType::TYPE_ENTITYREF => "SEntityTemplateReference",
+								EExtendedPropertyType::TYPE_VARIANT => "ZVariant"
+							}
+							.into(),
+							match entry.property_type {
+								EExtendedPropertyType::TYPE_RESOURCEPTR => Value::Null,
+								EExtendedPropertyType::TYPE_INT32 => to_value(0)?,
+								EExtendedPropertyType::TYPE_UINT32 => to_value(0)?,
+								EExtendedPropertyType::TYPE_FLOAT => to_value(0)?,
+								EExtendedPropertyType::TYPE_STRING => Value::String("".into()),
+								EExtendedPropertyType::TYPE_BOOL => Value::Bool(false),
+								EExtendedPropertyType::TYPE_ENTITYREF => Value::Null,
+								EExtendedPropertyType::TYPE_VARIANT => Value::Null
+							},
+							false
+						)));
+					}
+				}
+			} else if self.all_aibxs.contains(&factory) {
+				// All behaviour trees have the properties of ZBehaviorTreeEntity
+				for (prop_name, (prop_type, default_val)) in
+					self.get_cppt_properties(resource_packages, hash_list, game_version, "0028607138892D70")?
+				{
+					if prop_name == property_to_find {
+						return Ok(Some((prop_type, default_val, false)));
+					}
+				}
 			} else {
 				match ensure_entity_in_cache(
 					resource_packages,
@@ -1155,6 +1294,16 @@ impl Intellisense {
 					};
 
 					input.extend(dswb_data.m_aSwitches);
+				} else if self.all_ecpts.contains(&factory) {
+					// All extended CPP entities have the pins of ZMaterialOverwriteAspect
+					let cppt_data = self.cppt_pins.get("00D3003AAA7B3817").context("No such CPPT in pins")?;
+					input.extend(cppt_data.0.to_owned());
+					output.extend(cppt_data.1.to_owned());
+				} else if self.all_aibxs.contains(&factory) {
+					// All behaviour trees have the properties of ZBehaviorTreeEntity
+					let cppt_data = self.cppt_pins.get("0028607138892D70").context("No such CPPT in pins")?;
+					input.extend(cppt_data.0.to_owned());
+					output.extend(cppt_data.1.to_owned());
 				} else {
 					match ensure_entity_in_cache(
 						resource_packages,

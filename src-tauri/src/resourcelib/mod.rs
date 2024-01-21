@@ -243,6 +243,69 @@ pub fn h3_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SExtendedCppEntityBlueprint {
+	pub properties: Vec<SExtendedCppEntityProperty>
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SExtendedCppEntityProperty {
+	pub property_name: String,
+	pub property_type: EExtendedPropertyType,
+	pub rt_editable: bool,
+	pub extra_data: u64
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[allow(non_camel_case_types)]
+pub enum EExtendedPropertyType {
+	TYPE_RESOURCEPTR,
+	TYPE_INT32,
+	TYPE_UINT32,
+	TYPE_FLOAT,
+	TYPE_STRING,
+	TYPE_BOOL,
+	TYPE_ENTITYREF,
+	TYPE_VARIANT
+}
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib ECPB")]
+pub fn h3_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM3_GetConverterForResource(CString::new("ECPB")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SExtendedCppEntityBlueprint")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct UIControlData {
 	// ResourceLib thinks everything is a pin for some reason
 	pub m_aPins: Vec<UIControlDataEntry>
@@ -497,6 +560,41 @@ pub fn h2_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
 }
 
 #[try_fn]
+#[context("Couldn't convert binary data to ResourceLib ECPB")]
+pub fn h2_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM2_GetConverterForResource(CString::new("ECPB")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SExtendedCppEntityBlueprint")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
+#[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
 pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<RTFactory2016> {
 	let _lock = CONVERTER_MUTEX.lock();
@@ -695,6 +793,41 @@ pub fn h2016_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
 			.context("Couldn't convert CStr to str")?
 		)
 		.context("Couldn't deserialise returned JsonString as SwitchGroup")?;
+
+		(*converter).FreeJsonString.unwrap()(json_string);
+
+		res
+	}
+}
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib ECPB")]
+pub fn h2016_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		let converter = HM2016_GetConverterForResource(CString::new("ECPB")?.as_ptr());
+
+		if converter.is_null() {
+			bail!("Couldn't get ResourceLib converter")
+		}
+
+		let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+		if json_string.is_null() {
+			bail!("Couldn't convert data to JsonString")
+		}
+
+		let res = serde_json::from_str(
+			CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+				(*json_string).JsonData.cast(),
+				(*json_string).StrSize + 1 // include the null byte in the slice
+			))
+			.context("Couldn't construct CStr from JsonString data")?
+			.to_str()
+			.context("Couldn't convert CStr to str")?
+		)
+		.context("Couldn't deserialise returned JsonString as SExtendedCppEntityBlueprint")?;
 
 		(*converter).FreeJsonString.unwrap()(json_string);
 

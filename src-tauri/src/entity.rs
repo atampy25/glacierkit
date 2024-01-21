@@ -361,7 +361,7 @@ pub fn random_entity_id() -> String {
 
 	let mut id = String::from("cafe");
 
-	for _ in 0..14 {
+	for _ in 0..12 {
 		id.push(*digits.choose(&mut thread_rng()).expect("Slice is not empty"));
 	}
 

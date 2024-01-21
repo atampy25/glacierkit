@@ -257,8 +257,10 @@ fn event(app: AppHandle, event: Event) {
 													from_slice(&fs::read(&path).context("Couldn't read file")?)
 														.context("Invalid entity")?;
 
-												if let Some(resource_packages) = app_state.resource_packages.load().as_ref()&&let Some(install) = app_settings.load().game_install.as_ref()
-													&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+												if let Some(resource_packages) =
+													app_state.resource_packages.load().as_ref() && let Some(install) =
+													app_settings.load().game_install.as_ref() && let Some(hash_list) =
+													app_state.hash_list.load().as_ref()
 												{
 													ensure_entity_in_cache(
 														resource_packages,
@@ -738,7 +740,8 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							FileBrowserEvent::ConvertEntityToPatch { path } => {
-								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()&&let Some(install) = app_settings.load().game_install.as_ref()
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
 									let mut entity: Entity =
@@ -859,10 +862,12 @@ fn event(app: AppHandle, event: Event) {
 								let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 									.context("Invalid entity")?;
 
-								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()&&let Some(install) = app_settings.load().game_install.as_ref()
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
-									ensure_entity_in_cache(resource_packages,
+									ensure_entity_in_cache(
+										resource_packages,
 										&app_state.cached_entities,
 										app_state
 											.game_installs
@@ -1272,6 +1277,20 @@ fn event(app: AppHandle, event: Event) {
 													.filter(|(_, entry)| entry.games.contains(game_version))
 													.filter(|(_, entry)| entry.resource_type == "WSWT")
 													.map(|(hash, _)| hash.to_owned())
+													.collect(),
+												all_ecpts: hash_list
+													.entries
+													.iter()
+													.filter(|(_, entry)| entry.games.contains(game_version))
+													.filter(|(_, entry)| entry.resource_type == "ECPT")
+													.map(|(hash, _)| hash.to_owned())
+													.collect(),
+												all_aibxs: hash_list
+													.entries
+													.iter()
+													.filter(|(_, entry)| entry.games.contains(game_version))
+													.filter(|(_, entry)| entry.resource_type == "AIBX")
+													.map(|(hash, _)| hash.to_owned())
 													.collect()
 											}
 											.into()
@@ -1438,6 +1457,20 @@ fn event(app: AppHandle, event: Event) {
 													.iter()
 													.filter(|(_, entry)| entry.games.contains(game_version))
 													.filter(|(_, entry)| entry.resource_type == "WSWT")
+													.map(|(hash, _)| hash.to_owned())
+													.collect(),
+												all_ecpts: hash_list
+													.entries
+													.iter()
+													.filter(|(_, entry)| entry.games.contains(game_version))
+													.filter(|(_, entry)| entry.resource_type == "ECPT")
+													.map(|(hash, _)| hash.to_owned())
+													.collect(),
+												all_aibxs: hash_list
+													.entries
+													.iter()
+													.filter(|(_, entry)| entry.games.contains(game_version))
+													.filter(|(_, entry)| entry.resource_type == "AIBX")
 													.map(|(hash, _)| hash.to_owned())
 													.collect()
 											}
