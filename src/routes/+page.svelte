@@ -146,8 +146,9 @@
 								break
 
 							case "removeTab":
+								const tabIndex = tabs.findIndex((a) => a.id === request.data.data)
 								tabs = tabs.filter((a) => a.id !== request.data.data)
-								activeTab = tabs.at(-1)?.id || null
+								activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
 
 								void event({
 									type: "global",
