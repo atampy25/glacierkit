@@ -1351,6 +1351,9 @@ impl Intellisense {
 		input.extend(fac_input.into_iter().flatten());
 		output.extend(fac_output.into_iter().flatten());
 
-		(input, output)
+		(
+			input.into_iter().unique().collect(),
+			output.into_iter().unique().collect()
+		)
 	}
 }
