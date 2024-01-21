@@ -12,7 +12,7 @@
 	import { beforeUpdate, onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
 	import { fade, fly } from "svelte/transition"
-	import type { Request } from "$lib/bindings-types"
+	import type { Property, Request } from "$lib/bindings-types"
 	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import * as monaco from "monaco-editor"
@@ -110,6 +110,181 @@
 						schema: {}
 					}
 				]
+			})
+
+			monaco.languages.registerColorProvider("json", {
+				provideColorPresentations: (model, colorInfo) => {
+					const color = colorInfo.color
+
+					const r = Math.round(color.red * 255)
+						.toString(16)
+						.padStart(2, "0")
+
+					const g = Math.round(color.green * 255)
+						.toString(16)
+						.padStart(2, "0")
+
+					const b = Math.round(color.blue * 255)
+						.toString(16)
+						.padStart(2, "0")
+
+					const a = Math.round(color.alpha * 255)
+						.toString(16)
+						.padStart(2, "0")
+
+					// startLineNumber is 1-indexed so this gets the line just before the line with the colour value
+					const includeAlpha = model.getLinesContent()[colorInfo.range.startLineNumber - 2].includes("SColorRGBA")
+
+					return [
+						{
+							label: `#${r}${g}${b}${includeAlpha ? a : ""}`
+						}
+					]
+				},
+
+				provideDocumentColors: (model) => {
+					try {
+						const data = JSON.parse(model.getValue())
+
+						const colours: monaco.languages.IColorInformation[] = []
+
+						if (data.properties) {
+							for (const propertyData of Object.values(data.properties) as Property[]) {
+								if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
+									const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+									const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+									const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+
+									for (const [lineNo, line] of model.getLinesContent().entries()) {
+										const char = line.indexOf(propertyData.value)
+
+										if (char !== -1) {
+											colours.push({
+												color: {
+													red: r / 255,
+													green: g / 255,
+													blue: b / 255,
+													alpha: 1
+												},
+												range: {
+													startLineNumber: lineNo + 1,
+													endLineNumber: lineNo + 1,
+													startColumn: char + 1,
+													endColumn: char + 1 + 7
+												}
+											})
+										}
+									}
+								}
+
+								if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
+									const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+									const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+									const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+									const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
+
+									for (const [lineNo, line] of model.getLinesContent().entries()) {
+										const char = line.indexOf(propertyData.value)
+
+										if (char !== -1) {
+											colours.push({
+												color: {
+													red: r / 255,
+													green: g / 255,
+													blue: b / 255,
+													alpha: a / 255
+												},
+												range: {
+													startLineNumber: lineNo + 1,
+													endLineNumber: lineNo + 1,
+													startColumn: char + 1,
+													endColumn: char + 1 + 9
+												}
+											})
+										}
+									}
+								}
+							}
+						}
+
+						if (data.platformSpecificProperties) {
+							for (const platformData of Object.values(data.platformSpecificProperties) as Record<string, Property>[]) {
+								for (const propertyData of platformData) {
+									if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
+										const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+										const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+										const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+
+										for (const [lineNo, line] of model.getLinesContent().entries()) {
+											const char = line.indexOf(propertyData.value)
+
+											if (char !== -1) {
+												colours.push({
+													color: {
+														red: r / 255,
+														green: g / 255,
+														blue: b / 255,
+														alpha: 1
+													},
+													range: {
+														startLineNumber: lineNo + 1,
+														endLineNumber: lineNo + 1,
+														startColumn: char + 1,
+														endColumn: char + 1 + 7
+													}
+												})
+											}
+										}
+									}
+
+									if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
+										const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+										const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+										const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+										const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
+
+										for (const [lineNo, line] of model.getLinesContent().entries()) {
+											const char = line.indexOf(propertyData.value)
+
+											if (char !== -1) {
+												colours.push({
+													color: {
+														red: r / 255,
+														green: g / 255,
+														blue: b / 255,
+														alpha: a / 255
+													},
+													range: {
+														startLineNumber: lineNo + 1,
+														endLineNumber: lineNo + 1,
+														startColumn: char + 1,
+														endColumn: char + 1 + 9
+													}
+												})
+											}
+										}
+									}
+								}
+							}
+						}
+
+						const uniqueColours: monaco.languages.IColorInformation[] = []
+
+						for (const colour of colours) {
+							if (
+								!uniqueColours.some(
+									(a) => a.range.startColumn === colour.range.startColumn && a.range.endColumn === colour.range.endColumn && a.range.startLineNumber === colour.range.startLineNumber
+								)
+							) {
+								uniqueColours.push(colour)
+							}
+						}
+
+						return uniqueColours
+					} catch {
+						return []
+					}
+				}
 			})
 		}
 	})

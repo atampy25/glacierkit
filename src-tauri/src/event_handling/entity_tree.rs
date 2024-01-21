@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Context, Result};
-use arboard::Clipboard;
 use fn_error_context::context;
 use itertools::Itertools;
 use quickentity_rs::{
@@ -9,7 +8,7 @@ use quickentity_rs::{
 	patch_structs::{Patch, PatchOperation, SubEntityOperation},
 	qn_structs::{FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue}
 };
-use serde_json::{from_str, from_value, to_value, Value};
+use serde_json::{from_value, to_value, Value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;

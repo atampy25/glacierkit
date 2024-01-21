@@ -116,7 +116,8 @@
 			},
 			automaticLayout: true,
 			fontFamily: "Fira Code",
-			fontLigatures: true
+			fontLigatures: true,
+			colorDecorators: true
 		})
 
 		destroyFunc.run = () => {
