@@ -9,7 +9,7 @@
 	import { appWindow } from "@tauri-apps/api/window"
 	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
-	import { onDestroy, onMount } from "svelte"
+	import { beforeUpdate, onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
 	import { fade, fly } from "svelte/transition"
 	import type { Request } from "$lib/bindings-types"
@@ -33,79 +33,85 @@
 		}
 	})
 
-	onMount(async () => {
-		const unlistenStartTask = await listen("start-task", ({ payload: task }: { payload: [string, string] }) => {
-			tasks = [...tasks, task]
-		})
+	let hasListened = false
 
-		const unlistenFinishTask = await listen("finish-task", ({ payload: task }: { payload: string }) => {
-			tasks = tasks.filter((a) => a[0] !== task)
-		})
+	beforeUpdate(async () => {
+		if (!hasListened) {
+			hasListened = true
 
-		const unlistedNotification = await listen("send-notification", ({ payload: notification }: { payload: (typeof notifications)[number] }) => {
-			notifications = [...notifications, notification]
-			setTimeout(() => {
-				notifications = notifications.filter((a) => a[0] !== notification[0])
-			}, 6000)
-		})
+			const unlistenStartTask = await listen("start-task", ({ payload: task }: { payload: [string, string] }) => {
+				tasks = [...tasks, task]
+			})
 
-		const unlistenRequest = await listen("request", ({ payload: request }: { payload: Request }) => {
-			if (request.type === "global" && request.data.type === "setWindowTitle") {
-				console.log("Layout handling request", request)
+			const unlistenFinishTask = await listen("finish-task", ({ payload: task }: { payload: string }) => {
+				tasks = tasks.filter((a) => a[0] !== task)
+			})
 
-				appWindow.setTitle(`Deeznuts - ${request.data.data}`)
-				windowTitle = request.data.data
+			const unlistedNotification = await listen("send-notification", ({ payload: notification }: { payload: (typeof notifications)[number] }) => {
+				notifications = [...notifications, notification]
+				setTimeout(() => {
+					notifications = notifications.filter((a) => a[0] !== notification[0])
+				}, 6000)
+			})
+
+			const unlistenRequest = await listen("request", ({ payload: request }: { payload: Request }) => {
+				if (request.type === "global" && request.data.type === "setWindowTitle") {
+					console.log("Layout handling request", request)
+
+					appWindow.setTitle(`Deeznuts - ${request.data.data}`)
+					windowTitle = request.data.data
+				}
+
+				if (request.type === "global" && request.data.type === "errorReport") {
+					console.log("Layout handling request", request)
+
+					errorModalError = request.data.data.error
+					errorModalOpen = true
+					tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+				}
+			})
+
+			destroyFunc.run = () => {
+				unlistenStartTask()
+				unlistenFinishTask()
+				unlistedNotification()
+				unlistenRequest()
 			}
 
-			if (request.type === "global" && request.data.type === "errorReport") {
-				console.log("Layout handling request", request)
-
-				errorModalError = request.data.data.error
-				errorModalOpen = true
-				tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
-			}
-		})
-
-		destroyFunc.run = () => {
-			unlistenStartTask()
-			unlistenFinishTask()
-			unlistedNotification()
-			unlistenRequest()
-		}
-
-		self.MonacoEnvironment = {
-			getWorker: function (_moduleId: any, label: string) {
-				if (label === "json") {
-					return new jsonWorker()
-				} else {
-					return new editorWorker()
+			self.MonacoEnvironment = {
+				getWorker: function (_moduleId: any, label: string) {
+					if (label === "json") {
+						return new jsonWorker()
+					} else {
+						return new editorWorker()
+					}
 				}
 			}
+
+			monaco.editor.defineTheme("theme", {
+				base: "vs-dark",
+				inherit: true,
+				rules: [{ token: "keyword.json", foreground: "b5cea8" }],
+				colors: {}
+			})
+
+			monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+				validate: true,
+				enableSchemaRequest: true,
+				schemas: [
+					{
+						uri: "monaco-schema://manifest",
+						fileMatch: ["*manifest*"],
+						schema: await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
+					},
+					{
+						uri: "monaco-schema://qn-subentity",
+						fileMatch: ["*subentity*"],
+						schema: {}
+					}
+				]
+			})
 		}
-
-		monaco.editor.defineTheme("theme", {
-			base: "vs-dark",
-			inherit: true,
-			rules: [{ token: "keyword.json", foreground: "b5cea8" }],
-			colors: {}
-		})
-
-		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-			validate: true,
-			enableSchemaRequest: true,
-			schemas: [
-				{
-					uri: "monaco-schema://manifest",
-					fileMatch: ["*manifest*"],
-					schema: await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
-				},
-				{
-					uri: "monaco-schema://qn-subentity",
-					fileMatch: ["*subentity*"],
-					schema: {}
-				}
-			]
-		})
 	})
 
 	let windowTitle = "Deeznuts"

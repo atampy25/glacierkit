@@ -20,6 +20,7 @@
 	import TextSelection from "carbon-icons-svelte/lib/TextSelection.svelte"
 	import TextTransformer from "$lib/tools/TextTransformer.svelte"
 	import { shortcut } from "$lib/shortcut"
+	import { SortableList } from "@jhubbardsf/svelte-sortablejs"
 
 	const tools = {
 		FileBrowser: {
@@ -250,7 +251,15 @@
 			<Pane class="h-full">
 				<div class="h-full w-full flex flex-col py-2 pr-2 gap-2">
 					{#if tabs.length}
-						<div class="h-10 flex-shrink-0 bg-[#202020] flex overflow-x-auto overflow-y-hidden">
+						<SortableList
+							class="h-10 flex-shrink-0 bg-[#202020] flex overflow-x-auto overflow-y-hidden"
+							animation={150}
+							forceFallback
+							onEnd={(evt) => {
+								tabs.splice(evt.newIndex, 0, tabs.splice(evt.oldIndex, 1)[0])
+								tabs = tabs
+							}}
+						>
 							{#each tabs as tab (tab.id)}
 								<div
 									class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
@@ -306,7 +315,7 @@
 									</div>
 								</div>
 							{/each}
-						</div>
+						</SortableList>
 						{#each tabs as tab (tab.id)}
 							<div class="flex-grow" class:hidden={activeTab !== tab.id}>
 								<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />

@@ -285,6 +285,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@jhubbardsf/svelte-sortablejs@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "@jhubbardsf/svelte-sortablejs@npm:1.1.0"
+  dependencies:
+    sortablejs: "npm:^1.15.0"
+  checksum: fc5fb42c131d34bfd3fb6bc278850476afffb686c4048c838debc98353c06bce4e755466bfb646c50f8b8f90ba06f606a1cf60a93e1d9bc23ad5b9adde68e34a
+  languageName: node
+  linkType: hard
+
 "@jridgewell/gen-mapping@npm:^0.3.0, @jridgewell/gen-mapping@npm:^0.3.2":
   version: 0.3.3
   resolution: "@jridgewell/gen-mapping@npm:0.3.3"
@@ -2569,6 +2578,7 @@ __metadata:
   dependencies:
     "@fontsource/fira-code": "npm:^5.0.16"
     "@fortawesome/fontawesome-free": "npm:^6.5.1"
+    "@jhubbardsf/svelte-sortablejs": "npm:^1.1.0"
     "@sveltejs/adapter-static": "npm:^3.0.1"
     "@sveltejs/kit": "npm:^2.0.0"
     "@sveltejs/vite-plugin-svelte": "npm:^3.0.0"
@@ -3337,6 +3347,13 @@ __metadata:
   bin:
     sorcery: bin/sorcery
   checksum: 1d696966860da967b31603369442b5de87a61dcc1c42598d376dd0fba8a8d7c21c3656b667eed0e6864e661ee462c8b8603996d0f03f665b44d30094c3a01163
+  languageName: node
+  linkType: hard
+
+"sortablejs@npm:^1.15.0":
+  version: 1.15.2
+  resolution: "sortablejs@npm:1.15.2"
+  checksum: 9b9101f47a46976070f1e7ab45d1850a8754f6e71252506868731292af46a7f1a3add03914fe074cd2a6bdfe8cd6cad149cfa260fe8a53475f5306ae679bf38c
   languageName: node
   linkType: hard
 
