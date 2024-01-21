@@ -1244,9 +1244,8 @@ impl Intellisense {
 					{
 						// Pin
 						if entry.m_nUnk00 == 1 {
-							// Can't tell if they're input or output pins, since I have no idea what the unk01 value means for pins
-							input.push(entry.m_sName.to_owned());
-							output.push(entry.m_sName);
+							// All UICB pins are inputs, it seems
+							input.push(entry.m_sName);
 						}
 					}
 				} else if self.all_matts.contains(&factory) {
