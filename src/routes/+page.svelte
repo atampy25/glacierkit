@@ -21,6 +21,28 @@
 	import TextTransformer from "$lib/tools/TextTransformer.svelte"
 	import { shortcut } from "$lib/shortcut"
 	import { SortableList } from "@jhubbardsf/svelte-sortablejs"
+	import Idea from "carbon-icons-svelte/lib/Idea.svelte"
+
+	const hints = [
+		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
+		"You can save the active tab with Ctrl-S, or close it with Ctrl-W.",
+		"Drag an entity from the Game Content panel to the entity tree to create a new sub-entity with the given factory/blueprint.",
+		"Generate random UUIDs, calculate game hashes from paths, or calculate localisation hashes from strings with the Text Tools panel.",
+		"Pre-made templates for NPCs, logic entities and more are available from the Templates menu after right-clicking an entity.",
+		"Want to turn an existing entity.json file into a patch, or vice-versa? Right-click the entry in the Files panel and press Convert to Entity/Patch.",
+		"You can right-click a QuickEntity file and press Normalise to merge property overrides, sort keys and pad entity IDs to 16 characters.",
+		"If you want to quickly edit a file externally, right-click it and press Show in Explorer to open its containing folder in Windows Explorer.",
+		"The Help menu shows the default property values of a template or module, as well as the input and output pins it accepts. You can access it by right-clicking any entity in the tree.",
+		"Changes that you make externally to your project folder are automatically synced to the Files panel in Deeznuts.",
+		"Press Ctrl-Space to trigger intellisense in JSON editors - this can show you what properties are available and what their default values are.",
+		'Right-click an entity\'s "factory" field and press "Open factory in new tab" or click on it and press F12 to quickly inspect its underlying template.',
+		'You can visualise a ZCurve by right-clicking the property\'s name and pressing "Visualise curve".',
+		'You can follow entity references by right-clicking the entity ID and pressing "Follow reference", or by pressing F12.',
+		"Press F1 in any JSON editor to access the Command Palette, which lets you perform common operations like transforming text to lowercase/uppercase, or deleting duplicate lines.",
+		'You can use Find and Replace in any JSON editor with Ctrl-H, or by pressing F1 and typing "replace".'
+	]
+
+	let hint = hints[Math.floor(Math.random() * hints.length)]
 
 	const tools = {
 		FileBrowser: {
@@ -415,6 +437,13 @@
 							<div class="text-center">
 								<h1>Welcome to Deeznuts</h1>
 								<p>You can start by selecting a project on the left.</p>
+								<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+								<div
+									class="mt-8 flex gap-2 items-center text-neutral-300 cursor-pointer"
+									on:click={() => {
+										hint = hints[(hints.indexOf(hint) + 1) % hints.length]
+									}}><Idea size={20} />{hint}</div
+								>
 							</div>
 						</div>
 					{/if}

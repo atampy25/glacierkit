@@ -259,7 +259,7 @@
 								copy: {
 									separator_before: false,
 									separator_after: false,
-									label: "Copy Entity",
+									label: "Copy",
 									icon: "far fa-copy",
 									action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
 										const tree = jQuery.jstree!.reference(b.reference)
@@ -287,7 +287,7 @@
 									separator_before: false,
 									_disabled: false,
 									separator_after: false,
-									label: "Paste Entity",
+									label: "Paste",
 									icon: "far fa-paste",
 									action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
 										const tree = jQuery.jstree!.reference(b.reference)

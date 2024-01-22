@@ -254,7 +254,7 @@
 
 		editor.addAction({
 			id: "preview-curve",
-			label: "Preview curve",
+			label: "Visualise curve",
 			contextMenuGroupId: "navigation",
 			contextMenuOrder: 0,
 			keybindings: [],
