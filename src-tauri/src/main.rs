@@ -1062,9 +1062,17 @@ fn event(app: AppHandle, event: Event) {
 													.filter(|(_, entry)| entry.resource_type == "TEMP")
 													.filter(|(hash, entry)| {
 														query.split(' ').all(|y| {
-															entry.path.as_deref().unwrap_or("").contains(y)
-																|| entry.hint.as_deref().unwrap_or("").contains(y) || hash
-																.contains(y)
+															entry
+																.path
+																.as_deref()
+																.unwrap_or("")
+																.to_lowercase()
+																.contains(y) || entry
+																.hint
+																.as_deref()
+																.unwrap_or("")
+																.to_lowercase()
+																.contains(y) || hash.to_lowercase().contains(y)
 														})
 													})
 													.map(|(hash, entry)| GameBrowserEntry {
