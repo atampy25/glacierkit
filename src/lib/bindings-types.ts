@@ -163,7 +163,7 @@ new_entities: ([string, Ref, string, string, boolean])[] } } | { type: "searchRe
 /**
  * The IDs of the entities matching the query
  */
-results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } } | { type: "setTemplates"; data: { editor_id: string; templates: PastableTemplate[] } }
+results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } } | { type: "setTemplates"; data: { editor_id: string; templates: PastableTemplateCategory[] } }
 
 export type EphemeralQNSettings = { showReverseParentRefs: boolean }
 
@@ -236,6 +236,8 @@ type: string;
 value: JsonValue }
 
 export type PastableTemplate = { name: string; icon: string; pasteData: CopiedEntityData }
+
+export type PastableTemplateCategory = { name: string; icon: string; templates: PastableTemplate[] }
 
 export type Patch = { 
 /**

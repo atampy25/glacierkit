@@ -142,6 +142,14 @@ pub struct PastableTemplate {
 	pub paste_data: CopiedEntityData
 }
 
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PastableTemplateCategory {
+	pub name: String,
+	pub icon: String,
+	pub templates: Vec<PastableTemplate>
+}
+
 strike! {
 	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, Debug)]]
 	#[strikethrough[serde(rename_all = "camelCase", tag = "type", content = "data")]]
@@ -466,7 +474,7 @@ strike! {
 
 					SetTemplates {
 						editor_id: Uuid,
-						templates: Vec<PastableTemplate>
+						templates: Vec<PastableTemplateCategory>
 					}
 				}),
 

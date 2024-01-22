@@ -1,145 +1,239 @@
 [{
-    "name": "NPC",
-    "icon": "fa-regular fa-user",
-    "pasteData": {
-        "rootEntity": "cafe90366af3c5cb",
-        "data": {
-            "cafe90366af3c5cb": {
-                "parent": null,
-                "name": "NPC",
-                "factory": "[assembly:/templates/gameplay/ai2/actors.template?/npcactor.entitytemplate].pc_entitytype",
-                "blueprint": "[assembly:/templates/gameplay/ai2/actors.template?/npcactor.entitytemplate].pc_entityblueprint",
-                "properties": {
-                    "m_mTransform": {
-                        "type": "SMatrix43",
-                        "value": {
-                            "rotation": {
-                                "x": 0,
-                                "y": 0,
-                                "z": 0
-                            },
-                            "position": {
-                                "x": 0,
-                                "y": 0,
-                                "z": 0
-                            }
-                        }
-                    },
-                    "RepositoryId": {
-                        "type": "ZGuid",
-                        "value": "7af86858-df9d-478b-b5d8-803379cd165f"
-                    },
-                    "m_OutfitRepositoryID": {
-                        "type": "ZGuid",
-                        "value": "44f30ddb-cad9-402b-a307-6076fae3aa74"
-                    },
-                    "m_nOutfitVariation": {
-                        "type": "int32",
-                        "value": 0
-                    },
-                    "m_sActorName": {
-                        "type": "ZString",
-                        "value": "Richard Wilson"
-                    },
-                    "m_nOutfitCharset": {
-                        "type": "int32",
-                        "value": 0
-                    },
-                    "m_eRequiredVoiceVariation": {
-                        "type": "EActorVoiceVariation",
-                        "value": "eAVV_CIVMALEES03"
-                    }
-                },
-                "subsets": {
-                    "AudioEmitters": ["fffffffffffffffe"],
-                    "Replicable": ["fffffffffffffffe"]
-                }
-            },
-            "cafeb596a157e3cb": {
-                "parent": "cafe90366af3c5cb",
-                "name": "ActorDeath",
-                "factory": "[modules:/zactordeathentity.class].pc_entitytype",
-                "blueprint": "[modules:/zactordeathentity.class].pc_entityblueprint",
-                "properties": {
-                    "m_rActor": {
-                        "type": "SEntityTemplateReference",
-                        "value": "cafe90366af3c5cb"
-                    }
-                },
-                "events": {
-                    "OnDead": {
-                        "SetFalse": ["cafe388ad216260c", "cafe077d537f070c"]
-                    },
-                    "OnPacified": {
-                        "SetFalse": ["cafe077d537f070c"]
-                    },
-                    "OnAlive": {
-                        "SetTrue": ["cafe077d537f070c", "cafe388ad216260c"]
-                    }
-                }
-            },
-            "cafee4604fa3777b": {
-                "parent": "cafe90366af3c5cb",
-                "name": "Values",
-                "factory": "[modules:/zentity.class].pc_entitytype",
-                "blueprint": "[modules:/zentity.class].pc_entityblueprint"
-            },
-            "cafea7c450aade3f": {
-                "parent": "cafe90366af3c5cb",
-                "name": "ActorProxy",
-                "factory": "[modules:/zactorproxyentity.class].pc_entitytype",
-                "blueprint": "[modules:/zactorproxyentity.class].pc_entityblueprint",
-                "properties": {
-                    "m_rActor": {
-                        "type": "SEntityTemplateReference",
-                        "value": "cafe90366af3c5cb"
-                    }
-                }
-            },
-            "cafe388ad216260c": {
-                "parent": "cafee4604fa3777b",
-                "name": "Alive",
-                "factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entitytype",
-                "blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entityblueprint",
-                "properties": {
-                    "m_bValue": {
-                        "type": "bool",
-                        "value": true
-                    }
-                }
-            },
-            "cafe077d537f070c": {
-                "parent": "cafee4604fa3777b",
-                "name": "Conscious",
-                "factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entitytype",
-                "blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entityblueprint",
-                "properties": {
-                    "m_bValue": {
-                        "type": "bool",
-                        "value": true
-                    }
-                }
-            }
-        }
-    }
-}, {
-    "name": "ValueBool",
-    "icon": "fa-solid fa-cogs",
-    "pasteData": {
-        "rootEntity": "cafe5846574c00d4",
-        "data": {
-            "cafe5846574c00d4": {
-                "parent": null,
-                "name": "ValueBool",
-                "factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entitytype",
-                "blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entityblueprint",
-                "properties": {
-                    "m_bValue": {
-                        "type": "bool",
-                        "value": false
-                    }
-                }
-            }
-        }
-    }
-}]
+		"name": "Logic",
+		"icon": "fa-solid fa-cogs",
+		"templates": [{
+			"name": "ValueBool",
+			"icon": "fa-solid fa-toggle-on",
+			"pasteData": {
+				"rootEntity": "cafe5846574c00d4",
+				"data": {
+					"cafe5846574c00d4": {
+						"parent": null,
+						"name": "ValueBool",
+						"factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"m_bValue": {
+								"type": "bool",
+								"value": false
+							}
+						}
+					}
+				}
+			}
+		}, {
+			"name": "ValueBool_Poll",
+			"icon": "fa-solid fa-file-export",
+			"pasteData": {
+				"rootEntity": "cafe5846574c00d4",
+				"data": {
+					"cafe5846574c00d4": {
+						"parent": null,
+						"name": "ValueBool_Poll",
+						"factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_poll.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_poll.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"m_rValueEntity": {
+								"type": "SEntityTemplateReference",
+								"value": null
+							}
+						}
+					}
+				}
+			}
+		}, {
+			"name": "ValueBool_Changed",
+			"icon": "fa-solid fa-bolt",
+			"pasteData": {
+				"rootEntity": "cafe5846574c00d4",
+				"data": {
+					"cafe5846574c00d4": {
+						"parent": null,
+						"name": "ValueBool_Changed",
+						"factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_changed.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_changed.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"m_rValueEntity": {
+								"type": "SEntityTemplateReference",
+								"value": null
+							}
+						}
+					}
+				}
+			}
+		}, {
+			"name": "ValueBool_Operation",
+			"icon": "fa-solid fa-cogs",
+			"pasteData": {
+				"rootEntity": "cafe5846574c00d4",
+				"data": {
+					"cafe5846574c00d4": {
+						"parent": null,
+						"name": "ValueBool_Operation",
+						"factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_operation.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_operation.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"m_aValues": {
+								"type": "TArray<SEntityTemplateReference>",
+								"value": []
+							},
+							"m_eEvaluation": {
+								"type": "ZValueBool_Operation_Signal.EEvaluationType",
+								"value": "ALL"
+							}
+						}
+					}
+				}
+			}
+		}, {
+			"name": "TimerSimple",
+			"icon": "fa-solid fa-hourglass",
+			"pasteData": {
+				"rootEntity": "cafe5846574c00d4",
+				"data": {
+					"cafe5846574c00d4": {
+						"parent": null,
+						"name": "TimerSimple",
+						"factory": "[assembly:/_pro/design/logic.template?/timersimple.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/_pro/design/logic.template?/timersimple.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"Delay time (ms)": {
+								"type": "int32",
+								"value": 1000
+							}
+						}
+					}
+				}
+			}
+		}]
+	},
+	{
+		"name": "Misc",
+		"icon": "fa-solid fa-shapes",
+		"templates": [{
+			"name": "NPC",
+			"icon": "fa-regular fa-user",
+			"pasteData": {
+				"rootEntity": "cafe90366af3c5cb",
+				"data": {
+					"cafe90366af3c5cb": {
+						"parent": null,
+						"name": "NPC",
+						"factory": "[assembly:/templates/gameplay/ai2/actors.template?/npcactor.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/templates/gameplay/ai2/actors.template?/npcactor.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"m_mTransform": {
+								"type": "SMatrix43",
+								"value": {
+									"rotation": {
+										"x": 0,
+										"y": 0,
+										"z": 0
+									},
+									"position": {
+										"x": 0,
+										"y": 0,
+										"z": 0
+									}
+								}
+							},
+							"RepositoryId": {
+								"type": "ZGuid",
+								"value": "7af86858-df9d-478b-b5d8-803379cd165f"
+							},
+							"m_OutfitRepositoryID": {
+								"type": "ZGuid",
+								"value": "44f30ddb-cad9-402b-a307-6076fae3aa74"
+							},
+							"m_nOutfitVariation": {
+								"type": "int32",
+								"value": 0
+							},
+							"m_sActorName": {
+								"type": "ZString",
+								"value": "Richard Wilson"
+							},
+							"m_nOutfitCharset": {
+								"type": "int32",
+								"value": 0
+							},
+							"m_eRequiredVoiceVariation": {
+								"type": "EActorVoiceVariation",
+								"value": "eAVV_CIVMALEES03"
+							}
+						},
+						"subsets": {
+							"AudioEmitters": ["fffffffffffffffe"],
+							"Replicable": ["fffffffffffffffe"]
+						}
+					},
+					"cafeb596a157e3cb": {
+						"parent": "cafe90366af3c5cb",
+						"name": "ActorDeath",
+						"factory": "[modules:/zactordeathentity.class].pc_entitytype",
+						"blueprint": "[modules:/zactordeathentity.class].pc_entityblueprint",
+						"properties": {
+							"m_rActor": {
+								"type": "SEntityTemplateReference",
+								"value": "cafe90366af3c5cb"
+							}
+						},
+						"events": {
+							"OnDead": {
+								"SetFalse": ["cafe388ad216260c", "cafe077d537f070c"]
+							},
+							"OnPacified": {
+								"SetFalse": ["cafe077d537f070c"]
+							},
+							"OnAlive": {
+								"SetTrue": ["cafe077d537f070c", "cafe388ad216260c"]
+							}
+						}
+					},
+					"cafee4604fa3777b": {
+						"parent": "cafe90366af3c5cb",
+						"name": "Values",
+						"factory": "[modules:/zentity.class].pc_entitytype",
+						"blueprint": "[modules:/zentity.class].pc_entityblueprint"
+					},
+					"cafea7c450aade3f": {
+						"parent": "cafe90366af3c5cb",
+						"name": "ActorProxy",
+						"factory": "[modules:/zactorproxyentity.class].pc_entitytype",
+						"blueprint": "[modules:/zactorproxyentity.class].pc_entityblueprint",
+						"properties": {
+							"m_rActor": {
+								"type": "SEntityTemplateReference",
+								"value": "cafe90366af3c5cb"
+							}
+						}
+					},
+					"cafe388ad216260c": {
+						"parent": "cafee4604fa3777b",
+						"name": "Alive",
+						"factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"m_bValue": {
+								"type": "bool",
+								"value": true
+							}
+						}
+					},
+					"cafe077d537f070c": {
+						"parent": "cafee4604fa3777b",
+						"name": "Conscious",
+						"factory": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entitytype",
+						"blueprint": "[assembly:/_pro/design/logic/valuebool.template?/valuebool_basic.entitytemplate].pc_entityblueprint",
+						"properties": {
+							"m_bValue": {
+								"type": "bool",
+								"value": true
+							}
+						}
+					}
+				}
+			}
+		}]
+	}
+]

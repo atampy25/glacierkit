@@ -2,7 +2,7 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { EntityTreeRequest, PastableTemplate, Ref } from "$lib/bindings-types"
+	import type { EntityTreeRequest, PastableTemplateCategory, Ref } from "$lib/bindings-types"
 	import { Modal, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
@@ -44,7 +44,7 @@
 	let helpMenuOutputs: string[] = []
 	let helpMenuDefaultPropertiesHTML = ""
 
-	let templates: PastableTemplate[] = []
+	let templates: PastableTemplateCategory[] = []
 
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
@@ -320,36 +320,48 @@
 							icon: "fa-solid fa-shapes",
 							action: false,
 							submenu: Object.fromEntries(
-								templates.map((template) => [
-									`template${template.name.replace(" ", "")}`,
+								templates.map((category) => [
+									`templateCategory${category.name.replace(" ", "")}`,
 									{
-										separator_before: false,
-										_disabled: false,
+										separator_before: true,
 										separator_after: false,
-										label: template.name,
-										icon: template.icon,
-										action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
+										label: category.name,
+										icon: category.icon,
+										action: false,
+										submenu: Object.fromEntries(
+											category.templates.map((template) => [
+												`template${template.name.replace(" ", "")}`,
+												{
+													separator_before: false,
+													_disabled: false,
+													separator_after: false,
+													label: template.name,
+													icon: template.icon,
+													action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+														const tree = jQuery.jstree!.reference(b.reference)
+														const selected_node = tree.get_node(b.reference)
 
-											await event({
-												type: "editor",
-												data: {
-													type: "entity",
-													data: {
-														type: "tree",
-														data: {
-															type: "useTemplate",
+														await event({
+															type: "editor",
 															data: {
-																editor_id: editorID,
-																parent_id: selected_node.id,
-																template: template.pasteData
+																type: "entity",
+																data: {
+																	type: "tree",
+																	data: {
+																		type: "useTemplate",
+																		data: {
+																			editor_id: editorID,
+																			parent_id: selected_node.id,
+																			template: template.pasteData
+																		}
+																	}
+																}
 															}
-														}
+														})
 													}
 												}
-											})
-										}
+											])
+										)
 									}
 								])
 							)
@@ -538,8 +550,9 @@
 		sender: "fa fa-wifi",
 		event: "fa fa-location-arrow",
 		death: "fa fa-skull",
-		zone: "fa-regular fa-square", // Types
+		zone: "fa-regular fa-square",
 		fx: "fa fa-burst",
+		timer: "fa-solid fa-hourglass", // Types
 
 		"foliage/": "fa fa-seedling",
 		"vehicles/": "fa fa-car-side",
