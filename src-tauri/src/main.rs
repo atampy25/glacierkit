@@ -2264,7 +2264,7 @@ fn event(app: AppHandle, event: Event) {
 										let entity_id = random_entity_id();
 
 										let sub_entity = SubEntity {
-											parent: Ref::Short(Some(parent_id)),
+											parent: Ref::Short((parent_id != "#").then_some(parent_id)),
 											name: factory_path
 												.replace("].pc_entitytype", "")
 												.replace("].pc_entitytemplate", "")
@@ -2292,7 +2292,7 @@ fn event(app: AppHandle, event: Event) {
 											&app,
 											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 												EntityTreeRequest::NewItems {
-													editor_id,
+													editor_id: editor_id.to_owned(),
 													new_entities: vec![(
 														entity_id.to_owned(),
 														sub_entity.parent.to_owned(),
@@ -2305,6 +2305,14 @@ fn event(app: AppHandle, event: Event) {
 										)?;
 
 										entity.entities.insert(entity_id, sub_entity);
+
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::SetTabUnsaved {
+												id: editor_id,
+												unsaved: true
+											})
+										)?;
 									} else {
 										send_notification(
 											&app,

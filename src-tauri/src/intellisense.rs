@@ -12,7 +12,8 @@ use parking_lot::RwLock;
 use quickentity_rs::{
 	qn_structs::{Entity, Ref, RefMaybeConstantValue, RefWithConstantValue},
 	rt_structs::PropertyID,
-	util_structs::ZGuidPropertyValue
+	util_structs::{SMatrix43PropertyValue, ZGuidPropertyValue},
+	RAD2DEG
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
@@ -207,6 +208,106 @@ impl Intellisense {
 											.context("Invalid data")? * 255.0)
 											.round() as u8
 									))?
+								}
+
+								"SMatrix43" => {
+									let mut matrix =
+										from_value::<SMatrix43PropertyValue>(property_value.value.property_value)
+											.context("Invalid data")?;
+
+									// this is all from three.js
+
+									let n11 = matrix.XAxis.x;
+									let n12 = matrix.XAxis.y;
+									let n13 = matrix.XAxis.z;
+									let n14 = 0.0;
+									let n21 = matrix.YAxis.x;
+									let n22 = matrix.YAxis.y;
+									let n23 = matrix.YAxis.z;
+									let n24 = 0.0;
+									let n31 = matrix.ZAxis.x;
+									let n32 = matrix.ZAxis.y;
+									let n33 = matrix.ZAxis.z;
+									let n34 = 0.0;
+									let n41 = matrix.Trans.x;
+									let n42 = matrix.Trans.y;
+									let n43 = matrix.Trans.z;
+									let n44 = 1.0;
+
+									let det = n41
+										* (n14 * n23 * n32 - n13 * n24 * n32 - n14 * n22 * n33
+											+ n12 * n24 * n33 + n13 * n22 * n34 - n12 * n23 * n34)
+										+ n42
+											* (n11 * n23 * n34 - n11 * n24 * n33 + n14 * n21 * n33 - n13 * n21 * n34
+												+ n13 * n24 * n31 - n14 * n23 * n31) + n43
+										* (n11 * n24 * n32 - n11 * n22 * n34 - n14 * n21 * n32
+											+ n12 * n21 * n34 + n14 * n22 * n31 - n12 * n24 * n31)
+										+ n44
+											* (-n13 * n22 * n31 - n11 * n23 * n32 + n11 * n22 * n33 + n13 * n21 * n32
+												- n12 * n21 * n33 + n12 * n23 * n31);
+
+									let mut sx = n11 * n11 + n21 * n21 + n31 * n31;
+									let sy = n12 * n12 + n22 * n22 + n32 * n32;
+									let sz = n13 * n13 + n23 * n23 + n33 * n33;
+
+									if det < 0.0 {
+										sx = -sx
+									};
+
+									let pos = json!({ "x": n41, "y": n42, "z": n43 });
+									let scale = json!({ "x": sx, "y": sy, "z": sz });
+
+									let inv_sx = 1.0 / sx;
+									let inv_sy = 1.0 / sy;
+									let inv_sz = 1.0 / sz;
+
+									matrix.XAxis.x *= inv_sx;
+									matrix.YAxis.x *= inv_sx;
+									matrix.ZAxis.x *= inv_sx;
+									matrix.XAxis.y *= inv_sy;
+									matrix.YAxis.y *= inv_sy;
+									matrix.ZAxis.y *= inv_sy;
+									matrix.XAxis.z *= inv_sz;
+									matrix.YAxis.z *= inv_sz;
+									matrix.ZAxis.z *= inv_sz;
+
+									let rotation_x = (if matrix.XAxis.z.abs() < 0.9999999 {
+										(-matrix.YAxis.z).atan2(matrix.ZAxis.z)
+									} else {
+										(matrix.ZAxis.y).atan2(matrix.YAxis.y)
+									}) * RAD2DEG;
+
+									let rotation_y = matrix.XAxis.z.clamp(-1.0, 1.0).asin() * RAD2DEG;
+
+									let rotation_z = (if matrix.XAxis.z.abs() < 0.9999999 {
+										(-matrix.XAxis.y).atan2(matrix.XAxis.x)
+									} else {
+										0.0
+									}) * RAD2DEG;
+
+									if scale.get("x").expect("We made it").as_f64().expect("We made it") != 1.0
+										|| scale.get("y").expect("We made it").as_f64().expect("We made it") != 1.0
+										|| scale.get("z").expect("We made it").as_f64().expect("We made it") != 1.0
+									{
+										json!({
+											"rotation": {
+												"x": rotation_x,
+												"y": rotation_y,
+												"z": rotation_z
+											},
+											"position": pos,
+											"scale": scale
+										})
+									} else {
+										json!({
+											"rotation": {
+												"x": rotation_x,
+												"y": rotation_y,
+												"z": rotation_z
+											},
+											"position": pos
+										})
+									}
 								}
 
 								_ => property_value.value.property_value
