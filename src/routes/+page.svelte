@@ -335,6 +335,7 @@
 							class="h-10 flex-shrink-0 bg-[#202020] flex overflow-x-auto overflow-y-hidden"
 							animation={150}
 							forceFallback
+							fallbackTolerance={5}
 							onEnd={(evt) => {
 								tabs.splice(evt.newIndex, 0, tabs.splice(evt.oldIndex, 1)[0])
 								tabs = tabs
