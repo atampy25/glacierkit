@@ -26,8 +26,9 @@ use crate::{
 	hash_list::HashList,
 	material::{get_material_properties, MaterialProperty, MaterialPropertyData},
 	resourcelib::{
-		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2016_convert_ecpb, h2_convert_cppt, h2_convert_dswb,
-		h2_convert_ecpb, h3_convert_cppt, h3_convert_dswb, h3_convert_ecpb, EExtendedPropertyType
+		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2016_convert_ecpb, h2016_convert_wsgb, h2_convert_cppt,
+		h2_convert_dswb, h2_convert_ecpb, h2_convert_wsgb, h3_convert_cppt, h3_convert_dswb, h3_convert_ecpb,
+		h3_convert_wsgb, EExtendedPropertyType
 	},
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
@@ -50,7 +51,8 @@ pub struct Intellisense {
 	pub all_matts: HashSet<String>,
 	pub all_wswts: HashSet<String>,
 	pub all_ecpts: HashSet<String>,
-	pub all_aibxs: HashSet<String>
+	pub all_aibxs: HashSet<String>,
+	pub all_wsgts: HashSet<String>
 }
 
 impl Intellisense {
@@ -731,6 +733,13 @@ impl Intellisense {
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
+					} else if self.all_wsgts.contains(&factory) {
+						// All state groups have the properties of ZAudioStateEntity
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(resource_packages, hash_list, game_version, "000D409686293996")?
+						{
+							found.push((prop_name, prop_type, default_val, false));
+						}
 					} else {
 						match ensure_entity_in_cache(
 							resource_packages,
@@ -1152,6 +1161,15 @@ impl Intellisense {
 						return Ok(Some((prop_type, default_val, false)));
 					}
 				}
+			} else if self.all_wsgts.contains(&factory) {
+				// All state groups have the properties of ZAudioStateEntity
+				for (prop_name, (prop_type, default_val)) in
+					self.get_cppt_properties(resource_packages, hash_list, game_version, "000D409686293996")?
+				{
+					if prop_name == property_to_find {
+						return Ok(Some((prop_type, default_val, false)));
+					}
+				}
 			} else {
 				match ensure_entity_in_cache(
 					resource_packages,
@@ -1400,10 +1418,44 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 				} else if self.all_aibxs.contains(&factory) {
-					// All behaviour trees have the properties of ZBehaviorTreeEntity
+					// All behaviour trees have the pins of ZBehaviorTreeEntity
 					let cppt_data = self.cppt_pins.get("0028607138892D70").context("No such CPPT in pins")?;
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
+				} else if self.all_wsgts.contains(&factory) {
+					// All state groups have the pins of ZAudioStateEntity
+					let cppt_data = self.cppt_pins.get("000D409686293996").context("No such CPPT in pins")?;
+					input.extend(cppt_data.0.to_owned());
+					output.extend(cppt_data.1.to_owned());
+
+					let wsgt_meta = extract_latest_metadata(resource_packages, hash_list, &factory)?;
+
+					let wsgb_hash = &wsgt_meta
+						.hash_reference_data
+						.iter()
+						.find(|x| {
+							hash_list
+								.entries
+								.get(&normalise_to_hash(x.hash.to_owned()))
+								.map(|entry| entry.resource_type == "WSGB")
+								.unwrap_or(false)
+						})
+						.context("No blueprint dependency on WSWT")?
+						.hash;
+
+					let wsgb_data = match game_version {
+						GameVersion::H1 => {
+							h2016_convert_wsgb(&extract_latest_resource(resource_packages, hash_list, wsgb_hash)?.1)?
+						}
+						GameVersion::H2 => {
+							h2_convert_wsgb(&extract_latest_resource(resource_packages, hash_list, wsgb_hash)?.1)?
+						}
+						GameVersion::H3 => {
+							h3_convert_wsgb(&extract_latest_resource(resource_packages, hash_list, wsgb_hash)?.1)?
+						}
+					};
+
+					input.extend(wsgb_data.m_aSwitches);
 				} else {
 					match ensure_entity_in_cache(
 						resource_packages,
