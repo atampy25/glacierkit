@@ -480,6 +480,7 @@
 				if (request.data.id) {
 					tree.select_node(request.data.id)
 				}
+				tree.get_node(selectedNode, true)[0].scrollIntoView()
 				break
 
 			case "newTree":
