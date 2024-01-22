@@ -51,7 +51,7 @@
 	})
 
 	async function factoryHashInput(evt: any) {
-		const _event = evt as { target: HTMLInputElement }
+		const _event = evt as { detail: string }
 
 		await event({
 			type: "editor",
@@ -63,7 +63,7 @@
 						type: "setFactoryHash",
 						data: {
 							editor_id: editorID,
-							factory_hash: _event.target.value
+							factory_hash: _event.detail
 						}
 					}
 				}
@@ -72,7 +72,7 @@
 	}
 
 	async function blueprintHashInput(evt: any) {
-		const _event = evt as { target: HTMLInputElement }
+		const _event = evt as { detail: string }
 
 		await event({
 			type: "editor",
@@ -84,7 +84,7 @@
 						type: "setBlueprintHash",
 						data: {
 							editor_id: editorID,
-							blueprint_hash: _event.target.value
+							blueprint_hash: _event.detail
 						}
 					}
 				}
@@ -93,7 +93,7 @@
 	}
 
 	async function rootEntityInput(evt: any) {
-		const _event = evt as { target: HTMLInputElement }
+		const _event = evt as { detail: string }
 
 		await event({
 			type: "editor",
@@ -105,7 +105,7 @@
 						type: "setRootEntity",
 						data: {
 							editor_id: editorID,
-							root_entity: _event.target.value
+							root_entity: _event.detail
 						}
 					}
 				}

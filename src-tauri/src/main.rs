@@ -2710,6 +2710,14 @@ fn event(app: AppHandle, event: Event) {
 									};
 
 									entity.factory_hash = factory_hash;
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id,
+											unsaved: true
+										})
+									)?;
 								}
 
 								EntityMetadataEvent::SetBlueprintHash {
@@ -2730,6 +2738,14 @@ fn event(app: AppHandle, event: Event) {
 									};
 
 									entity.blueprint_hash = blueprint_hash;
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id,
+											unsaved: true
+										})
+									)?;
 								}
 
 								EntityMetadataEvent::SetRootEntity { editor_id, root_entity } => {
@@ -2747,6 +2763,14 @@ fn event(app: AppHandle, event: Event) {
 									};
 
 									entity.root_entity = root_entity;
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id,
+											unsaved: true
+										})
+									)?;
 								}
 
 								EntityMetadataEvent::SetSubType { editor_id, sub_type } => {
@@ -2764,6 +2788,14 @@ fn event(app: AppHandle, event: Event) {
 									};
 
 									entity.sub_type = sub_type;
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id,
+											unsaved: true
+										})
+									)?;
 								}
 
 								EntityMetadataEvent::SetExternalScenes {
@@ -2784,6 +2816,14 @@ fn event(app: AppHandle, event: Event) {
 									};
 
 									entity.external_scenes = external_scenes;
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id,
+											unsaved: true
+										})
+									)?;
 								}
 							},
 

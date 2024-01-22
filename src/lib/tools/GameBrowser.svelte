@@ -145,9 +145,9 @@
 	}
 
 	async function searchInput(evt: any) {
-		const _evt = evt as { target: HTMLInputElement }
+		const _event = evt as { target: HTMLInputElement }
 
-		if (_evt.target.value.length >= 3) {
+		if (_event.target.value.length >= 3) {
 			searchFeedback = ""
 			await event({
 				type: "tool",
@@ -155,7 +155,7 @@
 					type: "gameBrowser",
 					data: {
 						type: "search",
-						data: _evt.target.value.toLowerCase()
+						data: _event.target.value.toLowerCase()
 					}
 				}
 			})
