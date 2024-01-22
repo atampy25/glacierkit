@@ -371,7 +371,7 @@
 				...monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas!.filter((a) => a.uri !== `monaco-schema://qn-subentity-${editorID}`),
 				{
 					uri: `monaco-schema://qn-subentity-${editorID}`,
-					fileMatch: ["*subentity*"],
+					fileMatch: [`*subentity-${editorID}*`],
 					schema: merge(cloneDeep(baseIntellisenseSchema), {
 						definitions: {
 							SubEntity: {
