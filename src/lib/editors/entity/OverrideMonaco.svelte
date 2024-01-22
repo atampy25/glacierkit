@@ -159,7 +159,6 @@
 				}
 			]
 		})
-		console.log(editor.getModel()?.uri)
 
 		decorations = editor.createDecorationsCollection([])
 

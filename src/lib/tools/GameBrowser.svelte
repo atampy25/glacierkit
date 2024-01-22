@@ -28,7 +28,7 @@
 					dots: true,
 					icons: true
 				},
-				check_callback: true,
+				check_callback: false,
 				force_text: true
 			},
 			search: {
@@ -39,7 +39,10 @@
 			sort: function (a: any, b: any) {
 				return compareNodes(this.get_node(a), this.get_node(b))
 			},
-			plugins: ["sort"]
+			dnd: {
+				copy: true
+			},
+			plugins: ["sort", "dnd"]
 		})
 
 		tree = jQuery("#" + elemID).jstree()

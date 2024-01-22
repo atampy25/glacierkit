@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[try_fn]
-#[context("Couldn't handle paste event")]
+#[context("Couldn't handle delete event")]
 pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> {
 	let app_state = app.state::<AppState>();
 

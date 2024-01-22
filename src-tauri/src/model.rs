@@ -272,6 +272,12 @@ strike! {
 						editor_id: Uuid,
 						parent_id: String,
 						template: CopiedEntityData
+					},
+
+					AddGameBrowserItem {
+						editor_id: Uuid,
+						parent_id: String,
+						file: String
 					}
 				}),
 

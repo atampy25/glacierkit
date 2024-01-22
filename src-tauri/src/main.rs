@@ -35,7 +35,7 @@ use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
 use entity::{
 	calculate_reverse_references, check_local_references_exist, get_decorations, get_local_reference,
-	get_recursive_children, CopiedEntityData, ReverseReferenceData
+	get_recursive_children, random_entity_id, CopiedEntityData, ReverseReferenceData
 };
 use event_handling::{
 	entity_overrides::send_overrides_decorations,
@@ -2194,6 +2194,131 @@ fn event(app: AppHandle, event: Event) {
 									template
 								} => {
 									handle_paste(&app, editor_id, parent_id, template).await?;
+								}
+
+								EntityTreeEvent::AddGameBrowserItem {
+									editor_id,
+									parent_id,
+									file
+								} => {
+									let task = start_task(&app, format!("Adding {}", file))?;
+
+									let mut editor_state = app_state.editor_states.write().await;
+									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+									let entity = match editor_state.data {
+										EditorData::QNEntity { ref mut entity, .. } => entity,
+										EditorData::QNPatch { ref mut current, .. } => current,
+
+										_ => {
+											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+											panic!();
+										}
+									};
+
+									if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+										&& let Some(install) = app_settings.load().game_install.as_ref()
+									{
+										let game_version = app_state
+											.game_installs
+											.iter()
+											.try_find(|x| anyhow::Ok(x.path == *install))?
+											.context("No such game install")?
+											.version;
+
+										let (temp_meta, temp_data) =
+											extract_latest_resource(resource_packages, hash_list, &file)?;
+
+										let factory = match game_version {
+											GameVersion::H1 => convert_2016_factory_to_modern(
+												&h2016_convert_binary_to_factory(&temp_data)
+													.context("Couldn't convert binary data to ResourceLib factory")?
+											),
+
+											GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
+												.context("Couldn't convert binary data to ResourceLib factory")?,
+
+											GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
+												.context("Couldn't convert binary data to ResourceLib factory")?
+										};
+
+										let blueprint_hash = &temp_meta
+											.hash_reference_data
+											.get(factory.blueprint_index_in_resource_header as usize)
+											.context("Blueprint referenced in factory does not exist in dependencies")?
+											.hash;
+
+										let factory_path = hash_list
+											.entries
+											.get(&file)
+											.and_then(|x| x.path.to_owned())
+											.unwrap_or(file);
+
+										let blueprint_path = hash_list
+											.entries
+											.get(blueprint_hash)
+											.and_then(|x| x.path.to_owned())
+											.unwrap_or(blueprint_hash.to_owned());
+
+										let entity_id = random_entity_id();
+
+										let sub_entity = SubEntity {
+											parent: Ref::Short(Some(parent_id)),
+											name: factory_path
+												.replace("].pc_entitytype", "")
+												.replace("].pc_entitytemplate", "")
+												.replace(".entitytemplate", "")
+												.split('/')
+												.last()
+												.map(|x| x.to_owned())
+												.unwrap_or(factory_path.to_owned()),
+											factory: factory_path,
+											factory_flag: None,
+											blueprint: blueprint_path,
+											editor_only: None,
+											properties: None,
+											platform_specific_properties: None,
+											events: None,
+											input_copying: None,
+											output_copying: None,
+											property_aliases: None,
+											exposed_entities: None,
+											exposed_interfaces: None,
+											subsets: None
+										};
+
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::NewItems {
+													editor_id,
+													new_entities: vec![(
+														entity_id.to_owned(),
+														sub_entity.parent.to_owned(),
+														sub_entity.name.to_owned(),
+														sub_entity.factory.to_owned(),
+														false
+													)]
+												}
+											)))
+										)?;
+
+										entity.entities.insert(entity_id, sub_entity);
+									} else {
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Error,
+												title: "Game data unavailable".into(),
+												subtitle: "A copy of the game hasn't been selected, or the hash list \
+												           is unavailable."
+													.into()
+											}
+										)?;
+									}
+
+									finish_task(&app, task)?;
 								}
 							},
 

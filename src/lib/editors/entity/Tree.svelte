@@ -465,6 +465,29 @@
 			}
 		})
 
+		// Drag and drop from game browser
+		jQuery("#" + elemID).on("copy_node.jstree", async (_, { node, original }: { node: { id: string; parent: string }; original: { id: string } }) => {
+			tree.delete_node(node.id)
+
+			await event({
+				type: "editor",
+				data: {
+					type: "entity",
+					data: {
+						type: "tree",
+						data: {
+							type: "addGameBrowserItem",
+							data: {
+								editor_id: editorID,
+								parent_id: node.parent,
+								file: original.id
+							}
+						}
+					}
+				}
+			})
+		})
+
 		await event({
 			type: "editor",
 			data: {
