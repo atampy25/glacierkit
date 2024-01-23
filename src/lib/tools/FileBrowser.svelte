@@ -35,6 +35,16 @@
 		return indexOfNewNode
 	}
 
+	const icons = Object.entries({
+		json: "fa-regular fa-file-code",
+		md: "fa-regular fa-file-lines",
+		txt: "fa-regular fa-file-lines",
+		jpeg: "fa-regular fa-file-image",
+		jpg: "fa-regular fa-file-image",
+		png: "fa-regular fa-file-image",
+		webp: "fa-regular fa-file-image"
+	})
+
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
 			core: {
@@ -95,7 +105,12 @@
 
 														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
 
-														tree.set_icon(id, path.endsWith(".json") ? "fa-regular fa-pen-to-square" : "fa-regular fa-file")
+														tree.set_icon(
+															id,
+															icons.find((a) => path.split(".").at(-1)?.includes(a[0]))
+																? icons.find((a) => path.split(".").at(-1)?.includes(a[0]))![1]
+																: "fa-regular fa-file"
+														)
 
 														pathToID[path] = id
 
@@ -522,7 +537,11 @@
 				tree.settings!.core.data.push({
 					id,
 					parent: pathToID[path.split(sep).slice(0, -1).join(sep)],
-					icon: isFolder ? "fa-regular fa-folder" : path.endsWith(".json") ? "fa-regular fa-pen-to-square" : "fa-regular fa-file",
+					icon: isFolder
+						? "fa-regular fa-folder"
+						: icons.find((a) => path.split(".").at(-1)?.includes(a[0]))
+							? icons.find((a) => path.split(".").at(-1)?.includes(a[0]))![1]
+							: "fa-regular fa-file",
 					text: path.split(sep).at(-1),
 					folder: isFolder
 				})
