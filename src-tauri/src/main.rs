@@ -1300,13 +1300,13 @@ fn event(app: AppHandle, event: Event) {
 													.filter(|(_, entry)| entry.resource_type == "AIBX")
 													.map(|(hash, _)| hash.to_owned())
 													.collect(),
-													all_wsgts: hash_list
-														.entries
-														.iter()
-														.filter(|(_, entry)| entry.games.contains(game_version))
-														.filter(|(_, entry)| entry.resource_type == "WSGT")
-														.map(|(hash, _)| hash.to_owned())
-														.collect()
+												all_wsgts: hash_list
+													.entries
+													.iter()
+													.filter(|(_, entry)| entry.games.contains(game_version))
+													.filter(|(_, entry)| entry.resource_type == "WSGT")
+													.map(|(hash, _)| hash.to_owned())
+													.collect()
 											}
 											.into()
 										));
@@ -1488,13 +1488,13 @@ fn event(app: AppHandle, event: Event) {
 													.filter(|(_, entry)| entry.resource_type == "AIBX")
 													.map(|(hash, _)| hash.to_owned())
 													.collect(),
-													all_wsgts: hash_list
-														.entries
-														.iter()
-														.filter(|(_, entry)| entry.games.contains(game_version))
-														.filter(|(_, entry)| entry.resource_type == "WSGT")
-														.map(|(hash, _)| hash.to_owned())
-														.collect()
+												all_wsgts: hash_list
+													.entries
+													.iter()
+													.filter(|(_, entry)| entry.games.contains(game_version))
+													.filter(|(_, entry)| entry.resource_type == "WSGT")
+													.map(|(hash, _)| hash.to_owned())
+													.collect()
 											}
 											.into()
 										));

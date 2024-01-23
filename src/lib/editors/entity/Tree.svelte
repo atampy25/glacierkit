@@ -761,7 +761,15 @@
 	}
 </script>
 
-<Search placeholder="Filter..." icon={Filter} size="lg" on:change={searchInput} />
+<Search
+	placeholder="Filter..."
+	icon={Filter}
+	size="lg"
+	on:change={searchInput}
+	on:clear={() => {
+		tree.clear_search()
+	}}
+/>
 <div id={elemID} class="flex-grow overflow-auto" />
 
 <Modal bind:open={helpMenuOpen} modalHeading="Help for {helpMenuFactory}" passiveModal>

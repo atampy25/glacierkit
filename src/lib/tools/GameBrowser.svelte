@@ -159,6 +159,10 @@
 					}
 				}
 			})
+		} else if (_event.target.value.length >= 3) {
+			searchFeedback = ""
+			gameDescription = ""
+			await replaceTree([])
 		} else {
 			searchFeedback = "Search too broad"
 			gameDescription = ""
@@ -178,7 +182,18 @@
 		</div>
 	{:else}
 		<div class="pt-2 pb-1 px-2 leading-tight text-base">
-			<div class="mb-4"><Search placeholder="Search game files..." size="lg" on:change={searchInput} /></div>
+			<div class="mb-4"
+				><Search
+					placeholder="Search game files..."
+					size="lg"
+					on:change={searchInput}
+					on:clear={async () => {
+						searchFeedback = ""
+						gameDescription = ""
+						await replaceTree([])
+					}}
+				/></div
+			>
 			<div>{searchFeedback}</div>
 			<span class="text-neutral-400">{gameDescription}</span>
 		</div>

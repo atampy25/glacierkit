@@ -199,6 +199,8 @@
 		destroyFunc.run()
 	})
 
+	const debouncedUpdateFunction = { run: debounce(async (_: string) => {}, 1000) }
+
 	onMount(async () => {
 		editor = monaco.editor.create(el, {
 			model: monaco.editor.createModel("Select an entity in the tree to edit it here.", "json", monaco.Uri.parse(`monaco-model://qn-subentity-${editorID}`)),
@@ -336,30 +338,8 @@
 
 		decorations = editor.createDecorationsCollection([])
 
-		const debounced = debounce(async (entityID, content) => {
-			if (entityID) {
-				await event({
-					type: "editor",
-					data: {
-						type: "entity",
-						data: {
-							type: "monaco",
-							data: {
-								type: "updateContent",
-								data: {
-									editor_id: editorID,
-									entity_id: entityID,
-									content
-								}
-							}
-						}
-					}
-				})
-			}
-		}, 1000)
-
-		editor.onDidChangeModelContent(() => {
-			debounced(entityID, editor.getValue({ preserveBOM: true, lineEnding: "\n" }))
+		editor.onDidChangeModelContent((e) => {
+			debouncedUpdateFunction.run(editor.getValue({ preserveBOM: true, lineEnding: "\n" }))
 			updateDecorations()
 		})
 	})
@@ -501,6 +481,25 @@
 		switch (request.type) {
 			case "replaceContent":
 				entityID = request.data.entity_id
+				debouncedUpdateFunction.run = debounce(async (content: string) => {
+					await event({
+						type: "editor",
+						data: {
+							type: "entity",
+							data: {
+								type: "monaco",
+								data: {
+									type: "updateContent",
+									data: {
+										editor_id: editorID,
+										entity_id: request.data.entity_id,
+										content
+									}
+								}
+							}
+						}
+					})
+				}, 1000)
 				editor.setValue(request.data.content)
 				break
 
