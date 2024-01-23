@@ -11,55 +11,67 @@
 	},
 	"float32": {
 		"type": "number",
-		"description": "A single-precision floating-point number.",
-		"default": null
+		"description": "A single-precision floating-point number. Can store non-integer values.",
+		"default": null,
+		"minimum": 0
 	},
 	"int32": {
-		"type": "number",
+		"type": "integer",
 		"description": "A signed 32-bit integer. Can store values from -2147483648 to 2147483648.",
-		"default": null
+		"default": null,
+		"minimum": 0
 	},
 	"uint8": {
-		"type": "number",
+		"type": "integer",
 		"description": "An unsigned 8-bit integer. Can store values from 0 to 255.",
-		"default": null
+		"default": null,
+		"minimum": 0
 	},
 	"uint16": {
-		"type": "number",
+		"type": "integer",
 		"description": "An unsigned 16-bit integer. Can store values from 0 to 65535.",
-		"default": null
+		"default": null,
+		"minimum": 0
 	},
 	"uint32": {
-		"type": "number",
+		"type": "integer",
 		"description": "An unsigned 32-bit integer. Can store values from 0 to 4294967295.",
-		"default": null
+		"default": null,
+		"minimum": 0
 	},
 	"uint64": {
-		"type": "number",
+		"type": "integer",
 		"description": "An unsigned 64-bit integer. Can store values from 0 to 18446744073709551615.",
-		"default": null
+		"default": null,
+		"minimum": 0
 	},
 	"SColorRGB": {
 		"type": "string",
 		"description": "A colour in standard RGB hexadecimal format.",
-		"default": "#ffffff"
+		"default": "#ffffff",
+		"minLength": 7,
+		"maxLength": 7
 	},
 	"SColorRGBA": {
 		"type": "string",
 		"description": "A colour in standard RGBA hexadecimal format.",
-		"default": "#ffffffff"
+		"default": "#ffffffff",
+		"minLength": 9,
+		"maxLength": 9
 	},
 	"ZGuid": {
 		"type": "string",
 		"description": "A UUID in standard text format.",
-		"default": "00000000-0000-0000-0000-000000000000"
+		"default": "00000000-0000-0000-0000-000000000000",
+		"format": "uuid"
 	},
 	"ZGameTime": {
 		"type": "object",
-		"description": "A time expressed in the number of game ticks. There are 1048576 (1024 x 1024) ticks in each real second.",
+		"description": "A time expressed in a whole number of game ticks. There are 1048576 (1024 x 1024) ticks in each second.",
 		"properties": {
 			"m_nTicks": {
-				"type": "number"
+				"type": "integer",
+				"minimum": 0
 			}
 		},
 		"default": {
@@ -84,7 +96,7 @@
 	},
 	"SVector2": {
 		"type": "object",
-		"description": "A vector of two values.",
+		"description": "A vector of two floating-point values.",
 		"properties": {
 			"x": {
 				"type": "number"
@@ -101,7 +113,7 @@
 	},
 	"SVector3": {
 		"type": "object",
-		"description": "A vector of three values.",
+		"description": "A vector of three floating-point values.",
 		"properties": {
 			"x": {
 				"type": "number"
@@ -122,7 +134,7 @@
 	},
 	"SVector4": {
 		"type": "object",
-		"description": "A vector of four values.",
+		"description": "A vector of four floating-point values.",
 		"properties": {
 			"x": {
 				"type": "number"
@@ -153,7 +165,7 @@
 				"type": "number"
 			},
 			"fScale": {
-				"type": "integer"
+				"type": "number"
 			},
 			"bDynamicScale": {
 				"type": "boolean"
@@ -162,10 +174,10 @@
 				"type": "number"
 			},
 			"fDynamicScaleNearDistance": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fDynamicScaleBlendRange": {
-				"type": "integer"
+				"type": "number"
 			}
 		},
 		"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"],
@@ -176,40 +188,40 @@
 		"description": "2.5D projection settings.",
 		"properties": {
 			"fNearDistance": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fFarDistance": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fNearScale": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fFarScale": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fNearFov": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fFarFov": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fNearScaleFov": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fFarScaleFov": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fScaleFactor": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fNearAlpha": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fFarAlpha": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fAlphaFactor": {
-				"type": "integer"
+				"type": "number"
 			},
 			"aScaleCurve": {
 				"type": "array",
@@ -223,13 +235,13 @@
 				"type": "string"
 			},
 			"fViewportGutter": {
-				"type": "integer"
+				"type": "number"
 			},
 			"enableWorldSizeScaling": {
 				"type": "boolean"
 			},
 			"fWorldSizeScalingBaseDistance": {
-				"type": "integer"
+				"type": "number"
 			},
 			"fWorldSizeScalingFactorMax": {
 				"type": "number"
@@ -245,7 +257,7 @@
 						"type": "number"
 					},
 					"fScale": {
-						"type": "integer"
+						"type": "number"
 					},
 					"bDynamicScale": {
 						"type": "boolean"
@@ -254,10 +266,10 @@
 						"type": "number"
 					},
 					"fDynamicScaleNearDistance": {
-						"type": "integer"
+						"type": "number"
 					},
 					"fDynamicScaleBlendRange": {
-						"type": "integer"
+						"type": "number"
 					}
 				},
 				"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"]
@@ -377,40 +389,40 @@
 		"description": "Damage multipliers for individual body parts.",
 		"properties": {
 			"m_fHeadDamageMultiplier": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fFaceDamageMultiplier": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fArmDamageMultiplier": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fLArmDamageScalar": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fRArmDamageScalar": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fHandDamageMultiplier": {
 				"type": "number"
 			},
 			"m_fLHandDamageScalar": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fRHandDamageScalar": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fLegDamageMultiplier": {
 				"type": "number"
 			},
 			"m_fLLegDamageScalar": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fRLegDamageScalar": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_fTorsoDamageMultiplier": {
-				"type": "integer"
+				"type": "number"
 			},
 			"m_bApplyLeftRightScalars": {
 				"type": "boolean"
@@ -470,7 +482,7 @@
 		"properties": {
 			"data": {
 				"type": "array",
-				"description": "A curve made up of polynomial functions. ZCurves usually end with a constant curve where all coefficients are set to zero.",
+				"description": "A curve made up of polynomial functions. ZCurves usually end with a constant function, where all coefficients are set to zero.",
 				"items": {
 					"type": "array",
 					"description": "A polynomial function.",
