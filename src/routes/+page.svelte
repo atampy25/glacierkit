@@ -170,7 +170,10 @@
 							case "removeTab":
 								const tabIndex = tabs.findIndex((a) => a.id === request.data.data)
 								tabs = tabs.filter((a) => a.id !== request.data.data)
-								activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
+
+								if (activeTab === request.data.data) {
+									activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
+								}
 
 								void event({
 									type: "global",
@@ -375,6 +378,17 @@
 												type: "global",
 												data: {
 													type: "selectTab",
+													data: tab.id
+												}
+											})
+										}
+									}}
+									on:auxclick={async (e) => {
+										if (e.button === 1) {
+											await event({
+												type: "global",
+												data: {
+													type: "removeTab",
 													data: tab.id
 												}
 											})
