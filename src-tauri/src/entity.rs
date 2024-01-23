@@ -1092,6 +1092,20 @@ pub fn get_decorations(
 						.filter(|x| !x.is_empty() && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
 						.map(|x| x.trim().to_owned())
 						.tuples()
+						.map(|(prop, friendly)| {
+							(
+								if prop.starts_with("map") {
+									prop.chars().skip(3).collect()
+								} else {
+									prop
+								},
+								if friendly.starts_with("map") {
+									friendly.chars().skip(3).collect()
+								} else {
+									friendly
+								}
+							)
+						})
 				);
 			}
 		}
