@@ -39,7 +39,8 @@
 		'You can visualise a ZCurve by right-clicking the property\'s name and pressing "Visualise curve".',
 		'You can follow entity references by right-clicking the entity ID and pressing "Follow reference", or by pressing F12.',
 		"Press F1 in any JSON editor to access the Command Palette, which lets you perform common operations like transforming text to lowercase/uppercase, or deleting duplicate lines.",
-		'You can use Find and Replace in any JSON editor with Ctrl-H, or by pressing F1 and typing "replace".'
+		'You can use Find and Replace in any JSON editor with Ctrl-H, or by pressing F1 and typing "replace".',
+		"Right-click an entry in the Game Content panel to copy its hash or path."
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]

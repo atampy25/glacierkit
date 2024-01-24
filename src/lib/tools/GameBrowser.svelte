@@ -5,6 +5,7 @@
 	import type { GameBrowserEntry, GameBrowserRequest } from "$lib/bindings-types"
 	import { Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
+	import { clipboard } from "@tauri-apps/api"
 
 	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 
@@ -42,7 +43,44 @@
 			dnd: {
 				copy: true
 			},
-			plugins: ["sort", "dnd"]
+			contextmenu: {
+				select_node: false,
+				items: (rightClickedNode: { original: { path: string | null } }, c: any) => {
+					return {
+						copyHash: {
+							separator_before: false,
+							separator_after: false,
+							_disabled: false,
+							label: "Copy Hash",
+							icon: "far fa-copy",
+							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+								const tree = jQuery.jstree!.reference(b.reference)
+								const selected_node = tree.get_node(b.reference)
+
+								await clipboard.writeText(selected_node.id)
+							}
+						},
+						...(rightClickedNode.original.path
+							? {
+									copyPath: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Copy Path",
+										icon: "far fa-copy",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											await clipboard.writeText(selected_node.original.path)
+										}
+									}
+								}
+							: {})
+					}
+				}
+			},
+			plugins: ["contextmenu", "sort", "dnd"]
 		})
 
 		tree = jQuery("#" + elemID).jstree()
@@ -128,7 +166,8 @@
 					parent: path[1].split("/").slice(0, -1).join("/"),
 					icon: "fa-regular fa-file",
 					text: path[1].split("/").at(-1),
-					folder: false
+					folder: false,
+					path: entry.path
 				})
 			} else {
 				tree.settings!.core.data.push({
@@ -136,7 +175,8 @@
 					parent: "#",
 					icon: "fa-regular fa-file",
 					text: entry.hint ? `${entry.hint} (${entry.hash})` : entry.hash,
-					folder: false
+					folder: false,
+					path: null
 				})
 			}
 		}
