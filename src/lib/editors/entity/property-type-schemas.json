@@ -12,14 +12,12 @@
 	"float32": {
 		"type": "number",
 		"description": "A single-precision floating-point number. Can store non-integer values.",
-		"default": null,
-		"minimum": 0
+		"default": null
 	},
 	"int32": {
 		"type": "integer",
 		"description": "A signed 32-bit integer. Can store values from -2147483648 to 2147483648.",
-		"default": null,
-		"minimum": 0
+		"default": null
 	},
 	"uint8": {
 		"type": "integer",
