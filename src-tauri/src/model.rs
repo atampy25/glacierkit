@@ -451,6 +451,14 @@ strike! {
 					new_path: PathBuf
 				},
 
+				BeginRename {
+					old_path: PathBuf
+				},
+
+				FinishRename {
+					new_path: PathBuf
+				},
+
 				Select(Option<PathBuf>),
 
 				NewTree {

@@ -3844,12 +3844,13 @@ fn event(app: AppHandle, event: Event) {
 															send_request(
 																&notify_app,
 																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::Delete(
-																		evt.paths
+																	FileBrowserRequest::BeginRename {
+																		old_path: evt
+																			.paths
 																			.first()
 																			.context("Rename-from event had no path")?
 																			.to_owned()
-																	)
+																	}
 																))
 															)?;
 														}
@@ -3857,27 +3858,18 @@ fn event(app: AppHandle, event: Event) {
 														notify::EventKind::Modify(notify::event::ModifyKind::Name(
 															notify::event::RenameMode::To
 														)) => {
-															if let Ok(metadata) = fs::metadata(
-																evt.paths
-																	.first()
-																	.context("Rename-to event had no paths")?
-															) {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::Create {
-																			path: evt
-																				.paths
-																				.first()
-																				.context(
-																					"Rename-to event had no paths"
-																				)?
-																				.to_owned(),
-																			is_folder: metadata.is_dir()
-																		}
-																	))
-																)?;
-															}
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::FinishRename {
+																		new_path: evt
+																			.paths
+																			.first()
+																			.context("Rename-to event had no paths")?
+																			.to_owned()
+																	}
+																))
+															)?;
 														}
 
 														notify::EventKind::Remove(_) => {

@@ -440,6 +440,8 @@
 		})
 	})
 
+	let inProgressRename: string | null = null
+
 	export async function handleRequest(request: FileBrowserRequest) {
 		console.log("File browser handling request", request)
 
@@ -473,7 +475,9 @@
 			case "rename":
 				if (!(request.data.old_path.endsWith("project.json") || request.data.new_path.endsWith("project.json")) && pathToID[request.data.old_path]) {
 					if (request.data.old_path.split(sep).slice(0, -1).join(sep) === request.data.new_path.split(sep).slice(0, -1).join(sep)) {
-						tree.rename_node(tree.get_node(pathToID[request.data.old_path]), request.data.new_path.at(-1)!)
+						tree.rename_node(tree.get_node(pathToID[request.data.old_path]), request.data.new_path.split(sep).at(-1)!)
+						pathToID[request.data.new_path] = pathToID[request.data.old_path]
+						delete pathToID[request.data.old_path]
 					} else {
 						// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
 						tree.rename_node(tree.get_node(pathToID[request.data.old_path]), v4())
@@ -482,17 +486,58 @@
 							pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
 							getPositionOfNode(
 								pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
-								request.data.new_path.at(-1)!,
+								request.data.new_path.split(sep).at(-1)!,
 								tree.get_node(pathToID[request.data.old_path]).original.folder
 							),
 							() => {
 								pathToID[request.data.new_path] = pathToID[request.data.old_path]
 								delete pathToID[request.data.old_path]
-								tree.rename_node(tree.get_node(pathToID[request.data.new_path]), request.data.new_path.at(-1)!)
+								tree.rename_node(tree.get_node(pathToID[request.data.new_path]), request.data.new_path.split(sep).at(-1)!)
 							}
 						)
 					}
 				}
+				break
+
+			case "beginRename":
+				inProgressRename = request.data.old_path
+				break
+
+			case "finishRename":
+				while (typeof inProgressRename !== "string") {
+					await new Promise((r) => setTimeout(r, 100))
+				}
+
+				if (typeof inProgressRename === "string") {
+					if (!(inProgressRename.endsWith("project.json") || request.data.new_path.endsWith("project.json")) && pathToID[inProgressRename]) {
+						if (inProgressRename.split(sep).slice(0, -1).join(sep) === request.data.new_path.split(sep).slice(0, -1).join(sep)) {
+							tree.rename_node(tree.get_node(pathToID[inProgressRename]), request.data.new_path.split(sep).at(-1)!)
+							pathToID[request.data.new_path] = pathToID[inProgressRename]
+							delete pathToID[inProgressRename]
+						} else {
+							// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
+							tree.rename_node(tree.get_node(pathToID[inProgressRename]), v4())
+							tree.move_node(
+								tree.get_node(pathToID[inProgressRename]),
+								pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
+								getPositionOfNode(
+									pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
+									request.data.new_path.split(sep).at(-1)!,
+									tree.get_node(pathToID[inProgressRename]).original.folder
+								),
+								() => {
+									if (typeof inProgressRename === "string") {
+										pathToID[request.data.new_path] = pathToID[inProgressRename]
+										delete pathToID[inProgressRename]
+										tree.rename_node(tree.get_node(pathToID[request.data.new_path]), request.data.new_path.split(sep).at(-1)!)
+									}
+								}
+							)
+						}
+					}
+				}
+
+				inProgressRename = null
 				break
 
 			case "select":

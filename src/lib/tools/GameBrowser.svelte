@@ -154,7 +154,8 @@
 							parent: pathSection.split("/").slice(0, -1).join("/") || "#",
 							icon: "fa-regular fa-folder",
 							text: pathSection.split("/").at(-1),
-							folder: true
+							folder: true,
+							path: pathSection
 						})
 
 						addedFolders.add(pathSection)
