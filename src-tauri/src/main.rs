@@ -18,6 +18,7 @@ pub mod material;
 pub mod model;
 pub mod resourcelib;
 pub mod rpkg;
+pub mod rpkg_tool;
 pub mod show_in_folder;
 
 use std::{
@@ -25,7 +26,7 @@ use std::{
 	fs::{self, File},
 	io::{BufReader, Cursor},
 	ops::Deref,
-	path::Path,
+	path::{Path, PathBuf},
 	sync::Arc
 };
 
@@ -54,7 +55,8 @@ use model::{
 	EntityMetadataEvent, EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityOverridesEvent,
 	EntityOverridesRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
 	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings,
-	Request, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	Request, ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest, SettingsEvent, SettingsRequest,
+	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
@@ -69,11 +71,14 @@ use resourcelib::{
 	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
 };
 use rfd::AsyncFileDialog;
-use rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
+use rpkg::{ensure_entity_in_cache, extract_latest_overview_info, extract_latest_resource, normalise_to_hash};
 use rpkg_rs::{
 	misc::ini_file_system::IniFileSystem,
-	runtime::resource::{package_manager::PackageManager, resource_container::ResourceContainer}
+	runtime::resource::{
+		package_manager::PackageManager, resource_container::ResourceContainer, resource_package::ResourcePackage
+	}
 };
+use rpkg_tool::generate_rpkg_meta;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, json, to_string, to_vec};
 use show_in_folder::show_in_folder;
@@ -145,6 +150,7 @@ fn main() {
 				fs_watcher: None.into(),
 				editor_states: RwLock::new(HashMap::new()).into(),
 				resource_packages: None.into(),
+				resource_reverse_dependencies: None.into(),
 				cached_entities: parking_lot::RwLock::new(HashMap::new()).into(),
 				intellisense: None.into()
 			});
@@ -947,64 +953,7 @@ fn event(app: AppHandle, event: Event) {
 
 						ToolEvent::GameBrowser(event) => match event {
 							GameBrowserEvent::Select(hash) => {
-								let task = start_task(&app, format!("Loading entity {}", hash))?;
-
-								let game_install_data = app_state
-									.game_installs
-									.iter()
-									.try_find(|x| {
-										anyhow::Ok(x.path == *app_settings.load().game_install.as_ref().unwrap())
-									})?
-									.context("No such game install")?;
-
-								ensure_entity_in_cache(
-									app_state
-										.resource_packages
-										.load()
-										.as_deref()
-										.expect("Game install not loaded but game browser is available"),
-									&app_state.cached_entities,
-									game_install_data.version,
-									app_state
-										.hash_list
-										.load()
-										.as_ref()
-										.expect("Must be Some if game browser is active"),
-									&hash
-								)?;
-
-								let entity = app_state.cached_entities.read().get(&hash).unwrap().to_owned();
-
-								let default_tab_name = format!(
-									"{} ({})",
-									entity
-										.entities
-										.get(&entity.root_entity)
-										.context("Root entity doesn't exist")?
-										.name,
-									hash
-								);
-
-								let tab_name = if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-									if let Some(entry) = hash_list.entries.get(&hash) {
-										if let Some(path) = entry.path.as_ref() {
-											path.replace("].pc_entitytype", "")
-												.replace("].pc_entitytemplate", "")
-												.split('/')
-												.last()
-												.map(|x| x.to_owned())
-												.unwrap_or(default_tab_name)
-										} else if let Some(hint) = entry.hint.as_ref() {
-											format!("{} ({})", hint, hash)
-										} else {
-											default_tab_name
-										}
-									} else {
-										default_tab_name
-									}
-								} else {
-									default_tab_name
-								};
+								let task = start_task(&app, format!("Opening resource {}", hash))?;
 
 								let id = Uuid::new_v4();
 
@@ -1012,11 +961,7 @@ fn event(app: AppHandle, event: Event) {
 									id.to_owned(),
 									EditorState {
 										file: None,
-										data: EditorData::QNPatch {
-											base: Box::new(entity.to_owned()),
-											current: Box::new(entity.to_owned()),
-											settings: Default::default()
-										}
+										data: EditorData::ResourceOverview { hash: hash.to_owned() }
 									}
 								);
 
@@ -1024,8 +969,8 @@ fn event(app: AppHandle, event: Event) {
 									&app,
 									Request::Global(GlobalRequest::CreateTab {
 										id,
-										name: tab_name,
-										editor_type: EditorType::QNPatch
+										name: "Resource overview".into(),
+										editor_type: EditorType::ResourceOverview
 									})
 								)?;
 
@@ -1100,9 +1045,9 @@ fn event(app: AppHandle, event: Event) {
 									}))
 								)?;
 
-								let task = start_task(&app, "Loading game files")?;
-
 								if let Some(path) = app_settings.load().game_install.as_ref() {
+									let task = start_task(&app, "Loading game files")?;
+
 									let game_version = app_state
 										.game_installs
 										.iter()
@@ -1113,7 +1058,7 @@ fn event(app: AppHandle, event: Event) {
 									let mut thumbs = IniFileSystem::new();
 									thumbs.load(&path.join("thumbs.dat"))?;
 
-									let mut resource_packages = IndexMap::new();
+									let mut resource_packages: IndexMap<PathBuf, ResourcePackage> = IndexMap::new();
 
 									if let (Ok(proj_path), Ok(relative_runtime_path)) = (
 										thumbs.get_value("application", "PROJECT_PATH"),
@@ -1195,10 +1140,43 @@ fn event(app: AppHandle, event: Event) {
 										panic!();
 									}
 
-									app_state.resource_packages.store(Some(resource_packages.into()));
-								}
+									finish_task(&app, task)?;
 
-								finish_task(&app, task)?;
+									let task = start_task(&app, "Gathering reverse references")?;
+
+									let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
+
+									for rpkg in resource_packages.values() {
+										for (resource_header, offset_info) in
+											rpkg.resource_entries.iter().enumerate().map(|(index, entry)| {
+												(rpkg.resource_metadata.get(index).unwrap(), entry)
+											}) {
+											for reference in resource_header
+												.m_references
+												.as_ref()
+												.map(|x| &x.reference_hash)
+												.unwrap_or(&Vec::new())
+											{
+												reverse_dependencies
+													.entry(reference.to_hex_string())
+													.or_default()
+													.insert(offset_info.runtime_resource_id.to_hex_string());
+											}
+										}
+									}
+
+									app_state.resource_packages.store(Some(resource_packages.into()));
+
+									app_state.resource_reverse_dependencies.store(Some(
+										reverse_dependencies
+											.into_iter()
+											.map(|(x, y)| (x, y.into_iter().collect()))
+											.collect::<HashMap<_, _>>()
+											.into()
+									));
+
+									finish_task(&app, task)?;
+								}
 
 								let task = start_task(&app, "Acquiring latest hash list")?;
 
@@ -1328,6 +1306,8 @@ fn event(app: AppHandle, event: Event) {
 								let task = start_task(&app, "Loading game files")?;
 
 								if let Some(path) = path.as_ref() {
+									let task = start_task(&app, "Loading game files")?;
+
 									let game_version = app_state
 										.game_installs
 										.iter()
@@ -1338,7 +1318,7 @@ fn event(app: AppHandle, event: Event) {
 									let mut thumbs = IniFileSystem::new();
 									thumbs.load(&path.join("thumbs.dat"))?;
 
-									let mut resource_packages = IndexMap::new();
+									let mut resource_packages: IndexMap<PathBuf, ResourcePackage> = IndexMap::new();
 
 									if let (Ok(proj_path), Ok(relative_runtime_path)) = (
 										thumbs.get_value("application", "PROJECT_PATH"),
@@ -1420,16 +1400,44 @@ fn event(app: AppHandle, event: Event) {
 										panic!();
 									}
 
+									finish_task(&app, task)?;
+
+									let task = start_task(&app, "Gathering reverse references")?;
+
+									let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
+
+									for rpkg in resource_packages.values() {
+										for (resource_header, offset_info) in
+											rpkg.resource_entries.iter().enumerate().map(|(index, entry)| {
+												(rpkg.resource_metadata.get(index).unwrap(), entry)
+											}) {
+											for reference in resource_header
+												.m_references
+												.as_ref()
+												.map(|x| &x.reference_hash)
+												.unwrap_or(&Vec::new())
+											{
+												reverse_dependencies
+													.entry(reference.to_hex_string())
+													.or_default()
+													.insert(offset_info.runtime_resource_id.to_hex_string());
+											}
+										}
+									}
+
 									app_state.resource_packages.store(Some(resource_packages.into()));
 
-									if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-										let game_version = app_state
-											.game_installs
-											.iter()
-											.try_find(|x| anyhow::Ok(x.path == *path))?
-											.context("No such game install")?
-											.version;
+									app_state.resource_reverse_dependencies.store(Some(
+										reverse_dependencies
+											.into_iter()
+											.map(|(x, y)| (x, y.into_iter().collect()))
+											.collect::<HashMap<_, _>>()
+											.into()
+									));
 
+									finish_task(&app, task)?;
+
+									if let Some(hash_list) = app_state.hash_list.load().as_ref() {
 										app_state.intellisense.store(Some(
 											Intellisense {
 												cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
@@ -3004,6 +3012,640 @@ fn event(app: AppHandle, event: Event) {
 									}
 								}
 							}
+						},
+
+						EditorEvent::ResourceOverview(event) => match event {
+							ResourceOverviewEvent::Initialise { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(resource_reverse_dependencies) =
+										app_state.resource_reverse_dependencies.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let (chunk_patch, deps) = extract_latest_overview_info(resource_packages, hash)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::ResourceOverview(
+											ResourceOverviewRequest::Initialise {
+												id,
+												hash: hash.to_owned(),
+												chunk_patch,
+												path_or_hint: hash_list
+													.entries
+													.get(hash)
+													.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
+												dependencies: deps
+													.iter()
+													.map(|(hash, flag)| {
+														(
+															hash.to_owned(),
+															hash_list
+																.entries
+																.get(hash)
+																.map(|x| x.resource_type.to_owned())
+																.unwrap_or("".into()),
+															hash_list.entries.get(hash).and_then(|x| {
+																x.path.as_ref().or(x.hint.as_ref()).cloned()
+															}),
+															flag.to_owned()
+														)
+													})
+													.collect(),
+												reverse_dependencies: resource_reverse_dependencies
+													.get(hash)
+													.map(|hashes| {
+														hashes
+															.iter()
+															.map(|hash| {
+																(
+																	hash.to_owned(),
+																	hash_list
+																		.entries
+																		.get(hash)
+																		.expect("No entry in hash list for resource")
+																		.resource_type
+																		.to_owned(),
+																	hash_list.entries.get(hash).and_then(|x| {
+																		x.path.as_ref().or(x.hint.as_ref()).cloned()
+																	})
+																)
+															})
+															.collect()
+													})
+													.unwrap_or(vec![]),
+												data: match hash_list
+													.entries
+													.get(hash)
+													.expect("No entry in hash list for resource")
+													.resource_type
+													.as_ref()
+												{
+													"TEMP" => {
+														ensure_entity_in_cache(
+															resource_packages,
+															&app_state.cached_entities,
+															app_state
+																.game_installs
+																.iter()
+																.try_find(|x| anyhow::Ok(x.path == *install))?
+																.context("No such game install")?
+																.version,
+															hash_list,
+															hash
+														)?;
+
+														let entity = app_state.cached_entities.read();
+														let entity = entity.get(hash).unwrap();
+
+														ResourceOverviewData::Entity {
+															blueprint_hash: entity.blueprint_hash.to_owned(),
+															blueprint_path_or_hint: hash_list
+																.entries
+																.get(&entity.blueprint_hash)
+																.and_then(|x| {
+																	x.path.as_ref().or(x.hint.as_ref()).cloned()
+																})
+														}
+													}
+
+													_ => ResourceOverviewData::Generic
+												}
+											}
+										))
+									)?;
+								}
+							}
+
+							ResourceOverviewEvent::FollowDependency { id, new_hash } => {
+								let mut editor_state = app_state.editor_states.write().await;
+								let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref mut hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								*hash = new_hash;
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(resource_reverse_dependencies) =
+										app_state.resource_reverse_dependencies.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let (chunk_patch, deps) = extract_latest_overview_info(resource_packages, hash)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::ResourceOverview(
+											ResourceOverviewRequest::Initialise {
+												id,
+												hash: hash.to_owned(),
+												chunk_patch,
+												path_or_hint: hash_list
+													.entries
+													.get(hash)
+													.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
+												dependencies: deps
+													.iter()
+													.map(|(hash, flag)| {
+														(
+															hash.to_owned(),
+															hash_list
+																.entries
+																.get(hash)
+																.expect("No entry in hash list for resource")
+																.resource_type
+																.to_owned(),
+															hash_list.entries.get(hash).and_then(|x| {
+																x.path.as_ref().or(x.hint.as_ref()).cloned()
+															}),
+															flag.to_owned()
+														)
+													})
+													.collect(),
+												reverse_dependencies: resource_reverse_dependencies
+													.get(hash)
+													.map(|hashes| {
+														hashes
+															.iter()
+															.map(|hash| {
+																(
+																	hash.to_owned(),
+																	hash_list
+																		.entries
+																		.get(hash)
+																		.expect("No entry in hash list for resource")
+																		.resource_type
+																		.to_owned(),
+																	hash_list.entries.get(hash).and_then(|x| {
+																		x.path.as_ref().or(x.hint.as_ref()).cloned()
+																	})
+																)
+															})
+															.collect()
+													})
+													.unwrap_or(vec![]),
+												data: match hash_list
+													.entries
+													.get(hash)
+													.expect("No entry in hash list for resource")
+													.resource_type
+													.as_ref()
+												{
+													"TEMP" => {
+														ensure_entity_in_cache(
+															resource_packages,
+															&app_state.cached_entities,
+															app_state
+																.game_installs
+																.iter()
+																.try_find(|x| anyhow::Ok(x.path == *install))?
+																.context("No such game install")?
+																.version,
+															hash_list,
+															hash
+														)?;
+
+														let entity = app_state.cached_entities.read();
+														let entity = entity.get(hash).unwrap();
+
+														ResourceOverviewData::Entity {
+															blueprint_hash: entity.blueprint_hash.to_owned(),
+															blueprint_path_or_hint: hash_list
+																.entries
+																.get(&entity.blueprint_hash)
+																.and_then(|x| {
+																	x.path.as_ref().or(x.hint.as_ref()).cloned()
+																})
+														}
+													}
+
+													_ => ResourceOverviewData::Generic
+												}
+											}
+										))
+									)?;
+								}
+							}
+
+							ResourceOverviewEvent::OpenInEditor { id } => {
+								let hash = {
+									let editor_state = app_state.editor_states.read().await;
+									let editor_state = editor_state.get(&id).context("No such editor")?;
+									match editor_state.data {
+										EditorData::ResourceOverview { ref hash, .. } => hash,
+
+										_ => {
+											Err(anyhow!("Editor {} is not a resource overview", id))?;
+											panic!();
+										}
+									}
+									.to_owned()
+								};
+
+								// Only available for entities currently
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let task = start_task(&app, format!("Loading entity {}", hash))?;
+
+									let game_install_data = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| anyhow::Ok(x.path == *install))?
+										.context("No such game install")?;
+
+									ensure_entity_in_cache(
+										resource_packages,
+										&app_state.cached_entities,
+										game_install_data.version,
+										hash_list,
+										&hash
+									)?;
+
+									let entity = app_state.cached_entities.read().get(&hash).unwrap().to_owned();
+
+									let default_tab_name = format!(
+										"{} ({})",
+										entity
+											.entities
+											.get(&entity.root_entity)
+											.context("Root entity doesn't exist")?
+											.name,
+										hash
+									);
+
+									let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
+										if let Some(path) = entry.path.as_ref() {
+											path.replace("].pc_entitytype", "")
+												.replace("].pc_entitytemplate", "")
+												.split('/')
+												.last()
+												.map(|x| x.to_owned())
+												.unwrap_or(default_tab_name)
+										} else if let Some(hint) = entry.hint.as_ref() {
+											format!("{} ({})", hint, hash)
+										} else {
+											default_tab_name
+										}
+									} else {
+										default_tab_name
+									};
+
+									let id = Uuid::new_v4();
+
+									app_state.editor_states.write().await.insert(
+										id.to_owned(),
+										EditorState {
+											file: None,
+											data: EditorData::QNPatch {
+												base: Box::new(entity.to_owned()),
+												current: Box::new(entity),
+												settings: Default::default()
+											}
+										}
+									);
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::CreateTab {
+											id,
+											name: tab_name,
+											editor_type: EditorType::QNPatch
+										})
+									)?;
+
+									finish_task(&app, task)?;
+								}
+							}
+
+							ResourceOverviewEvent::ExtractAsFile { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let (metadata, data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+									let metadata_file = generate_rpkg_meta(&metadata)?;
+
+									let file_type = hash_list
+										.entries
+										.get(hash)
+										.expect("Can only open files from the hash list")
+										.resource_type
+										.to_owned();
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) = dialog
+										.add_filter(&format!("{} file", file_type), &[&file_type])
+										.save_file()
+										.await
+									{
+										fs::write(save_handle.path(), data)?;
+
+										fs::write(
+											save_handle.path().parent().unwrap().join(format!(
+												"{}.meta",
+												save_handle.path().file_name().unwrap().to_string_lossy()
+											)),
+											metadata_file
+										)?;
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractAsQN { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									ensure_entity_in_cache(
+										resource_packages,
+										&app_state.cached_entities,
+										app_state
+											.game_installs
+											.iter()
+											.try_find(|x| anyhow::Ok(x.path == *install))?
+											.context("No such game install")?
+											.version,
+										hash_list,
+										hash
+									)?;
+
+									let entity_json = {
+										let entity = app_state.cached_entities.read();
+										let entity = entity.get(hash).unwrap();
+										to_vec(entity)?
+									};
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract entity");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) = dialog
+										.add_filter("QuickEntity entity", &["entity.json"])
+										.save_file()
+										.await
+									{
+										fs::write(save_handle.path(), entity_json)?;
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractTEMPAsRT { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let (metadata, data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+									let metadata_file = generate_rpkg_meta(&metadata)?;
+
+									let data = match app_state
+										.game_installs
+										.iter()
+										.try_find(|x| anyhow::Ok(x.path == *install))?
+										.context("No such game install")?
+										.version
+									{
+										GameVersion::H1 => to_vec(
+											&h2016_convert_binary_to_factory(&data)
+												.context("Couldn't convert binary data to ResourceLib factory")?
+										)?,
+
+										GameVersion::H2 => to_vec(
+											&h2_convert_binary_to_factory(&data)
+												.context("Couldn't convert binary data to ResourceLib factory")?
+										)?,
+
+										GameVersion::H3 => to_vec(
+											&h3_convert_binary_to_factory(&data)
+												.context("Couldn't convert binary data to ResourceLib factory")?
+										)?
+									};
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) =
+										dialog.add_filter("TEMP.json file", &["TEMP.json"]).save_file().await
+									{
+										fs::write(save_handle.path(), data)?;
+
+										fs::write(
+											save_handle.path().parent().unwrap().join(format!(
+												"{}.meta",
+												save_handle.path().file_name().unwrap().to_string_lossy()
+											)),
+											metadata_file
+										)?;
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractTBLUAsFile { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let game_version = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| anyhow::Ok(x.path == *install))?
+										.context("No such game install")?
+										.version;
+
+									ensure_entity_in_cache(
+										resource_packages,
+										&app_state.cached_entities,
+										game_version,
+										hash_list,
+										hash
+									)?;
+
+									let (metadata, data) = extract_latest_resource(resource_packages, hash_list, &{
+										let entity = app_state.cached_entities.read();
+										let entity = entity.get(hash).unwrap();
+										entity.blueprint_hash.to_owned()
+									})?;
+
+									let metadata_file = generate_rpkg_meta(&metadata)?;
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) =
+										dialog.add_filter("TBLU file", &["TBLU"]).save_file().await
+									{
+										fs::write(save_handle.path(), data)?;
+
+										fs::write(
+											save_handle.path().parent().unwrap().join(format!(
+												"{}.meta",
+												save_handle.path().file_name().unwrap().to_string_lossy()
+											)),
+											metadata_file
+										)?;
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractTBLUAsRT { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let game_version = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| anyhow::Ok(x.path == *install))?
+										.context("No such game install")?
+										.version;
+
+									ensure_entity_in_cache(
+										resource_packages,
+										&app_state.cached_entities,
+										game_version,
+										hash_list,
+										hash
+									)?;
+
+									let (metadata, data) = extract_latest_resource(resource_packages, hash_list, &{
+										let entity = app_state.cached_entities.read();
+										let entity = entity.get(hash).unwrap();
+										entity.blueprint_hash.to_owned()
+									})?;
+
+									let metadata_file = generate_rpkg_meta(&metadata)?;
+
+									let data = match game_version {
+										GameVersion::H1 => to_vec(
+											&h2016_convert_binary_to_blueprint(&data)
+												.context("Couldn't convert binary data to ResourceLib blueprint")?
+										)?,
+
+										GameVersion::H2 => to_vec(
+											&h2_convert_binary_to_blueprint(&data)
+												.context("Couldn't convert binary data to ResourceLib blueprint")?
+										)?,
+
+										GameVersion::H3 => to_vec(
+											&h3_convert_binary_to_blueprint(&data)
+												.context("Couldn't convert binary data to ResourceLib blueprint")?
+										)?
+									};
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) =
+										dialog.add_filter("TBLU.json file", &["TBLU.json"]).save_file().await
+									{
+										fs::write(save_handle.path(), data)?;
+
+										fs::write(
+											save_handle.path().parent().unwrap().join(format!(
+												"{}.meta",
+												save_handle.path().file_name().unwrap().to_string_lossy()
+											)),
+											metadata_file
+										)?;
+									}
+								}
+							}
 						}
 					},
 
@@ -3331,6 +3973,11 @@ fn event(app: AppHandle, event: Event) {
 									panic!();
 								}
 
+								EditorData::ResourceOverview { .. } => {
+									Err(anyhow!("Editor is a resource overview"))?;
+									panic!();
+								}
+
 								EditorData::Text { content, .. } => content.as_bytes().to_owned(),
 
 								EditorData::QNEntity { entity, .. } => {
@@ -3370,6 +4017,11 @@ fn event(app: AppHandle, event: Event) {
 												panic!();
 											}
 
+											EditorData::ResourceOverview { .. } => {
+												Err(anyhow!("Editor is a resource overview"))?;
+												panic!();
+											}
+
 											EditorData::Text {
 												file_type: TextFileType::PlainText,
 												..
@@ -3392,6 +4044,11 @@ fn event(app: AppHandle, event: Event) {
 										&[match &editor.data {
 											EditorData::Nil => {
 												Err(anyhow!("Editor is a nil editor"))?;
+												panic!();
+											}
+
+											EditorData::ResourceOverview { .. } => {
+												Err(anyhow!("Editor is a resource overview"))?;
 												panic!();
 											}
 

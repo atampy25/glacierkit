@@ -42,6 +42,10 @@ pub struct AppState {
 	pub fs_watcher: ArcSwapOption<RecommendedWatcher>,
 	pub editor_states: Arc<RwLock<HashMap<Uuid, EditorState>>>,
 	pub resource_packages: ArcSwapOption<IndexMap<PathBuf, ResourcePackage>>,
+
+	/// Resource -> Resources which depend on it
+	pub resource_reverse_dependencies: ArcSwapOption<HashMap<String, Vec<String>>>,
+
 	pub cached_entities: Arc<parking_lot::RwLock<HashMap<String, Entity>>>,
 	pub intellisense: ArcSwapOption<Intellisense>
 }
@@ -55,6 +59,9 @@ pub struct EditorState {
 #[derive(Debug, Clone)]
 pub enum EditorData {
 	Nil,
+	ResourceOverview {
+		hash: String
+	},
 	Text {
 		content: String,
 		file_type: TextFileType
@@ -122,6 +129,7 @@ pub enum TextFileType {
 #[serde(tag = "type", content = "data")]
 pub enum EditorType {
 	Nil,
+	ResourceOverview,
 	Text { file_type: TextFileType },
 	QNEntity,
 	QNPatch
@@ -148,6 +156,16 @@ pub struct PastableTemplateCategory {
 	pub name: String,
 	pub icon: String,
 	pub templates: Vec<PastableTemplate>
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "data")]
+pub enum ResourceOverviewData {
+	Generic,
+	Entity {
+		blueprint_hash: String,
+		blueprint_path_or_hint: Option<String>
+	}
 }
 
 strike! {
@@ -368,6 +386,41 @@ strike! {
 						content: String
 					}
 				})
+			}),
+
+			ResourceOverview(pub enum ResourceOverviewEvent {
+				Initialise {
+					id: Uuid
+				},
+
+				FollowDependency {
+					id: Uuid,
+					new_hash: String
+				},
+
+				OpenInEditor {
+					id: Uuid
+				},
+
+				ExtractAsQN {
+					id: Uuid
+				},
+
+				ExtractAsFile {
+					id: Uuid
+				},
+
+				ExtractTEMPAsRT {
+					id: Uuid
+				},
+
+				ExtractTBLUAsFile {
+					id: Uuid
+				},
+
+				ExtractTBLUAsRT {
+					id: Uuid
+				}
 			})
 		}),
 
@@ -550,6 +603,23 @@ strike! {
 						decorations: Vec<(String, String)>,
 					}
 				})
+			}),
+
+			ResourceOverview(pub enum ResourceOverviewRequest {
+				Initialise {
+					id: Uuid,
+					hash: String,
+					chunk_patch: String,
+					path_or_hint: Option<String>,
+
+					/// Hash, type, path/hint, flag
+					dependencies: Vec<(String, String, Option<String>, String)>,
+
+					/// Hash, type, path/hint
+					reverse_dependencies: Vec<(String, String, Option<String>)>,
+
+					data: ResourceOverviewData
+				}
 			})
 		}),
 

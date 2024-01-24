@@ -22,6 +22,7 @@
 	import { shortcut } from "$lib/shortcut"
 	import { SortableList } from "@jhubbardsf/svelte-sortablejs"
 	import Idea from "carbon-icons-svelte/lib/Idea.svelte"
+	import ResourceOverviewEditor from "$lib/editors/resourceoverview/ResourceOverviewEditor.svelte"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -83,6 +84,9 @@
 			case "QNEntity":
 			case "QNPatch":
 				return EntityEditor
+
+			case "ResourceOverview":
+				return ResourceOverviewEditor
 
 			default:
 				editorType satisfies never
@@ -199,6 +203,10 @@
 
 							case "entity":
 								void tabComponents[request.data.data.data.data.editor_id].handleRequest?.(request.data.data)
+								break
+
+							case "resourceOverview":
+								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
 								break
 
 							default:

@@ -43,11 +43,11 @@ string
  */
 export type DependencyWithFlag = { resource: string; flag: string }
 
-export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent }
+export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent }
 
-export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest }
+export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest }
 
-export type EditorType = { type: "Nil" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" }
+export type EditorType = { type: "Nil" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" }
 
 export type EditorValidity = { type: "Valid" } | { type: "Invalid"; data: string }
 
@@ -405,6 +405,20 @@ ref: Ref;
 value: SimpleProperty }
 
 export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; data: EditorRequest } | { type: "global"; data: GlobalRequest }
+
+export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } }
+
+export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } }
+
+export type ResourceOverviewRequest = { type: "initialise"; data: { id: string; hash: string; chunk_patch: string; path_or_hint: string | null; 
+/**
+ * Hash, type, path/hint, flag
+ */
+dependencies: ([string, string, string | null, string])[]; 
+/**
+ * Hash, type, path/hint
+ */
+reverse_dependencies: ([string, string, string | null])[]; data: ResourceOverviewData } }
 
 export type ReverseReference = { from: string; data: ReverseReferenceData }
 

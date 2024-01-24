@@ -193,6 +193,52 @@ pub fn extract_latest_metadata(
 	bail!("Couldn't find the resource in any RPKG");
 }
 
+/// Get miscellaneous information for the latest copy of a resource by its hash.
+#[context("Couldn't extract overview info for resource {}", resource)]
+pub fn extract_latest_overview_info(
+	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	resource: &str
+) -> Result<(String, Vec<(String, String)>)> {
+	let resource_id = RuntimeResourceID {
+		id: u64::from_str_radix(resource, 16)?
+	};
+
+	for (path, rpkg) in resource_packages.iter() {
+		if let Some(resource_header) = rpkg
+			.resource_entries
+			.iter()
+			.enumerate()
+			.find(|(_, entry)| entry.runtime_resource_id == resource_id)
+			.map(|(index, _)| rpkg.resource_metadata.get(index).unwrap())
+		{
+			return Ok((
+				path.file_name()
+					.unwrap()
+					.to_string_lossy()
+					.split('.')
+					.next()
+					.unwrap()
+					.into(),
+				resource_header
+					.m_references
+					.as_ref()
+					.map(|refs| {
+						refs.reference_flags
+							.iter()
+							.zip(refs.reference_hash.iter())
+							.map(|(flag, hash)| {
+								(hash.to_hex_string(), format!("{:02X}", flag.to_owned().into_bytes()[0]))
+							})
+							.collect()
+					})
+					.unwrap_or(vec![])
+			));
+		}
+	}
+
+	bail!("Couldn't find the resource in any RPKG");
+}
+
 /// Extract an entity by its factory's hash (you must normalise paths yourself) and put it in the cache. Returns early if the entity is already cached.
 #[try_fn]
 #[context("Couldn't ensure caching of entity {}", factory_hash)]
