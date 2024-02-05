@@ -207,7 +207,7 @@
 								tree.is_selected(selected_node) ? tree.delete_node(tree.get_selected()) : tree.delete_node(selected_node)
 
 								if (selected_node.parent !== "#") {
-									tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some((a: any) => a.parent == selected_node.id)
+									tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some((a: any) => a.parent == tree.get_node(selected_node.parent).id)
 									tree.get_node(selected_node.parent).original.folder =
 										tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
 										tree.get_node(selected_node.parent).original.hasReverseParentRefs
