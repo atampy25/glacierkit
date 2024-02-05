@@ -1142,7 +1142,7 @@ fn event(app: AppHandle, event: Event) {
 
 									finish_task(&app, task)?;
 
-									let task = start_task(&app, "Gathering reverse references")?;
+									let task = start_task(&app, "Caching reverse references")?;
 
 									let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -1402,7 +1402,7 @@ fn event(app: AppHandle, event: Event) {
 
 									finish_task(&app, task)?;
 
-									let task = start_task(&app, "Gathering reverse references")?;
+									let task = start_task(&app, "Caching reverse references")?;
 
 									let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -3171,9 +3171,8 @@ fn event(app: AppHandle, event: Event) {
 															hash_list
 																.entries
 																.get(hash)
-																.expect("No entry in hash list for resource")
-																.resource_type
-																.to_owned(),
+																.map(|x| x.resource_type.to_owned())
+																.unwrap_or("".into()),
 															hash_list.entries.get(hash).and_then(|x| {
 																x.path.as_ref().or(x.hint.as_ref()).cloned()
 															}),
