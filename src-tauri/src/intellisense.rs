@@ -1361,10 +1361,12 @@ impl Intellisense {
 					)?
 					.m_aPins
 					{
-						// Pin
 						if entry.m_nUnk00 == 1 {
-							// All UICB pins are inputs, it seems
+							// Input pin
 							input.push(entry.m_sName);
+						} else if entry.m_nUnk00 == 2 {
+							// Output pin
+							output.push(entry.m_sName);
 						}
 					}
 				} else if self.all_matts.contains(&factory) {
