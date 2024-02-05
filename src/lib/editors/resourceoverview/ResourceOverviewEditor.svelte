@@ -180,32 +180,40 @@
 					<h4 class="mb-1">Dependencies</h4>
 					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
 						{#each dependencies as [hash, type, path, flag]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
+							{#if type}
+								<div
+									class="bg-[#303030] p-3 cursor-pointer"
+									on:click={async () => {
+										await event({
+											type: "editor",
 											data: {
-												type: "followDependency",
+												type: "resourceOverview",
 												data: {
-													id,
-													new_hash: hash
+													type: "followDependency",
+													data: {
+														id,
+														new_hash: hash
+													}
 												}
 											}
-										}
-									})
-								}}
-							>
-								<div class="text-base -mt-1"
-									><span class="font-bold"
-										>{hash}{#if type}.{type}{/if}</span
-									>
-									{flag}</div
+										})
+									}}
 								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
+									<div class="text-base -mt-1"
+										><span class="font-bold">{hash}.{type}</span>
+										{flag}</div
+									>
+									<div class="break-all">{path || "No path"}</div>
+								</div>
+							{:else}
+								<div class="bg-[#303030] p-3">
+									<div class="text-base -mt-1"
+										><span class="font-bold">{hash}</span>
+										{flag}</div
+									>
+									<div class="break-all">Unknown resource</div>
+								</div>
+							{/if}
 						{/each}
 					</div>
 				</div>
@@ -213,29 +221,36 @@
 					<h4 class="mb-1">Reverse dependencies</h4>
 					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
 						{#each reverseDependencies as [hash, type, path]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
+							{#if type}
+								<div
+									class="bg-[#303030] p-3 cursor-pointer"
+									on:click={async () => {
+										await event({
+											type: "editor",
 											data: {
-												type: "followDependency",
+												type: "resourceOverview",
 												data: {
-													id,
-													new_hash: hash
+													type: "followDependency",
+													data: {
+														id,
+														new_hash: hash
+													}
 												}
 											}
-										}
-									})
-								}}
-							>
-								<div class="font-bold text-base -mt-1"
-									>{hash}{#if type}.{type}{/if}</div
+										})
+									}}
 								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
+									<div class="font-bold text-base -mt-1"
+										>{hash}{#if type}.{type}{/if}</div
+									>
+									<div class="break-all">{path || "No path"}</div>
+								</div>
+							{:else}
+								<div class="bg-[#303030] p-3">
+									<div class="font-bold text-base -mt-1">{hash}</div>
+									<div class="break-all">Unknown resource</div>
+								</div>
+							{/if}
 						{/each}
 					</div>
 				</div>
