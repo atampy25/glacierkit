@@ -2938,7 +2938,15 @@ fn event(app: AppHandle, event: Event) {
 										if entity.property_overrides != deserialised {
 											entity.property_overrides = deserialised;
 
-											send_overrides_decorations(&app, editor_id, entity)?;
+											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::SetTabUnsaved {
+													id: editor_id,
+													unsaved: true
+												})
+											)?;
 										}
 									}
 								}
@@ -2961,7 +2969,15 @@ fn event(app: AppHandle, event: Event) {
 										if entity.override_deletes != deserialised {
 											entity.override_deletes = deserialised;
 
-											send_overrides_decorations(&app, editor_id, entity)?;
+											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::SetTabUnsaved {
+													id: editor_id,
+													unsaved: true
+												})
+											)?;
 										}
 									}
 								}
@@ -2984,7 +3000,15 @@ fn event(app: AppHandle, event: Event) {
 										if entity.pin_connection_overrides != deserialised {
 											entity.pin_connection_overrides = deserialised;
 
-											send_overrides_decorations(&app, editor_id, entity)?;
+											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::SetTabUnsaved {
+													id: editor_id,
+													unsaved: true
+												})
+											)?;
 										}
 									}
 								}
@@ -3007,7 +3031,15 @@ fn event(app: AppHandle, event: Event) {
 										if entity.pin_connection_override_deletes != deserialised {
 											entity.pin_connection_override_deletes = deserialised;
 
-											send_overrides_decorations(&app, editor_id, entity)?;
+											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::SetTabUnsaved {
+													id: editor_id,
+													unsaved: true
+												})
+											)?;
 										}
 									}
 								}
