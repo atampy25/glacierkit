@@ -45,39 +45,63 @@
 			},
 			contextmenu: {
 				select_node: false,
-				items: (rightClickedNode: { original: { path: string | null } }, c: any) => {
-					return {
-						copyHash: {
-							separator_before: false,
-							separator_after: false,
-							_disabled: false,
-							label: "Copy Hash",
-							icon: "far fa-copy",
-							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
+				items: (rightClickedNode: { original: { folder: boolean; path: string | null } }, c: any) => {
+					return rightClickedNode.original.folder
+						? {}
+						: {
+								openInEditor: {
+									separator_before: false,
+									separator_after: false,
+									_disabled: false,
+									label: "Open in Editor",
+									icon: "fa-regular fa-pen-to-square",
+									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
 
-								await clipboard.writeText(selected_node.id)
-							}
-						},
-						...(rightClickedNode.original.path
-							? {
-									copyPath: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Copy Path",
-										icon: "far fa-copy",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											await clipboard.writeText(selected_node.original.path)
-										}
+										await event({
+											type: "tool",
+											data: {
+												type: "gameBrowser",
+												data: {
+													type: "openInEditor",
+													data: selected_node.id
+												}
+											}
+										})
 									}
-								}
-							: {})
-					}
+								},
+								copyHash: {
+									separator_before: false,
+									separator_after: false,
+									_disabled: false,
+									label: "Copy Hash",
+									icon: "far fa-copy",
+									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
+
+										await clipboard.writeText(selected_node.id)
+									}
+								},
+								...(rightClickedNode.original.path
+									? {
+											copyPath: {
+												separator_before: false,
+												separator_after: false,
+												_disabled: false,
+												label: "Copy Path",
+												icon: "far fa-copy",
+												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+													const tree = jQuery.jstree!.reference(b.reference)
+													const selected_node = tree.get_node(b.reference)
+
+													await clipboard.writeText(selected_node.original.path)
+												}
+											}
+										}
+									: {})
+							}
 				}
 			},
 			plugins: ["contextmenu", "sort", "dnd"]

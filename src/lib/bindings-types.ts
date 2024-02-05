@@ -211,7 +211,7 @@ exposedEntity?: string | null }
 
 export type GameBrowserEntry = { hash: string; path: string | null; hint: string | null }
 
-export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: string }
+export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: string } | { type: "openInEditor"; data: string }
 
 export type GameBrowserRequest = { type: "setEnabled"; data: boolean } | { type: "newTree"; data: { game_description: string; entries: GameBrowserEntry[] } }
 

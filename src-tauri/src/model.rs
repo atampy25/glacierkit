@@ -203,7 +203,8 @@ strike! {
 
 			GameBrowser(pub enum GameBrowserEvent {
 				Select(String),
-				Search(String)
+				Search(String),
+				OpenInEditor(String)
 			}),
 
 			Settings(pub enum SettingsEvent {

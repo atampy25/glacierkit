@@ -51,292 +51,296 @@
 </script>
 
 <div class="w-full h-full flex flex-col p-4">
-	{#if data?.type === "Entity"}
-		<div class="text-2xl mb-2 font-bold">
-			{pathOrHint || "No path"}
-		</div>
-		<div class="flex flex-wrap gap-8 items-center mb-4">
-			<div>
-				<div>Factory</div>
-				<div class="text-xl">{hash}</div>
+	{#if data}
+		{#if data.type === "Entity"}
+			<div class="text-2xl mb-2 font-bold">
+				{pathOrHint || "No path"}
 			</div>
-			<div>
-				<div>Blueprint</div>
-				<div class="text-xl">{data.data.blueprint_hash}</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Factory</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Blueprint</div>
+					<div class="text-xl">{data.data.blueprint_hash}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
 			</div>
-			<div>
-				<div>Chunk</div>
-				<div class="text-xl">{chunk}</div>
-			</div>
-		</div>
-		<h4 class="mb-1">Actions</h4>
-		<div class="flex flex-wrap gap-2 mb-4">
-			<Button
-				icon={Edit}
-				on:click={async () => {
-					await event({
-						type: "editor",
-						data: {
-							type: "resourceOverview",
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={Edit}
+					on:click={async () => {
+						await event({
+							type: "editor",
 							data: {
-								type: "openInEditor",
+								type: "resourceOverview",
 								data: {
-									id
-								}
-							}
-						}
-					})
-				}}>Open in editor</Button
-			>
-			<Button
-				icon={Export}
-				on:click={async () => {
-					await event({
-						type: "editor",
-						data: {
-							type: "resourceOverview",
-							data: {
-								type: "extractAsQN",
-								data: {
-									id
-								}
-							}
-						}
-					})
-				}}>Extract as QuickEntity JSON</Button
-			>
-			<Button
-				icon={Export}
-				on:click={async () => {
-					await event({
-						type: "editor",
-						data: {
-							type: "resourceOverview",
-							data: {
-								type: "extractAsFile",
-								data: {
-									id
-								}
-							}
-						}
-					})
-				}}>Extract TEMP as binary file</Button
-			>
-			<Button
-				icon={Export}
-				on:click={async () => {
-					await event({
-						type: "editor",
-						data: {
-							type: "resourceOverview",
-							data: {
-								type: "extractTEMPAsRT",
-								data: {
-									id
-								}
-							}
-						}
-					})
-				}}>Extract TEMP as ResourceLib JSON</Button
-			>
-			<Button
-				icon={Export}
-				on:click={async () => {
-					await event({
-						type: "editor",
-						data: {
-							type: "resourceOverview",
-							data: {
-								type: "extractTBLUAsFile",
-								data: {
-									id
-								}
-							}
-						}
-					})
-				}}>Extract TBLU as binary file</Button
-			>
-			<Button
-				icon={Export}
-				on:click={async () => {
-					await event({
-						type: "editor",
-						data: {
-							type: "resourceOverview",
-							data: {
-								type: "extractTBLUAsRT",
-								data: {
-									id
-								}
-							}
-						}
-					})
-				}}>Extract TBLU as ResourceLib JSON</Button
-			>
-		</div>
-		<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-			<div class="flex flex-col">
-				<h4 class="mb-1">Dependencies</h4>
-				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-					{#each dependencies as [hash, type, path, flag]}
-						<div
-							class="bg-[#303030] p-3 cursor-pointer"
-							on:click={async () => {
-								await event({
-									type: "editor",
+									type: "openInEditor",
 									data: {
-										type: "resourceOverview",
+										id
+									}
+								}
+							}
+						})
+					}}>Open in editor</Button
+				>
+				<Button
+					icon={Export}
+					on:click={async () => {
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsQN",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract as QuickEntity JSON</Button
+				>
+				<Button
+					icon={Export}
+					on:click={async () => {
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract TEMP as binary file</Button
+				>
+				<Button
+					icon={Export}
+					on:click={async () => {
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractTEMPAsRT",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract TEMP as ResourceLib JSON</Button
+				>
+				<Button
+					icon={Export}
+					on:click={async () => {
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractTBLUAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract TBLU as binary file</Button
+				>
+				<Button
+					icon={Export}
+					on:click={async () => {
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractTBLUAsRT",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract TBLU as ResourceLib JSON</Button
+				>
+			</div>
+			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+				<div class="flex flex-col">
+					<h4 class="mb-1">Dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each dependencies as [hash, type, path, flag]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									await event({
+										type: "editor",
 										data: {
-											type: "followDependency",
+											type: "resourceOverview",
 											data: {
-												id,
-												new_hash: hash
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
 											}
 										}
-									}
-								})
-							}}
-						>
-							<div class="text-base -mt-1"
-								><span class="font-bold"
-									>{hash}{#if type}.{type}{/if}</span
+									})
+								}}
+							>
+								<div class="text-base -mt-1"
+									><span class="font-bold"
+										>{hash}{#if type}.{type}{/if}</span
+									>
+									{flag}</div
 								>
-								{flag}</div
-							>
-							<div class="break-all">{path || "No path"}</div>
-						</div>
-					{/each}
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
 				</div>
-			</div>
-			<div class="flex flex-col">
-				<h4 class="mb-1">Reverse dependencies</h4>
-				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-					{#each reverseDependencies as [hash, type, path]}
-						<div
-							class="bg-[#303030] p-3 cursor-pointer"
-							on:click={async () => {
-								await event({
-									type: "editor",
-									data: {
-										type: "resourceOverview",
+				<div class="flex flex-col">
+					<h4 class="mb-1">Reverse dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each reverseDependencies as [hash, type, path]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									await event({
+										type: "editor",
 										data: {
-											type: "followDependency",
+											type: "resourceOverview",
 											data: {
-												id,
-												new_hash: hash
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
 											}
 										}
-									}
-								})
-							}}
-						>
-							<div class="font-bold text-base -mt-1"
-								>{hash}{#if type}.{type}{/if}</div
+									})
+								}}
 							>
-							<div class="break-all">{path || "No path"}</div>
-						</div>
-					{/each}
+								<div class="font-bold text-base -mt-1"
+									>{hash}{#if type}.{type}{/if}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			</div>
-		</div>
-	{:else if data?.type === "Generic"}
-		<div class="text-2xl mb-2 font-bold">
-			{pathOrHint || "No path"}
-		</div>
-		<div class="flex flex-wrap gap-8 items-center mb-4">
-			<div>
-				<div>Hash</div>
-				<div class="text-xl">{hash}</div>
+		{:else if data.type === "Generic"}
+			<div class="text-2xl mb-2 font-bold">
+				{pathOrHint || "No path"}
 			</div>
-			<div>
-				<div>Chunk</div>
-				<div class="text-xl">{chunk}</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
 			</div>
-		</div>
-		<h4 class="mb-1">Actions</h4>
-		<div class="flex flex-wrap gap-2 mb-4">
-			<Button
-				icon={Export}
-				on:click={async () => {
-					await event({
-						type: "editor",
-						data: {
-							type: "resourceOverview",
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={Export}
+					on:click={async () => {
+						await event({
+							type: "editor",
 							data: {
-								type: "extractAsFile",
+								type: "resourceOverview",
 								data: {
-									id
+									type: "extractAsFile",
+									data: {
+										id
+									}
 								}
 							}
-						}
-					})
-				}}>Extract file</Button
-			>
-		</div>
-		<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-			<div class="flex flex-col">
-				<h4 class="mb-1">Dependencies</h4>
-				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-					{#each dependencies as [hash, type, path, flag]}
-						<div
-							class="bg-[#303030] p-3 cursor-pointer"
-							on:click={async () => {
-								await event({
-									type: "editor",
-									data: {
-										type: "resourceOverview",
+						})
+					}}>Extract file</Button
+				>
+			</div>
+			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+				<div class="flex flex-col">
+					<h4 class="mb-1">Dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each dependencies as [hash, type, path, flag]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									await event({
+										type: "editor",
 										data: {
-											type: "followDependency",
+											type: "resourceOverview",
 											data: {
-												id,
-												new_hash: hash
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
 											}
 										}
-									}
-								})
-							}}
-						>
-							<div class="text-base -mt-1"
-								><span class="font-bold"
-									>{hash}{#if type}.{type}{/if}</span
+									})
+								}}
+							>
+								<div class="text-base -mt-1"
+									><span class="font-bold"
+										>{hash}{#if type}.{type}{/if}</span
+									>
+									{flag}</div
 								>
-								{flag}</div
-							>
-							<div class="break-all">{path || "No path"}</div>
-						</div>
-					{/each}
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
 				</div>
-			</div>
-			<div class="flex flex-col">
-				<h4 class="mb-1">Reverse dependencies</h4>
-				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-					{#each reverseDependencies as [hash, type, path]}
-						<div
-							class="bg-[#303030] p-3 cursor-pointer"
-							on:click={async () => {
-								await event({
-									type: "editor",
-									data: {
-										type: "resourceOverview",
+				<div class="flex flex-col">
+					<h4 class="mb-1">Reverse dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each reverseDependencies as [hash, type, path]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									await event({
+										type: "editor",
 										data: {
-											type: "followDependency",
+											type: "resourceOverview",
 											data: {
-												id,
-												new_hash: hash
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
 											}
 										}
-									}
-								})
-							}}
-						>
-							<div class="font-bold text-base -mt-1"
-								>{hash}{#if type}.{type}{/if}</div
+									})
+								}}
 							>
-							<div class="break-all">{path || "No path"}</div>
-						</div>
-					{/each}
+								<div class="font-bold text-base -mt-1"
+									>{hash}{#if type}.{type}{/if}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			</div>
-		</div>
+		{/if}
+	{:else}
+		Loading...
 	{/if}
 </div>
