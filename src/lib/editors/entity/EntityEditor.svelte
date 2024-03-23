@@ -115,7 +115,7 @@
 					</Splitpanes>
 				</div>
 			</Pane>
-			<Pane>
+			<Pane class="overflow-visible">
 				<div class="h-full w-full flex flex-col gap-1">
 					<h3>Editor</h3>
 					<Monaco editorID={id} bind:this={monaco} />
@@ -124,3 +124,9 @@
 		</Splitpanes>
 	</div>
 </div>
+
+<style>
+	:global(.splitpanes__pane.overflow-visible) {
+		overflow: visible;
+	}
+</style>
