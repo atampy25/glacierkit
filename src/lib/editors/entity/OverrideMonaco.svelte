@@ -131,28 +131,28 @@
 				...monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas!.filter((a) => !a.uri.startsWith("monaco-schema://qn-override-")),
 				{
 					uri: "monaco-schema://qn-override-propertyOverrides",
-					fileMatch: ["*propertyoverrides*"],
+					fileMatch: ["*-propertyoverrides*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
 						$ref: "#/definitions/Entity/properties/propertyOverrides"
 					})
 				},
 				{
 					uri: "monaco-schema://qn-override-overrideDeletes",
-					fileMatch: ["*overridedeletes*"],
+					fileMatch: ["*-overridedeletes*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
 						$ref: "#/definitions/Entity/properties/overrideDeletes"
 					})
 				},
 				{
 					uri: "monaco-schema://qn-override-pinConnectionOverrides",
-					fileMatch: ["*pinconnectionoverrides*"],
+					fileMatch: ["*-pinconnectionoverrides*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
 						$ref: "#/definitions/Entity/properties/pinConnectionOverrides"
 					})
 				},
 				{
 					uri: "monaco-schema://qn-override-pinConnectionOverrideDeletes",
-					fileMatch: ["*pinconnectionoverridedeletes*"],
+					fileMatch: ["*-pinconnectionoverridedeletes*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
 						$ref: "#/definitions/Entity/properties/pinConnectionOverrideDeletes"
 					})
