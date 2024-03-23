@@ -12,6 +12,7 @@
 	let rootEntity = ""
 	let subType: SubType = "scene"
 	let externalScenes: string[] = []
+	let hashModificationAllowed = true
 
 	export async function handleRequest(request: EntityMetadataRequest) {
 		console.log(`Metadata editor for editor ${editorID} handling request`, request)
@@ -25,10 +26,13 @@
 				externalScenes = request.data.external_scenes
 				break
 
-			// Exhaustiveness check not necessary as there's only one request type
-			// default:
-			// 	request satisfies never
-			// 	break
+			case "setHashModificationAllowed":
+				hashModificationAllowed = request.data.hash_modification_allowed
+				break
+
+			default:
+				request satisfies never
+				break
 		}
 	}
 
@@ -116,9 +120,23 @@
 
 <div class="h-full w-full overflow-y-auto">
 	<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-		<TextInput value={factoryHash} placeholder="You can use the Text Tools panel to generate this" labelText="Factory hash" on:change={factoryHashInput} class="code-font" />
+		<TextInput
+			value={factoryHash}
+			placeholder="You can use the Text Tools panel to generate this"
+			labelText="Factory hash"
+			on:change={factoryHashInput}
+			disabled={!hashModificationAllowed}
+			class="code-font"
+		/>
 
-		<TextInput value={blueprintHash} placeholder="You can use the Text Tools panel to generate this" labelText="Blueprint hash" on:change={blueprintHashInput} class="code-font" />
+		<TextInput
+			value={blueprintHash}
+			placeholder="You can use the Text Tools panel to generate this"
+			labelText="Blueprint hash"
+			on:change={blueprintHashInput}
+			disabled={!hashModificationAllowed}
+			class="code-font"
+		/>
 
 		<TextInput value={rootEntity} placeholder="The root sub-entity of this entity" labelText="Root entity" on:change={rootEntityInput} class="code-font" />
 

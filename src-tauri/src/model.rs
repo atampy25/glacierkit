@@ -595,6 +595,11 @@ strike! {
 						root_entity: String,
 						sub_type: SubType,
 						external_scenes: Vec<String>
+					},
+
+					SetHashModificationAllowed {
+						editor_id: Uuid,
+						hash_modification_allowed: bool
 					}
 				}),
 

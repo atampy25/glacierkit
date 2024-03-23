@@ -2782,12 +2782,27 @@ fn event(app: AppHandle, event: Event) {
 										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
 											EntityMetadataRequest::Initialise {
-												editor_id,
+												editor_id: editor_id.to_owned(),
 												factory_hash: entity.factory_hash.to_owned(),
 												blueprint_hash: entity.blueprint_hash.to_owned(),
 												root_entity: entity.root_entity.to_owned(),
 												sub_type: entity.sub_type.to_owned(),
 												external_scenes: entity.external_scenes.to_owned()
+											}
+										)))
+									)?;
+
+									// allow user to modify hash if there is no defined file we're writing to; will automatically convert editor state into entity editor rather than patch editor
+									// also allow user to modify hash if it's already an entity
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+											EntityMetadataRequest::SetHashModificationAllowed {
+												editor_id,
+												hash_modification_allowed: matches!(
+													editor_state.data,
+													EditorData::QNEntity { .. }
+												) || editor_state.file.is_none()
 											}
 										)))
 									)?;
@@ -2798,19 +2813,46 @@ fn event(app: AppHandle, event: Event) {
 									factory_hash
 								} => {
 									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
+									let mut is_patch_editor = false;
 
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
+									{
+										let editor_state =
+											editor_state.get_mut(&editor_id).context("No such editor")?;
 
-									entity.factory_hash = factory_hash;
+										let entity = match editor_state.data {
+											EditorData::QNEntity { ref mut entity, .. } => entity,
+
+											EditorData::QNPatch { ref mut current, .. } => {
+												is_patch_editor = true;
+												current
+											}
+
+											_ => {
+												Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+												panic!();
+											}
+										};
+
+										entity.factory_hash = factory_hash;
+									}
+
+									// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity
+									if is_patch_editor {
+										let state = editor_state.remove(&editor_id).context("No such editor")?;
+
+										let EditorState{data:EditorData::QNPatch { settings, current, .. },file:None} = state else {
+											unreachable!();
+										};
+
+										editor_state.insert(
+											editor_id.to_owned(),
+											EditorState {data:EditorData::QNEntity {
+												settings,
+												entity: current
+											},file:None}
+										);
+									}
 
 									send_request(
 										&app,
@@ -2826,19 +2868,46 @@ fn event(app: AppHandle, event: Event) {
 									blueprint_hash
 								} => {
 									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
 
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
+									let mut is_patch_editor = false;
 
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
+									{
+										let editor_state =
+											editor_state.get_mut(&editor_id).context("No such editor")?;
 
-									entity.blueprint_hash = blueprint_hash;
+										let entity = match editor_state.data {
+											EditorData::QNEntity { ref mut entity, .. } => entity,
+
+											EditorData::QNPatch { ref mut current, .. } => {
+												is_patch_editor = true;
+												current
+											}
+
+											_ => {
+												Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+												panic!();
+											}
+										};
+
+										entity.blueprint_hash = blueprint_hash;
+									}
+
+									// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity
+									if is_patch_editor {
+										let state = editor_state.remove(&editor_id).context("No such editor")?;
+
+										let EditorState{data:EditorData::QNPatch { settings, current, .. },file:None} = state else {
+											unreachable!();
+										};
+
+										editor_state.insert(
+											editor_id.to_owned(),
+											EditorState {data:EditorData::QNEntity {
+												settings,
+												entity: current
+											},file:None}
+										);
+									}
 
 									send_request(
 										&app,
