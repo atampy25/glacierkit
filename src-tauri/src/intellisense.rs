@@ -810,16 +810,19 @@ impl Intellisense {
 		{
 			for alias in aliases {
 				if let Ref::Short(Some(ent)) = &alias.original_entity {
-					if let Some(data) = self.get_specific_property(
-						resource_packages,
-						cached_entities,
-						hash_list,
-						game_version,
-						entity,
-						ent,
-						&alias.original_property
-					)? {
-						return Ok(Some((data.0, data.1, data.2)));
+					// Avoids issues from an entity having a property alias to itself
+					if ent != sub_entity && property_to_find == alias.original_property {
+						if let Some(data) = self.get_specific_property(
+							resource_packages,
+							cached_entities,
+							hash_list,
+							game_version,
+							entity,
+							ent,
+							&alias.original_property
+						)? {
+							return Ok(Some((data.0, data.1, data.2)));
+						}
 					}
 				}
 			}
