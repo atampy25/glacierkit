@@ -4155,12 +4155,24 @@ fn event(app: AppHandle, event: Event) {
 									serde_json::to_vec(&entity).context("Entity is invalid")?
 								}
 
-								EditorData::QNPatch { base, current, .. } => serde_json::to_vec(
+								EditorData::QNPatch { base, current, .. } => {
+									// Once a patch has been saved you can no longer modify the hashes without manually converting to entity.json
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+											EntityMetadataRequest::SetHashModificationAllowed {
+												editor_id: tab.to_owned(),
+												hash_modification_allowed: false
+											}
+										)))
+									)?;
+									
+									serde_json::to_vec(
 									&generate_patch(base, current)
 										.map_err(|x| anyhow!(x))
 										.context("Couldn't generate patch")?
 								)
-								.context("Entity is invalid")?
+								.context("Entity is invalid")?}
 							};
 
 							if let Some(file) = editor.file.as_ref() {
