@@ -642,7 +642,19 @@
 	{:else}
 		<div class="pt-2 pb-1 px-2 leading-tight text-base">
 			<div class="mb-4"><Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} /></div>
-			<span class="text-neutral-400">{path}</span>
+			<span
+				class="text-neutral-400 cursor-pointer"
+				on:click={async () => {
+					const path = await open({
+						title: "Select the project folder",
+						directory: true
+					})
+
+					if (typeof path === "string") {
+						await event({ type: "global", data: { type: "loadWorkspace", data: path } })
+					}
+				}}>{path}</span
+			>
 		</div>
 	{/if}
 

@@ -24,6 +24,7 @@ pub mod show_in_folder;
 use std::{
 	collections::{HashMap, HashSet},
 	fs::{self, File},
+	future::Future,
 	io::{BufReader, Cursor},
 	ops::Deref,
 	path::{Path, PathBuf},
@@ -83,7 +84,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, json, to_string, to_vec};
 use show_in_folder::show_in_folder;
 use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
-use tauri::{async_runtime, AppHandle, Manager};
+use tauri::{
+	async_runtime::{self, JoinHandle},
+	AppHandle, Manager
+};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -159,6 +163,51 @@ fn main() {
 		})
 		.run(tauri::generate_context!())
 		.expect("Couldn't run Tauri application");
+}
+
+fn spawn_fallible<F>(app: &AppHandle, task: F)
+where
+	F: Future<Output = Result<()>> + Send + 'static
+{
+	let cloned_app1 = app.clone();
+	let cloned_app2 = app.clone();
+
+	async_runtime::spawn(async move {
+		if let Err(e) = async_runtime::spawn(async move {
+			if let Err::<_, Error>(e) = task.await {
+				send_request(
+					&cloned_app1,
+					Request::Global(GlobalRequest::ErrorReport {
+						error: format!("{:?}", e)
+					})
+				)
+				.expect("Couldn't send error report to frontend");
+			}
+		})
+		.await
+		{
+			send_request(
+				&cloned_app2,
+				Request::Global(GlobalRequest::ErrorReport {
+					error: match e {
+						tauri::Error::JoinError(x) if x.is_panic() => {
+							let x = x.into_panic();
+							let payload = x
+								.downcast_ref::<String>()
+								.map(String::as_str)
+								.or_else(|| x.downcast_ref::<&str>().cloned())
+								.unwrap_or("<non string panic payload>");
+
+							format!("Thread panic: {}", payload)
+						}
+
+						_ => format!("{:?}", e)
+					}
+				})
+			)
+			.expect("Couldn't send error report to frontend");
+		}
+	});
 }
 
 #[tauri::command]
@@ -2841,16 +2890,23 @@ fn event(app: AppHandle, event: Event) {
 									if is_patch_editor {
 										let state = editor_state.remove(&editor_id).context("No such editor")?;
 
-										let EditorState{data:EditorData::QNPatch { settings, current, .. },file:None} = state else {
+										let EditorState {
+											data: EditorData::QNPatch { settings, current, .. },
+											file: None
+										} = state
+										else {
 											unreachable!();
 										};
 
 										editor_state.insert(
 											editor_id.to_owned(),
-											EditorState {data:EditorData::QNEntity {
-												settings,
-												entity: current
-											},file:None}
+											EditorState {
+												data: EditorData::QNEntity {
+													settings,
+													entity: current
+												},
+												file: None
+											}
 										);
 									}
 
@@ -2896,16 +2952,23 @@ fn event(app: AppHandle, event: Event) {
 									if is_patch_editor {
 										let state = editor_state.remove(&editor_id).context("No such editor")?;
 
-										let EditorState{data:EditorData::QNPatch { settings, current, .. },file:None} = state else {
+										let EditorState {
+											data: EditorData::QNPatch { settings, current, .. },
+											file: None
+										} = state
+										else {
 											unreachable!();
 										};
 
 										editor_state.insert(
 											editor_id.to_owned(),
-											EditorState {data:EditorData::QNEntity {
-												settings,
-												entity: current
-											},file:None}
+											EditorState {
+												data: EditorData::QNEntity {
+													settings,
+													entity: current
+												},
+												file: None
+											}
 										);
 									}
 
@@ -3851,12 +3914,10 @@ fn event(app: AppHandle, event: Event) {
 									settings = read_settings;
 								} else {
 									settings = ProjectSettings::default();
-									fs::create_dir_all(&path).unwrap();
 									fs::write(path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
 								}
 							} else {
 								settings = ProjectSettings::default();
-								fs::create_dir_all(&path).unwrap();
 								fs::write(path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
 							}
 
@@ -4166,13 +4227,14 @@ fn event(app: AppHandle, event: Event) {
 											}
 										)))
 									)?;
-									
+
 									serde_json::to_vec(
-									&generate_patch(base, current)
-										.map_err(|x| anyhow!(x))
-										.context("Couldn't generate patch")?
-								)
-								.context("Entity is invalid")?}
+										&generate_patch(base, current)
+											.map_err(|x| anyhow!(x))
+											.context("Couldn't generate patch")?
+									)
+									.context("Entity is invalid")?
+								}
 							};
 
 							if let Some(file) = editor.file.as_ref() {

@@ -75,8 +75,8 @@
 			</span>
 		</TooltipIcon>
 	</div>
-	
-	<p>Game</p>
+
+	<p class="mt-1">Game</p>
 	<div class="mt-1 flex flex-wrap gap-2">
 		{#each gameInstalls as gameInstall}
 			<div
