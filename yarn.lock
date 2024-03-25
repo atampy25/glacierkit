@@ -29,6 +29,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@aptabase/tauri@npm:^0.4.1":
+  version: 0.4.1
+  resolution: "@aptabase/tauri@npm:0.4.1"
+  dependencies:
+    "@tauri-apps/api": "npm:^1.0.0"
+  checksum: e796dcb076004947f6f6c3277a381af86418fe6bd2f35bf9032d954c74878618feb13f6520c3c0478bccdaf17588cf4317d8f6c3884b52d6c970952f259234d0
+  languageName: node
+  linkType: hard
+
 "@esbuild/aix-ppc64@npm:0.19.11":
   version: 0.19.11
   resolution: "@esbuild/aix-ppc64@npm:0.19.11"
@@ -555,7 +564,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/api@npm:^1.5.3":
+"@tauri-apps/api@npm:^1.0.0, @tauri-apps/api@npm:^1.5.3":
   version: 1.5.3
   resolution: "@tauri-apps/api@npm:1.5.3"
   checksum: 7709c368603881d1f615eb334261339b55f479e44af112702ce42e65a7bf1cfd48e95a7ad3efec9d275d78c09af43fe0b7c3acffc7cef6a14a470a457b807272
@@ -2576,6 +2585,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mod-studio@workspace:."
   dependencies:
+    "@aptabase/tauri": "npm:^0.4.1"
     "@fontsource/fira-code": "npm:^5.0.16"
     "@fortawesome/fontawesome-free": "npm:^6.5.1"
     "@jhubbardsf/svelte-sortablejs": "npm:^1.1.0"

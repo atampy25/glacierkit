@@ -38,6 +38,7 @@
 	"type": "module",
 	"packageManager": "yarn@4.0.2",
 	"dependencies": {
+		"@aptabase/tauri": "^0.4.1",
 		"@fontsource/fira-code": "^5.0.16",
 		"@fortawesome/fontawesome-free": "^6.5.1",
 		"@jhubbardsf/svelte-sortablejs": "^1.1.0",

@@ -88,6 +88,7 @@ use tauri::{
 	async_runtime::{self, JoinHandle},
 	AppHandle, Manager
 };
+use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -121,8 +122,18 @@ fn main() {
 	};
 
 	tauri::Builder::default()
+		.plugin(
+			tauri_plugin_aptabase::Builder::new("A-SH-1114087815")
+				.with_options(InitOptions {
+					host: Some("http://159.13.49.212".into()),
+					flush_interval: None
+				})
+				.build()
+		)
 		.plugin(specta)
 		.setup(|app| {
+			app.track_event("app_started", None);
+
 			let app_data_path = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
 			let mut invalid = true;
@@ -4210,13 +4221,23 @@ fn event(app: AppHandle, event: Event) {
 									panic!();
 								}
 
-								EditorData::Text { content, .. } => content.as_bytes().to_owned(),
+								EditorData::Text { content, file_type } => {
+									app.track_event("save_text_file", Some(json!({
+										"file_type": file_type
+									})));
+
+									content.as_bytes().to_owned()
+								},
 
 								EditorData::QNEntity { entity, .. } => {
+									app.track_event("save_qn_entity", None);
+
 									serde_json::to_vec(&entity).context("Entity is invalid")?
 								}
 
 								EditorData::QNPatch { base, current, .. } => {
+									app.track_event("save_qn_patch", None);
+
 									// Once a patch has been saved you can no longer modify the hashes without manually converting to entity.json
 									send_request(
 										&app,
