@@ -212,7 +212,7 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 								.entities
 								.get(&reverse_ref.from)
 								.unwrap()
-								.input_copying
+								.output_copying
 								.as_ref()
 								.unwrap()
 								.get(event)
