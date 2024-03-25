@@ -84,10 +84,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, json, to_string, to_vec};
 use show_in_folder::show_in_folder;
 use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
-use tauri::{
-	async_runtime::{self, JoinHandle},
-	AppHandle, Manager
-};
+use tauri::{async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
@@ -132,7 +129,7 @@ fn main() {
 		)
 		.plugin(specta)
 		.setup(|app| {
-			app.track_event("app_started", None);
+			app.track_event("App started", None);
 
 			let app_data_path = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
@@ -172,8 +169,14 @@ fn main() {
 
 			Ok(())
 		})
-		.run(tauri::generate_context!())
-		.expect("Couldn't run Tauri application");
+		.build(tauri::generate_context!())
+		.expect("error while building tauri application")
+		.run(|handler, event| {
+			if let tauri::RunEvent::Exit = event {
+				handler.track_event("App exited", None);
+				handler.flush_events_blocking();
+			}
+		});
 }
 
 fn spawn_fallible<F>(app: &AppHandle, task: F)
@@ -1176,6 +1179,29 @@ fn event(app: AppHandle, event: Event) {
 
 						ToolEvent::Settings(event) => match event {
 							SettingsEvent::Initialise => {
+								let selected_install_info = app_settings
+									.load()
+									.game_install
+									.as_ref()
+									.map(|x| {
+										let install = app_state
+											.game_installs
+											.iter()
+											.find(|y| y.path == *x)
+											.expect("No such game install");
+										format!("{:?} {}", install.version, install.platform)
+									})
+									.unwrap_or("None".into());
+
+								app.track_event(
+									"App initialised",
+									Some(json!({
+										"game_installs": app_state.game_installs.len(),
+										"extract_modded_files": app_settings.load().extract_modded_files,
+										"selected_install": selected_install_info
+									}))
+								);
+
 								send_request(
 									&app,
 									Request::Tool(ToolRequest::Settings(SettingsRequest::Initialise {
@@ -1190,7 +1216,7 @@ fn event(app: AppHandle, event: Event) {
 									let game_version = app_state
 										.game_installs
 										.iter()
-										.try_find(|x| anyhow::Ok(x.path == *path))?
+										.find(|x| x.path == *path)
 										.context("No such game install")?
 										.version;
 
@@ -3904,6 +3930,7 @@ fn event(app: AppHandle, event: Event) {
 
 					Event::Global(event) => match event {
 						GlobalEvent::LoadWorkspace(path) => {
+							app.track_event("Workspace loaded", None);
 							let task = start_task(&app, format!("Loading project {}", path.display()))?;
 
 							let mut files = vec![];
@@ -4222,21 +4249,40 @@ fn event(app: AppHandle, event: Event) {
 								}
 
 								EditorData::Text { content, file_type } => {
-									app.track_event("save_text_file", Some(json!({
-										"file_type": file_type
-									})));
+									app.track_event(
+										"Editor saved",
+										Some(json!({
+											"file_type": file_type
+										}))
+									);
 
 									content.as_bytes().to_owned()
-								},
+								}
 
-								EditorData::QNEntity { entity, .. } => {
-									app.track_event("save_qn_entity", None);
+								EditorData::QNEntity { entity, settings } => {
+									app.track_event(
+										"Editor saved",
+										Some(json!({
+											"file_type": "QNEntity",
+											"show_reverse_parent_refs": settings.show_reverse_parent_refs
+										}))
+									);
 
 									serde_json::to_vec(&entity).context("Entity is invalid")?
 								}
 
-								EditorData::QNPatch { base, current, .. } => {
-									app.track_event("save_qn_patch", None);
+								EditorData::QNPatch {
+									base,
+									current,
+									settings
+								} => {
+									app.track_event(
+										"Editor saved",
+										Some(json!({
+											"file_type": "QNPatch",
+											"show_reverse_parent_refs": settings.show_reverse_parent_refs
+										}))
+									);
 
 									// Once a patch has been saved you can no longer modify the hashes without manually converting to entity.json
 									send_request(
@@ -4358,6 +4404,7 @@ fn event(app: AppHandle, event: Event) {
 					}
 				}
 			} {
+				app.track_event("Error", Some(json!({"error":format!("{:?}", e)})));
 				send_request(
 					&app,
 					Request::Global(GlobalRequest::ErrorReport {
@@ -4369,26 +4416,24 @@ fn event(app: AppHandle, event: Event) {
 		})
 		.await
 		{
-			send_request(
-				&cloned_app,
-				Request::Global(GlobalRequest::ErrorReport {
-					error: match e {
-						tauri::Error::JoinError(x) if x.is_panic() => {
-							let x = x.into_panic();
-							let payload = x
-								.downcast_ref::<String>()
-								.map(String::as_str)
-								.or_else(|| x.downcast_ref::<&str>().cloned())
-								.unwrap_or("<non string panic payload>");
+			let error = match e {
+				tauri::Error::JoinError(x) if x.is_panic() => {
+					let x = x.into_panic();
+					let payload = x
+						.downcast_ref::<String>()
+						.map(String::as_str)
+						.or_else(|| x.downcast_ref::<&str>().cloned())
+						.unwrap_or("<non string panic payload>");
 
-							format!("Thread panic: {}", payload)
-						}
+					format!("Thread panic: {}", payload)
+				}
 
-						_ => format!("{:?}", e)
-					}
-				})
-			)
-			.expect("Couldn't send error report to frontend");
+				_ => format!("{:?}", e)
+			};
+
+			cloned_app.track_event("Error", Some(json!({"error":error.to_owned()})));
+			send_request(&cloned_app, Request::Global(GlobalRequest::ErrorReport { error }))
+				.expect("Couldn't send error report to frontend");
 		}
 	});
 }

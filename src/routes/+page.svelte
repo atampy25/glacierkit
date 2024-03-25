@@ -23,6 +23,7 @@
 	import { SortableList } from "@jhubbardsf/svelte-sortablejs"
 	import Idea from "carbon-icons-svelte/lib/Idea.svelte"
 	import ResourceOverviewEditor from "$lib/editors/resourceoverview/ResourceOverviewEditor.svelte"
+	import { trackEvent } from "@aptabase/tauri"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -232,6 +233,8 @@
 		control: true,
 		callback: async () => {
 			if (activeTab && tabs.find((a) => a.id === activeTab)?.unsaved) {
+				trackEvent("Save tab using CTRL-S")
+
 				await event({
 					type: "global",
 					data: {
@@ -247,6 +250,8 @@
 		control: true,
 		callback: async () => {
 			if (activeTab) {
+				trackEvent("Close tab using CTRL-W")
+
 				await event({
 					type: "global",
 					data: {
@@ -261,38 +266,46 @@
 		key: "Tab",
 		control: true,
 		callback: async () => {
-			if (activeTab) {
-				activeTab = tabs[(tabs.findIndex((a) => a.id === activeTab) + 1) % tabs.length].id
-			} else {
-				activeTab = tabs[0].id
-			}
+			if (tabs.length) {
+				trackEvent("Cycle tab forward using CTRL-Tab")
 
-			await event({
-				type: "global",
-				data: {
-					type: "selectTab",
-					data: activeTab
+				if (activeTab) {
+					activeTab = tabs[(tabs.findIndex((a) => a.id === activeTab) + 1) % tabs.length].id
+				} else {
+					activeTab = tabs[0].id
 				}
-			})
+
+				await event({
+					type: "global",
+					data: {
+						type: "selectTab",
+						data: activeTab
+					}
+				})
+			}
 		}
 	}}
 	use:shortcut={{
 		key: "PageDown",
 		control: true,
 		callback: async () => {
-			if (activeTab) {
-				activeTab = tabs[(tabs.findIndex((a) => a.id === activeTab) + 1) % tabs.length].id
-			} else {
-				activeTab = tabs[0].id
-			}
+			if (tabs.length) {
+				trackEvent("Cycle tab forward using CTRL-PgDown")
 
-			await event({
-				type: "global",
-				data: {
-					type: "selectTab",
-					data: activeTab
+				if (activeTab) {
+					activeTab = tabs[(tabs.findIndex((a) => a.id === activeTab) + 1) % tabs.length].id
+				} else {
+					activeTab = tabs[0].id
 				}
-			})
+
+				await event({
+					type: "global",
+					data: {
+						type: "selectTab",
+						data: activeTab
+					}
+				})
+			}
 		}
 	}}
 	use:shortcut={{
@@ -300,40 +313,48 @@
 		control: true,
 		shift: true,
 		callback: async () => {
-			if (activeTab) {
-				const nextLeft = tabs.findIndex((a) => a.id === activeTab) - 1
-				activeTab = tabs[nextLeft >= 0 ? nextLeft : tabs.length - 1].id
-			} else {
-				activeTab = tabs[0].id
-			}
+			if (tabs.length) {
+				trackEvent("Cycle tab backward using CTRL-Shift-Tab")
 
-			await event({
-				type: "global",
-				data: {
-					type: "selectTab",
-					data: activeTab
+				if (activeTab) {
+					const nextLeft = tabs.findIndex((a) => a.id === activeTab) - 1
+					activeTab = tabs[nextLeft >= 0 ? nextLeft : tabs.length - 1].id
+				} else {
+					activeTab = tabs[0].id
 				}
-			})
+
+				await event({
+					type: "global",
+					data: {
+						type: "selectTab",
+						data: activeTab
+					}
+				})
+			}
 		}
 	}}
 	use:shortcut={{
 		key: "PageUp",
 		control: true,
 		callback: async () => {
-			if (activeTab) {
-				const nextLeft = tabs.findIndex((a) => a.id === activeTab) - 1
-				activeTab = tabs[nextLeft >= 0 ? nextLeft : tabs.length - 1].id
-			} else {
-				activeTab = tabs[0].id
-			}
+			if (tabs.length) {
+				trackEvent("Cycle tab backward using CTRL-PgUp")
 
-			await event({
-				type: "global",
-				data: {
-					type: "selectTab",
-					data: activeTab
+				if (activeTab) {
+					const nextLeft = tabs.findIndex((a) => a.id === activeTab) - 1
+					activeTab = tabs[nextLeft >= 0 ? nextLeft : tabs.length - 1].id
+				} else {
+					activeTab = tabs[0].id
 				}
-			})
+
+				await event({
+					type: "global",
+					data: {
+						type: "selectTab",
+						data: activeTab
+					}
+				})
+			}
 		}
 	}}
 />
@@ -371,6 +392,8 @@
 							forceFallback
 							fallbackTolerance={5}
 							onEnd={(evt) => {
+								trackEvent("Reorder tabs by dragging")
+
 								tabs.splice(evt.newIndex, 0, tabs.splice(evt.oldIndex, 1)[0])
 								tabs = tabs
 							}}
@@ -394,6 +417,8 @@
 									}}
 									on:auxclick={async (e) => {
 										if (e.button === 1) {
+											trackEvent("Close tab using middle-click")
+
 											await event({
 												type: "global",
 												data: {
@@ -413,6 +438,8 @@
 												icon={Save}
 												iconDescription="Save (CTRL-S)"
 												on:click={async () => {
+													trackEvent("Save tab using button")
+
 													await event({
 														type: "global",
 														data: {
@@ -429,6 +456,8 @@
 											icon={Close}
 											iconDescription="Close (CTRL-W)"
 											on:click={async () => {
+												trackEvent("Close tab using button")
+
 												await event({
 													type: "global",
 													data: {

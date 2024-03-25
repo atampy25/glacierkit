@@ -3,6 +3,7 @@
 	import { event } from "$lib/utils"
 	import { ClickableTile, TextArea } from "carbon-components-svelte"
 	import { debounce } from "lodash"
+	import { trackEvent } from "@aptabase/tauri"
 
 	export let editorID: string
 
@@ -33,6 +34,8 @@
 
 	async function setNotes(entityID: string | null, value: string) {
 		if (entityID) {
+			trackEvent("Set entity notes")
+
 			await event({
 				type: "editor",
 				data: {
@@ -68,6 +71,8 @@
 		{#each reverseRefs as ref}
 			<ClickableTile
 				on:click={async () => {
+					trackEvent("Jump to reference from meta pane")
+
 					await event({
 						type: "editor",
 						data: {

@@ -5,6 +5,7 @@
 	import { onMount } from "svelte"
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
 	import Export from "carbon-icons-svelte/lib/Export.svelte"
+	import { trackEvent } from "@aptabase/tauri"
 
 	export let id: string
 
@@ -75,6 +76,8 @@
 				<Button
 					icon={Edit}
 					on:click={async () => {
+						trackEvent("Open in editor from resource overview")
+
 						await event({
 							type: "editor",
 							data: {
@@ -92,6 +95,8 @@
 				<Button
 					icon={Export}
 					on:click={async () => {
+						trackEvent("Extract entity to QN JSON")
+
 						await event({
 							type: "editor",
 							data: {
@@ -109,6 +114,8 @@
 				<Button
 					icon={Export}
 					on:click={async () => {
+						trackEvent("Extract TEMP as binary file")
+
 						await event({
 							type: "editor",
 							data: {
@@ -126,6 +133,8 @@
 				<Button
 					icon={Export}
 					on:click={async () => {
+						trackEvent("Extract TEMP as RT JSON")
+
 						await event({
 							type: "editor",
 							data: {
@@ -143,6 +152,8 @@
 				<Button
 					icon={Export}
 					on:click={async () => {
+						trackEvent("Extract TBLU as binary file")
+
 						await event({
 							type: "editor",
 							data: {
@@ -160,6 +171,8 @@
 				<Button
 					icon={Export}
 					on:click={async () => {
+						trackEvent("Extract TBLU as RT JSON")
+
 						await event({
 							type: "editor",
 							data: {
@@ -184,6 +197,8 @@
 								<div
 									class="bg-[#303030] p-3 cursor-pointer"
 									on:click={async () => {
+										trackEvent("Follow dependency from resource overview")
+
 										await event({
 											type: "editor",
 											data: {
@@ -225,6 +240,8 @@
 								<div
 									class="bg-[#303030] p-3 cursor-pointer"
 									on:click={async () => {
+										trackEvent("Follow reverse dependency from resource overview")
+
 										await event({
 											type: "editor",
 											data: {
@@ -274,6 +291,8 @@
 				<Button
 					icon={Export}
 					on:click={async () => {
+						trackEvent("Extract generic file")
+
 						await event({
 							type: "editor",
 							data: {
@@ -297,6 +316,8 @@
 							<div
 								class="bg-[#303030] p-3 cursor-pointer"
 								on:click={async () => {
+									trackEvent("Follow dependency from resource overview")
+
 									await event({
 										type: "editor",
 										data: {
@@ -330,6 +351,8 @@
 							<div
 								class="bg-[#303030] p-3 cursor-pointer"
 								on:click={async () => {
+									trackEvent("Follow reverse dependency from resource overview")
+
 									await event({
 										type: "editor",
 										data: {

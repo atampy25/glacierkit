@@ -5,12 +5,16 @@ use std::path::PathBuf;
 use std::process::Command;
 #[cfg(target_os = "linux")]
 use std::{fs::metadata, path::PathBuf};
+use tauri::AppHandle;
+use tauri_plugin_aptabase::EventTracker;
 
 // from https://github.com/tauri-apps/tauri/issues/4062#issuecomment-1338048169
 
 #[tauri::command]
 #[specta::specta]
-pub fn show_in_folder(path: String) {
+pub fn show_in_folder(app: AppHandle, path: String) {
+	app.track_event("Show in folder", None);
+
 	#[cfg(target_os = "windows")]
 	{
 		Command::new("explorer")

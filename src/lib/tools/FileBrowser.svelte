@@ -10,6 +10,7 @@
 	import FolderAdd from "carbon-icons-svelte/lib/FolderAdd.svelte"
 	import { v4 } from "uuid"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
+	import { trackEvent } from "@aptabase/tauri"
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 	let tree: JSTree = null!
@@ -274,6 +275,8 @@
 										label: "Normalise",
 										icon: "fa-solid fa-rotate",
 										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Normalise entity")
+
 											const tree = jQuery.jstree!.reference(b.reference)
 											const selected_node = tree.get_node(b.reference)
 
@@ -300,6 +303,8 @@
 										label: "Convert to Patch",
 										icon: "fa-solid fa-right-left",
 										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert entity to patch")
+
 											const tree = jQuery.jstree!.reference(b.reference)
 											const selected_node = tree.get_node(b.reference)
 
@@ -330,6 +335,8 @@
 										label: "Normalise",
 										icon: "fa-solid fa-rotate",
 										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Normalise patch")
+
 											const tree = jQuery.jstree!.reference(b.reference)
 											const selected_node = tree.get_node(b.reference)
 
@@ -356,6 +363,8 @@
 										label: "Convert to Entity",
 										icon: "fa-solid fa-right-left",
 										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert patch to entity")
+
 											const tree = jQuery.jstree!.reference(b.reference)
 											const selected_node = tree.get_node(b.reference)
 

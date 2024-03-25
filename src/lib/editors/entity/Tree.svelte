@@ -8,6 +8,7 @@
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { changeReferenceToLocalEntity, genRandHex, getReferencedLocalEntity } from "./utils"
 	import { clipboard } from "@tauri-apps/api"
+	import { trackEvent } from "@aptabase/tauri"
 
 	export let editorID: string
 
@@ -338,6 +339,8 @@
 													label: template.name,
 													icon: template.icon,
 													action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+														trackEvent("Insert template", { template: template.name })
+
 														const tree = jQuery.jstree!.reference(b.reference)
 														const selected_node = tree.get_node(b.reference)
 
@@ -386,6 +389,8 @@
 							label: "Help",
 							icon: "far fa-circle-question",
 							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+								trackEvent("Show help menu")
+
 								const tree = jQuery.jstree!.reference(b.reference)
 								const selected_node = tree.get_node(b.reference)
 
@@ -467,6 +472,8 @@
 
 		// Drag and drop from game browser
 		jQuery("#" + elemID).on("copy_node.jstree", async (_, { node, original }: { node: { id: string; parent: string }; original: { id: string } }) => {
+			trackEvent("Drag and drop from game browser to entity tree")
+
 			tree.delete_node(node.id)
 
 			await event({

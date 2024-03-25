@@ -6,6 +6,7 @@
 	import { Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { clipboard } from "@tauri-apps/api"
+	import { trackEvent } from "@aptabase/tauri"
 
 	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 
@@ -59,6 +60,8 @@
 										const tree = jQuery.jstree!.reference(b.reference)
 										const selected_node = tree.get_node(b.reference)
 
+										trackEvent("Open in editor from game tree")
+
 										await event({
 											type: "tool",
 											data: {
@@ -78,6 +81,8 @@
 									label: "Copy Hash",
 									icon: "far fa-copy",
 									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										trackEvent("Copy hash from game tree")
+
 										const tree = jQuery.jstree!.reference(b.reference)
 										const selected_node = tree.get_node(b.reference)
 
@@ -93,6 +98,8 @@
 												label: "Copy Path",
 												icon: "far fa-copy",
 												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+													trackEvent("Copy path from game tree")
+
 													const tree = jQuery.jstree!.reference(b.reference)
 													const selected_node = tree.get_node(b.reference)
 

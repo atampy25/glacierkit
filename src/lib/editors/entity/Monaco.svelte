@@ -12,6 +12,7 @@
 	import { listen } from "@tauri-apps/api/event"
 	import { Modal } from "carbon-components-svelte"
 	import GraphRenderer from "./GraphRenderer.svelte"
+	import { trackEvent } from "@aptabase/tauri"
 
 	let el: HTMLDivElement = null!
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
@@ -262,6 +263,8 @@
 			keybindings: [],
 			precondition: "showPreviewCurveCondition",
 			run: async (ed) => {
+				trackEvent("Visualise curve")
+
 				const propertyName = editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
 
 				curveToPreview = JSON.parse(editor.getValue()).properties[propertyName].value.data
@@ -278,6 +281,8 @@
 			keybindings: [monaco.KeyCode.F12],
 			precondition: "showFollowReferenceCondition",
 			run: async (ed) => {
+				trackEvent("Follow reference in Monaco editor")
+
 				await event({
 					type: "editor",
 					data: {
@@ -305,6 +310,8 @@
 			keybindings: [monaco.KeyCode.F12],
 			precondition: "showOpenFactoryCondition",
 			run: async (ed) => {
+				trackEvent("Open factory in new tab from Monaco editor")
+
 				await event({
 					type: "editor",
 					data: {

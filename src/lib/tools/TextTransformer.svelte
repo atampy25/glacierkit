@@ -3,6 +3,7 @@
 	import { v4 } from "uuid"
 	import md5 from "md5"
 	import { Decimal } from "decimal.js"
+	import { trackEvent } from "@aptabase/tauri"
 
 	export async function handleRequest(request: any) {
 		// Text transformer is purely frontend
@@ -18,12 +19,21 @@
 	<CodeSnippet
 		code={uuid}
 		on:copy={() => {
+			trackEvent("Get random UUID")
 			uuid = v4()
 		}}
 	/>
 
 	<h4 class="mt-4 mb-2">Hash calculator</h4>
-	<TextInput bind:value={pathToCalculateHash} placeholder="[assembly:/_pro/characters/templates/hero/agent47/agent47.template?/agent47_default.entitytemplate].pc_entitytype" />
+	<TextInput
+		bind:value={pathToCalculateHash}
+		on:change={() => {
+			if (pathToCalculateHash) {
+				trackEvent("Calculate path hash")
+			}
+		}}
+		placeholder="[assembly:/_pro/characters/templates/hero/agent47/agent47.template?/agent47_default.entitytemplate].pc_entitytype"
+	/>
 	<div class="mt-4">
 		<div class="bx--label">Hex</div>
 		<CodeSnippet code={("00" + md5(pathToCalculateHash.toLowerCase()).slice(2, 16)).toUpperCase()} />
@@ -33,7 +43,15 @@
 	</div>
 
 	<h4 class="mt-4 mb-2">Localisation hash calculator</h4>
-	<TextInput bind:value={stringToCalculateLocHash} placeholder="UI_SOME_TEXT" />
+	<TextInput
+		bind:value={stringToCalculateLocHash}
+		on:change={() => {
+			if (stringToCalculateLocHash) {
+				trackEvent("Calculate localisation hash")
+			}
+		}}
+		placeholder="UI_SOME_TEXT"
+	/>
 	<div class="mt-4">
 		<div class="bx--label">Hex</div>
 		<CodeSnippet code={window.crc.crc32(stringToCalculateLocHash.toUpperCase()).toString(16).toUpperCase()} />
