@@ -191,6 +191,12 @@
 								})
 								break
 
+							case "renameTab":
+								const id2 = request.data.data.id
+								tabs.find((a) => a.id === id2)!.name = request.data.data.new_name
+								tabs = tabs
+								break
+
 							default:
 								request.data satisfies never
 								break

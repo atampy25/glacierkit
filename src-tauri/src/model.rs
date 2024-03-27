@@ -652,6 +652,10 @@ strike! {
 				name: String,
 				editor_type: EditorType
 			},
+			RenameTab {
+				id: Uuid,
+				new_name: String
+			},
 			SelectTab(Uuid),
 			SetTabUnsaved {
 				id: Uuid,

@@ -221,7 +221,7 @@ export type GameVersion = "h1" | "h2" | "h3"
 
 export type GlobalEvent = { type: "loadWorkspace"; data: string } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string }
 
-export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string }
+export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string }
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key in string]: JsonValue }
 

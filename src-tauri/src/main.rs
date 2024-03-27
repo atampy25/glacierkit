@@ -3461,7 +3461,7 @@ fn event(app: AppHandle, event: Event) {
 									}
 								};
 
-								*hash = new_hash;
+								*hash = new_hash.to_owned();
 
 								let task = start_task(&app, format!("Loading resource overview for {}", hash))?;
 
@@ -3478,7 +3478,7 @@ fn event(app: AppHandle, event: Event) {
 										&app,
 										Request::Editor(EditorRequest::ResourceOverview(
 											ResourceOverviewRequest::Initialise {
-												id,
+												id: id.to_owned(),
 												hash: hash.to_owned(),
 												filetype,
 												chunk_patch,
@@ -3565,6 +3565,11 @@ fn event(app: AppHandle, event: Event) {
 											}
 										))
 									)?;
+
+									send_request(&app, Request::Global(GlobalRequest::RenameTab {
+										id,
+										new_name: format!("Resource overview ({new_hash})")
+									}));
 								}
 
 								finish_task(&app, task)?;
