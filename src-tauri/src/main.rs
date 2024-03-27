@@ -1470,7 +1470,9 @@ fn event(app: AppHandle, event: Event) {
 							SettingsEvent::ChangeGameInstall(path) => {
 								let task = start_task(&app, "Loading game files")?;
 
-								if let Some(path) = path.as_ref() {
+								if let Some(path) = path.as_ref()
+									&& app_settings.load().game_install.as_ref() != Some(path)
+								{
 									let task = start_task(&app, "Loading game files")?;
 
 									let game_version = app_state
