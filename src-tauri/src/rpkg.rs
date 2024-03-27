@@ -198,7 +198,7 @@ pub fn extract_latest_metadata(
 pub fn extract_latest_overview_info(
 	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
 	resource: &str
-) -> Result<(String, Vec<(String, String)>)> {
+) -> Result<(String, String, Vec<(String, String)>)> {
 	let resource_id = RuntimeResourceID {
 		id: u64::from_str_radix(resource, 16)?
 	};
@@ -212,6 +212,7 @@ pub fn extract_latest_overview_info(
 			.map(|(index, _)| rpkg.resource_metadata.get(index).unwrap())
 		{
 			return Ok((
+				resource_header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
 				path.file_name()
 					.unwrap()
 					.to_string_lossy()

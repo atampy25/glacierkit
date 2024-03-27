@@ -1016,8 +1016,6 @@ fn event(app: AppHandle, event: Event) {
 
 						ToolEvent::GameBrowser(event) => match event {
 							GameBrowserEvent::Select(hash) => {
-								let task = start_task(&app, format!("Opening resource {}", hash))?;
-
 								let id = Uuid::new_v4();
 
 								app_state.editor_states.write().await.insert(
@@ -1032,12 +1030,10 @@ fn event(app: AppHandle, event: Event) {
 									&app,
 									Request::Global(GlobalRequest::CreateTab {
 										id,
-										name: "Resource overview".into(),
+										name: format!("Resource overview ({hash})"),
 										editor_type: EditorType::ResourceOverview
 									})
 								)?;
-
-								finish_task(&app, task)?;
 							}
 
 							GameBrowserEvent::Search(query) => {
@@ -1067,7 +1063,14 @@ fn event(app: AppHandle, event: Event) {
 													.entries
 													.iter()
 													.filter(|(_, entry)| entry.games.contains(install.version))
-													.filter(|(_, entry)| entry.resource_type == "TEMP")
+													.filter(|(_, entry)| {
+														![
+															"TBLU", "CBLU", "ASEB", "UICB", "MATB", "WSWB", "DSWB",
+															"ECPB", "WSGB"
+														]
+														.iter()
+														.any(|x| *x == entry.resource_type)
+													})
 													.filter(|(hash, entry)| {
 														query.split(' ').all(|y| {
 															entry
@@ -1086,7 +1089,8 @@ fn event(app: AppHandle, event: Event) {
 													.map(|(hash, entry)| GameBrowserEntry {
 														hash: hash.to_owned(),
 														path: entry.path.to_owned(),
-														hint: entry.hint.to_owned()
+														hint: entry.hint.to_owned(),
+														filetype: entry.resource_type.to_owned()
 													})
 													.collect()
 											}))
@@ -2416,92 +2420,119 @@ fn event(app: AppHandle, event: Event) {
 											.context("No such game install")?
 											.version;
 
-										let (temp_meta, temp_data) =
-											extract_latest_resource(resource_packages, hash_list, &file)?;
+										if {
+											let res_type = &hash_list
+												.entries
+												.get(&file)
+												.context("File not in hash list")?
+												.resource_type;
 
-										let factory = match game_version {
-											GameVersion::H1 => convert_2016_factory_to_modern(
-												&h2016_convert_binary_to_factory(&temp_data)
+											res_type == "TEMP"
+												|| res_type == "CPPT" || res_type == "ASET" || res_type == "UICT"
+												|| res_type == "MATT" || res_type == "WSWT" || res_type == "ECPT"
+												|| res_type == "AIBX" || res_type == "WSGT"
+										} {
+											let (temp_meta, temp_data) =
+												extract_latest_resource(resource_packages, hash_list, &file)?;
+
+											let factory = match game_version {
+												GameVersion::H1 => convert_2016_factory_to_modern(
+													&h2016_convert_binary_to_factory(&temp_data).context(
+														"Couldn't convert binary data to ResourceLib factory"
+													)?
+												),
+
+												GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
+													.context("Couldn't convert binary data to ResourceLib factory")?,
+
+												GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
 													.context("Couldn't convert binary data to ResourceLib factory")?
-											),
+											};
 
-											GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
-												.context("Couldn't convert binary data to ResourceLib factory")?,
+											let blueprint_hash = &temp_meta
+												.hash_reference_data
+												.get(factory.blueprint_index_in_resource_header as usize)
+												.context(
+													"Blueprint referenced in factory does not exist in dependencies"
+												)?
+												.hash;
 
-											GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
-												.context("Couldn't convert binary data to ResourceLib factory")?
-										};
+											let factory_path = hash_list
+												.entries
+												.get(&file)
+												.and_then(|x| x.path.to_owned())
+												.unwrap_or(file);
 
-										let blueprint_hash = &temp_meta
-											.hash_reference_data
-											.get(factory.blueprint_index_in_resource_header as usize)
-											.context("Blueprint referenced in factory does not exist in dependencies")?
-											.hash;
+											let blueprint_path = hash_list
+												.entries
+												.get(blueprint_hash)
+												.and_then(|x| x.path.to_owned())
+												.unwrap_or(blueprint_hash.to_owned());
 
-										let factory_path = hash_list
-											.entries
-											.get(&file)
-											.and_then(|x| x.path.to_owned())
-											.unwrap_or(file);
+											let entity_id = random_entity_id();
 
-										let blueprint_path = hash_list
-											.entries
-											.get(blueprint_hash)
-											.and_then(|x| x.path.to_owned())
-											.unwrap_or(blueprint_hash.to_owned());
+											let sub_entity = SubEntity {
+												parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+												name: factory_path
+													.replace("].pc_entitytype", "")
+													.replace("].pc_entitytemplate", "")
+													.replace(".entitytemplate", "")
+													.split('/')
+													.last()
+													.map(|x| x.to_owned())
+													.unwrap_or(factory_path.to_owned()),
+												factory: factory_path,
+												factory_flag: None,
+												blueprint: blueprint_path,
+												editor_only: None,
+												properties: None,
+												platform_specific_properties: None,
+												events: None,
+												input_copying: None,
+												output_copying: None,
+												property_aliases: None,
+												exposed_entities: None,
+												exposed_interfaces: None,
+												subsets: None
+											};
 
-										let entity_id = random_entity_id();
+											send_request(
+												&app,
+												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+													EntityTreeRequest::NewItems {
+														editor_id: editor_id.to_owned(),
+														new_entities: vec![(
+															entity_id.to_owned(),
+															sub_entity.parent.to_owned(),
+															sub_entity.name.to_owned(),
+															sub_entity.factory.to_owned(),
+															false
+														)]
+													}
+												)))
+											)?;
 
-										let sub_entity = SubEntity {
-											parent: Ref::Short((parent_id != "#").then_some(parent_id)),
-											name: factory_path
-												.replace("].pc_entitytype", "")
-												.replace("].pc_entitytemplate", "")
-												.replace(".entitytemplate", "")
-												.split('/')
-												.last()
-												.map(|x| x.to_owned())
-												.unwrap_or(factory_path.to_owned()),
-											factory: factory_path,
-											factory_flag: None,
-											blueprint: blueprint_path,
-											editor_only: None,
-											properties: None,
-											platform_specific_properties: None,
-											events: None,
-											input_copying: None,
-											output_copying: None,
-											property_aliases: None,
-											exposed_entities: None,
-											exposed_interfaces: None,
-											subsets: None
-										};
+											entity.entities.insert(entity_id, sub_entity);
 
-										send_request(
-											&app,
-											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-												EntityTreeRequest::NewItems {
-													editor_id: editor_id.to_owned(),
-													new_entities: vec![(
-														entity_id.to_owned(),
-														sub_entity.parent.to_owned(),
-														sub_entity.name.to_owned(),
-														sub_entity.factory.to_owned(),
-														false
-													)]
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::SetTabUnsaved {
+													id: editor_id,
+													unsaved: true
+												})
+											)?;
+										} else {
+											send_notification(
+												&app,
+												Notification {
+													kind: NotificationKind::Error,
+													title: "Not a valid template".into(),
+													subtitle: "Only entity templates can be dragged into the entity \
+													           tree."
+														.into()
 												}
-											)))
-										)?;
-
-										entity.entities.insert(entity_id, sub_entity);
-
-										send_request(
-											&app,
-											Request::Global(GlobalRequest::SetTabUnsaved {
-												id: editor_id,
-												unsaved: true
-											})
-										)?;
+											)?;
+										}
 									} else {
 										send_notification(
 											&app,
@@ -3310,13 +3341,16 @@ fn event(app: AppHandle, event: Event) {
 									}
 								};
 
+								let task = start_task(&app, format!("Loading resource overview for {}", hash))?;
+
 								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 									&& let Some(resource_reverse_dependencies) =
 										app_state.resource_reverse_dependencies.load().as_ref()
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
-									let (chunk_patch, deps) = extract_latest_overview_info(resource_packages, hash)?;
+									let (filetype, chunk_patch, deps) =
+										extract_latest_overview_info(resource_packages, hash)?;
 
 									send_request(
 										&app,
@@ -3324,6 +3358,7 @@ fn event(app: AppHandle, event: Event) {
 											ResourceOverviewRequest::Initialise {
 												id,
 												hash: hash.to_owned(),
+												filetype,
 												chunk_patch,
 												path_or_hint: hash_list
 													.entries
@@ -3409,6 +3444,8 @@ fn event(app: AppHandle, event: Event) {
 										))
 									)?;
 								}
+
+								finish_task(&app, task)?;
 							}
 
 							ResourceOverviewEvent::FollowDependency { id, new_hash } => {
@@ -3426,13 +3463,16 @@ fn event(app: AppHandle, event: Event) {
 
 								*hash = new_hash;
 
+								let task = start_task(&app, format!("Loading resource overview for {}", hash))?;
+
 								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 									&& let Some(resource_reverse_dependencies) =
 										app_state.resource_reverse_dependencies.load().as_ref()
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
-									let (chunk_patch, deps) = extract_latest_overview_info(resource_packages, hash)?;
+									let (filetype, chunk_patch, deps) =
+										extract_latest_overview_info(resource_packages, hash)?;
 
 									send_request(
 										&app,
@@ -3440,6 +3480,7 @@ fn event(app: AppHandle, event: Event) {
 											ResourceOverviewRequest::Initialise {
 												id,
 												hash: hash.to_owned(),
+												filetype,
 												chunk_patch,
 												path_or_hint: hash_list
 													.entries
@@ -3525,6 +3566,29 @@ fn event(app: AppHandle, event: Event) {
 										))
 									)?;
 								}
+
+								finish_task(&app, task)?;
+							}
+
+							ResourceOverviewEvent::FollowDependencyInNewTab { id, hash } => {
+								let id = Uuid::new_v4();
+
+								app_state.editor_states.write().await.insert(
+									id.to_owned(),
+									EditorState {
+										file: None,
+										data: EditorData::ResourceOverview { hash: hash.to_owned() }
+									}
+								);
+
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::CreateTab {
+										id,
+										name: format!("Resource overview ({hash})"),
+										editor_type: EditorType::ResourceOverview
+									})
+								)?;
 							}
 
 							ResourceOverviewEvent::OpenInEditor { id } => {

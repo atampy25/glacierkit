@@ -10,6 +10,7 @@
 	export let id: string
 
 	let hash = ""
+	let filetype = ""
 	let chunk = ""
 	let pathOrHint: string | null = null
 	let dependencies: [string, string, string | null, string][] = []
@@ -37,6 +38,7 @@
 		switch (request.type) {
 			case "initialise":
 				hash = request.data.hash
+				filetype = request.data.filetype
 				chunk = request.data.chunk_patch.replace(/patch[0-9]+/, "")
 				pathOrHint = request.data.path_or_hint
 				dependencies = request.data.dependencies
@@ -54,7 +56,7 @@
 <div class="w-full h-full flex flex-col p-4">
 	{#if data}
 		{#if data.type === "Entity"}
-			<div class="text-2xl mb-2 font-bold">
+			<div class="text-2xl mb-2 font-bold break-all">
 				{pathOrHint || "No path"}
 			</div>
 			<div class="flex flex-wrap gap-8 items-center mb-4">
@@ -213,6 +215,24 @@
 											}
 										})
 									}}
+									on:contextmenu={async (e) => {
+										e.preventDefault()
+										trackEvent("Follow dependency in new tab from resource overview")
+
+										await event({
+											type: "editor",
+											data: {
+												type: "resourceOverview",
+												data: {
+													type: "followDependencyInNewTab",
+													data: {
+														id,
+														hash
+													}
+												}
+											}
+										})
+									}}
 								>
 									<div class="text-base -mt-1"
 										><span class="font-bold">{hash}.{type}</span>
@@ -256,6 +276,24 @@
 											}
 										})
 									}}
+									on:contextmenu={async (e) => {
+										e.preventDefault()
+										trackEvent("Follow reverse dependency in new tab from resource overview")
+
+										await event({
+											type: "editor",
+											data: {
+												type: "resourceOverview",
+												data: {
+													type: "followDependencyInNewTab",
+													data: {
+														id,
+														hash
+													}
+												}
+											}
+										})
+									}}
 								>
 									<div class="font-bold text-base -mt-1"
 										>{hash}{#if type}.{type}{/if}</div
@@ -273,13 +311,17 @@
 				</div>
 			</div>
 		{:else if data.type === "Generic"}
-			<div class="text-2xl mb-2 font-bold">
+			<div class="text-2xl mb-2 font-bold break-all">
 				{pathOrHint || "No path"}
 			</div>
 			<div class="flex flex-wrap gap-8 items-center mb-4">
 				<div>
 					<div>Hash</div>
 					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
 				</div>
 				<div>
 					<div>Chunk</div>
@@ -332,6 +374,23 @@
 										}
 									})
 								}}
+								on:contextmenu={async () => {
+									trackEvent("Follow dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
 							>
 								<div class="text-base -mt-1"
 									><span class="font-bold"
@@ -362,6 +421,24 @@
 												data: {
 													id,
 													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async (e) => {
+									e.preventDefault()
+									trackEvent("Follow reverse dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
 												}
 											}
 										}

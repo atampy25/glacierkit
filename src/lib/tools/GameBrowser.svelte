@@ -46,34 +46,38 @@
 			},
 			contextmenu: {
 				select_node: false,
-				items: (rightClickedNode: { original: { folder: boolean; path: string | null } }, c: any) => {
+				items: (rightClickedNode: { original: { folder: boolean; path: string | null; filetype: string } }, c: any) => {
 					return rightClickedNode.original.folder
 						? {}
 						: {
-								openInEditor: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Open in Editor",
-									icon: "fa-regular fa-pen-to-square",
-									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+								...(rightClickedNode.original.filetype === "TEMP"
+									? {
+											openInEditor: {
+												separator_before: false,
+												separator_after: false,
+												_disabled: false,
+												label: "Open in Editor",
+												icon: "fa-regular fa-pen-to-square",
+												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+													const tree = jQuery.jstree!.reference(b.reference)
+													const selected_node = tree.get_node(b.reference)
 
-										trackEvent("Open in editor from game tree")
+													trackEvent("Open in editor from game tree", { filetype: selected_node.original.filetype })
 
-										await event({
-											type: "tool",
-											data: {
-												type: "gameBrowser",
-												data: {
-													type: "openInEditor",
-													data: selected_node.id
+													await event({
+														type: "tool",
+														data: {
+															type: "gameBrowser",
+															data: {
+																type: "openInEditor",
+																data: selected_node.id
+															}
+														}
+													})
 												}
 											}
-										})
-									}
-								},
+										}
+									: {}),
 								copyHash: {
 									separator_before: false,
 									separator_after: false,
@@ -173,9 +177,12 @@
 
 		for (const entry of entries) {
 			if (entry.path) {
-				const path = /\[(.*)\]\.pc_entity/.exec(entry.path)!
+				console.log(entry.path)
+				const path = /\[(.*)\](?:\.pc_|\(.*\)\.pc_)/.exec(entry.path)![1]
+				const params = /\[.*\]\((.*)\)\.pc_/.exec(entry.path)?.[1]
+				const platformType = "." + /\[.*\](?:\.pc_|\(.*\)\.pc_)(.*)/.exec(entry.path)?.[1]
 
-				for (const pathSection of path[1]
+				for (const pathSection of path
 					.split("/")
 					.map((_, ind, arr) => arr.slice(0, ind + 1).join("/"))
 					.slice(0, -1)) {
@@ -186,7 +193,8 @@
 							icon: "fa-regular fa-folder",
 							text: pathSection.split("/").at(-1),
 							folder: true,
-							path: pathSection
+							path: pathSection,
+							filetype: null
 						})
 
 						addedFolders.add(pathSection)
@@ -195,20 +203,22 @@
 
 				tree.settings!.core.data.push({
 					id: entry.hash,
-					parent: path[1].split("/").slice(0, -1).join("/"),
+					parent: path.split("/").slice(0, -1).join("/"),
 					icon: "fa-regular fa-file",
-					text: path[1].split("/").at(-1),
+					text: (params ? `[${path.split("/").at(-1)}](${params})` : path.split("/").at(-1)) + (platformType === ".entitytype" || platformType === ".entitytemplate" ? "" : platformType),
 					folder: false,
-					path: entry.path
+					path: entry.path,
+					filetype: entry.filetype
 				})
 			} else {
 				tree.settings!.core.data.push({
 					id: entry.hash,
 					parent: "#",
 					icon: "fa-regular fa-file",
-					text: entry.hint ? `${entry.hint} (${entry.hash})` : entry.hash,
+					text: entry.hint ? `${entry.hint} (${entry.hash}.${entry.filetype})` : `${entry.hash}.${entry.filetype}`,
 					folder: false,
-					path: null
+					path: null,
+					filetype: entry.filetype
 				})
 			}
 		}

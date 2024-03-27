@@ -209,7 +209,7 @@ externalScene: string | null;
  */
 exposedEntity?: string | null }
 
-export type GameBrowserEntry = { hash: string; path: string | null; hint: string | null }
+export type GameBrowserEntry = { hash: string; path: string | null; hint: string | null; filetype: string }
 
 export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: string } | { type: "openInEditor"; data: string }
 
@@ -408,9 +408,9 @@ export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; da
 
 export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } }
 
-export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } }
+export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "followDependencyInNewTab"; data: { id: string; hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } }
 
-export type ResourceOverviewRequest = { type: "initialise"; data: { id: string; hash: string; chunk_patch: string; path_or_hint: string | null; 
+export type ResourceOverviewRequest = { type: "initialise"; data: { id: string; hash: string; filetype: string; chunk_patch: string; path_or_hint: string | null; 
 /**
  * Hash, type, path/hint, flag
  */

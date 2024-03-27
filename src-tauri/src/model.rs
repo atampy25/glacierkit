@@ -113,7 +113,8 @@ impl Default for ProjectSettings {
 pub struct GameBrowserEntry {
 	pub hash: String,
 	pub path: Option<String>,
-	pub hint: Option<String>
+	pub hint: Option<String>,
+	pub filetype: String
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -399,6 +400,11 @@ strike! {
 					new_hash: String
 				},
 
+				FollowDependencyInNewTab {
+					id: Uuid,
+					hash: String
+				},
+
 				OpenInEditor {
 					id: Uuid
 				},
@@ -623,6 +629,7 @@ strike! {
 				Initialise {
 					id: Uuid,
 					hash: String,
+					filetype: String,
 					chunk_patch: String,
 					path_or_hint: Option<String>,
 
