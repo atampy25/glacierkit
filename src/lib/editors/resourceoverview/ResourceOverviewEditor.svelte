@@ -4,7 +4,7 @@
 	import { Button } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
-	import Export from "carbon-icons-svelte/lib/Export.svelte"
+	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
 	import { trackEvent } from "@aptabase/tauri"
 
 	export let id: string
@@ -93,7 +93,7 @@
 					}}>Open in editor</Button
 				>
 				<Button
-					icon={Export}
+					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract entity to QN JSON")
 
@@ -112,7 +112,7 @@
 					}}>Extract as QuickEntity JSON</Button
 				>
 				<Button
-					icon={Export}
+					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract TEMP as binary file")
 
@@ -131,7 +131,7 @@
 					}}>Extract TEMP as binary file</Button
 				>
 				<Button
-					icon={Export}
+					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract TEMP as RT JSON")
 
@@ -150,7 +150,7 @@
 					}}>Extract TEMP as ResourceLib JSON</Button
 				>
 				<Button
-					icon={Export}
+					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract TBLU as binary file")
 
@@ -169,7 +169,7 @@
 					}}>Extract TBLU as binary file</Button
 				>
 				<Button
-					icon={Export}
+					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract TBLU as RT JSON")
 
@@ -289,7 +289,7 @@
 			<h4 class="mb-1">Actions</h4>
 			<div class="flex flex-wrap gap-2 mb-4">
 				<Button
-					icon={Export}
+					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract generic file")
 
