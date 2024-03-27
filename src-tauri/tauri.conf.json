@@ -54,7 +54,8 @@
 				"resizable": true,
 				"title": "Deeznuts",
 				"width": 1280,
-				"decorations": false
+				"decorations": false,
+				"visible": false
 			}
 		]
 	}

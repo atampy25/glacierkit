@@ -286,6 +286,8 @@
 					}
 				}
 			})
+
+			appWindow.show()
 		}
 	})
 
