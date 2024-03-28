@@ -26,6 +26,14 @@
 				externalScenes = request.data.external_scenes
 				break
 
+			case "setFactoryHash":
+				factoryHash = request.data.factory_hash
+				break
+
+			case "setBlueprintHash":
+				blueprintHash = request.data.blueprint_hash
+				break
+
 			case "setHashModificationAllowed":
 				hashModificationAllowed = request.data.hash_modification_allowed
 				break

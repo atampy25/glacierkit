@@ -3026,11 +3026,25 @@ fn event(app: AppHandle, event: Event) {
 
 								EntityMetadataEvent::SetFactoryHash {
 									editor_id,
-									factory_hash
+									mut factory_hash
 								} => {
 									let mut editor_state = app_state.editor_states.write().await;
 
 									let mut is_patch_editor = false;
+
+									if factory_hash != normalise_to_hash(factory_hash.to_owned()) {
+										factory_hash = normalise_to_hash(factory_hash);
+
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+												EntityMetadataRequest::SetFactoryHash {
+													editor_id: editor_id.to_owned(),
+													factory_hash: factory_hash.to_owned()
+												}
+											)))
+										)?;
+									}
 
 									{
 										let editor_state =
@@ -3088,11 +3102,25 @@ fn event(app: AppHandle, event: Event) {
 
 								EntityMetadataEvent::SetBlueprintHash {
 									editor_id,
-									blueprint_hash
+									mut blueprint_hash
 								} => {
 									let mut editor_state = app_state.editor_states.write().await;
 
 									let mut is_patch_editor = false;
+
+									if blueprint_hash != normalise_to_hash(blueprint_hash.to_owned()) {
+										blueprint_hash = normalise_to_hash(blueprint_hash);
+
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+												EntityMetadataRequest::SetBlueprintHash {
+													editor_id: editor_id.to_owned(),
+													blueprint_hash: blueprint_hash.to_owned()
+												}
+											)))
+										)?;
+									}
 
 									{
 										let editor_state =

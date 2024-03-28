@@ -616,6 +616,16 @@ strike! {
 					SetHashModificationAllowed {
 						editor_id: Uuid,
 						hash_modification_allowed: bool
+					},
+
+					SetFactoryHash {
+						editor_id: Uuid,
+						factory_hash: String
+					},
+
+					SetBlueprintHash {
+						editor_id: Uuid,
+						blueprint_hash: String
 					}
 				}),
 
