@@ -37,7 +37,8 @@ use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
 use entity::{
 	calculate_reverse_references, check_local_references_exist, get_decorations, get_local_reference,
-	get_recursive_children, random_entity_id, CopiedEntityData, ReverseReferenceData
+	get_recursive_children, is_valid_entity_blueprint, is_valid_entity_factory, random_entity_id, CopiedEntityData,
+	ReverseReferenceData
 };
 use event_handling::{
 	entity_overrides::send_overrides_decorations,
@@ -2420,18 +2421,13 @@ fn event(app: AppHandle, event: Event) {
 											.context("No such game install")?
 											.version;
 
-										if {
-											let res_type = &hash_list
+										if is_valid_entity_factory(
+											&hash_list
 												.entries
 												.get(&file)
 												.context("File not in hash list")?
-												.resource_type;
-
-											res_type == "TEMP"
-												|| res_type == "CPPT" || res_type == "ASET" || res_type == "UICT"
-												|| res_type == "MATT" || res_type == "WSWT" || res_type == "ECPT"
-												|| res_type == "AIBX" || res_type == "WSGT"
-										} {
+												.resource_type
+										) {
 											let (temp_meta, temp_data) =
 												extract_latest_resource(resource_packages, hash_list, &file)?;
 
@@ -2575,6 +2571,57 @@ fn event(app: AppHandle, event: Event) {
 												if sub_entity
 													!= *entity.entities.get(&entity_id).context("No such sub-entity")?
 												{
+													if let Some(hash_list) = app_state.hash_list.load().as_ref() {
+														if let Some(entry) = hash_list
+															.entries
+															.get(&normalise_to_hash(sub_entity.factory.to_owned()))
+														{
+															if !is_valid_entity_factory(&entry.resource_type) {
+																send_request(
+																	&app,
+																	Request::Editor(EditorRequest::Entity(
+																		EntityEditorRequest::Monaco(
+																			EntityMonacoRequest::UpdateValidity {
+																				editor_id,
+																				validity: EditorValidity::Invalid(
+																					"Invalid factory; unsupported \
+																					 resource type"
+																						.into()
+																				)
+																			}
+																		)
+																	))
+																)?;
+
+																return;
+															}
+														}
+
+														if let Some(entry) = hash_list
+															.entries
+															.get(&normalise_to_hash(sub_entity.blueprint.to_owned()))
+														{
+															if !is_valid_entity_blueprint(&entry.resource_type) {
+																send_request(
+																	&app,
+																	Request::Editor(EditorRequest::Entity(
+																		EntityEditorRequest::Monaco(
+																			EntityMonacoRequest::UpdateValidity {
+																				editor_id,
+																				validity: EditorValidity::Invalid(
+																					"Invalid blueprint; unsupported \
+																					 resource type"
+																						.into()
+																				)
+																			}
+																		)
+																	))
+																)?;
+
+																return;
+															}
+														}
+													}
 													let mut reverse_parent_refs: HashSet<String> = HashSet::new();
 
 													for entity_data in entity.entities.values() {

@@ -258,6 +258,10 @@ pub fn ensure_entity_in_cache(
 
 	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, factory_hash)?;
 
+	if temp_meta.hash_resource_type != "TEMP" {
+		bail!("Given factory was not a TEMP");
+	}
+
 	let factory =
 		match game_version {
 			GameVersion::H1 => convert_2016_factory_to_modern(

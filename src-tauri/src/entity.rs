@@ -1113,3 +1113,28 @@ pub fn get_decorations(
 
 	decorations.into_iter().unique().collect()
 }
+
+pub fn is_valid_entity_factory(resource_type: &str) -> bool {
+	resource_type == "TEMP"
+		|| resource_type == "CPPT"
+		|| resource_type == "ASET"
+		|| resource_type == "UICT"
+		|| resource_type == "MATT"
+		|| resource_type == "WSWT"
+		|| resource_type == "ECPT"
+		|| resource_type == "AIBX"
+		|| resource_type == "WSGT"
+}
+
+pub fn is_valid_entity_blueprint(resource_type: &str) -> bool {
+	resource_type == "TBLU"
+		|| resource_type == "CBLU"
+		|| resource_type == "ASEB"
+		|| resource_type == "UICB"
+		|| resource_type == "MATB"
+		|| resource_type == "WSWB"
+		|| resource_type == "DSWB"
+		|| resource_type == "ECPB"
+		|| resource_type == "AIBB"
+		|| resource_type == "WSGB"
+}
