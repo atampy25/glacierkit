@@ -31,7 +31,8 @@
 					icons: true
 				},
 				check_callback: false,
-				force_text: true
+				force_text: true,
+				keyboard: {}
 			},
 			search: {
 				fuzzy: true,

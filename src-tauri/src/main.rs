@@ -2682,6 +2682,18 @@ fn event(app: AppHandle, event: Event) {
 
 														finish_task(&app, task)?;
 													}
+												} else {
+													send_request(
+														&app,
+														Request::Editor(EditorRequest::Entity(
+															EntityEditorRequest::Monaco(
+																EntityMonacoRequest::UpdateValidity {
+																	editor_id,
+																	validity: EditorValidity::Valid
+																}
+															)
+														))
+													)?;
 												}
 											}
 
