@@ -310,7 +310,7 @@
 					</div>
 				</div>
 			</div>
-		{:else if data.type === "Generic"}
+		{:else}
 			<div class="text-2xl mb-2 font-bold break-all">
 				{pathOrHint || "No path"}
 			</div>

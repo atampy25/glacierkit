@@ -84,7 +84,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, json, to_string, to_vec};
 use show_in_folder::show_in_folder;
 use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
-use tauri::{async_runtime, AppHandle, Manager};
+use tauri::{async_runtime, AppHandle, Manager, State};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
@@ -2753,75 +2753,113 @@ fn event(app: AppHandle, event: Event) {
 									{
 										let factory = normalise_to_hash(factory);
 
-										let task = start_task(&app, format!("Loading entity {}", factory))?;
+										if let Ok((filetype, _, _)) =
+											extract_latest_overview_info(resource_packages, &factory)
+										{
+											if filetype == "TEMP" {
+												let task = start_task(&app, format!("Loading entity {}", factory))?;
 
-										let game_install_data = app_state
-											.game_installs
-											.iter()
-											.try_find(|x| anyhow::Ok(x.path == *install))?
-											.context("No such game install")?;
+												let game_install_data = app_state
+													.game_installs
+													.iter()
+													.try_find(|x| anyhow::Ok(x.path == *install))?
+													.context("No such game install")?;
 
-										ensure_entity_in_cache(
-											resource_packages,
-											&app_state.cached_entities,
-											game_install_data.version,
-											hash_list,
-											&factory
-										)?;
+												ensure_entity_in_cache(
+													resource_packages,
+													&app_state.cached_entities,
+													game_install_data.version,
+													hash_list,
+													&factory
+												)?;
 
-										let entity = app_state.cached_entities.read().get(&factory).unwrap().to_owned();
+												let entity =
+													app_state.cached_entities.read().get(&factory).unwrap().to_owned();
 
-										let default_tab_name = format!(
-											"{} ({})",
-											entity
-												.entities
-												.get(&entity.root_entity)
-												.context("Root entity doesn't exist")?
-												.name,
-											factory
-										);
+												let default_tab_name = format!(
+													"{} ({})",
+													entity
+														.entities
+														.get(&entity.root_entity)
+														.context("Root entity doesn't exist")?
+														.name,
+													factory
+												);
 
-										let tab_name = if let Some(entry) = hash_list.entries.get(&factory) {
-											if let Some(path) = entry.path.as_ref() {
-												path.replace("].pc_entitytype", "")
-													.replace("].pc_entitytemplate", "")
-													.split('/')
-													.last()
-													.map(|x| x.to_owned())
-													.unwrap_or(default_tab_name)
-											} else if let Some(hint) = entry.hint.as_ref() {
-												format!("{} ({})", hint, factory)
+												let tab_name = if let Some(entry) = hash_list.entries.get(&factory) {
+													if let Some(path) = entry.path.as_ref() {
+														path.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(default_tab_name)
+													} else if let Some(hint) = entry.hint.as_ref() {
+														format!("{} ({})", hint, factory)
+													} else {
+														default_tab_name
+													}
+												} else {
+													default_tab_name
+												};
+
+												let id = Uuid::new_v4();
+
+												app_state.editor_states.write().await.insert(
+													id.to_owned(),
+													EditorState {
+														file: None,
+														data: EditorData::QNPatch {
+															base: Box::new(entity.to_owned()),
+															current: Box::new(entity.to_owned()),
+															settings: Default::default()
+														}
+													}
+												);
+
+												send_request(
+													&app,
+													Request::Global(GlobalRequest::CreateTab {
+														id,
+														name: tab_name,
+														editor_type: EditorType::QNPatch
+													})
+												)?;
+
+												finish_task(&app, task)?;
 											} else {
-												default_tab_name
+												let id = Uuid::new_v4();
+
+												app_state.editor_states.write().await.insert(
+													id.to_owned(),
+													EditorState {
+														file: None,
+														data: EditorData::ResourceOverview {
+															hash: factory.to_owned()
+														}
+													}
+												);
+
+												send_request(
+													&app,
+													Request::Global(GlobalRequest::CreateTab {
+														id,
+														name: format!("Resource overview ({factory})"),
+														editor_type: EditorType::ResourceOverview
+													})
+												)?;
 											}
 										} else {
-											default_tab_name
-										};
-
-										let id = Uuid::new_v4();
-
-										app_state.editor_states.write().await.insert(
-											id.to_owned(),
-											EditorState {
-												file: None,
-												data: EditorData::QNPatch {
-													base: Box::new(entity.to_owned()),
-													current: Box::new(entity.to_owned()),
-													settings: Default::default()
+											send_notification(
+												&app,
+												Notification {
+													kind: NotificationKind::Error,
+													title: "Not a vanilla resource".into(),
+													subtitle: "This factory doesn't exist in the base game files."
+														.into()
 												}
-											}
-										);
-
-										send_request(
-											&app,
-											Request::Global(GlobalRequest::CreateTab {
-												id,
-												name: tab_name,
-												editor_type: EditorType::QNPatch
-											})
-										)?;
-
-										finish_task(&app, task)?;
+											)?;
+										}
 									} else {
 										send_notification(
 											&app,
@@ -3349,99 +3387,15 @@ fn event(app: AppHandle, event: Event) {
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
-									let (filetype, chunk_patch, deps) =
-										extract_latest_overview_info(resource_packages, hash)?;
-
-									send_request(
+									initialise_resource_overview(
 										&app,
-										Request::Editor(EditorRequest::ResourceOverview(
-											ResourceOverviewRequest::Initialise {
-												id,
-												hash: hash.to_owned(),
-												filetype,
-												chunk_patch,
-												path_or_hint: hash_list
-													.entries
-													.get(hash)
-													.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
-												dependencies: deps
-													.iter()
-													.map(|(hash, flag)| {
-														(
-															hash.to_owned(),
-															hash_list
-																.entries
-																.get(hash)
-																.map(|x| x.resource_type.to_owned())
-																.unwrap_or("".into()),
-															hash_list.entries.get(hash).and_then(|x| {
-																x.path.as_ref().or(x.hint.as_ref()).cloned()
-															}),
-															flag.to_owned()
-														)
-													})
-													.collect(),
-												reverse_dependencies: resource_reverse_dependencies
-													.get(hash)
-													.map(|hashes| {
-														hashes
-															.iter()
-															.map(|hash| {
-																(
-																	hash.to_owned(),
-																	hash_list
-																		.entries
-																		.get(hash)
-																		.expect("No entry in hash list for resource")
-																		.resource_type
-																		.to_owned(),
-																	hash_list.entries.get(hash).and_then(|x| {
-																		x.path.as_ref().or(x.hint.as_ref()).cloned()
-																	})
-																)
-															})
-															.collect()
-													})
-													.unwrap_or(vec![]),
-												data: match hash_list
-													.entries
-													.get(hash)
-													.expect("No entry in hash list for resource")
-													.resource_type
-													.as_ref()
-												{
-													"TEMP" => {
-														ensure_entity_in_cache(
-															resource_packages,
-															&app_state.cached_entities,
-															app_state
-																.game_installs
-																.iter()
-																.try_find(|x| anyhow::Ok(x.path == *install))?
-																.context("No such game install")?
-																.version,
-															hash_list,
-															hash
-														)?;
-
-														let entity = app_state.cached_entities.read();
-														let entity = entity.get(hash).unwrap();
-
-														ResourceOverviewData::Entity {
-															blueprint_hash: entity.blueprint_hash.to_owned(),
-															blueprint_path_or_hint: hash_list
-																.entries
-																.get(&entity.blueprint_hash)
-																.and_then(|x| {
-																	x.path.as_ref().or(x.hint.as_ref()).cloned()
-																})
-														}
-													}
-
-													_ => ResourceOverviewData::Generic
-												}
-											}
-										))
+										&app_state,
+										id,
+										hash,
+										resource_packages,
+										resource_reverse_dependencies,
+										install,
+										hash_list
 									)?;
 								}
 
@@ -3471,111 +3425,30 @@ fn event(app: AppHandle, event: Event) {
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
-									let (filetype, chunk_patch, deps) =
-										extract_latest_overview_info(resource_packages, hash)?;
+									initialise_resource_overview(
+										&app,
+										&app_state,
+										id,
+										hash,
+										resource_packages,
+										resource_reverse_dependencies,
+										install,
+										hash_list
+									)?;
 
 									send_request(
 										&app,
-										Request::Editor(EditorRequest::ResourceOverview(
-											ResourceOverviewRequest::Initialise {
-												id: id.to_owned(),
-												hash: hash.to_owned(),
-												filetype,
-												chunk_patch,
-												path_or_hint: hash_list
-													.entries
-													.get(hash)
-													.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
-												dependencies: deps
-													.iter()
-													.map(|(hash, flag)| {
-														(
-															hash.to_owned(),
-															hash_list
-																.entries
-																.get(hash)
-																.map(|x| x.resource_type.to_owned())
-																.unwrap_or("".into()),
-															hash_list.entries.get(hash).and_then(|x| {
-																x.path.as_ref().or(x.hint.as_ref()).cloned()
-															}),
-															flag.to_owned()
-														)
-													})
-													.collect(),
-												reverse_dependencies: resource_reverse_dependencies
-													.get(hash)
-													.map(|hashes| {
-														hashes
-															.iter()
-															.map(|hash| {
-																(
-																	hash.to_owned(),
-																	hash_list
-																		.entries
-																		.get(hash)
-																		.expect("No entry in hash list for resource")
-																		.resource_type
-																		.to_owned(),
-																	hash_list.entries.get(hash).and_then(|x| {
-																		x.path.as_ref().or(x.hint.as_ref()).cloned()
-																	})
-																)
-															})
-															.collect()
-													})
-													.unwrap_or(vec![]),
-												data: match hash_list
-													.entries
-													.get(hash)
-													.expect("No entry in hash list for resource")
-													.resource_type
-													.as_ref()
-												{
-													"TEMP" => {
-														ensure_entity_in_cache(
-															resource_packages,
-															&app_state.cached_entities,
-															app_state
-																.game_installs
-																.iter()
-																.try_find(|x| anyhow::Ok(x.path == *install))?
-																.context("No such game install")?
-																.version,
-															hash_list,
-															hash
-														)?;
-
-														let entity = app_state.cached_entities.read();
-														let entity = entity.get(hash).unwrap();
-
-														ResourceOverviewData::Entity {
-															blueprint_hash: entity.blueprint_hash.to_owned(),
-															blueprint_path_or_hint: hash_list
-																.entries
-																.get(&entity.blueprint_hash)
-																.and_then(|x| {
-																	x.path.as_ref().or(x.hint.as_ref()).cloned()
-																})
-														}
-													}
-
-													_ => ResourceOverviewData::Generic
-												}
-											}
-										))
+										Request::Global(GlobalRequest::RenameTab {
+											id,
+											new_name: format!("Resource overview ({new_hash})")
+										})
 									)?;
-
-									send_request(&app, Request::Global(GlobalRequest::RenameTab {
-										id,
-										new_name: format!("Resource overview ({new_hash})")
-									}));
 								}
 
 								finish_task(&app, task)?;
 							}
 
-							ResourceOverviewEvent::FollowDependencyInNewTab { id, hash } => {
+							ResourceOverviewEvent::FollowDependencyInNewTab { hash, .. } => {
 								let id = Uuid::new_v4();
 
 								app_state.editor_states.write().await.insert(
@@ -4507,6 +4380,116 @@ fn event(app: AppHandle, event: Event) {
 				.expect("Couldn't send error report to frontend");
 		}
 	});
+}
+
+#[try_fn]
+#[context("Couldn't initialise resource overview {id}")]
+pub fn initialise_resource_overview(
+	app: &AppHandle,
+	app_state: &State<AppState>,
+	id: Uuid,
+	hash: &String,
+	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	resource_reverse_dependencies: &Arc<HashMap<String, Vec<String>>>,
+	install: &PathBuf,
+	hash_list: &Arc<HashList>
+) -> Result<()> {
+	let (filetype, chunk_patch, deps) = extract_latest_overview_info(resource_packages, hash)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::ResourceOverview(ResourceOverviewRequest::Initialise {
+			id,
+			hash: hash.to_owned(),
+			filetype,
+			chunk_patch,
+			path_or_hint: hash_list
+				.entries
+				.get(hash)
+				.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
+			dependencies: deps
+				.iter()
+				.map(|(hash, flag)| {
+					(
+						hash.to_owned(),
+						hash_list
+							.entries
+							.get(hash)
+							.map(|x| x.resource_type.to_owned())
+							.unwrap_or("".into()),
+						hash_list
+							.entries
+							.get(hash)
+							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
+						flag.to_owned()
+					)
+				})
+				.collect(),
+			reverse_dependencies: resource_reverse_dependencies
+				.get(hash)
+				.map(|hashes| {
+					hashes
+						.iter()
+						.map(|hash| {
+							(
+								hash.to_owned(),
+								hash_list
+									.entries
+									.get(hash)
+									.expect("No entry in hash list for resource")
+									.resource_type
+									.to_owned(),
+								hash_list
+									.entries
+									.get(hash)
+									.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
+							)
+						})
+						.collect()
+				})
+				.unwrap_or_default(),
+			data: match hash_list
+				.entries
+				.get(hash)
+				.expect("No entry in hash list for resource")
+				.resource_type
+				.as_ref()
+			{
+				"TEMP" => {
+					ensure_entity_in_cache(
+						resource_packages,
+						&app_state.cached_entities,
+						app_state
+							.game_installs
+							.iter()
+							.try_find(|x| anyhow::Ok(x.path == *install))?
+							.context("No such game install")?
+							.version,
+						hash_list,
+						hash
+					)?;
+
+					let entity = app_state.cached_entities.read();
+					let entity = entity.get(hash).unwrap();
+
+					ResourceOverviewData::Entity {
+						blueprint_hash: entity.blueprint_hash.to_owned(),
+						blueprint_path_or_hint: hash_list
+							.entries
+							.get(&entity.blueprint_hash)
+							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
+					}
+				}
+
+				"AIRG" | "TBLU" | "RTLV" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "DSWB" | "GFXF" | "GIDX"
+				| "WSGB" | "ECPB" | "UICB" | "ENUM" => ResourceOverviewData::GenericRL,
+
+				"ORES" => ResourceOverviewData::Ores,
+
+				_ => ResourceOverviewData::Generic
+			}
+		}))
+	)?;
 }
 
 #[try_fn]

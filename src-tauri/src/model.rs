@@ -166,7 +166,9 @@ pub enum ResourceOverviewData {
 	Entity {
 		blueprint_hash: String,
 		blueprint_path_or_hint: Option<String>
-	}
+	},
+	GenericRL,
+	Ores
 }
 
 strike! {
@@ -427,7 +429,15 @@ strike! {
 
 				ExtractTBLUAsRT {
 					id: Uuid
-				}
+				},
+
+				// ExtractAsRTGeneric {
+				// 	id: Uuid
+				// },
+
+				// ExtractAsOres {
+				// 	id: Uuid
+				// }
 			})
 		}),
 
