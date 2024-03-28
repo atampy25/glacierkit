@@ -222,6 +222,13 @@
 										delete pathToID[oldPath]
 										pathToID[newPath] = node.id
 
+										tree.set_icon(
+											node.id,
+											icons.find((a) => newPath.split(".").at(-1)?.includes(a[0]))
+												? icons.find((a) => newPath.split(".").at(-1)?.includes(a[0]))![1]
+												: "fa-regular fa-file"
+										)
+
 										await event({
 											type: "tool",
 											data: {
