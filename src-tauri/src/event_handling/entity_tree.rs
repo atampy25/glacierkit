@@ -1,30 +1,222 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+	collections::{HashMap, HashSet},
+	io::{BufReader, Cursor},
+	ops::Deref
+};
 
 use anyhow::{anyhow, Context, Result};
+use arc_swap::ArcSwap;
 use fn_error_context::context;
 use itertools::Itertools;
 use quickentity_rs::{
-	apply_patch,
+	apply_patch, convert_2016_factory_to_modern,
 	patch_structs::{Patch, PatchOperation, SubEntityOperation},
-	qn_structs::{FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue}
+	qn_structs::{FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity}
 };
-use serde_json::{from_value, to_value, Value};
+use serde::Serialize;
+use serde_json::{from_value, json, to_value, Value};
+use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
 	entity::{
-		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local,
-		get_local_reference, get_recursive_children, random_entity_id, CopiedEntityData, ReverseReferenceData
+		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local, get_decorations,
+		get_local_reference, get_recursive_children, is_valid_entity_factory, random_entity_id, CopiedEntityData,
+		ReverseReferenceData
 	},
 	finish_task,
+	game_detection::GameVersion,
 	model::{
-		AppState, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest, EntityTreeRequest,
-		GlobalRequest, Request
+		AppSettings, AppState, EditorData, EditorRequest, EditorValidity, EntityEditorRequest, EntityMetaPaneRequest,
+		EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
 	},
+	resourcelib::{
+		h2016_convert_binary_to_factory, h2016_convert_cppt, h2_convert_binary_to_factory, h2_convert_cppt,
+		h3_convert_binary_to_factory, h3_convert_cppt
+	},
+	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash},
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
+
+#[try_fn]
+#[context("Couldn't handle select event")]
+pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
+
+	let editor_state = app_state.editor_states.read().await;
+	let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref entity, .. } => entity,
+		EditorData::QNPatch { ref current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let task = start_task(&app, format!("Selecting {}", id))?;
+
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	entity
+		.entities
+		.get(&id)
+		.context("No such entity")?
+		.serialize(&mut ser)?;
+
+	send_request(
+		&app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::ReplaceContent {
+				editor_id: editor_id.to_owned(),
+				entity_id: id.to_owned(),
+				content: String::from_utf8(buf)?
+			}
+		)))
+	)?;
+
+	send_request(
+		&app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::UpdateValidity {
+				editor_id,
+				validity: EditorValidity::Valid
+			}
+		)))
+	)?;
+
+	let reverse_refs = calculate_reverse_references(entity)?
+		.remove(&id)
+		.context("No such entity")?;
+
+	let settings = match editor_state.data {
+		EditorData::QNEntity { ref settings, .. } => settings,
+		EditorData::QNPatch { ref settings, .. } => settings,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	send_request(
+		&app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
+			EntityMetaPaneRequest::SetReverseRefs {
+				editor_id: editor_id.to_owned(),
+				entity_names: reverse_refs
+					.iter()
+					.filter(|x| settings.show_reverse_parent_refs || !matches!(x.data, ReverseReferenceData::Parent))
+					.map(|x| (x.from.to_owned(), entity.entities.get(&x.from).unwrap().name.to_owned()))
+					.collect(),
+				reverse_refs: reverse_refs
+					.into_iter()
+					.filter(|x| settings.show_reverse_parent_refs || !matches!(x.data, ReverseReferenceData::Parent))
+					.collect()
+			}
+		)))
+	)?;
+
+	send_request(
+		&app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
+			EntityMetaPaneRequest::SetNotes {
+				editor_id: editor_id.to_owned(),
+				entity_id: id.to_owned(),
+				notes: entity
+					.comments
+					.iter()
+					.find(|x| matches!(x.parent, Ref::Short(Some(ref x)) if *x == id))
+					.map(|x| x.text.deref())
+					.unwrap_or("")
+					.into()
+			}
+		)))
+	)?;
+
+	finish_task(&app, task)?;
+
+	if let Some(intellisense) = app_state.intellisense.load().as_ref()
+		&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+	{
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.try_find(|x| anyhow::Ok(x.path == *install))?
+			.context("No such game install")?
+			.version;
+
+		let task = start_task(&app, format!("Gathering intellisense data for {}", id))?;
+
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::UpdateIntellisense {
+					editor_id: editor_id.to_owned(),
+					entity_id: id.to_owned(),
+					properties: intellisense.get_properties(
+						resource_packages,
+						&app_state.cached_entities,
+						hash_list,
+						game_version,
+						entity,
+						&id,
+						true
+					)?,
+					pins: intellisense.get_pins(
+						resource_packages,
+						&app_state.cached_entities,
+						hash_list,
+						game_version,
+						entity,
+						&id,
+						false
+					)?
+				}
+			)))
+		)?;
+
+		finish_task(&app, task)?;
+
+		let task = start_task(&app, format!("Computing decorations for {}", id))?;
+
+		let decorations = get_decorations(
+			resource_packages,
+			&app_state.cached_entities,
+			hash_list,
+			game_version,
+			entity.entities.get(&id).context("No such entity")?,
+			entity
+		)?;
+
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
+					editor_id: editor_id.to_owned(),
+					entity_id: id.to_owned(),
+					local_ref_entity_ids: decorations
+						.iter()
+						.filter(|(x, _)| entity.entities.contains_key(x))
+						.map(|(x, _)| x.to_owned())
+						.collect(),
+					decorations
+				}
+			)))
+		)?;
+
+		finish_task(&app, task)?;
+	}
+}
 
 #[try_fn]
 #[context("Couldn't handle delete event")]
@@ -909,4 +1101,774 @@ pub async fn handle_paste(
 			unsaved: true
 		})
 	)?;
+}
+
+#[try_fn]
+#[context("Couldn't handle help menu event")]
+pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(&app, format!("Showing help menu for {}", entity_id))?;
+
+	let editor_state = app_state.editor_states.read().await;
+	let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref entity, .. } => entity,
+		EditorData::QNPatch { ref current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let sub_entity = entity.entities.get(&entity_id).context("No such entity")?;
+
+	if let Some(intellisense) = app_state.intellisense.load().as_ref()
+		&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+	{
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.try_find(|x| anyhow::Ok(x.path == *install))?
+			.context("No such game install")?
+			.version;
+
+		let (properties, pins) = if hash_list
+			.entries
+			.get(&sub_entity.factory)
+			.map(|entry| entry.resource_type == "TEMP")
+			.unwrap_or(false)
+		{
+			ensure_entity_in_cache(
+				resource_packages,
+				&app_state.cached_entities,
+				game_version,
+				hash_list,
+				&normalise_to_hash(sub_entity.factory.to_owned())
+			)?;
+
+			let underlying_entity = app_state.cached_entities.read();
+			let underlying_entity = underlying_entity
+				.get(&normalise_to_hash(sub_entity.factory.to_owned()))
+				.unwrap();
+
+			(
+				intellisense.get_properties(
+					resource_packages,
+					&app_state.cached_entities,
+					hash_list,
+					game_version,
+					underlying_entity,
+					&underlying_entity.root_entity,
+					false
+				)?,
+				intellisense.get_pins(
+					resource_packages,
+					&app_state.cached_entities,
+					hash_list,
+					game_version,
+					underlying_entity,
+					&underlying_entity.root_entity,
+					false
+				)?
+			)
+		} else {
+			(
+				intellisense.get_properties(
+					resource_packages,
+					&app_state.cached_entities,
+					hash_list,
+					game_version,
+					entity,
+					&entity_id,
+					true
+				)?,
+				intellisense.get_pins(
+					resource_packages,
+					&app_state.cached_entities,
+					hash_list,
+					game_version,
+					entity,
+					&entity_id,
+					true
+				)?
+			)
+		};
+
+		let properties_data_str = {
+			let mut buf = Vec::new();
+			let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+			let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+			properties
+				.into_iter()
+				.map(|(name, ty, default_val, post_init)| {
+					(
+						name,
+						if post_init {
+							json!({
+								"type": ty,
+								"value": default_val,
+								"postInit": true
+							})
+						} else {
+							json!({
+								"type": ty,
+								"value": default_val
+							})
+						}
+					)
+				})
+				.collect::<HashMap<_, _>>()
+				.serialize(&mut ser)?;
+
+			String::from_utf8(buf)?
+		};
+
+		let ss = SyntaxSet::load_defaults_newlines();
+
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::ShowHelpMenu {
+					editor_id,
+					factory: sub_entity.factory.to_owned(),
+					input_pins: pins.0,
+					output_pins: pins.1,
+					default_properties_html: highlighted_html_for_string(
+						&properties_data_str,
+						&ss,
+						ss.find_syntax_by_extension("json").unwrap(),
+						&ThemeSet::load_from_reader(&mut BufReader::new(Cursor::new(include_bytes!(
+							"../../assets/vs-dark.tmTheme"
+						))))?
+					)?
+				}
+			)))
+		)?;
+	} else {
+		send_notification(
+			&app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "Help menu unavailable".into(),
+				subtitle: "A copy of the game hasn't been selected, or the hash list is unavailable.".into()
+			}
+		)?;
+	}
+
+	finish_task(&app, task)?;
+}
+
+#[try_fn]
+#[context("Couldn't handle game browser add event")]
+pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: String, file: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(&app, format!("Adding {}", file))?;
+
+	let mut editor_state = app_state.editor_states.write().await;
+	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+	{
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.try_find(|x| anyhow::Ok(x.path == *install))?
+			.context("No such game install")?
+			.version;
+
+		if is_valid_entity_factory(
+			&hash_list
+				.entries
+				.get(&file)
+				.context("File not in hash list")?
+				.resource_type
+		) {
+			let entity_id = random_entity_id();
+
+			let sub_entity = match hash_list
+				.entries
+				.get(&file)
+				.context("File not in hash list")?
+				.resource_type
+				.as_str()
+			{
+				"TEMP" => {
+					let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, &file)?;
+
+					let factory = match game_version {
+						GameVersion::H1 => convert_2016_factory_to_modern(
+							&h2016_convert_binary_to_factory(&temp_data)
+								.context("Couldn't convert binary data to ResourceLib factory")?
+						),
+
+						GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
+							.context("Couldn't convert binary data to ResourceLib factory")?,
+
+						GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
+							.context("Couldn't convert binary data to ResourceLib factory")?
+					};
+
+					let blueprint_hash = &temp_meta
+						.hash_reference_data
+						.get(factory.blueprint_index_in_resource_header as usize)
+						.context("Blueprint referenced in factory does not exist in dependencies")?
+						.hash;
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"CPPT" => {
+					let (cppt_meta, cppt_data) = extract_latest_resource(resource_packages, hash_list, &file)?;
+
+					let factory =
+						match game_version {
+							GameVersion::H1 => h2016_convert_cppt(&cppt_data)
+								.context("Couldn't convert binary data to ResourceLib format")?,
+
+							GameVersion::H2 => h2_convert_cppt(&cppt_data)
+								.context("Couldn't convert binary data to ResourceLib format")?,
+
+							GameVersion::H3 => h3_convert_cppt(&cppt_data)
+								.context("Couldn't convert binary data to ResourceLib format")?
+						};
+
+					let blueprint_hash = &cppt_meta
+						.hash_reference_data
+						.get(factory.blueprint_index_in_resource_header as usize)
+						.context("Blueprint referenced in factory does not exist in dependencies")?
+						.hash;
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace(".class", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"ASET" => {
+					let blueprint_hash = extract_latest_metadata(resource_packages, hash_list, &file)?
+						.hash_reference_data
+						.into_iter()
+						.last()
+						.context("ASET had no dependencies")?
+						.hash;
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(&blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path.to_owned(),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"UICT" => {
+					let blueprint_hash = extract_latest_metadata(resource_packages, hash_list, &file)?
+						.hash_reference_data
+						.into_iter()
+						.last()
+						.context("UICT had no dependencies")?
+						.hash;
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(&blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"MATT" => {
+					let blueprint_hash = {
+						let mut blueprint_hash = String::new();
+
+						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+							.hash_reference_data
+							.into_iter()
+						{
+							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
+								== "MATB"
+							{
+								blueprint_hash = dep.hash.to_owned();
+								break;
+							}
+						}
+
+						if blueprint_hash.is_empty() {
+							Err(anyhow!("MATT had no MATB dependency"))?;
+						}
+
+						blueprint_hash
+					};
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(&blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"WSWT" => {
+					let blueprint_hash = {
+						let mut blueprint_hash = String::new();
+
+						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+							.hash_reference_data
+							.into_iter()
+						{
+							let metadata = extract_latest_metadata(resource_packages, hash_list, &dep.hash)?;
+
+							if metadata.hash_resource_type == "WSWB" || metadata.hash_resource_type == "DSWB" {
+								blueprint_hash = dep.hash.to_owned();
+								break;
+							}
+						}
+
+						if blueprint_hash.is_empty() {
+							Err(anyhow!("WSWT had no WSWB/DSWB dependency"))?;
+						}
+
+						blueprint_hash
+					};
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(&blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"ECPT" => {
+					let blueprint_hash = {
+						let mut blueprint_hash = String::new();
+
+						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+							.hash_reference_data
+							.into_iter()
+						{
+							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
+								== "ECPB"
+							{
+								blueprint_hash = dep.hash.to_owned();
+								break;
+							}
+						}
+
+						if blueprint_hash.is_empty() {
+							Err(anyhow!("ECPT had no ECPB dependency"))?;
+						}
+
+						blueprint_hash
+					};
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(&blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"AIBX" => {
+					let blueprint_hash = {
+						let mut blueprint_hash = String::new();
+
+						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+							.hash_reference_data
+							.into_iter()
+						{
+							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
+								== "AIBB"
+							{
+								blueprint_hash = dep.hash.to_owned();
+								break;
+							}
+						}
+
+						if blueprint_hash.is_empty() {
+							Err(anyhow!("AIBX had no AIBB dependency"))?;
+						}
+
+						blueprint_hash
+					};
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(&blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				"WSGT" => {
+					let blueprint_hash = {
+						let mut blueprint_hash = String::new();
+
+						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+							.hash_reference_data
+							.into_iter()
+						{
+							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
+								== "WSGB"
+							{
+								blueprint_hash = dep.hash.to_owned();
+								break;
+							}
+						}
+
+						if blueprint_hash.is_empty() {
+							Err(anyhow!("WSGT had no WSGB dependency"))?;
+						}
+
+						blueprint_hash
+					};
+
+					let factory_path = hash_list
+						.entries
+						.get(&file)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(file);
+
+					let blueprint_path = hash_list
+						.entries
+						.get(&blueprint_hash)
+						.and_then(|x| x.path.to_owned())
+						.unwrap_or(blueprint_hash.to_owned());
+
+					SubEntity {
+						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+						name: factory_path
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.last()
+							.map(|x| x.to_owned())
+							.unwrap_or(factory_path.to_owned()),
+						factory: factory_path,
+						factory_flag: None,
+						blueprint: blueprint_path,
+						editor_only: None,
+						properties: None,
+						platform_specific_properties: None,
+						events: None,
+						input_copying: None,
+						output_copying: None,
+						property_aliases: None,
+						exposed_entities: None,
+						exposed_interfaces: None,
+						subsets: None
+					}
+				}
+
+				_ => unreachable!()
+			};
+
+			send_request(
+				&app,
+				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+					EntityTreeRequest::NewItems {
+						editor_id: editor_id.to_owned(),
+						new_entities: vec![(
+							entity_id.to_owned(),
+							sub_entity.parent.to_owned(),
+							sub_entity.name.to_owned(),
+							sub_entity.factory.to_owned(),
+							false
+						)]
+					}
+				)))
+			)?;
+
+			entity.entities.insert(entity_id, sub_entity);
+
+			send_request(
+				&app,
+				Request::Global(GlobalRequest::SetTabUnsaved {
+					id: editor_id,
+					unsaved: true
+				})
+			)?;
+		} else {
+			send_notification(
+				&app,
+				Notification {
+					kind: NotificationKind::Error,
+					title: "Not a valid template".into(),
+					subtitle: "Only entity templates can be dragged into the entity tree.".into()
+				}
+			)?;
+		}
+	} else {
+		send_notification(
+			&app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "Game data unavailable".into(),
+				subtitle: "A copy of the game hasn't been selected, or the hash list is unavailable.".into()
+			}
+		)?;
+	}
+
+	finish_task(&app, task)?;
 }

@@ -28,7 +28,7 @@
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
 		"You can save the active tab with Ctrl-S, or close it with Ctrl-W.",
-		"Drag an entity from the Game Content panel to the entity tree to create a new sub-entity with the given factory/blueprint.",
+		"Drag a valid template (entity, class, etc.) from the Game Content panel to the entity tree to create a new sub-entity with the given factory/blueprint.",
 		"Generate random UUIDs, calculate game hashes from paths, or calculate localisation hashes from strings with the Text Tools panel.",
 		"Pre-made templates for NPCs, logic entities and more are available from the Templates menu after right-clicking an entity.",
 		"Want to turn an existing entity.json file into a patch, or vice-versa? Right-click the entry in the Files panel and press Convert to Entity/Patch.",
