@@ -1,45 +1,24 @@
-use std::{
-	collections::{HashMap, HashSet},
-	io::{BufReader, Cursor},
-	ops::Deref
-};
+use std::collections::HashSet;
 
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
-use itertools::Itertools;
-use quickentity_rs::{
-	apply_patch, convert_2016_factory_to_modern,
-	patch_structs::{Patch, PatchOperation, SubEntityOperation},
-	qn_structs::{FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity}
-};
-use serde::Serialize;
-use serde_json::{from_str, from_value, json, to_value, Value};
-use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
+use quickentity_rs::qn_structs::Ref;
+
+use serde_json::from_str;
+
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
-	entity::{
-		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local,
-		check_local_references_exist, get_decorations, get_local_reference, get_recursive_children,
-		is_valid_entity_blueprint, is_valid_entity_factory, random_entity_id, CopiedEntityData, ReverseReferenceData
-	},
+	entity::{check_local_references_exist, get_decorations, is_valid_entity_blueprint, is_valid_entity_factory},
 	finish_task,
-	game_detection::GameVersion,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, EditorValidity, EntityEditorRequest,
-		EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
+		EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
 	},
-	resourcelib::{
-		h2016_convert_binary_to_factory, h2016_convert_cppt, h2_convert_binary_to_factory, h2_convert_cppt,
-		h3_convert_binary_to_factory, h3_convert_cppt
-	},
-	rpkg::{
-		ensure_entity_in_cache, extract_latest_metadata, extract_latest_overview_info, extract_latest_resource,
-		normalise_to_hash
-	},
+	rpkg::{ensure_entity_in_cache, extract_latest_overview_info, normalise_to_hash},
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
@@ -70,7 +49,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						if let Some(entry) = hash_list.entries.get(&normalise_to_hash(sub_entity.factory.to_owned())) {
 							if !is_valid_entity_factory(&entry.resource_type) {
 								send_request(
-									&app,
+									app,
 									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 										EntityMonacoRequest::UpdateValidity {
 											editor_id,
@@ -91,7 +70,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						{
 							if !is_valid_entity_blueprint(&entry.resource_type) {
 								send_request(
-									&app,
+									app,
 									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 										EntityMonacoRequest::UpdateValidity {
 											editor_id,
@@ -123,7 +102,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 					}
 
 					send_request(
-						&app,
+						app,
 						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 							EntityTreeRequest::NewItems {
 								editor_id,
@@ -141,7 +120,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 					entity.entities.insert(entity_id.to_owned(), sub_entity);
 
 					send_request(
-						&app,
+						app,
 						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 							EntityMonacoRequest::UpdateValidity {
 								editor_id,
@@ -151,7 +130,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 					)?;
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::SetTabUnsaved {
 							id: editor_id,
 							unsaved: true
@@ -169,7 +148,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							.context("No such game install")?
 							.version;
 
-						let task = start_task(&app, "Updating decorations")?;
+						let task = start_task(app, "Updating decorations")?;
 
 						let decorations = get_decorations(
 							resource_packages,
@@ -181,7 +160,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						)?;
 
 						send_request(
-							&app,
+							app,
 							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 								EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
 									editor_id: editor_id.to_owned(),
@@ -196,11 +175,11 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							)))
 						)?;
 
-						finish_task(&app, task)?;
+						finish_task(app, task)?;
 					}
 				} else {
 					send_request(
-						&app,
+						app,
 						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 							EntityMonacoRequest::UpdateValidity {
 								editor_id,
@@ -213,7 +192,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 
 			Ok(EditorValidity::Invalid(reason)) => {
 				send_request(
-					&app,
+					app,
 					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 						EntityMonacoRequest::UpdateValidity {
 							editor_id,
@@ -225,7 +204,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 
 			Err(err) => {
 				send_request(
-					&app,
+					app,
 					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 						EntityMonacoRequest::UpdateValidity {
 							editor_id,
@@ -238,7 +217,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 
 		Err(err) => {
 			send_request(
-				&app,
+				app,
 				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 					EntityMonacoRequest::UpdateValidity {
 						editor_id,
@@ -264,7 +243,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 
 		if let Ok((filetype, _, _)) = extract_latest_overview_info(resource_packages, &factory) {
 			if filetype == "TEMP" {
-				let task = start_task(&app, format!("Loading entity {}", factory))?;
+				let task = start_task(app, format!("Loading entity {}", factory))?;
 
 				let game_install_data = app_state
 					.game_installs
@@ -324,7 +303,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: tab_name,
@@ -332,7 +311,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 					})
 				)?;
 
-				finish_task(&app, task)?;
+				finish_task(app, task)?;
 			} else {
 				let id = Uuid::new_v4();
 
@@ -347,7 +326,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: format!("Resource overview ({factory})"),
@@ -357,7 +336,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 			}
 		} else {
 			send_notification(
-				&app,
+				app,
 				Notification {
 					kind: NotificationKind::Error,
 					title: "Not a vanilla resource".into(),
@@ -367,7 +346,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 		}
 	} else {
 		send_notification(
-			&app,
+			app,
 			Notification {
 				kind: NotificationKind::Error,
 				title: "No game selected".into(),

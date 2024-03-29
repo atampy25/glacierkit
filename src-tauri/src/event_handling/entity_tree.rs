@@ -59,7 +59,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		}
 	};
 
-	let task = start_task(&app, format!("Selecting {}", id))?;
+	let task = start_task(app, format!("Selecting {}", id))?;
 
 	let mut buf = Vec::new();
 	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -72,7 +72,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		.serialize(&mut ser)?;
 
 	send_request(
-		&app,
+		app,
 		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 			EntityMonacoRequest::ReplaceContent {
 				editor_id: editor_id.to_owned(),
@@ -83,7 +83,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 	)?;
 
 	send_request(
-		&app,
+		app,
 		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 			EntityMonacoRequest::UpdateValidity {
 				editor_id,
@@ -107,7 +107,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 	};
 
 	send_request(
-		&app,
+		app,
 		Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
 			EntityMetaPaneRequest::SetReverseRefs {
 				editor_id: editor_id.to_owned(),
@@ -125,7 +125,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 	)?;
 
 	send_request(
-		&app,
+		app,
 		Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
 			EntityMetaPaneRequest::SetNotes {
 				editor_id: editor_id.to_owned(),
@@ -141,7 +141,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		)))
 	)?;
 
-	finish_task(&app, task)?;
+	finish_task(app, task)?;
 
 	if let Some(intellisense) = app_state.intellisense.load().as_ref()
 		&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
@@ -155,10 +155,10 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 			.context("No such game install")?
 			.version;
 
-		let task = start_task(&app, format!("Gathering intellisense data for {}", id))?;
+		let task = start_task(app, format!("Gathering intellisense data for {}", id))?;
 
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::UpdateIntellisense {
 					editor_id: editor_id.to_owned(),
@@ -185,9 +185,9 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 			)))
 		)?;
 
-		finish_task(&app, task)?;
+		finish_task(app, task)?;
 
-		let task = start_task(&app, format!("Computing decorations for {}", id))?;
+		let task = start_task(app, format!("Computing decorations for {}", id))?;
 
 		let decorations = get_decorations(
 			resource_packages,
@@ -199,7 +199,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		)?;
 
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
 					editor_id: editor_id.to_owned(),
@@ -214,7 +214,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 			)))
 		)?;
 
-		finish_task(&app, task)?;
+		finish_task(app, task)?;
 	}
 }
 
@@ -1109,7 +1109,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let task = start_task(&app, format!("Showing help menu for {}", entity_id))?;
+	let task = start_task(app, format!("Showing help menu for {}", entity_id))?;
 
 	let editor_state = app_state.editor_states.read().await;
 	let editor_state = editor_state.get(&editor_id).context("No such editor")?;
@@ -1233,7 +1233,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 		let ss = SyntaxSet::load_defaults_newlines();
 
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 				EntityTreeRequest::ShowHelpMenu {
 					editor_id,
@@ -1253,7 +1253,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 		)?;
 	} else {
 		send_notification(
-			&app,
+			app,
 			Notification {
 				kind: NotificationKind::Error,
 				title: "Help menu unavailable".into(),
@@ -1262,7 +1262,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 		)?;
 	}
 
-	finish_task(&app, task)?;
+	finish_task(app, task)?;
 }
 
 #[try_fn]
@@ -1271,7 +1271,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let task = start_task(&app, format!("Adding {}", file))?;
+	let task = start_task(app, format!("Adding {}", file))?;
 
 	let mut editor_state = app_state.editor_states.write().await;
 	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
@@ -1825,7 +1825,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 			};
 
 			send_request(
-				&app,
+				app,
 				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 					EntityTreeRequest::NewItems {
 						editor_id: editor_id.to_owned(),
@@ -1843,7 +1843,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 			entity.entities.insert(entity_id, sub_entity);
 
 			send_request(
-				&app,
+				app,
 				Request::Global(GlobalRequest::SetTabUnsaved {
 					id: editor_id,
 					unsaved: true
@@ -1851,7 +1851,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 			)?;
 		} else {
 			send_notification(
-				&app,
+				app,
 				Notification {
 					kind: NotificationKind::Error,
 					title: "Not a valid template".into(),
@@ -1861,7 +1861,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 		}
 	} else {
 		send_notification(
-			&app,
+			app,
 			Notification {
 				kind: NotificationKind::Error,
 				title: "Game data unavailable".into(),
@@ -1870,5 +1870,5 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 		)?;
 	}
 
-	finish_task(&app, task)?;
+	finish_task(app, task)?;
 }

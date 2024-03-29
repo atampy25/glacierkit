@@ -25,7 +25,7 @@ use std::{
 	collections::{HashMap, HashSet},
 	fs::{self, File},
 	future::Future,
-	io::{BufReader, Cursor},
+	io::Cursor,
 	ops::Deref,
 	path::{Path, PathBuf},
 	sync::Arc
@@ -36,9 +36,8 @@ use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
 use entity::{
-	calculate_reverse_references, check_local_references_exist, get_decorations, get_local_reference,
-	get_recursive_children, is_valid_entity_blueprint, is_valid_entity_factory, random_entity_id, CopiedEntityData,
-	ReverseReferenceData
+	calculate_reverse_references, get_local_reference, get_recursive_children, is_valid_entity_blueprint,
+	CopiedEntityData
 };
 use event_handling::{
 	entity_monaco::{handle_openfactory, handle_updatecontent},
@@ -53,13 +52,13 @@ use intellisense::Intellisense;
 use itertools::Itertools;
 use memmap2::Mmap;
 use model::{
-	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EditorValidity,
-	EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetaPaneRequest,
-	EntityMetadataEvent, EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityOverridesEvent,
-	EntityOverridesRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
-	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings,
-	Request, ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest, SettingsEvent, SettingsRequest,
-	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
+	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataEvent, EntityMetadataRequest,
+	EntityMonacoEvent, EntityMonacoRequest, EntityOverridesEvent, EntityOverridesRequest, EntityTreeEvent,
+	EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent,
+	GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings, Request, ResourceOverviewData,
+	ResourceOverviewEvent, ResourceOverviewRequest, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest,
+	TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
@@ -70,15 +69,11 @@ use quickentity_rs::{
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use resourcelib::{
-	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2016_convert_cppt,
-	h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h2_convert_cppt, h3_convert_binary_to_blueprint,
-	h3_convert_binary_to_factory, h3_convert_cppt
+	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
+	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
 };
 use rfd::AsyncFileDialog;
-use rpkg::{
-	ensure_entity_in_cache, extract_latest_metadata, extract_latest_overview_info, extract_latest_resource,
-	normalise_to_hash
-};
+use rpkg::{ensure_entity_in_cache, extract_latest_overview_info, extract_latest_resource, normalise_to_hash};
 use rpkg_rs::{
 	misc::ini_file_system::IniFileSystem,
 	runtime::resource::{
@@ -89,7 +84,7 @@ use rpkg_tool::generate_rpkg_meta;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, json, to_string, to_vec};
 use show_in_folder::show_in_folder;
-use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
+
 use tauri::{async_runtime, AppHandle, Manager, State};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tokio::sync::RwLock;
