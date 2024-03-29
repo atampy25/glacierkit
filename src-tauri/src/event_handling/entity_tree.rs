@@ -19,7 +19,10 @@ use crate::{
 		get_local_reference, get_recursive_children, random_entity_id, CopiedEntityData, ReverseReferenceData
 	},
 	finish_task,
-	model::{AppState, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, GlobalRequest, Request},
+	model::{
+		AppState, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest, EntityTreeRequest,
+		GlobalRequest, Request
+	},
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
@@ -350,6 +353,16 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 			id: editor_id,
 			unsaved: true
 		})
+	)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::DeselectIfSelected {
+				editor_id: editor_id.to_owned(),
+				entity_ids: entities_to_delete.iter().cloned().collect()
+			}
+		)))
 	)?;
 }
 

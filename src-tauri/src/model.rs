@@ -563,7 +563,18 @@ strike! {
 				}),
 
 				Monaco(pub enum EntityMonacoRequest {
+					DeselectIfSelected {
+						editor_id: Uuid,
+						entity_ids: Vec<String>
+					},
+
 					ReplaceContent {
+						editor_id: Uuid,
+						entity_id: String,
+						content: String
+					},
+
+					ReplaceContentIfSameEntityID {
 						editor_id: Uuid,
 						entity_id: String,
 						content: String

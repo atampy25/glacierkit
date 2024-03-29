@@ -486,6 +486,12 @@
 		console.log(`Monaco editor for editor ${editorID} handling request`, request)
 
 		switch (request.type) {
+			case "deselectIfSelected":
+				if (request.data.entity_ids.includes(entityID)) {
+					entityID = null
+				}
+				break
+
 			case "replaceContent":
 				entityID = request.data.entity_id
 				debouncedUpdateFunction.run = debounce(async (content: string) => {
@@ -508,6 +514,12 @@
 					})
 				}, 1000)
 				editor.setValue(request.data.content)
+				break
+
+			case "replaceContentIfSameEntityID":
+				if (entityID === request.data.entity_id) {
+					editor.setValue(request.data.content)
+				}
 				break
 
 			case "updateValidity":

@@ -2108,6 +2108,27 @@ fn event(app: AppHandle, event: Event) {
 											unsaved: true
 										})
 									)?;
+
+									let mut buf = Vec::new();
+									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+									entity
+										.entities
+										.get(&id)
+										.context("No such entity")?
+										.serialize(&mut ser)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::ReplaceContentIfSameEntityID {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												content: String::from_utf8(buf)?
+											}
+										)))
+									)?;
 								}
 
 								EntityTreeEvent::Reparent {
@@ -2136,6 +2157,27 @@ fn event(app: AppHandle, event: Event) {
 											id: editor_id,
 											unsaved: true
 										})
+									)?;
+
+									let mut buf = Vec::new();
+									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+									entity
+										.entities
+										.get(&id)
+										.context("No such entity")?
+										.serialize(&mut ser)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::ReplaceContentIfSameEntityID {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												content: String::from_utf8(buf)?
+											}
+										)))
 									)?;
 								}
 

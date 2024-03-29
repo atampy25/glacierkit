@@ -169,9 +169,6 @@
 									if (status) {
 										tree.move_node(node, node.parent, getPositionOfNode(node.parent, node.text, node.original.folder))
 
-										// re-add the entity ID
-										tree.rename_node(node, `${node.text} (${node.id})`)
-
 										await event({
 											type: "editor",
 											data: {
@@ -189,6 +186,9 @@
 												}
 											}
 										})
+
+										// re-add the entity ID
+										tree.rename_node(node, `${node.text} (${node.id})`)
 									} else {
 										// re-add the entity ID
 										tree.rename_node(node, `${node.text} (${node.id})`)
