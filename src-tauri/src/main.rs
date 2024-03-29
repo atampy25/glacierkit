@@ -69,11 +69,15 @@ use quickentity_rs::{
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use resourcelib::{
-	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
-	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
+	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2016_convert_cppt,
+	h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h2_convert_cppt, h3_convert_binary_to_blueprint,
+	h3_convert_binary_to_factory, h3_convert_cppt
 };
 use rfd::AsyncFileDialog;
-use rpkg::{ensure_entity_in_cache, extract_latest_overview_info, extract_latest_resource, normalise_to_hash};
+use rpkg::{
+	ensure_entity_in_cache, extract_latest_metadata, extract_latest_overview_info, extract_latest_resource,
+	normalise_to_hash
+};
 use rpkg_rs::{
 	misc::ini_file_system::IniFileSystem,
 	runtime::resource::{
@@ -1065,12 +1069,7 @@ fn event(app: AppHandle, event: Event) {
 													.iter()
 													.filter(|(_, entry)| entry.games.contains(install.version))
 													.filter(|(_, entry)| {
-														![
-															"TBLU", "CBLU", "ASEB", "UICB", "MATB", "WSWB", "DSWB",
-															"ECPB", "WSGB"
-														]
-														.iter()
-														.any(|x| *x == entry.resource_type)
+														!is_valid_entity_blueprint(&entry.resource_type)
 													})
 													.filter(|(hash, entry)| {
 														query.split(' ').all(|y| {
@@ -1083,6 +1082,9 @@ fn event(app: AppHandle, event: Event) {
 																.hint
 																.as_deref()
 																.unwrap_or("")
+																.to_lowercase()
+																.contains(y) || entry
+																.resource_type
 																.to_lowercase()
 																.contains(y) || hash.to_lowercase().contains(y)
 														})
@@ -1473,8 +1475,6 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							SettingsEvent::ChangeGameInstall(path) => {
-								let task = start_task(&app, "Loading game files")?;
-
 								if let Some(path) = path.as_ref()
 									&& app_settings.load().game_install.as_ref() != Some(path)
 								{
@@ -1703,8 +1703,6 @@ fn event(app: AppHandle, event: Event) {
 											&& app_state.hash_list.load().is_some()
 									)))
 								)?;
-
-								finish_task(&app, task)?;
 							}
 
 							SettingsEvent::ChangeExtractModdedFiles(value) => {
@@ -2470,68 +2468,584 @@ fn event(app: AppHandle, event: Event) {
 												.context("File not in hash list")?
 												.resource_type
 										) {
-											let (temp_meta, temp_data) =
-												extract_latest_resource(resource_packages, hash_list, &file)?;
-
-											let factory = match game_version {
-												GameVersion::H1 => convert_2016_factory_to_modern(
-													&h2016_convert_binary_to_factory(&temp_data).context(
-														"Couldn't convert binary data to ResourceLib factory"
-													)?
-												),
-
-												GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
-													.context("Couldn't convert binary data to ResourceLib factory")?,
-
-												GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
-													.context("Couldn't convert binary data to ResourceLib factory")?
-											};
-
-											let blueprint_hash = &temp_meta
-												.hash_reference_data
-												.get(factory.blueprint_index_in_resource_header as usize)
-												.context(
-													"Blueprint referenced in factory does not exist in dependencies"
-												)?
-												.hash;
-
-											let factory_path = hash_list
-												.entries
-												.get(&file)
-												.and_then(|x| x.path.to_owned())
-												.unwrap_or(file);
-
-											let blueprint_path = hash_list
-												.entries
-												.get(blueprint_hash)
-												.and_then(|x| x.path.to_owned())
-												.unwrap_or(blueprint_hash.to_owned());
-
+											
 											let entity_id = random_entity_id();
 
-											let sub_entity = SubEntity {
-												parent: Ref::Short((parent_id != "#").then_some(parent_id)),
-												name: factory_path
-													.replace("].pc_entitytype", "")
-													.replace("].pc_entitytemplate", "")
-													.replace(".entitytemplate", "")
-													.split('/')
-													.last()
-													.map(|x| x.to_owned())
-													.unwrap_or(factory_path.to_owned()),
-												factory: factory_path,
-												factory_flag: None,
-												blueprint: blueprint_path,
-												editor_only: None,
-												properties: None,
-												platform_specific_properties: None,
-												events: None,
-												input_copying: None,
-												output_copying: None,
-												property_aliases: None,
-												exposed_entities: None,
-												exposed_interfaces: None,
-												subsets: None
+											let sub_entity = match hash_list
+												.entries
+												.get(&file)
+												.context("File not in hash list")?
+												.resource_type
+												.as_str()
+											{
+												"TEMP" => {
+													let (temp_meta, temp_data) =
+														extract_latest_resource(resource_packages, hash_list, &file)?;
+
+													let factory = match game_version {
+														GameVersion::H1 => convert_2016_factory_to_modern(
+															&h2016_convert_binary_to_factory(&temp_data).context(
+																"Couldn't convert binary data to ResourceLib factory"
+															)?
+														),
+
+														GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
+															.context(
+																"Couldn't convert binary data to ResourceLib factory"
+															)?,
+
+														GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
+															.context(
+																"Couldn't convert binary data to ResourceLib factory"
+															)?
+													};
+
+													let blueprint_hash = &temp_meta
+														.hash_reference_data
+														.get(factory.blueprint_index_in_resource_header as usize)
+														.context(
+															"Blueprint referenced in factory does not exist in \
+															 dependencies"
+														)?
+														.hash;
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.replace(".entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"CPPT" => {
+													let (cppt_meta, cppt_data) =
+														extract_latest_resource(resource_packages, hash_list, &file)?;
+
+													let factory = match game_version {
+														GameVersion::H1 => h2016_convert_cppt(&cppt_data).context(
+															"Couldn't convert binary data to ResourceLib format"
+														)?,
+
+														GameVersion::H2 => h2_convert_cppt(&cppt_data).context(
+															"Couldn't convert binary data to ResourceLib format"
+														)?,
+
+														GameVersion::H3 => h3_convert_cppt(&cppt_data).context(
+															"Couldn't convert binary data to ResourceLib format"
+														)?
+													};
+
+													let blueprint_hash = &cppt_meta
+														.hash_reference_data
+														.get(factory.blueprint_index_in_resource_header as usize)
+														.context(
+															"Blueprint referenced in factory does not exist in \
+															 dependencies"
+														)?
+														.hash;
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace(".class", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"ASET" => {
+													let blueprint_hash =
+														extract_latest_metadata(resource_packages, hash_list, &file)?
+															.hash_reference_data
+															.into_iter()
+															.last()
+															.context("ASET had no dependencies")?
+															.hash;
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(&blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path.to_owned(),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"UICT" => {
+													let blueprint_hash =
+														extract_latest_metadata(resource_packages, hash_list, &file)?
+															.hash_reference_data
+															.into_iter()
+															.last()
+															.context("UICT had no dependencies")?
+															.hash;
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(&blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.replace(".entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"MATT" => {
+													let blueprint_hash = {
+														let mut blueprint_hash = String::new();
+
+														for dep in extract_latest_metadata(
+															resource_packages,
+															hash_list,
+															&file
+														)?
+														.hash_reference_data
+														.into_iter()
+														{
+															if extract_latest_metadata(
+																resource_packages,
+																hash_list,
+																&dep.hash
+															)?
+															.hash_resource_type == "MATB"
+															{
+																blueprint_hash = dep.hash.to_owned();
+																break;
+															}
+														}
+
+														if blueprint_hash.is_empty() {
+															Err(anyhow!("MATT had no MATB dependency"))?;
+														}
+
+														blueprint_hash
+													};
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(&blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.replace(".entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"WSWT" => {
+													let blueprint_hash = {
+														let mut blueprint_hash = String::new();
+
+														for dep in extract_latest_metadata(
+															resource_packages,
+															hash_list,
+															&file
+														)?
+														.hash_reference_data
+														.into_iter()
+														{
+															let metadata = extract_latest_metadata(
+																resource_packages,
+																hash_list,
+																&dep.hash
+															)?;
+
+															if metadata.hash_resource_type == "WSWB"
+																|| metadata.hash_resource_type == "DSWB"
+															{
+																blueprint_hash = dep.hash.to_owned();
+																break;
+															}
+														}
+
+														if blueprint_hash.is_empty() {
+															Err(anyhow!("WSWT had no WSWB/DSWB dependency"))?;
+														}
+
+														blueprint_hash
+													};
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(&blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.replace(".entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"ECPT" => {
+													let blueprint_hash = {
+														let mut blueprint_hash = String::new();
+
+														for dep in extract_latest_metadata(
+															resource_packages,
+															hash_list,
+															&file
+														)?
+														.hash_reference_data
+														.into_iter()
+														{
+															if extract_latest_metadata(
+																resource_packages,
+																hash_list,
+																&dep.hash
+															)?
+															.hash_resource_type == "ECPB"
+															{
+																blueprint_hash = dep.hash.to_owned();
+																break;
+															}
+														}
+
+														if blueprint_hash.is_empty() {
+															Err(anyhow!("ECPT had no ECPB dependency"))?;
+														}
+
+														blueprint_hash
+													};
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(&blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.replace(".entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"AIBX" => {
+													let blueprint_hash = {
+														let mut blueprint_hash = String::new();
+
+														for dep in extract_latest_metadata(
+															resource_packages,
+															hash_list,
+															&file
+														)?
+														.hash_reference_data
+														.into_iter()
+														{
+															if extract_latest_metadata(
+																resource_packages,
+																hash_list,
+																&dep.hash
+															)?
+															.hash_resource_type == "AIBB"
+															{
+																blueprint_hash = dep.hash.to_owned();
+																break;
+															}
+														}
+
+														if blueprint_hash.is_empty() {
+															Err(anyhow!("AIBX had no AIBB dependency"))?;
+														}
+
+														blueprint_hash
+													};
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(&blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.replace(".entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												"WSGT" => {
+													let blueprint_hash = {
+														let mut blueprint_hash = String::new();
+
+														for dep in extract_latest_metadata(
+															resource_packages,
+															hash_list,
+															&file
+														)?
+														.hash_reference_data
+														.into_iter()
+														{
+															if extract_latest_metadata(
+																resource_packages,
+																hash_list,
+																&dep.hash
+															)?
+															.hash_resource_type == "WSGB"
+															{
+																blueprint_hash = dep.hash.to_owned();
+																break;
+															}
+														}
+
+														if blueprint_hash.is_empty() {
+															Err(anyhow!("WSGT had no WSGB dependency"))?;
+														}
+
+														blueprint_hash
+													};
+
+													let factory_path = hash_list
+														.entries
+														.get(&file)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(file);
+
+													let blueprint_path = hash_list
+														.entries
+														.get(&blueprint_hash)
+														.and_then(|x| x.path.to_owned())
+														.unwrap_or(blueprint_hash.to_owned());
+
+													SubEntity {
+														parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+														name: factory_path
+															.replace("].pc_entitytype", "")
+															.replace("].pc_entitytemplate", "")
+															.replace(".entitytemplate", "")
+															.split('/')
+															.last()
+															.map(|x| x.to_owned())
+															.unwrap_or(factory_path.to_owned()),
+														factory: factory_path,
+														factory_flag: None,
+														blueprint: blueprint_path,
+														editor_only: None,
+														properties: None,
+														platform_specific_properties: None,
+														events: None,
+														input_copying: None,
+														output_copying: None,
+														property_aliases: None,
+														exposed_entities: None,
+														exposed_interfaces: None,
+														subsets: None
+													}
+												}
+
+												_ => unreachable!()
 											};
 
 											send_request(
@@ -2559,6 +3073,7 @@ fn event(app: AppHandle, event: Event) {
 													unsaved: true
 												})
 											)?;
+										
 										} else {
 											send_notification(
 												&app,
@@ -2750,24 +3265,24 @@ fn event(app: AppHandle, event: Event) {
 														)?;
 
 														send_request(
-														&app,
-														Request::Editor(EditorRequest::Entity(
-															EntityEditorRequest::Monaco(
-																EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
-																	editor_id: editor_id.to_owned(),
-																	entity_id: entity_id.to_owned(),
-																	local_ref_entity_ids: decorations
-																		.iter()
-																		.filter(|(x, _)| {
-																			entity.entities.contains_key(x)
-																		})
-																		.map(|(x, _)| x.to_owned())
-																		.collect(),
-																	decorations
-																}
-															)
-														))
-													)?;
+															&app,
+															Request::Editor(EditorRequest::Entity(
+																EntityEditorRequest::Monaco(
+																	EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
+																		editor_id: editor_id.to_owned(),
+																		entity_id: entity_id.to_owned(),
+																		local_ref_entity_ids: decorations
+																			.iter()
+																			.filter(|(x, _)| {
+																				entity.entities.contains_key(x)
+																			})
+																			.map(|(x, _)| x.to_owned())
+																			.collect(),
+																		decorations
+																	}
+																)
+															))
+														)?;
 
 														finish_task(&app, task)?;
 													}

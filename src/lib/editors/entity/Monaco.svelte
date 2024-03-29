@@ -487,7 +487,7 @@
 
 		switch (request.type) {
 			case "deselectIfSelected":
-				if (request.data.entity_ids.includes(entityID)) {
+				if (request.data.entity_ids.includes(entityID || "")) {
 					entityID = null
 				}
 				break

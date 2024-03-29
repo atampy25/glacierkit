@@ -178,7 +178,6 @@
 
 		for (const entry of entries) {
 			if (entry.path) {
-				console.log(entry.path)
 				const path = /\[(.*)\](?:\.pc_|\(.*\)\.pc_)/.exec(entry.path)![1]
 				const params = /\[.*\]\((.*)\)\.pc_/.exec(entry.path)?.[1]
 				const platformType = "." + /\[.*\](?:\.pc_|\(.*\)\.pc_)(.*)/.exec(entry.path)?.[1]
@@ -245,7 +244,10 @@
 					}`,
 					text:
 						(params ? `[${path.split("/").at(-1)}](${params})` : path.split("/").at(-1)) +
-						(platformType === ".entitytype" || platformType === ".entitytemplate" || path.split("/").at(-1)!.endsWith(platformType) ? "" : platformType),
+						((platformType === ".entitytype" && (path.endsWith(".class") || path.endsWith(".aspect") || path.endsWith(".entitytype") || path.endsWith(".entitytemplate"))) ||
+						path.endsWith(platformType)
+							? ""
+							: platformType),
 					folder: false,
 					path: entry.path,
 					filetype: entry.filetype
