@@ -211,7 +211,7 @@ exposedEntity?: string | null }
 
 export type GameBrowserEntry = { hash: string; path: string | null; hint: string | null; filetype: string }
 
-export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: string } | { type: "openInEditor"; data: string }
+export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: [string, SearchFilter] } | { type: "openInEditor"; data: string }
 
 export type GameBrowserRequest = { type: "setEnabled"; data: boolean } | { type: "newTree"; data: { game_description: string; entries: GameBrowserEntry[] } }
 
@@ -423,6 +423,8 @@ reverse_dependencies: ([string, string, string | null])[]; data: ResourceOvervie
 export type ReverseReference = { from: string; data: ReverseReferenceData }
 
 export type ReverseReferenceData = { type: "parent" } | { type: "property"; data: { property_name: string } } | { type: "platformSpecificProperty"; data: { property_name: string; platform: string } } | { type: "event"; data: { event: string; trigger: string } } | { type: "inputCopy"; data: { trigger: string; propagate: string } } | { type: "outputCopy"; data: { event: string; propagate: string } } | { type: "propertyAlias"; data: { aliased_name: string; original_property: string } } | { type: "exposedEntity"; data: { exposed_name: string } } | { type: "exposedInterface"; data: { interface: string } } | { type: "subset"; data: { subset: string } }
+
+export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
 export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean }
 

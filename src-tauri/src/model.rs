@@ -173,6 +173,16 @@ pub enum ResourceOverviewData {
 	Ores
 }
 
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+pub enum SearchFilter {
+	All,
+	Templates,
+	Classes,
+	Models,
+	Textures,
+	Sound
+}
+
 strike! {
 	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, Debug)]]
 	#[strikethrough[serde(rename_all = "camelCase", tag = "type", content = "data")]]
@@ -208,7 +218,7 @@ strike! {
 
 			GameBrowser(pub enum GameBrowserEvent {
 				Select(String),
-				Search(String),
+				Search(String, SearchFilter),
 				OpenInEditor(String)
 			}),
 

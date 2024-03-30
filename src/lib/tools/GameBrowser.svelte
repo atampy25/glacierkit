@@ -2,8 +2,8 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { GameBrowserEntry, GameBrowserRequest } from "$lib/bindings-types"
-	import { Search } from "carbon-components-svelte"
+	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter } from "$lib/bindings-types"
+	import { Dropdown, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { clipboard } from "@tauri-apps/api"
 	import { trackEvent } from "@aptabase/tauri"
@@ -245,6 +245,7 @@
 					text:
 						(params ? `[${path.split("/").at(-1)}](${params})` : path.split("/").at(-1)) +
 						((platformType === ".entitytype" && (path.endsWith(".class") || path.endsWith(".aspect") || path.endsWith(".entitytype") || path.endsWith(".entitytemplate"))) ||
+						platformType === ".wwisebank" ||
 						path.endsWith(platformType)
 							? ""
 							: platformType),
@@ -316,13 +317,13 @@
 					type: "gameBrowser",
 					data: {
 						type: "search",
-						data: _event.target.value.toLowerCase()
+						data: [_event.target.value.toLowerCase(), searchFilter]
 					}
 				}
 			})
-		} else if (_event.target.value.length >= 3) {
+		} else if (_event.target.value.length === 0) {
 			searchFeedback = ""
-			gameDescription = ""
+			gameDescription = "Search for a game file above to get started"
 			await replaceTree([])
 		} else {
 			searchFeedback = "Search too broad"
@@ -334,6 +335,8 @@
 	let enabled = false
 	let gameDescription = "Search for a game file above to get started"
 	let searchFeedback = ""
+	let searchFilter: SearchFilter = "All"
+	let searchQuery = ""
 </script>
 
 <div class="w-full h-full p-2 flex flex-col">
@@ -343,18 +346,48 @@
 		</div>
 	{:else}
 		<div class="pt-2 pb-1 px-2 leading-tight text-base">
-			<div class="mb-4"
-				><Search
-					placeholder="Search game files..."
-					size="lg"
-					on:change={searchInput}
-					on:clear={async () => {
-						searchFeedback = ""
-						gameDescription = ""
-						await replaceTree([])
-					}}
-				/></div
-			>
+			<div class="mb-4">
+				<div class="flex gap-2">
+					<Search
+						placeholder="Search game files..."
+						size="lg"
+						on:change={searchInput}
+						on:clear={async () => {
+							searchFeedback = ""
+							gameDescription = ""
+							await replaceTree([])
+						}}
+						bind:value={searchQuery}
+					/>
+					<Dropdown
+						class="w-40 no-menu-spacing"
+						bind:selectedId={searchFilter}
+						items={[
+							{ id: "All", text: "All" },
+							{ id: "Templates", text: "Templates" },
+							{ id: "Classes", text: "Classes" },
+							{ id: "Models", text: "Models" },
+							{ id: "Textures", text: "Textures" },
+							{ id: "Sound", text: "Sound" }
+						]}
+						on:select={async ({ detail: { selectedId } }) => {
+							if (searchQuery.length >= 3) {
+								searchFeedback = ""
+								await event({
+									type: "tool",
+									data: {
+										type: "gameBrowser",
+										data: {
+											type: "search",
+											data: [searchQuery.toLowerCase(), selectedId]
+										}
+									}
+								})
+							}
+						}}
+					/>
+				</div>
+			</div>
 			<div>{searchFeedback}</div>
 			<span class="text-neutral-400">{gameDescription}</span>
 		</div>
@@ -364,3 +397,11 @@
 		<div class="w-full h-full" id={elemID} />
 	</div>
 </div>
+
+<style>
+	:global(.no-menu-spacing .bx--list-box__menu-item__option) {
+		padding-right: 0;
+		margin-left: 0.75rem;
+		margin-right: 0.5rem;
+	}
+</style>

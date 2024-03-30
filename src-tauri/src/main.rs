@@ -57,8 +57,8 @@ use model::{
 	EntityMonacoEvent, EntityMonacoRequest, EntityOverridesEvent, EntityOverridesRequest, EntityTreeEvent,
 	EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent,
 	GameBrowserRequest, GlobalEvent, GlobalRequest, Project, ProjectSettings, Request, ResourceOverviewData,
-	ResourceOverviewEvent, ResourceOverviewRequest, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest,
-	TextFileType, ToolEvent, ToolRequest
+	ResourceOverviewEvent, ResourceOverviewRequest, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent,
+	TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use quickentity_rs::{
@@ -1037,7 +1037,7 @@ fn event(app: AppHandle, event: Event) {
 								)?;
 							}
 
-							GameBrowserEvent::Search(query) => {
+							GameBrowserEvent::Search(query, filter) => {
 								let task = start_task(&app, format!("Searching game files for {}", query))?;
 
 								if let Some(install) = app_settings.load().game_install.as_ref() {
@@ -1046,6 +1046,17 @@ fn event(app: AppHandle, event: Event) {
 										.iter()
 										.find(|x| x.path == *install)
 										.context("No such game install as specified in project.json")?;
+
+									let filter_includes: &[&str] = match filter {
+										SearchFilter::All => &[],
+										SearchFilter::Templates => {
+											&["TEMP", "CPPT", "ASET", "UICT", "MATT", "WSWT", "ECPT", "AIBX", "WSGT"]
+										}
+										SearchFilter::Classes => &["CPPT"],
+										SearchFilter::Models => &["PRIM", "BORG", "ALOC"],
+										SearchFilter::Textures => &["TEXT", "TEXD"],
+										SearchFilter::Sound => &["WBNK", "WWFX", "WWEV", "WWES", "WWEM"]
+									};
 
 									if let Some(hash_list) = app_state.hash_list.load().deref() {
 										send_request(
@@ -1064,6 +1075,10 @@ fn event(app: AppHandle, event: Event) {
 													.entries
 													.iter()
 													.filter(|(_, entry)| entry.games.contains(install.version))
+													.filter(|(_, entry)| {
+														matches!(filter, SearchFilter::All)
+															|| filter_includes.iter().any(|&x| x == entry.resource_type)
+													})
 													.filter(|(_, entry)| {
 														!is_valid_entity_blueprint(&entry.resource_type)
 													})

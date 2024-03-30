@@ -58,7 +58,7 @@ externalScene: string | null;
  * The sub-entity to reference that is exposed by the referenced entity.
  */
 exposedEntity?: string | null }
-export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: string } | { type: "openInEditor"; data: string }
+export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: [string, SearchFilter] } | { type: "openInEditor"; data: string }
 export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string }
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key in string]: JsonValue }
 /**
@@ -113,6 +113,7 @@ ref: Ref;
  */
 value: SimpleProperty }
 export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "followDependencyInNewTab"; data: { id: string; hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } }
+export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean }
 /**
  * A simple property.
