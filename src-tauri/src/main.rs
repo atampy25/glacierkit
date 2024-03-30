@@ -1182,6 +1182,13 @@ fn event(app: AppHandle, event: Event) {
 
 						ToolEvent::Settings(event) => match event {
 							SettingsEvent::Initialise => {
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::InitialiseDynamics {
+										seen_announcements: app_settings.load().seen_announcements.to_owned()
+									})
+								)?;
+
 								let selected_install_info = app_settings
 									.load()
 									.game_install
@@ -3152,6 +3159,20 @@ fn event(app: AppHandle, event: Event) {
 					},
 
 					Event::Global(event) => match event {
+						GlobalEvent::SetSeenAnnouncements(seen_announcements) => {
+							let mut settings = (*app_settings.load_full()).to_owned();
+							settings.seen_announcements = seen_announcements;
+							fs::write(
+								app.path_resolver()
+									.app_data_dir()
+									.context("Couldn't get app data dir")?
+									.join("settings.json"),
+								to_vec(&settings).unwrap()
+							)
+							.unwrap();
+							app_settings.store(settings.into());
+						}
+
 						GlobalEvent::LoadWorkspace(path) => {
 							app.track_event("Workspace loaded", None);
 							let task = start_task(&app, format!("Loading project {}", path.display()))?;

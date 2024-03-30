@@ -23,14 +23,16 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
 	pub extract_modded_files: bool,
-	pub game_install: Option<PathBuf>
+	pub game_install: Option<PathBuf>,
+	pub seen_announcements: Vec<String>
 }
 
 impl Default for AppSettings {
 	fn default() -> Self {
 		Self {
 			extract_modded_files: false,
-			game_install: None
+			game_install: None,
+			seen_announcements: vec![]
 		}
 	}
 }
@@ -442,6 +444,7 @@ strike! {
 		}),
 
 		Global(pub enum GlobalEvent {
+			SetSeenAnnouncements(Vec<String>),
 			LoadWorkspace(PathBuf),
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
@@ -678,6 +681,7 @@ strike! {
 		Global(pub enum GlobalRequest {
 			ErrorReport { error: String },
 			SetWindowTitle(String),
+			InitialiseDynamics { seen_announcements: Vec<String> },
 			CreateTab {
 				id: Uuid,
 				name: String,

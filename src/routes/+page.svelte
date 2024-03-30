@@ -7,7 +7,7 @@
 	import SettingsIcon from "carbon-icons-svelte/lib/Settings.svelte"
 	import GameBrowser from "$lib/tools/GameBrowser.svelte"
 	import ToolButton from "$lib/components/ToolButton.svelte"
-	import { Button } from "carbon-components-svelte"
+	import { Button, ToastNotification } from "carbon-components-svelte"
 	import { SvelteComponent, beforeUpdate, onDestroy } from "svelte"
 	import { emit, listen } from "@tauri-apps/api/event"
 	import type { EditorType, Request } from "$lib/bindings-types"
@@ -47,6 +47,17 @@
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]
+
+	let announcements: {
+		id: string
+		kind: "info" | "success" | "warning" | "error" | "info-square" | "warning-alt"
+		title: string
+		description: string
+		persistent: boolean
+		until: number | null
+	}[] = []
+
+	let seenAnnouncements: string[] = []
 
 	const tools = {
 		FileBrowser: {
@@ -150,6 +161,10 @@
 								// Handled by +layout.svelte
 								break
 
+							case "initialiseDynamics":
+								seenAnnouncements = request.data.data.seen_announcements
+								break
+
 							case "createTab":
 								tabs = [
 									...tabs,
@@ -230,6 +245,10 @@
 			})
 
 			destroyFunc.run = unlisten
+
+			const dynamics = await (await fetch("https://hitman-resources.netlify.app/glacierkit/dynamics.json")).json()
+
+			announcements = dynamics.announcements
 		}
 	})
 </script>
@@ -496,6 +515,35 @@
 							<div class="text-center">
 								<h1>Welcome to Deeznuts</h1>
 								<p>You can start by selecting a project on the left.</p>
+								{#if announcements.length}
+									<div class="flex-col items-center -mb-4">
+										{#each announcements as announcement (announcement.id)}
+											{#if new Date().getTime() < (announcement.until || Number.MAX_VALUE) && !seenAnnouncements.includes(announcement.id)}
+												<div class="text-left -mb-2 flex items-center justify-center -mr-4">
+													<ToastNotification
+														lowContrast
+														kind={announcement.kind}
+														title={announcement.title}
+														hideCloseButton={announcement.persistent}
+														on:close={async () => {
+															seenAnnouncements = [...seenAnnouncements, announcement.id]
+
+															await event({
+																type: "global",
+																data: {
+																	type: "setSeenAnnouncements",
+																	data: seenAnnouncements
+																}
+															})
+														}}
+													>
+														<div slot="subtitle">{@html announcement.description}</div>
+													</ToastNotification>
+												</div>
+											{/if}
+										{/each}
+									</div>
+								{/if}
 								<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 								<div
 									class="mt-8 flex gap-2 items-center text-neutral-300 cursor-pointer"
