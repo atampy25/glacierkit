@@ -16,6 +16,7 @@ pub mod hash_list;
 pub mod intellisense;
 pub mod material;
 pub mod model;
+pub mod ores;
 pub mod resourcelib;
 pub mod rpkg;
 pub mod rpkg_tool;
@@ -47,6 +48,7 @@ use event_handling::{
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
+use image::io::Reader as ImageReader;
 use indexmap::IndexMap;
 use intellisense::Intellisense;
 use itertools::Itertools;
@@ -61,6 +63,7 @@ use model::{
 	TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
+use ores::parse_hashes_ores;
 use quickentity_rs::{
 	apply_patch, convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn, convert_to_rt,
 	generate_patch,
@@ -69,8 +72,9 @@ use quickentity_rs::{
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use resourcelib::{
-	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
-	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
+	convert_generic, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
+	h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
+	h3_convert_binary_to_factory
 };
 use rfd::AsyncFileDialog;
 use rpkg::{ensure_entity_in_cache, extract_latest_overview_info, extract_latest_resource, normalise_to_hash};
@@ -82,10 +86,9 @@ use rpkg_rs::{
 };
 use rpkg_tool::generate_rpkg_meta;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, from_str, json, to_string, to_vec};
+use serde_json::{from_slice, from_str, json, to_string, to_vec, Value};
 use show_in_folder::show_in_folder;
-
-use tauri::{async_runtime, AppHandle, Manager, State};
+use tauri::{api::process::Command, async_runtime, AppHandle, Manager, State};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
@@ -151,6 +154,10 @@ fn main() {
 				)
 				.expect("Couldn't write default app settings");
 				app.manage(ArcSwap::new(settings.into()));
+			}
+
+			if app_data_path.join("temp").exists() {
+				fs::remove_dir_all(app_data_path.join("temp"))?;
 			}
 
 			app.manage(AppState {
@@ -3170,6 +3177,127 @@ fn event(app: AppHandle, event: Event) {
 									}
 								}
 							}
+
+							ResourceOverviewEvent::ExtractAsRTGeneric { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let game_version = app_state
+										.game_installs
+										.iter()
+										.try_find(|x| anyhow::Ok(x.path == *install))?
+										.context("No such game install")?
+										.version;
+
+									let (res_meta, res_data) =
+										extract_latest_resource(resource_packages, hash_list, hash)?;
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) = dialog
+										.add_filter(
+											&format!("{}.json file", res_meta.hash_resource_type),
+											&[&format!("{}.json", res_meta.hash_resource_type)]
+										)
+										.save_file()
+										.await
+									{
+										fs::write(
+											save_handle.path(),
+											to_vec(&convert_generic::<Value>(
+												&res_data,
+												game_version,
+												&res_meta.hash_resource_type
+											)?)?
+										)?;
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractORESAsJson { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									let res_data = parse_hashes_ores(&res_data)?;
+
+									if let Some(save_handle) =
+										dialog.add_filter("JSON file", &["json"]).save_file().await
+									{
+										fs::write(save_handle.path(), to_vec(&res_data)?)?;
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractAsPng { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) = dialog.add_filter("PNG file", &["png"]).save_file().await
+									{
+										ImageReader::new(Cursor::new(res_data))
+											.with_guessed_format()?
+											.decode()?
+											.save(save_handle.path())?;
+									}
+								}
+							}
 						}
 					},
 
@@ -3800,6 +3928,41 @@ pub fn initialise_resource_overview(
 				| "WSGB" | "ECPB" | "UICB" | "ENUM" => ResourceOverviewData::GenericRL,
 
 				"ORES" => ResourceOverviewData::Ores,
+
+				"GFXI" => {
+					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let temp_file_id = Uuid::new_v4();
+
+					fs::create_dir_all(data_dir.join("temp"))?;
+
+					let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+
+					ImageReader::new(Cursor::new(res_data))
+						.with_guessed_format()?
+						.decode()?
+						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
+
+					ResourceOverviewData::Image {
+						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id))
+					}
+				}
+
+				"WWES" | "WWEM" => {
+					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let temp_file_id = Uuid::new_v4();
+
+					fs::create_dir_all(data_dir.join("temp"))?;
+
+					let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+
+					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
+
+					Command::new_sidecar("binaries/vgmstream")?;
+
+					ResourceOverviewData::Audio {
+						wav_path: data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+					}
+				}
 
 				_ => ResourceOverviewData::Generic
 			}

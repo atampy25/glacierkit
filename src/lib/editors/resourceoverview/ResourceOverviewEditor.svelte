@@ -6,6 +6,7 @@
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
 	import { trackEvent } from "@aptabase/tauri"
+	import { convertFileSrc } from "@tauri-apps/api/tauri"
 
 	export let id: string
 
@@ -53,7 +54,7 @@
 	}
 </script>
 
-<div class="w-full h-full flex flex-col p-4">
+<div class="w-full h-full flex flex-col p-4 overflow-y-auto">
 	{#if data}
 		{#if data.type === "Entity"}
 			<div class="text-2xl mb-2 font-bold break-all">
@@ -135,7 +136,7 @@
 				<Button
 					icon={DocumentExport}
 					on:click={async () => {
-						trackEvent("Extract TEMP as RT JSON")
+						trackEvent("Extract TEMP as RL JSON")
 
 						await event({
 							type: "editor",
@@ -173,7 +174,7 @@
 				<Button
 					icon={DocumentExport}
 					on:click={async () => {
-						trackEvent("Extract TBLU as RT JSON")
+						trackEvent("Extract TBLU as RL JSON")
 
 						await event({
 							type: "editor",
@@ -310,6 +311,497 @@
 					</div>
 				</div>
 			</div>
+		{:else if data.type === "Image"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<img class="mb-4 h-[33%] w-fit" src={convertFileSrc(data.data.image_path)} alt="Resource preview" />
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract image file as PNG")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsPng",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract as PNG</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract image file as original")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+				<div class="flex flex-col">
+					<h4 class="mb-1">Dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each dependencies as [hash, type, path, flag]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async () => {
+									trackEvent("Follow dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="text-base -mt-1"
+									><span class="font-bold"
+										>{hash}{#if type}.{type}{/if}</span
+									>
+									{flag}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+				<div class="flex flex-col">
+					<h4 class="mb-1">Reverse dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each reverseDependencies as [hash, type, path]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow reverse dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async (e) => {
+									e.preventDefault()
+									trackEvent("Follow reverse dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="font-bold text-base -mt-1"
+									>{hash}{#if type}.{type}{/if}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
+		{:else if data.type === "GenericRL"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract generic ResourceLib file as JSON", { hash, filetype })
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsRTGeneric",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract as ResourceLib JSON</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract generic ResourceLib file as binary", { hash, filetype })
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+				<div class="flex flex-col">
+					<h4 class="mb-1">Dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each dependencies as [hash, type, path, flag]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async () => {
+									trackEvent("Follow dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="text-base -mt-1"
+									><span class="font-bold"
+										>{hash}{#if type}.{type}{/if}</span
+									>
+									{flag}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+				<div class="flex flex-col">
+					<h4 class="mb-1">Reverse dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each reverseDependencies as [hash, type, path]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow reverse dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async (e) => {
+									e.preventDefault()
+									trackEvent("Follow reverse dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="font-bold text-base -mt-1"
+									>{hash}{#if type}.{type}{/if}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
+		{:else if data.type === "Ores"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract ORES as JSON")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractORESAsJson",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract as JSON</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract ORES as binary")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+				<div class="flex flex-col">
+					<h4 class="mb-1">Dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each dependencies as [hash, type, path, flag]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async () => {
+									trackEvent("Follow dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="text-base -mt-1"
+									><span class="font-bold"
+										>{hash}{#if type}.{type}{/if}</span
+									>
+									{flag}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+				<div class="flex flex-col">
+					<h4 class="mb-1">Reverse dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each reverseDependencies as [hash, type, path]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow reverse dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async (e) => {
+									e.preventDefault()
+									trackEvent("Follow reverse dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="font-bold text-base -mt-1"
+									>{hash}{#if type}.{type}{/if}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
 		{:else}
 			<div class="text-2xl mb-2 font-bold break-all">
 				{pathOrHint || "No path"}
@@ -333,7 +825,7 @@
 				<Button
 					icon={DocumentExport}
 					on:click={async () => {
-						trackEvent("Extract generic file")
+						trackEvent("Extract generic file", { hash, filetype })
 
 						await event({
 							type: "editor",

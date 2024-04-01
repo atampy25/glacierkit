@@ -6,12 +6,15 @@ use fn_error_context::context;
 use lazy_static::lazy_static;
 use quickentity_rs::rt_2016_structs::{RTBlueprint2016, RTFactory2016};
 use quickentity_rs::rt_structs::{RTBlueprint, RTFactory, SEntityTemplateProperty};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
 
 mod bindings_2;
 mod bindings_2016;
 mod bindings_3;
+
+use crate::game_detection::GameVersion;
 
 use self::bindings_2::{HM2_GetConverterForResource, HM2_GetGeneratorForResource, JsonString as JsonString2};
 use self::bindings_2016::{
@@ -937,5 +940,102 @@ pub fn h2016_convert_wsgb(data: &[u8]) -> Result<SwitchGroup> {
 		(*converter).FreeJsonString.unwrap()(json_string);
 
 		res
+	}
+}
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib format")]
+pub fn convert_generic<T: DeserializeOwned>(data: &[u8], game: GameVersion, resource_type: &str) -> Result<T> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		match game {
+			GameVersion::H1 => {
+				let converter = HM2016_GetConverterForResource(CString::new(resource_type)?.as_ptr());
+
+				if converter.is_null() {
+					bail!("Couldn't get ResourceLib converter")
+				}
+
+				let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+				if json_string.is_null() {
+					bail!("Couldn't convert data to JsonString")
+				}
+
+				let res = serde_json::from_str(
+					CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+						(*json_string).JsonData.cast(),
+						(*json_string).StrSize + 1 // include the null byte in the slice
+					))
+					.context("Couldn't construct CStr from JsonString data")?
+					.to_str()
+					.context("Couldn't convert CStr to str")?
+				)
+				.context("Couldn't deserialise returned JsonString as Value")?;
+
+				(*converter).FreeJsonString.unwrap()(json_string);
+
+				res
+			}
+
+			GameVersion::H2 => {
+				let converter = HM2_GetConverterForResource(CString::new(resource_type)?.as_ptr());
+
+				if converter.is_null() {
+					bail!("Couldn't get ResourceLib converter")
+				}
+
+				let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+				if json_string.is_null() {
+					bail!("Couldn't convert data to JsonString")
+				}
+
+				let res = serde_json::from_str(
+					CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+						(*json_string).JsonData.cast(),
+						(*json_string).StrSize + 1 // include the null byte in the slice
+					))
+					.context("Couldn't construct CStr from JsonString data")?
+					.to_str()
+					.context("Couldn't convert CStr to str")?
+				)
+				.context("Couldn't deserialise returned JsonString as Value")?;
+
+				(*converter).FreeJsonString.unwrap()(json_string);
+
+				res
+			}
+
+			GameVersion::H3 => {
+				let converter = HM3_GetConverterForResource(CString::new(resource_type)?.as_ptr());
+
+				if converter.is_null() {
+					bail!("Couldn't get ResourceLib converter")
+				}
+
+				let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+				if json_string.is_null() {
+					bail!("Couldn't convert data to JsonString")
+				}
+
+				let res = serde_json::from_str(
+					CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+						(*json_string).JsonData.cast(),
+						(*json_string).StrSize + 1 // include the null byte in the slice
+					))
+					.context("Couldn't construct CStr from JsonString data")?
+					.to_str()
+					.context("Couldn't convert CStr to str")?
+				)
+				.context("Couldn't deserialise returned JsonString as Value")?;
+
+				(*converter).FreeJsonString.unwrap()(json_string);
+
+				res
+			}
+		}
 	}
 }

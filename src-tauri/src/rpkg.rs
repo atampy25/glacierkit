@@ -53,7 +53,7 @@ pub fn extract_latest_resource(
 			.find(|(_, entry)| entry.runtime_resource_id == resource_id)
 			.map(|(index, entry)| (rpkg.resource_metadata.get(index).unwrap(), entry))
 		{
-			let final_size = offset_info.compressed_size_and_is_scrambled_flag & 0x3FFFFFFF;
+			let final_size = offset_info.compressed_size_and_is_scrambled_flag & 0x7FFFFFFF;
 			let is_lz4ed = final_size != resource_header.data_size;
 			let is_scrambled = offset_info.compressed_size_and_is_scrambled_flag & 0x80000000 == 0x80000000;
 

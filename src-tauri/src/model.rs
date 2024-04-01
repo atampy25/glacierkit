@@ -170,7 +170,13 @@ pub enum ResourceOverviewData {
 		blueprint_path_or_hint: Option<String>
 	},
 	GenericRL,
-	Ores
+	Ores,
+	Image {
+		image_path: PathBuf
+	},
+	Audio {
+		wav_path: PathBuf
+	}
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -443,13 +449,17 @@ strike! {
 					id: Uuid
 				},
 
-				// ExtractAsRTGeneric {
-				// 	id: Uuid
-				// },
+				ExtractAsRTGeneric {
+					id: Uuid
+				},
 
-				// ExtractAsOres {
-				// 	id: Uuid
-				// }
+				ExtractAsPng {
+					id: Uuid
+				},
+
+				ExtractORESAsJson {
+					id: Uuid
+				}
 			})
 		}),
 
