@@ -47,7 +47,7 @@
 			},
 			contextmenu: {
 				select_node: false,
-				items: (rightClickedNode: { original: { folder: boolean; path: string | null; filetype: string } }, c: any) => {
+				items: (rightClickedNode: { original: { folder: boolean; path: string | null; hint: string | null; filetype: string } }, c: any) => {
 					return rightClickedNode.original.folder
 						? {}
 						: {

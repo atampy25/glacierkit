@@ -2933,6 +2933,7 @@ fn event(app: AppHandle, event: Event) {
 									}
 
 									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.{}", hash, file_type))
 										.add_filter(&format!("{} file", file_type), &[&file_type])
 										.save_file()
 										.await
@@ -3051,8 +3052,11 @@ fn event(app: AppHandle, event: Event) {
 										dialog = dialog.set_directory(&project.path);
 									}
 
-									if let Some(save_handle) =
-										dialog.add_filter("TEMP.json file", &["TEMP.json"]).save_file().await
+									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.TEMP.json", hash))
+										.add_filter("TEMP.json file", &["TEMP.json"])
+										.save_file()
+										.await
 									{
 										fs::write(save_handle.path(), data)?;
 
@@ -3113,8 +3117,11 @@ fn event(app: AppHandle, event: Event) {
 										dialog = dialog.set_directory(&project.path);
 									}
 
-									if let Some(save_handle) =
-										dialog.add_filter("TBLU file", &["TBLU"]).save_file().await
+									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.TBLU", metadata.hash_value))
+										.add_filter("TBLU file", &["TBLU"])
+										.save_file()
+										.await
 									{
 										fs::write(save_handle.path(), data)?;
 
@@ -3192,8 +3199,11 @@ fn event(app: AppHandle, event: Event) {
 										dialog = dialog.set_directory(&project.path);
 									}
 
-									if let Some(save_handle) =
-										dialog.add_filter("TBLU.json file", &["TBLU.json"]).save_file().await
+									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.TBLU", metadata.hash_value))
+										.add_filter("TBLU.json file", &["TBLU.json"])
+										.save_file()
+										.await
 									{
 										fs::write(save_handle.path(), data)?;
 
@@ -3242,6 +3252,7 @@ fn event(app: AppHandle, event: Event) {
 									}
 
 									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.{}.json", hash, res_meta.hash_resource_type))
 										.add_filter(
 											&format!("{}.json file", res_meta.hash_resource_type),
 											&[&format!("{}.json", res_meta.hash_resource_type)]
@@ -3287,8 +3298,11 @@ fn event(app: AppHandle, event: Event) {
 
 									let res_data = parse_hashes_ores(&res_data)?;
 
-									if let Some(save_handle) =
-										dialog.add_filter("JSON file", &["json"]).save_file().await
+									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.json", hash))
+										.add_filter("JSON file", &["json"])
+										.save_file()
+										.await
 									{
 										fs::write(save_handle.path(), to_vec(&res_data)?)?;
 									}
@@ -3319,7 +3333,11 @@ fn event(app: AppHandle, event: Event) {
 										dialog = dialog.set_directory(&project.path);
 									}
 
-									if let Some(save_handle) = dialog.add_filter("PNG file", &["png"]).save_file().await
+									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.png", hash))
+										.add_filter("PNG file", &["png"])
+										.save_file()
+										.await
 									{
 										ImageReader::new(Cursor::new(res_data))
 											.with_guessed_format()?
@@ -3351,7 +3369,11 @@ fn event(app: AppHandle, event: Event) {
 										dialog = dialog.set_directory(&project.path);
 									}
 
-									if let Some(save_handle) = dialog.add_filter("WAV file", &["wav"]).save_file().await
+									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}.wav", hash))
+										.add_filter("WAV file", &["wav"])
+										.save_file()
+										.await
 									{
 										let (_, res_data) =
 											extract_latest_resource(resource_packages, hash_list, hash)?;
@@ -3505,7 +3527,11 @@ fn event(app: AppHandle, event: Event) {
 										dialog = dialog.set_directory(&project.path);
 									}
 
-									if let Some(save_handle) = dialog.add_filter("WAV file", &["wav"]).save_file().await
+									if let Some(save_handle) = dialog
+										.set_file_name(&format!("{}~{}.wav", hash, index))
+										.add_filter("WAV file", &["wav"])
+										.save_file()
+										.await
 									{
 										let data_dir =
 											app.path_resolver().app_data_dir().expect("Couldn't get data dir");
@@ -3514,8 +3540,6 @@ fn event(app: AppHandle, event: Event) {
 											extract_latest_resource(resource_packages, hash_list, hash)?;
 
 										let wwev = parse_wwev(&res_data)?;
-
-										let mut idx = 0;
 
 										match wwev.data {
 											WwiseEventData::NonStreamed(objects) => {
@@ -3542,7 +3566,12 @@ fn event(app: AppHandle, event: Event) {
 
 												let wwem_hash = &res_meta
 													.hash_reference_data
-													.get(objects.get(index as usize).context("No such audio object")?.dependency_index as usize)
+													.get(
+														objects
+															.get(index as usize)
+															.context("No such audio object")?
+															.dependency_index as usize
+													)
 													.context("No such WWEM dependency")?
 													.hash;
 
