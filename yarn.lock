@@ -2627,6 +2627,7 @@ __metadata:
     typescript: "npm:^5.0.0"
     uuid: "npm:^9.0.1"
     vite: "npm:^5.0.3"
+    wavesurfer.js: "npm:^7.7.8"
   languageName: unknown
   linkType: soft
 
@@ -3861,6 +3862,13 @@ __metadata:
     vite:
       optional: true
   checksum: 5781ece3025b6be0eb87ee7d97760a7721b1c6c5ad60ede5f37c86393ece3c8fce4245472f62368eb192448034086e25bdcadf098eefc271277176ab9a430204
+  languageName: node
+  linkType: hard
+
+"wavesurfer.js@npm:^7.7.8":
+  version: 7.7.8
+  resolution: "wavesurfer.js@npm:7.7.8"
+  checksum: b5f4cfb65781448c7548adaf322e89c509c493f83369d1790cd9f01d56c49477d38d6bd6dd7dd9b46ac09fa19cda092e530ea40efa1dd933fb5d292237b996ee
   languageName: node
   linkType: hard
 

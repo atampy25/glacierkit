@@ -54,13 +54,21 @@ pub fn extract_latest_resource(
 			.map(|(index, entry)| (rpkg.resource_metadata.get(index).unwrap(), entry))
 		{
 			let final_size = offset_info.compressed_size_and_is_scrambled_flag & 0x7FFFFFFF;
-			let is_lz4ed = final_size != resource_header.data_size;
+			let is_lz4ed = final_size != 0;
 			let is_scrambled = offset_info.compressed_size_and_is_scrambled_flag & 0x80000000 == 0x80000000;
 
 			let mut package_file = File::open(rpkg_path)?;
 			package_file.seek(SeekFrom::Start(offset_info.data_offset))?;
 
-			let mut extracted = vec![0; final_size as usize];
+			let mut extracted = vec![
+				0;
+				if is_lz4ed {
+					final_size
+				} else {
+					resource_header.data_size
+				} as usize
+			];
+
 			package_file.read_exact(&mut extracted)?;
 
 			// Unscramble the data

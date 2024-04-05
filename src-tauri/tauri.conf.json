@@ -20,7 +20,7 @@
 			"shell": {
 				"sidecar": true,
 				"scope": [
-					{ "name": "binaries/vgmstream-cli", "sidecar": true }
+					{ "name": "vgmstream-cli", "sidecar": true }
 				]
 			}
 		},
@@ -31,7 +31,7 @@
 			"deb": {
 				"depends": []
 			},
-			"externalBin": ["binaries/vgmstream-cli"],
+			"externalBin": ["vgmstream-cli"],
 			"icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
 			"identifier": "app.deeznuts",
 			"longDescription": "",

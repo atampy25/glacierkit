@@ -112,6 +112,25 @@
 												}
 											}
 										}
+									: {}),
+								...(rightClickedNode.original.hint
+									? {
+											copyhint: {
+												separator_before: false,
+												separator_after: false,
+												_disabled: false,
+												label: "Copy Hint",
+												icon: "far fa-copy",
+												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+													trackEvent("Copy hint from game tree")
+
+													const tree = jQuery.jstree!.reference(b.reference)
+													const selected_node = tree.get_node(b.reference)
+
+													await clipboard.writeText(selected_node.original.hint)
+												}
+											}
+										}
 									: {})
 							}
 				}
@@ -247,6 +266,7 @@
 						((platformType === ".entitytype" && (path.endsWith(".class") || path.endsWith(".aspect") || path.endsWith(".entitytype") || path.endsWith(".entitytemplate"))) ||
 						platformType === ".wwisebank" ||
 						platformType === ".gfx" ||
+						platformType === ".wes" ||
 						path.endsWith(platformType)
 							? ""
 							: platformType),
@@ -299,6 +319,7 @@
 					text: entry.hint ? `${entry.hint} (${entry.hash}.${entry.filetype})` : `${entry.hash}.${entry.filetype}`,
 					folder: false,
 					path: null,
+					hint: entry.hint || null,
 					filetype: entry.filetype
 				})
 			}

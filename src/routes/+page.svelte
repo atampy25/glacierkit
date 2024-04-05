@@ -10,7 +10,7 @@
 	import { Button, ToastNotification } from "carbon-components-svelte"
 	import { SvelteComponent, beforeUpdate, onDestroy } from "svelte"
 	import { emit, listen } from "@tauri-apps/api/event"
-	import type { EditorType, Request } from "$lib/bindings-types"
+	import type { Announcement, EditorType, Request } from "$lib/bindings-types"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
 	import Close from "carbon-icons-svelte/lib/Close.svelte"
 	import Save from "carbon-icons-svelte/lib/Save.svelte"
@@ -48,14 +48,7 @@
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]
 
-	let announcements: {
-		id: string
-		kind: "info" | "success" | "warning" | "error" | "info-square" | "warning-alt"
-		title: string
-		description: string
-		persistent: boolean
-		until: number | null
-	}[] = []
+	let announcements: Announcement[] = []
 
 	let seenAnnouncements: string[] = []
 
@@ -162,6 +155,7 @@
 								break
 
 							case "initialiseDynamics":
+								announcements = request.data.data.dynamics.announcements
 								seenAnnouncements = request.data.data.seen_announcements
 								break
 
@@ -245,10 +239,6 @@
 			})
 
 			destroyFunc.run = unlisten
-
-			const dynamics = await (await fetch("https://hitman-resources.netlify.app/glacierkit/dynamics.json")).json()
-
-			announcements = dynamics.announcements
 		}
 	})
 </script>
@@ -522,7 +512,7 @@
 												<div class="text-left -mb-2 flex items-center justify-center -mr-4">
 													<ToastNotification
 														lowContrast
-														kind={announcement.kind}
+														kind={announcement.kind === "warning" ? "warning-alt" : announcement.kind}
 														title={announcement.title}
 														hideCloseButton={announcement.persistent}
 														on:close={async () => {

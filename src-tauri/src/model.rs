@@ -176,6 +176,10 @@ pub enum ResourceOverviewData {
 	},
 	Audio {
 		wav_path: PathBuf
+	},
+	MultiAudio {
+		name: String,
+		wav_paths: Vec<(String, PathBuf)>
 	}
 }
 
@@ -187,6 +191,32 @@ pub enum SearchFilter {
 	Models,
 	Textures,
 	Sound
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Dynamics {
+	pub announcements: Vec<Announcement>
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Announcement {
+	pub id: String,
+	pub kind: AnnouncementKind,
+	pub title: String,
+	pub description: String,
+	pub persistent: bool,
+	pub until: Option<u32>
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum AnnouncementKind {
+	Info,
+	Success,
+	Warning,
+	Error
 }
 
 strike! {
@@ -457,6 +487,19 @@ strike! {
 					id: Uuid
 				},
 
+				ExtractAsWav {
+					id: Uuid
+				},
+
+				ExtractMultiWav {
+					id: Uuid
+				},
+
+				ExtractSpecificMultiWav {
+					id: Uuid,
+					index: u32
+				},
+
 				ExtractORESAsJson {
 					id: Uuid
 				}
@@ -701,7 +744,7 @@ strike! {
 		Global(pub enum GlobalRequest {
 			ErrorReport { error: String },
 			SetWindowTitle(String),
-			InitialiseDynamics { seen_announcements: Vec<String> },
+			InitialiseDynamics { dynamics: Dynamics, seen_announcements: Vec<String> },
 			CreateTab {
 				id: Uuid,
 				name: String,

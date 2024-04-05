@@ -7,6 +7,8 @@
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
 	import { trackEvent } from "@aptabase/tauri"
 	import { convertFileSrc } from "@tauri-apps/api/tauri"
+	import WaveformPlayer from "$lib/components/WaveformPlayer.svelte"
+	import MultiWaveformPlayer from "$lib/components/MultiWaveformPlayer.svelte"
 
 	export let id: string
 
@@ -356,6 +358,360 @@
 					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract image file as original")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+				<div class="flex flex-col">
+					<h4 class="mb-1">Dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each dependencies as [hash, type, path, flag]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async () => {
+									trackEvent("Follow dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="text-base -mt-1"
+									><span class="font-bold"
+										>{hash}{#if type}.{type}{/if}</span
+									>
+									{flag}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+				<div class="flex flex-col">
+					<h4 class="mb-1">Reverse dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each reverseDependencies as [hash, type, path]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow reverse dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async (e) => {
+									e.preventDefault()
+									trackEvent("Follow reverse dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="font-bold text-base -mt-1"
+									>{hash}{#if type}.{type}{/if}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
+		{:else if data.type === "Audio"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4">
+				<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract audio file as WAV")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsWav",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract as WAV</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract audio file as original")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+				<div class="flex flex-col">
+					<h4 class="mb-1">Dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each dependencies as [hash, type, path, flag]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async () => {
+									trackEvent("Follow dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="text-base -mt-1"
+									><span class="font-bold"
+										>{hash}{#if type}.{type}{/if}</span
+									>
+									{flag}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+				<div class="flex flex-col">
+					<h4 class="mb-1">Reverse dependencies</h4>
+					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+						{#each reverseDependencies as [hash, type, path]}
+							<div
+								class="bg-[#303030] p-3 cursor-pointer"
+								on:click={async () => {
+									trackEvent("Follow reverse dependency from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependency",
+												data: {
+													id,
+													new_hash: hash
+												}
+											}
+										}
+									})
+								}}
+								on:contextmenu={async (e) => {
+									e.preventDefault()
+									trackEvent("Follow reverse dependency in new tab from resource overview")
+
+									await event({
+										type: "editor",
+										data: {
+											type: "resourceOverview",
+											data: {
+												type: "followDependencyInNewTab",
+												data: {
+													id,
+													hash: hash
+												}
+											}
+										}
+									})
+								}}
+							>
+								<div class="font-bold text-base -mt-1"
+									>{hash}{#if type}.{type}{/if}</div
+								>
+								<div class="break-all">{path || "No path"}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
+		{:else if data.type === "MultiAudio"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4">
+				<div class="text-neutral-400 mb-2">{data.data.name}</div>
+				<MultiWaveformPlayer
+					src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
+					on:download={async ({ detail }) => {
+						trackEvent("Extract specific audio from WWEV file as WAV")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractSpecificMultiWav",
+									data: {
+										id,
+										index: detail
+									}
+								}
+							}
+						})
+					}}
+				/>
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract WWEV file as WAVs")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractMultiWav",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract all as WAVs</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract audio file as original")
 
 						await event({
 							type: "editor",

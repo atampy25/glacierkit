@@ -21,6 +21,7 @@ pub mod resourcelib;
 pub mod rpkg;
 pub mod rpkg_tool;
 pub mod show_in_folder;
+pub mod wwev;
 
 use std::{
 	collections::{HashMap, HashSet},
@@ -32,7 +33,7 @@ use std::{
 	sync::Arc
 };
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use binrw::BinReaderExt;
@@ -43,7 +44,8 @@ use entity::{
 use event_handling::{
 	entity_monaco::{handle_openfactory, handle_updatecontent},
 	entity_overrides::send_overrides_decorations,
-	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select}
+	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select},
+	resource_overview::initialise_resource_overview
 };
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
@@ -95,12 +97,32 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
+use wwev::{parse_wwev, WwiseEventData};
 
 const HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
 
 const HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/hash_list.sml";
+
+pub trait RunCommandExt {
+	/// Run the command, returning its stdout. If the command fails (status code non-zero), an error is returned with the stderr output.
+	fn run(self) -> Result<String>;
+}
+
+impl RunCommandExt for Command {
+	#[try_fn]
+	#[context("Couldn't run command")]
+	fn run(self) -> Result<String> {
+		let output = self.output()?;
+
+		if output.status.success() {
+			output.stdout
+		} else {
+			bail!("Command failed: {}", output.stderr);
+		}
+	}
+}
 
 fn main() {
 	let specta = {
@@ -1207,6 +1229,14 @@ fn event(app: AppHandle, event: Event) {
 								send_request(
 									&app,
 									Request::Global(GlobalRequest::InitialiseDynamics {
+										dynamics: reqwest::get(
+											"https://hitman-resources.netlify.app/glacierkit/dynamics.json"
+										)
+										.await?
+										.json()
+										.await
+										.ok()
+										.unwrap_or_default(),
 										seen_announcements: app_settings.load().seen_announcements.to_owned()
 									})
 								)?;
@@ -3298,6 +3328,246 @@ fn event(app: AppHandle, event: Event) {
 									}
 								}
 							}
+
+							ResourceOverviewEvent::ExtractAsWav { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) = dialog.add_filter("WAV file", &["wav"]).save_file().await
+									{
+										let (_, res_data) =
+											extract_latest_resource(resource_packages, hash_list, hash)?;
+
+										let data_dir =
+											app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+
+										let temp_file_id = Uuid::new_v4();
+
+										fs::write(
+											data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
+											res_data
+										)?;
+
+										Command::new_sidecar("vgmstream-cli")?
+											.current_dir(data_dir.join("temp"))
+											.args([
+												&format!("{}.wem", temp_file_id),
+												"-o",
+												save_handle.path().to_string_lossy().as_ref()
+											])
+											.run()
+											.context("VGMStream command failed")?;
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractMultiWav { id } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let mut dialog = AsyncFileDialog::new().set_title("Extract all WAVs to folder");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) = dialog.pick_folder().await {
+										let data_dir =
+											app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+
+										let (res_meta, res_data) =
+											extract_latest_resource(resource_packages, hash_list, hash)?;
+
+										let wwev = parse_wwev(&res_data)?;
+
+										let mut idx = 0;
+
+										match wwev.data {
+											WwiseEventData::NonStreamed(objects) => {
+												for object in objects {
+													let temp_file_id = Uuid::new_v4();
+
+													fs::write(
+														data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
+														object.data
+													)?;
+
+													Command::new_sidecar("vgmstream-cli")?
+														.current_dir(data_dir.join("temp"))
+														.args([
+															&format!("{}.wem", temp_file_id),
+															"-o",
+															save_handle
+																.path()
+																.join(format!("{}.wav", idx))
+																.to_string_lossy()
+																.as_ref()
+														])
+														.run()
+														.context("VGMStream command failed")?;
+
+													idx += 1;
+												}
+											}
+
+											WwiseEventData::Streamed(objects) => {
+												for object in objects {
+													let temp_file_id = Uuid::new_v4();
+
+													let wwem_hash = &res_meta
+														.hash_reference_data
+														.get(object.dependency_index as usize)
+														.context("No such WWEM dependency")?
+														.hash;
+
+													let (_, wem_data) = extract_latest_resource(
+														resource_packages,
+														hash_list,
+														wwem_hash
+													)?;
+
+													fs::write(
+														data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
+														wem_data
+													)?;
+
+													Command::new_sidecar("vgmstream-cli")?
+														.current_dir(data_dir.join("temp"))
+														.args([
+															&format!("{}.wem", temp_file_id),
+															"-o",
+															save_handle
+																.path()
+																.join(format!("{}.wav", idx))
+																.to_string_lossy()
+																.as_ref()
+														])
+														.run()
+														.context("VGMStream command failed")?;
+
+													idx += 1;
+												}
+											}
+										}
+									}
+								}
+							}
+
+							ResourceOverviewEvent::ExtractSpecificMultiWav { id, index } => {
+								let editor_state = app_state.editor_states.read().await;
+								let editor_state = editor_state.get(&id).context("No such editor")?;
+
+								let hash = match editor_state.data {
+									EditorData::ResourceOverview { ref hash, .. } => hash,
+
+									_ => {
+										Err(anyhow!("Editor {} is not a resource overview", id))?;
+										panic!();
+									}
+								};
+
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(save_handle) = dialog.add_filter("WAV file", &["wav"]).save_file().await
+									{
+										let data_dir =
+											app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+
+										let (res_meta, res_data) =
+											extract_latest_resource(resource_packages, hash_list, hash)?;
+
+										let wwev = parse_wwev(&res_data)?;
+
+										let mut idx = 0;
+
+										match wwev.data {
+											WwiseEventData::NonStreamed(objects) => {
+												let temp_file_id = Uuid::new_v4();
+
+												fs::write(
+													data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
+													&objects.get(index as usize).context("No such audio object")?.data
+												)?;
+
+												Command::new_sidecar("vgmstream-cli")?
+													.current_dir(data_dir.join("temp"))
+													.args([
+														&format!("{}.wem", temp_file_id),
+														"-o",
+														save_handle.path().to_string_lossy().as_ref()
+													])
+													.run()
+													.context("VGMStream command failed")?;
+											}
+
+											WwiseEventData::Streamed(objects) => {
+												let temp_file_id = Uuid::new_v4();
+
+												let wwem_hash = &res_meta
+													.hash_reference_data
+													.get(objects.get(index as usize).context("No such audio object")?.dependency_index as usize)
+													.context("No such WWEM dependency")?
+													.hash;
+
+												let (_, wem_data) =
+													extract_latest_resource(resource_packages, hash_list, wwem_hash)?;
+
+												fs::write(
+													data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
+													wem_data
+												)?;
+
+												Command::new_sidecar("vgmstream-cli")?
+													.current_dir(data_dir.join("temp"))
+													.args([
+														&format!("{}.wem", temp_file_id),
+														"-o",
+														save_handle.path().to_string_lossy().as_ref()
+													])
+													.run()
+													.context("VGMStream command failed")?;
+											}
+										}
+									}
+								}
+							}
 						}
 					},
 
@@ -3823,151 +4093,6 @@ fn event(app: AppHandle, event: Event) {
 				.expect("Couldn't send error report to frontend");
 		}
 	});
-}
-
-#[try_fn]
-#[context("Couldn't initialise resource overview {id}")]
-pub fn initialise_resource_overview(
-	app: &AppHandle,
-	app_state: &State<AppState>,
-	id: Uuid,
-	hash: &String,
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	resource_reverse_dependencies: &Arc<HashMap<String, Vec<String>>>,
-	install: &PathBuf,
-	hash_list: &Arc<HashList>
-) -> Result<()> {
-	let (filetype, chunk_patch, deps) = extract_latest_overview_info(resource_packages, hash)?;
-
-	send_request(
-		app,
-		Request::Editor(EditorRequest::ResourceOverview(ResourceOverviewRequest::Initialise {
-			id,
-			hash: hash.to_owned(),
-			filetype,
-			chunk_patch,
-			path_or_hint: hash_list
-				.entries
-				.get(hash)
-				.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
-			dependencies: deps
-				.iter()
-				.map(|(hash, flag)| {
-					(
-						hash.to_owned(),
-						hash_list
-							.entries
-							.get(hash)
-							.map(|x| x.resource_type.to_owned())
-							.unwrap_or("".into()),
-						hash_list
-							.entries
-							.get(hash)
-							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
-						flag.to_owned()
-					)
-				})
-				.collect(),
-			reverse_dependencies: resource_reverse_dependencies
-				.get(hash)
-				.map(|hashes| {
-					hashes
-						.iter()
-						.map(|hash| {
-							(
-								hash.to_owned(),
-								hash_list
-									.entries
-									.get(hash)
-									.expect("No entry in hash list for resource")
-									.resource_type
-									.to_owned(),
-								hash_list
-									.entries
-									.get(hash)
-									.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
-							)
-						})
-						.collect()
-				})
-				.unwrap_or_default(),
-			data: match hash_list
-				.entries
-				.get(hash)
-				.expect("No entry in hash list for resource")
-				.resource_type
-				.as_ref()
-			{
-				"TEMP" => {
-					ensure_entity_in_cache(
-						resource_packages,
-						&app_state.cached_entities,
-						app_state
-							.game_installs
-							.iter()
-							.try_find(|x| anyhow::Ok(x.path == *install))?
-							.context("No such game install")?
-							.version,
-						hash_list,
-						hash
-					)?;
-
-					let entity = app_state.cached_entities.read();
-					let entity = entity.get(hash).unwrap();
-
-					ResourceOverviewData::Entity {
-						blueprint_hash: entity.blueprint_hash.to_owned(),
-						blueprint_path_or_hint: hash_list
-							.entries
-							.get(&entity.blueprint_hash)
-							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
-					}
-				}
-
-				"AIRG" | "TBLU" | "RTLV" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "DSWB" | "GFXF" | "GIDX"
-				| "WSGB" | "ECPB" | "UICB" | "ENUM" => ResourceOverviewData::GenericRL,
-
-				"ORES" => ResourceOverviewData::Ores,
-
-				"GFXI" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
-					let temp_file_id = Uuid::new_v4();
-
-					fs::create_dir_all(data_dir.join("temp"))?;
-
-					let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
-
-					ImageReader::new(Cursor::new(res_data))
-						.with_guessed_format()?
-						.decode()?
-						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
-
-					ResourceOverviewData::Image {
-						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id))
-					}
-				}
-
-				"WWES" | "WWEM" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
-					let temp_file_id = Uuid::new_v4();
-
-					fs::create_dir_all(data_dir.join("temp"))?;
-
-					let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
-
-					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
-
-					Command::new_sidecar("binaries/vgmstream")?;
-
-					ResourceOverviewData::Audio {
-						wav_path: data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-					}
-				}
-
-				_ => ResourceOverviewData::Generic
-			}
-		}))
-	)?;
 }
 
 #[try_fn]
