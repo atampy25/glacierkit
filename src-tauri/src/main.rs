@@ -776,6 +776,37 @@ fn event(app: AppHandle, event: Event) {
 												}
 											}
 
+											"unlockables.json" | "dlge.json" | "locr.json" | "rtlv.json" | "clng.json" | "ditl.json" | "material.json" | "contract.json" => {
+												let id = Uuid::new_v4();
+
+												app_state.editor_states.write().await.insert(
+													id.to_owned(),
+													EditorState {
+														file: Some(path.to_owned()),
+														data: EditorData::Text {
+															content: fs::read_to_string(&path)
+																.context("Couldn't read file")?,
+															file_type: TextFileType::Json
+														}
+													}
+												);
+
+												send_request(
+													&app,
+													Request::Global(GlobalRequest::CreateTab {
+														id,
+														name: path
+															.file_name()
+															.context("No file name")?
+															.to_string_lossy()
+															.into(),
+														editor_type: EditorType::Text {
+															file_type: TextFileType::Json
+														}
+													})
+												)?;
+											}
+
 											_ => {
 												// Unsupported extension
 
