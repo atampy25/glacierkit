@@ -16,6 +16,8 @@
 	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import * as monaco from "monaco-editor"
+	import { createPatch } from "rfc6902"
+	import { writeTextFile } from "@tauri-apps/api/fs"
 
 	let tasks: [string, string][] = []
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
@@ -68,6 +70,22 @@
 					errorModalError = request.data.data.error
 					errorModalOpen = true
 					tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+				}
+
+				// Because rfc6902 is the only patch creation library which properly handles arrays
+				if (request.type === "global" && request.data.type === "computeJSONPatchAndSave") {
+					console.log("Layout handling request", request)
+
+					const patch = createPatch(request.data.data.base, request.data.data.current)
+
+					void writeTextFile(
+						request.data.data.save_path,
+						JSON.stringify({
+							file: "00204D1AFD76AB13",
+							type: "REPO",
+							patch
+						})
+					)
 				}
 			})
 

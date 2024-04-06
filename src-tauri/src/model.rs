@@ -16,7 +16,8 @@ use crate::{
 	entity::{CopiedEntityData, ReverseReference},
 	game_detection::GameInstall,
 	hash_list::HashList,
-	intellisense::Intellisense
+	intellisense::Intellisense,
+	repository::RepositoryItem
 };
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -76,6 +77,11 @@ pub enum EditorData {
 		settings: EphemeralQNSettings,
 		base: Box<Entity>,
 		current: Box<Entity>
+	},
+	RepositoryPatch {
+		base: Vec<RepositoryItem>,
+		current: Vec<RepositoryItem>,
+		patch_type: JsonPatchType
 	}
 }
 
@@ -135,7 +141,15 @@ pub enum EditorType {
 	ResourceOverview,
 	Text { file_type: TextFileType },
 	QNEntity,
-	QNPatch
+	QNPatch,
+	RepositoryPatch { patch_type: JsonPatchType }
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "data")]
+pub enum JsonPatchType {
+	MergePatch,
+	JsonPatch
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -759,7 +773,12 @@ strike! {
 				id: Uuid,
 				unsaved: bool
 			},
-			RemoveTab(Uuid)
+			RemoveTab(Uuid),
+			ComputeJSONPatchAndSave {
+				base: Value,
+				current: Value,
+				save_path: PathBuf
+			}
 		})
 	}
 }

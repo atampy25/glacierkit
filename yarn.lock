@@ -2619,6 +2619,7 @@ __metadata:
     postcss: "npm:^8.4.32"
     prettier: "npm:^3.1.1"
     prettier-plugin-svelte: "npm:^3.1.2"
+    rfc6902: "npm:^5.1.1"
     svelte: "npm:^4.2.7"
     svelte-check: "npm:^3.6.0"
     svelte-splitpanes: "npm:^0.8.0"
@@ -3145,6 +3146,13 @@ __metadata:
   version: 1.0.4
   resolution: "reusify@npm:1.0.4"
   checksum: c19ef26e4e188f408922c46f7ff480d38e8dfc55d448310dfb518736b23ed2c4f547fb64a6ed5bdba92cd7e7ddc889d36ff78f794816d5e71498d645ef476107
+  languageName: node
+  linkType: hard
+
+"rfc6902@npm:^5.1.1":
+  version: 5.1.1
+  resolution: "rfc6902@npm:5.1.1"
+  checksum: ebbb7e3e6c6063fbdcd57e7255635b39e6b9bda3aa522570299b12dc127cf02da99406eabaeff3022c2860006cac0a7f8e21d6ab64b48c9eb8a00514be431784
   languageName: node
   linkType: hard
 

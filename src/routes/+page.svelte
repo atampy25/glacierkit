@@ -8,8 +8,8 @@
 	import GameBrowser from "$lib/tools/GameBrowser.svelte"
 	import ToolButton from "$lib/components/ToolButton.svelte"
 	import { Button, ToastNotification } from "carbon-components-svelte"
-	import { SvelteComponent, beforeUpdate, onDestroy } from "svelte"
-	import { emit, listen } from "@tauri-apps/api/event"
+	import { beforeUpdate, onDestroy } from "svelte"
+	import { listen } from "@tauri-apps/api/event"
 	import type { Announcement, EditorType, Request } from "$lib/bindings-types"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
 	import Close from "carbon-icons-svelte/lib/Close.svelte"
@@ -24,6 +24,7 @@
 	import Idea from "carbon-icons-svelte/lib/Idea.svelte"
 	import ResourceOverviewEditor from "$lib/editors/resourceoverview/ResourceOverviewEditor.svelte"
 	import { trackEvent } from "@aptabase/tauri"
+	import RepositoryPatchEditor from "$lib/editors/repositorypatch/RepositoryPatchEditor.svelte"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -94,6 +95,9 @@
 			case "ResourceOverview":
 				return ResourceOverviewEditor
 
+			case "RepositoryPatch":
+				return RepositoryPatchEditor
+
 			default:
 				editorType satisfies never
 				return NilEditor
@@ -151,6 +155,10 @@
 								break
 
 							case "setWindowTitle":
+								// Handled by +layout.svelte
+								break
+
+							case "computeJSONPatchAndSave":
 								// Handled by +layout.svelte
 								break
 

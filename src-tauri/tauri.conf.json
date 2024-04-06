@@ -22,6 +22,11 @@
 				"scope": [
 					{ "name": "vgmstream-cli", "sidecar": true }
 				]
+			},
+			"fs": {
+				"all": false,
+				"writeFile": true,
+				"scope": ["**/*"]
 			}
 		},
 		"bundle": {
