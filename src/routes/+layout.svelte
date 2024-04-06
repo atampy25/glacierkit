@@ -60,7 +60,7 @@
 				if (request.type === "global" && request.data.type === "setWindowTitle") {
 					console.log("Layout handling request", request)
 
-					appWindow.setTitle(`Deeznuts - ${request.data.data}`)
+					appWindow.setTitle(`GlacierKit - ${request.data.data}`)
 					windowTitle = request.data.data
 				}
 
@@ -333,7 +333,7 @@
 	<SkipToContent />
 
 	<!-- svelte-ignore a11y-missing-attribute -->
-	<a data-tauri-drag-region class:bx--header__name={true}>Deeznuts</a>
+	<a data-tauri-drag-region class:bx--header__name={true}>GlacierKit</a>
 
 	<div data-tauri-drag-region class="pointer-events-none cursor-none w-full text-center text-neutral-400">{windowTitle}</div>
 

@@ -310,7 +310,7 @@ fn event(app: AppHandle, event: Event) {
 													from_slice(&fs::read(&path).context("Couldn't read file")?)
 														.context("Invalid entity")?;
 
-												// Normalise comments to form used by Deeznuts (single comment for each entity)
+												// Normalise comments to form used by GlacierKit (single comment for each entity)
 												let mut comments: Vec<CommentEntity> = vec![];
 												for comment in entity.comments {
 													if let Some(x) =
@@ -389,7 +389,7 @@ fn event(app: AppHandle, event: Event) {
 													apply_patch(&mut entity, patch, true)
 														.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-													// Normalise comments to form used by Deeznuts (single comment for each entity)
+													// Normalise comments to form used by GlacierKit (single comment for each entity)
 													let mut comments: Vec<CommentEntity> = vec![];
 													for comment in entity.comments {
 														if let Some(x) =
@@ -776,7 +776,8 @@ fn event(app: AppHandle, event: Event) {
 												}
 											}
 
-											"unlockables.json" | "dlge.json" | "locr.json" | "rtlv.json" | "clng.json" | "ditl.json" | "material.json" | "contract.json" => {
+											"unlockables.json" | "dlge.json" | "locr.json" | "rtlv.json"
+											| "clng.json" | "ditl.json" | "material.json" | "contract.json" => {
 												let id = Uuid::new_v4();
 
 												app_state.editor_states.write().await.insert(
@@ -967,7 +968,7 @@ fn event(app: AppHandle, event: Event) {
 											from_slice(&fs::read(&path).context("Couldn't read file")?)
 												.context("Invalid entity")?;
 
-										// Normalise comments to form used by Deeznuts (single comment for each entity)
+										// Normalise comments to form used by GlacierKit (single comment for each entity)
 										let mut comments: Vec<CommentEntity> = vec![];
 										for comment in entity.comments {
 											if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
@@ -1036,7 +1037,7 @@ fn event(app: AppHandle, event: Event) {
 											apply_patch(&mut entity, patch, true)
 												.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-											// Normalise comments to form used by Deeznuts (single comment for each entity)
+											// Normalise comments to form used by GlacierKit (single comment for each entity)
 											let mut comments: Vec<CommentEntity> = vec![];
 											for comment in entity.comments {
 												if let Some(x) =
@@ -1110,7 +1111,7 @@ fn event(app: AppHandle, event: Event) {
 										from_slice(&fs::read(&path).context("Couldn't read file")?)
 											.context("Invalid entity")?;
 
-									// Normalise comments to form used by Deeznuts (single comment for each entity)
+									// Normalise comments to form used by GlacierKit (single comment for each entity)
 									let mut comments: Vec<CommentEntity> = vec![];
 									for comment in entity.comments {
 										if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
@@ -1251,7 +1252,7 @@ fn event(app: AppHandle, event: Event) {
 									apply_patch(&mut entity, patch, true)
 										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-									// Normalise comments to form used by Deeznuts (single comment for each entity)
+									// Normalise comments to form used by GlacierKit (single comment for each entity)
 									let mut comments: Vec<CommentEntity> = vec![];
 									for comment in entity.comments {
 										if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {

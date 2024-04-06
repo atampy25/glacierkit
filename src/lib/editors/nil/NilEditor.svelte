@@ -8,7 +8,7 @@
 
 <div class="h-full flex items-center justify-center">
 	<div class="text-center">
-		<h1>This file can't be edited in Deeznuts.</h1>
+		<h1>This file can't be edited in GlacierKit.</h1>
 		<p>You may be able to use VS Code or another tool to edit it.</p>
 	</div>
 </div>

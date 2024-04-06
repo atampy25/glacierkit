@@ -36,7 +36,7 @@
 		"You can right-click a QuickEntity file and press Normalise to merge property overrides, sort keys and pad entity IDs to 16 characters.",
 		"If you want to quickly edit a file externally, right-click it and press Show in Explorer to open its containing folder in Windows Explorer.",
 		"The Help menu shows the default property values of a template or module, as well as the input and output pins it accepts. You can access it by right-clicking any entity in the tree.",
-		"Changes that you make externally to your project folder are automatically synced to the Files panel in Deeznuts.",
+		"Changes that you make externally to your project folder are automatically synced to the Files panel in GlacierKit.",
 		"Press Ctrl-Space to trigger intellisense in JSON editors - this can show you what properties are available and what their default values are.",
 		'Right-click an entity\'s "factory" field and press "Open factory in new tab" or click on it and press F12 to quickly inspect its underlying template.',
 		'You can visualise a ZCurve by right-clicking the property\'s name and pressing "Visualise curve".',
@@ -507,7 +507,7 @@
 						{#if !activeTab}
 							<div class="flex-grow flex items-center justify-center">
 								<div class="text-center">
-									<h1>Welcome to Deeznuts</h1>
+									<h1>Welcome to GlacierKit</h1>
 									<p>Select a tab above to edit it here.</p>
 								</div>
 							</div>
@@ -515,7 +515,7 @@
 					{:else}
 						<div class="flex-grow flex items-center justify-center">
 							<div class="text-center">
-								<h1>Welcome to Deeznuts</h1>
+								<h1>Welcome to GlacierKit</h1>
 								<p>You can start by selecting a project on the left.</p>
 								{#if announcements.length}
 									<div class="flex-col items-center -mb-4">

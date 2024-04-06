@@ -7,7 +7,7 @@
 		"distDir": "../build"
 	},
 	"package": {
-		"productName": "Deeznuts",
+		"productName": "GlacierKit",
 		"version": "1.0.0"
 	},
 	"tauri": {
@@ -38,7 +38,7 @@
 			},
 			"externalBin": ["vgmstream-cli"],
 			"icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-			"identifier": "app.deeznuts",
+			"identifier": "app.glacierkit",
 			"longDescription": "",
 			"macOS": {
 				"entitlements": null,
@@ -67,7 +67,7 @@
 				"fullscreen": false,
 				"height": 720,
 				"resizable": true,
-				"title": "Deeznuts",
+				"title": "GlacierKit",
 				"width": 1280,
 				"decorations": false,
 				"visible": false

@@ -64,14 +64,14 @@
 </script>
 
 <div class="w-full h-full p-6 overflow-x-hidden overflow-y-auto">
-	<h4>Deeznuts settings</h4>
+	<h4>GlacierKit settings</h4>
 	<div class="flex items-center gap-2">
 		<div class="flex-shrink">
 			<Checkbox checked={extractModdedFiles} on:change={changeExtractModdedFiles} labelText="Allow extracting modded files" />
 		</div>
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
-				Deeznuts usually ignores modded copies of files (files past chunk0patch9) when reading game files.
+				GlacierKit usually ignores modded copies of files (files past chunk0patch9) when reading game files.
 			</span>
 		</TooltipIcon>
 	</div>
