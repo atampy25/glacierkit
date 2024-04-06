@@ -234,6 +234,10 @@
 								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
 								break
 
+							case "repositoryPatch":
+								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								break
+
 							default:
 								request.data satisfies never
 								break

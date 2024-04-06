@@ -46,6 +46,7 @@ use event_handling::{
 	entity_monaco::{handle_openfactory, handle_updatecontent},
 	entity_overrides::send_overrides_decorations,
 	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select},
+	repository_patch::handle_repository_patch_event,
 	resource_overview::{handle_resource_overview_event, initialise_resource_overview}
 };
 use fn_error_context::context;
@@ -557,7 +558,21 @@ fn event(app: AppHandle, event: Event) {
 													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
 													app_state.hash_list.load().as_ref()
 												{
-													let mut repository: Value = from_slice(
+													let mut repository = to_value(
+														from_slice::<Vec<RepositoryItem>>(
+															&extract_latest_resource(
+																resource_packages,
+																hash_list,
+																"00204D1AFD76AB13"
+															)?
+															.1
+														)?
+														.into_iter()
+														.map(|x| (x.id, x.data))
+														.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+													)?;
+
+													let base = from_slice::<Value>(
 														&extract_latest_resource(
 															resource_packages,
 															hash_list,
@@ -566,13 +581,18 @@ fn event(app: AppHandle, event: Event) {
 														.1
 													)?;
 
-													let base = repository.to_owned();
-
 													let patch: Value =
 														from_slice(&fs::read(&path).context("Couldn't read file")?)
 															.context("Invalid JSON")?;
 
 													json_patch::merge(&mut repository, &patch);
+
+													let repository = from_value::<
+														IndexMap<Uuid, IndexMap<String, Value>>
+													>(repository)?
+													.into_iter()
+													.map(|(id, data)| RepositoryItem { id, data })
+													.collect();
 
 													app_state.editor_states.write().await.insert(
 														id.to_owned(),
@@ -580,7 +600,7 @@ fn event(app: AppHandle, event: Event) {
 															file: Some(path.to_owned()),
 															data: EditorData::RepositoryPatch {
 																base: from_value(base)?,
-																current: from_value(repository)?,
+																current: repository,
 																patch_type: JsonPatchType::MergePatch
 															}
 														}
@@ -641,7 +661,21 @@ fn event(app: AppHandle, event: Event) {
 														) =
 															app_state.hash_list.load().as_ref()
 														{
-															let mut repository: Value = from_slice(
+															let mut repository = to_value(
+																from_slice::<Vec<RepositoryItem>>(
+																	&extract_latest_resource(
+																		resource_packages,
+																		hash_list,
+																		"00204D1AFD76AB13"
+																	)?
+																	.1
+																)?
+																.into_iter()
+																.map(|x| (x.id, x.data))
+																.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+															)?;
+
+															let base = from_slice::<Value>(
 																&extract_latest_resource(
 																	resource_packages,
 																	hash_list,
@@ -650,13 +684,19 @@ fn event(app: AppHandle, event: Event) {
 																.1
 															)?;
 
-															let base = repository.to_owned();
+															let patch: Value = from_slice(
+																&fs::read(&path).context("Couldn't read file")?
+															)
+															.context("Invalid JSON")?;
 
-															let patch: Vec<_> = from_value(
-																file.get("patch").context("No patch key")?.to_owned()
-															)?;
+															json_patch::merge(&mut repository, &patch);
 
-															json_patch::patch(&mut repository, &patch)?;
+															let repository = from_value::<
+																IndexMap<Uuid, IndexMap<String, Value>>
+															>(repository)?
+															.into_iter()
+															.map(|(id, data)| RepositoryItem { id, data })
+															.collect();
 
 															app_state.editor_states.write().await.insert(
 																id.to_owned(),
@@ -664,7 +704,7 @@ fn event(app: AppHandle, event: Event) {
 																	file: Some(path.to_owned()),
 																	data: EditorData::RepositoryPatch {
 																		base: from_value(base)?,
-																		current: from_value(repository)?,
+																		current: repository,
 																		patch_type: JsonPatchType::MergePatch
 																	}
 																}
@@ -832,6 +872,10 @@ fn event(app: AppHandle, event: Event) {
 													comments: vec![]
 												})?
 											)?;
+										}
+
+										"repository.json" => {
+											fs::write(path, "{}")?;
 										}
 
 										_ => {
@@ -1230,6 +1274,382 @@ fn event(app: AppHandle, event: Event) {
 									)?;
 								}
 							}
+
+							FileBrowserEvent::ConvertRepoPatchToMergePatch { path } => {
+								if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+									.context("Invalid JSON")?
+									.get("type")
+									.unwrap_or(&Value::String("JSON".into()))
+									.as_str()
+									.context("Type key was not string")? == "REPO"
+								{
+									if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+									{
+										let mut current = to_value(
+											from_slice::<Vec<RepositoryItem>>(
+												&extract_latest_resource(
+													resource_packages,
+													hash_list,
+													"00204D1AFD76AB13"
+												)?
+												.1
+											)?
+											.into_iter()
+											.map(|x| (x.id, x.data))
+											.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+										)?;
+
+										let base = current.to_owned();
+
+										let patch: Vec<json_patch::PatchOperation> = from_value(
+											from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+												.context("Invalid JSON")?
+												.get("patch")
+												.context("No patch key")?
+												.to_owned()
+										)
+										.context("Invalid JSON patch")?;
+
+										json_patch::patch(&mut current, &patch)?;
+
+										let patch = json_patch::diff(&base, &current);
+
+										let mut merge_patch = json!({});
+
+										for operation in patch.0 {
+											match operation {
+												json_patch::PatchOperation::Add(json_patch::AddOperation {
+													path,
+													value
+												}) => {
+													let mut view = &mut merge_patch;
+
+													if path
+														.chars()
+														.skip(1)
+														.collect::<String>()
+														.split('/')
+														.last()
+														.unwrap()
+														.parse::<usize>()
+														.is_err()
+													{
+														for component in
+															path.chars().skip(1).collect::<String>().split('/')
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = value;
+													} else {
+														// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+														for component in path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.collect::<Vec<_>>()
+															.into_iter()
+															.rev()
+															.skip(1)
+															.rev()
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = current
+															.pointer(
+																&path
+																	.chars()
+																	.skip(1)
+																	.collect::<String>()
+																	.split('/')
+																	.collect::<Vec<_>>()
+																	.into_iter()
+																	.rev()
+																	.skip(1)
+																	.rev()
+																	.collect::<Vec<_>>()
+																	.join("/")
+															)
+															.unwrap()
+															.to_owned();
+													}
+												}
+
+												json_patch::PatchOperation::Remove(json_patch::RemoveOperation {
+													path
+												}) => {
+													let mut view = &mut merge_patch;
+
+													if path
+														.chars()
+														.skip(1)
+														.collect::<String>()
+														.split('/')
+														.last()
+														.unwrap()
+														.parse::<usize>()
+														.is_err()
+													{
+														for component in
+															path.chars().skip(1).collect::<String>().split('/')
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = Value::Null;
+													} else {
+														// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+														for component in path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.collect::<Vec<_>>()
+															.into_iter()
+															.rev()
+															.skip(1)
+															.rev()
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = current
+															.pointer(
+																&path
+																	.chars()
+																	.skip(1)
+																	.collect::<String>()
+																	.split('/')
+																	.collect::<Vec<_>>()
+																	.into_iter()
+																	.rev()
+																	.skip(1)
+																	.rev()
+																	.collect::<Vec<_>>()
+																	.join("/")
+															)
+															.unwrap()
+															.to_owned();
+													}
+												}
+
+												json_patch::PatchOperation::Replace(json_patch::ReplaceOperation {
+													path,
+													value
+												}) => {
+													let mut view = &mut merge_patch;
+
+													if path
+														.chars()
+														.skip(1)
+														.collect::<String>()
+														.split('/')
+														.last()
+														.unwrap()
+														.parse::<usize>()
+														.is_err()
+													{
+														for component in
+															path.chars().skip(1).collect::<String>().split('/')
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = value;
+													} else {
+														// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+														for component in path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.collect::<Vec<_>>()
+															.into_iter()
+															.rev()
+															.skip(1)
+															.rev()
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = current
+															.pointer(
+																&path
+																	.chars()
+																	.skip(1)
+																	.collect::<String>()
+																	.split('/')
+																	.collect::<Vec<_>>()
+																	.into_iter()
+																	.rev()
+																	.skip(1)
+																	.rev()
+																	.collect::<Vec<_>>()
+																	.join("/")
+															)
+															.unwrap()
+															.to_owned();
+													}
+												}
+
+												json_patch::PatchOperation::Move(_) => unreachable!(
+													"Calculation of JSON patch does not emit Move operations"
+												),
+
+												json_patch::PatchOperation::Copy(_) => unreachable!(
+													"Calculation of JSON patch does not emit Copy operations"
+												),
+
+												json_patch::PatchOperation::Test(_) => unreachable!(
+													"Calculation of JSON patch does not emit Test operations"
+												)
+											}
+										}
+
+										fs::write(
+											{
+												let mut x = path.to_owned();
+												x.pop();
+												x.push(
+													path.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.replace(".JSON.patch.json", ".repository.json")
+												);
+												x
+											},
+											to_vec(&merge_patch)?
+										)?;
+
+										fs::remove_file(&path)?;
+
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Success,
+												title: "File converted to repository.json".into(),
+												subtitle: "The patch file has been converted into a repository.json \
+												           file."
+													.into()
+											}
+										)?;
+									} else {
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Error,
+												title: "No game selected".into(),
+												subtitle: "You can't convert between patch formats without a copy of \
+												           the game selected."
+													.into()
+											}
+										)?;
+									}
+								} else {
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Error,
+											title: "Not a repository patch".into(),
+											subtitle: "This patch is for a different type of file, so it can't be \
+											           converted to a repository.json file."
+												.into()
+										}
+									)?;
+								}
+							}
+
+							FileBrowserEvent::ConvertRepoPatchToJsonPatch { path } => {
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let mut current = to_value(
+										from_slice::<Vec<RepositoryItem>>(
+											&extract_latest_resource(resource_packages, hash_list, "00204D1AFD76AB13")?
+												.1
+										)?
+										.into_iter()
+										.map(|x| (x.id, x.data))
+										.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+									)?;
+
+									let base = current.to_owned();
+
+									let patch: Value = from_slice(&fs::read(&path).context("Couldn't read file")?)
+										.context("Invalid JSON")?;
+
+									json_patch::merge(&mut current, &patch);
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+											base,
+											current,
+											save_path: {
+												let mut x = path.to_owned();
+												x.pop();
+												x.push(
+													path.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.replace(".repository.json", ".JSON.patch.json")
+												);
+												x
+											}
+										})
+									)?;
+
+									fs::remove_file(&path)?;
+
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Success,
+											title: "File converted to JSON.patch.json".into(),
+											subtitle: "The patch file has been converted into a JSON.patch.json file."
+												.into()
+										}
+									)?;
+								} else {
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Error,
+											title: "No game selected".into(),
+											subtitle: "You can't convert between patch formats without a copy of the \
+											           game selected."
+												.into()
+										}
+									)?;
+								}
+							}
 						},
 
 						ToolEvent::GameBrowser(event) => match event {
@@ -1333,81 +1753,134 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							GameBrowserEvent::OpenInEditor(hash) => {
-								// Only available for entities currently
+								// Only available for entities and the repository currently
 
 								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
-									let task = start_task(&app, format!("Loading entity {}", hash))?;
+									match hash_list
+										.entries
+										.get(&hash)
+										.context("Not in hash list")?
+										.resource_type
+										.as_ref()
+									{
+										"TEMP" => {
+											let task = start_task(&app, format!("Loading entity {}", hash))?;
 
-									let game_install_data = app_state
-										.game_installs
-										.iter()
-										.try_find(|x| anyhow::Ok(x.path == *install))?
-										.context("No such game install")?;
+											let game_install_data = app_state
+												.game_installs
+												.iter()
+												.try_find(|x| anyhow::Ok(x.path == *install))?
+												.context("No such game install")?;
 
-									ensure_entity_in_cache(
-										resource_packages,
-										&app_state.cached_entities,
-										game_install_data.version,
-										hash_list,
-										&hash
-									)?;
+											ensure_entity_in_cache(
+												resource_packages,
+												&app_state.cached_entities,
+												game_install_data.version,
+												hash_list,
+												&hash
+											)?;
 
-									let entity = app_state.cached_entities.read().get(&hash).unwrap().to_owned();
+											let entity =
+												app_state.cached_entities.read().get(&hash).unwrap().to_owned();
 
-									let default_tab_name = format!(
-										"{} ({})",
-										entity
-											.entities
-											.get(&entity.root_entity)
-											.context("Root entity doesn't exist")?
-											.name,
-										hash
-									);
+											let default_tab_name = format!(
+												"{} ({})",
+												entity
+													.entities
+													.get(&entity.root_entity)
+													.context("Root entity doesn't exist")?
+													.name,
+												hash
+											);
 
-									let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
-										if let Some(path) = entry.path.as_ref() {
-											path.replace("].pc_entitytype", "")
-												.replace("].pc_entitytemplate", "")
-												.split('/')
-												.last()
-												.map(|x| x.to_owned())
-												.unwrap_or(default_tab_name)
-										} else if let Some(hint) = entry.hint.as_ref() {
-											format!("{} ({})", hint, hash)
-										} else {
-											default_tab_name
+											let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
+												if let Some(path) = entry.path.as_ref() {
+													path.replace("].pc_entitytype", "")
+														.replace("].pc_entitytemplate", "")
+														.split('/')
+														.last()
+														.map(|x| x.to_owned())
+														.unwrap_or(default_tab_name)
+												} else if let Some(hint) = entry.hint.as_ref() {
+													format!("{} ({})", hint, hash)
+												} else {
+													default_tab_name
+												}
+											} else {
+												default_tab_name
+											};
+
+											let id = Uuid::new_v4();
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: None,
+													data: EditorData::QNPatch {
+														base: Box::new(entity.to_owned()),
+														current: Box::new(entity),
+														settings: Default::default()
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: tab_name,
+													editor_type: EditorType::QNPatch
+												})
+											)?;
+
+											finish_task(&app, task)?;
 										}
-									} else {
-										default_tab_name
-									};
 
-									let id = Uuid::new_v4();
+										"REPO" => {
+											let task = start_task(&app, "Loading repository")?;
 
-									app_state.editor_states.write().await.insert(
-										id.to_owned(),
-										EditorState {
-											file: None,
-											data: EditorData::QNPatch {
-												base: Box::new(entity.to_owned()),
-												current: Box::new(entity),
-												settings: Default::default()
-											}
+											let id = Uuid::new_v4();
+
+											let repository: Vec<RepositoryItem> = from_slice(
+												&extract_latest_resource(
+													resource_packages,
+													hash_list,
+													"00204D1AFD76AB13"
+												)?
+												.1
+											)?;
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: None,
+													data: EditorData::RepositoryPatch {
+														base: repository.to_owned(),
+														current: repository,
+														patch_type: JsonPatchType::MergePatch
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: "pro.repo".into(),
+													editor_type: EditorType::RepositoryPatch {
+														patch_type: JsonPatchType::MergePatch
+													}
+												})
+											)?;
+
+											finish_task(&app, task)?;
 										}
-									);
 
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::CreateTab {
-											id,
-											name: tab_name,
-											editor_type: EditorType::QNPatch
-										})
-									)?;
-
-									finish_task(&app, task)?;
+										x => panic!("Opening {x} files in editor is not supported")
+									}
 								}
 							}
 						},
@@ -2894,6 +3367,10 @@ fn event(app: AppHandle, event: Event) {
 						EditorEvent::ResourceOverview(event) => {
 							handle_resource_overview_event(&app, event).await?;
 						}
+
+						EditorEvent::RepositoryPatch(event) => {
+							handle_repository_patch_event(&app, event).await?;
+						}
 					},
 
 					Event::Global(event) => match event {
@@ -3294,14 +3771,14 @@ fn event(app: AppHandle, event: Event) {
 										JsonPatchType::MergePatch => {
 											let base = to_value(
 												base.iter()
-													.map(|x| (x.id.to_owned(), x.to_owned()))
+													.map(|x| (x.id.to_owned(), x.data.to_owned()))
 													.collect::<HashMap<_, _>>()
 											)?;
 
 											let current = to_value(
 												current
 													.iter()
-													.map(|x| (x.id.to_owned(), x.to_owned()))
+													.map(|x| (x.id.to_owned(), x.data.to_owned()))
 													.collect::<HashMap<_, _>>()
 											)?;
 

@@ -49,9 +49,9 @@ export type DependencyWithFlag = { resource: string; flag: string }
 
 export type Dynamics = { announcements: Announcement[] }
 
-export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent }
+export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent }
 
-export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest }
+export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest }
 
 export type EditorType = { type: "Nil" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" } | { type: "RepositoryPatch"; data: { patch_type: JsonPatchType } }
 
@@ -190,7 +190,7 @@ isArray: boolean;
  */
 refersTo: Ref[] }
 
-export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "normaliseQNFile"; data: { path: string } } | { type: "convertEntityToPatch"; data: { path: string } } | { type: "convertPatchToEntity"; data: { path: string } }
+export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "normaliseQNFile"; data: { path: string } } | { type: "convertEntityToPatch"; data: { path: string } } | { type: "convertPatchToEntity"; data: { path: string } } | { type: "convertRepoPatchToMergePatch"; data: { path: string } } | { type: "convertRepoPatchToJsonPatch"; data: { path: string } }
 
 export type FileBrowserRequest = { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "beginRename"; data: { old_path: string } } | { type: "finishRename"; data: { new_path: string } } | { type: "select"; data: string | null } | { type: "newTree"; data: { base_path: string; 
 /**
@@ -412,9 +412,15 @@ ref: Ref;
  */
 value: SimpleProperty }
 
+export type RepositoryItemInformation = { type: "NPC"; data: { name: string } } | { type: "Item"; data: { name: string } } | { type: "Weapon"; data: { name: string } } | { type: "Modifier"; data: { kind: string } } | { type: "MapArea"; data: { name: string } } | { type: "Outfit"; data: { name: string } } | { type: "Setpiece"; data: { traits: string[] } } | { type: "DifficultyParameter"; data: { name: string } } | { type: "AmmoConfig"; data: { name: string } } | { type: "MagazineConfig"; data: { size: number; tags: string[] } } | { type: "AmmoBehaviour"; data: { name: string } } | { type: "MasteryItem"; data: { name: string } } | { type: "ScoreMultiplier"; data: { name: string } } | { type: "ItemBundle"; data: { name: string } } | { type: "ItemList" } | { type: "WeaponConfig" } | { type: "Unknown" }
+
+export type RepositoryPatchEditorEvent = { type: "initialise"; data: { id: string } } | { type: "createRepositoryItem"; data: { id: string } } | { type: "resetModifications"; data: { id: string; item: string } } | { type: "modifyItem"; data: { id: string; item: string; data: string } } | { type: "selectItem"; data: { id: string; item: string } }
+
+export type RepositoryPatchEditorRequest = { type: "setRepositoryItems"; data: { id: string; items: ([string, RepositoryItemInformation])[] } } | { type: "setModifiedRepositoryItems"; data: { id: string; modified: string[] } } | { type: "addNewRepositoryItem"; data: { id: string; new_item: [string, RepositoryItemInformation] } } | { type: "removeRepositoryItem"; data: { id: string; item: string } } | { type: "setMonacoContent"; data: { id: string; item: string; orig_data: string; data: string } } | { type: "deselectMonaco"; data: { id: string } } | { type: "modifyItemInformation"; data: { id: string; item: string; info: RepositoryItemInformation } }
+
 export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; data: EditorRequest } | { type: "global"; data: GlobalRequest }
 
-export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL" } | { type: "Ores" } | { type: "Image"; data: { image_path: string } } | { type: "Audio"; data: { wav_path: string } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } }
+export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL" } | { type: "Ores" } | { type: "Image"; data: { image_path: string } } | { type: "Audio"; data: { wav_path: string } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } } | { type: "Repository" }
 
 export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "followDependencyInNewTab"; data: { id: string; hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } } | { type: "extractAsRTGeneric"; data: { id: string } } | { type: "extractAsPng"; data: { id: string } } | { type: "extractAsWav"; data: { id: string } } | { type: "extractMultiWav"; data: { id: string } } | { type: "extractSpecificMultiWav"; data: { id: string; index: number } } | { type: "extractORESAsJson"; data: { id: string } }
 

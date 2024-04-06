@@ -51,7 +51,7 @@
 					return rightClickedNode.original.folder
 						? {}
 						: {
-								...(rightClickedNode.original.filetype === "TEMP"
+								...(rightClickedNode.original.filetype === "TEMP" || rightClickedNode.original.filetype === "REPO"
 									? {
 											openInEditor: {
 												separator_before: false,
@@ -63,7 +63,7 @@
 													const tree = jQuery.jstree!.reference(b.reference)
 													const selected_node = tree.get_node(b.reference)
 
-													trackEvent("Open in editor from game tree", { filetype: selected_node.original.filetype })
+													trackEvent("Open QN entity in editor from game tree", { filetype: selected_node.original.filetype })
 
 													await event({
 														type: "tool",
@@ -378,6 +378,7 @@
 							searchFeedback = ""
 							gameDescription = ""
 							await replaceTree([])
+							searchQuery = ""
 						}}
 						bind:value={searchQuery}
 					/>
@@ -419,11 +420,3 @@
 		<div class="w-full h-full" id={elemID} />
 	</div>
 </div>
-
-<style>
-	:global(.no-menu-spacing .bx--list-box__menu-item__option) {
-		padding-right: 0;
-		margin-left: 0.75rem;
-		margin-right: 0.5rem;
-	}
-</style>

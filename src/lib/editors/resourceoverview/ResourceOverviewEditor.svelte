@@ -81,7 +81,7 @@
 				<Button
 					icon={Edit}
 					on:click={async () => {
-						trackEvent("Open in editor from resource overview")
+						trackEvent("Open QN entity in editor from resource overview")
 
 						await event({
 							type: "editor",
@@ -193,126 +193,6 @@
 					}}>Extract TBLU as ResourceLib JSON</Button
 				>
 			</div>
-			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-				<div class="flex flex-col">
-					<h4 class="mb-1">Dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each dependencies as [hash, type, path, flag]}
-							{#if type}
-								<div
-									class="bg-[#303030] p-3 cursor-pointer"
-									on:click={async () => {
-										trackEvent("Follow dependency from resource overview")
-
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "followDependency",
-													data: {
-														id,
-														new_hash: hash
-													}
-												}
-											}
-										})
-									}}
-									on:contextmenu={async (e) => {
-										e.preventDefault()
-										trackEvent("Follow dependency in new tab from resource overview")
-
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "followDependencyInNewTab",
-													data: {
-														id,
-														hash
-													}
-												}
-											}
-										})
-									}}
-								>
-									<div class="text-base -mt-1"
-										><span class="font-bold">{hash}.{type}</span>
-										{flag}</div
-									>
-									<div class="break-all">{path || "No path"}</div>
-								</div>
-							{:else}
-								<div class="bg-[#303030] p-3">
-									<div class="text-base -mt-1"
-										><span class="font-bold">{hash}</span>
-										{flag}</div
-									>
-									<div class="break-all">Unknown resource</div>
-								</div>
-							{/if}
-						{/each}
-					</div>
-				</div>
-				<div class="flex flex-col">
-					<h4 class="mb-1">Reverse dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each reverseDependencies as [hash, type, path]}
-							{#if type}
-								<div
-									class="bg-[#303030] p-3 cursor-pointer"
-									on:click={async () => {
-										trackEvent("Follow reverse dependency from resource overview")
-
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "followDependency",
-													data: {
-														id,
-														new_hash: hash
-													}
-												}
-											}
-										})
-									}}
-									on:contextmenu={async (e) => {
-										e.preventDefault()
-										trackEvent("Follow reverse dependency in new tab from resource overview")
-
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "followDependencyInNewTab",
-													data: {
-														id,
-														hash
-													}
-												}
-											}
-										})
-									}}
-								>
-									<div class="font-bold text-base -mt-1"
-										>{hash}{#if type}.{type}{/if}</div
-									>
-									<div class="break-all">{path || "No path"}</div>
-								</div>
-							{:else}
-								<div class="bg-[#303030] p-3">
-									<div class="font-bold text-base -mt-1">{hash}</div>
-									<div class="break-all">Unknown resource</div>
-								</div>
-							{/if}
-						{/each}
-					</div>
-				</div>
-			</div>
 		{:else if data.type === "Image"}
 			<div class="text-2xl mb-2 font-bold break-all">
 				{pathOrHint || "No path"}
@@ -373,110 +253,6 @@
 						})
 					}}>Extract file</Button
 				>
-			</div>
-			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-				<div class="flex flex-col">
-					<h4 class="mb-1">Dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each dependencies as [hash, type, path, flag]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async () => {
-									trackEvent("Follow dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="text-base -mt-1"
-									><span class="font-bold"
-										>{hash}{#if type}.{type}{/if}</span
-									>
-									{flag}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="flex flex-col">
-					<h4 class="mb-1">Reverse dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each reverseDependencies as [hash, type, path]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow reverse dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async (e) => {
-									e.preventDefault()
-									trackEvent("Follow reverse dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="font-bold text-base -mt-1"
-									>{hash}{#if type}.{type}{/if}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
 			</div>
 		{:else if data.type === "Audio"}
 			<div class="text-2xl mb-2 font-bold break-all">
@@ -540,110 +316,6 @@
 						})
 					}}>Extract file</Button
 				>
-			</div>
-			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-				<div class="flex flex-col">
-					<h4 class="mb-1">Dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each dependencies as [hash, type, path, flag]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async () => {
-									trackEvent("Follow dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="text-base -mt-1"
-									><span class="font-bold"
-										>{hash}{#if type}.{type}{/if}</span
-									>
-									{flag}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="flex flex-col">
-					<h4 class="mb-1">Reverse dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each reverseDependencies as [hash, type, path]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow reverse dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async (e) => {
-									e.preventDefault()
-									trackEvent("Follow reverse dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="font-bold text-base -mt-1"
-									>{hash}{#if type}.{type}{/if}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
 			</div>
 		{:else if data.type === "MultiAudio"}
 			<div class="text-2xl mb-2 font-bold break-all">
@@ -728,110 +400,6 @@
 					}}>Extract file</Button
 				>
 			</div>
-			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-				<div class="flex flex-col">
-					<h4 class="mb-1">Dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each dependencies as [hash, type, path, flag]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async () => {
-									trackEvent("Follow dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="text-base -mt-1"
-									><span class="font-bold"
-										>{hash}{#if type}.{type}{/if}</span
-									>
-									{flag}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="flex flex-col">
-					<h4 class="mb-1">Reverse dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each reverseDependencies as [hash, type, path]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow reverse dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async (e) => {
-									e.preventDefault()
-									trackEvent("Follow reverse dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="font-bold text-base -mt-1"
-									>{hash}{#if type}.{type}{/if}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-			</div>
 		{:else if data.type === "GenericRL"}
 			<div class="text-2xl mb-2 font-bold break-all">
 				{pathOrHint || "No path"}
@@ -890,110 +458,6 @@
 						})
 					}}>Extract file</Button
 				>
-			</div>
-			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-				<div class="flex flex-col">
-					<h4 class="mb-1">Dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each dependencies as [hash, type, path, flag]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async () => {
-									trackEvent("Follow dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="text-base -mt-1"
-									><span class="font-bold"
-										>{hash}{#if type}.{type}{/if}</span
-									>
-									{flag}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="flex flex-col">
-					<h4 class="mb-1">Reverse dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each reverseDependencies as [hash, type, path]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow reverse dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async (e) => {
-									e.preventDefault()
-									trackEvent("Follow reverse dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="font-bold text-base -mt-1"
-									>{hash}{#if type}.{type}{/if}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
 			</div>
 		{:else if data.type === "Ores"}
 			<div class="text-2xl mb-2 font-bold break-all">
@@ -1054,109 +518,64 @@
 					}}>Extract file</Button
 				>
 			</div>
-			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-				<div class="flex flex-col">
-					<h4 class="mb-1">Dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each dependencies as [hash, type, path, flag]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async () => {
-									trackEvent("Follow dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="text-base -mt-1"
-									><span class="font-bold"
-										>{hash}{#if type}.{type}{/if}</span
-									>
-									{flag}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
+		{:else if data.type === "Repository"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
 				</div>
-				<div class="flex flex-col">
-					<h4 class="mb-1">Reverse dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each reverseDependencies as [hash, type, path]}
-							<div
-								class="bg-[#303030] p-3 cursor-pointer"
-								on:click={async () => {
-									trackEvent("Follow reverse dependency from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependency",
-												data: {
-													id,
-													new_hash: hash
-												}
-											}
-										}
-									})
-								}}
-								on:contextmenu={async (e) => {
-									e.preventDefault()
-									trackEvent("Follow reverse dependency in new tab from resource overview")
-
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "followDependencyInNewTab",
-												data: {
-													id,
-													hash: hash
-												}
-											}
-										}
-									})
-								}}
-							>
-								<div class="font-bold text-base -mt-1"
-									>{hash}{#if type}.{type}{/if}</div
-								>
-								<div class="break-all">{path || "No path"}</div>
-							</div>
-						{/each}
-					</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
 				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={Edit}
+					on:click={async () => {
+						trackEvent("Open repository in editor")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "openInEditor",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Open in editor</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract ORES as binary")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
 			</div>
 		{:else}
 			<div class="text-2xl mb-2 font-bold break-all">
@@ -1198,11 +617,14 @@
 					}}>Extract file</Button
 				>
 			</div>
-			<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-				<div class="flex flex-col">
-					<h4 class="mb-1">Dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each dependencies as [hash, type, path, flag]}
+		{/if}
+
+		<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
+			<div class="flex flex-col">
+				<h4 class="mb-1">Dependencies</h4>
+				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+					{#each dependencies as [hash, type, path, flag]}
+						{#if type}
 							<div
 								class="bg-[#303030] p-3 cursor-pointer"
 								on:click={async () => {
@@ -1222,7 +644,8 @@
 										}
 									})
 								}}
-								on:contextmenu={async () => {
+								on:contextmenu={async (e) => {
+									e.preventDefault()
 									trackEvent("Follow dependency in new tab from resource overview")
 
 									await event({
@@ -1233,7 +656,7 @@
 												type: "followDependencyInNewTab",
 												data: {
 													id,
-													hash: hash
+													hash
 												}
 											}
 										}
@@ -1241,20 +664,28 @@
 								}}
 							>
 								<div class="text-base -mt-1"
-									><span class="font-bold"
-										>{hash}{#if type}.{type}{/if}</span
-									>
+									><span class="font-bold">{hash}.{type}</span>
 									{flag}</div
 								>
 								<div class="break-all">{path || "No path"}</div>
 							</div>
-						{/each}
-					</div>
+						{:else}
+							<div class="bg-[#303030] p-3">
+								<div class="text-base -mt-1"
+									><span class="font-bold">{hash}</span>
+									{flag}</div
+								>
+								<div class="break-all">Unknown resource</div>
+							</div>
+						{/if}
+					{/each}
 				</div>
-				<div class="flex flex-col">
-					<h4 class="mb-1">Reverse dependencies</h4>
-					<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-						{#each reverseDependencies as [hash, type, path]}
+			</div>
+			<div class="flex flex-col">
+				<h4 class="mb-1">Reverse dependencies</h4>
+				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
+					{#each reverseDependencies as [hash, type, path]}
+						{#if type}
 							<div
 								class="bg-[#303030] p-3 cursor-pointer"
 								on:click={async () => {
@@ -1286,7 +717,7 @@
 												type: "followDependencyInNewTab",
 												data: {
 													id,
-													hash: hash
+													hash
 												}
 											}
 										}
@@ -1298,11 +729,16 @@
 								>
 								<div class="break-all">{path || "No path"}</div>
 							</div>
-						{/each}
-					</div>
+						{:else}
+							<div class="bg-[#303030] p-3">
+								<div class="font-bold text-base -mt-1">{hash}</div>
+								<div class="break-all">Unknown resource</div>
+							</div>
+						{/if}
+					{/each}
 				</div>
 			</div>
-		{/if}
+		</div>
 	{:else}
 		Loading...
 	{/if}

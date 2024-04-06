@@ -11,6 +11,7 @@
 	import { v4 } from "uuid"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { trackEvent } from "@aptabase/tauri"
+	import { readTextFile } from "@tauri-apps/api/fs"
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 	let tree: JSTree = null!
@@ -61,7 +62,6 @@
 				keyboard: {}
 			},
 			search: {
-				fuzzy: true,
 				show_only_matches: true,
 				close_opened_onclear: false
 			},
@@ -99,8 +99,8 @@
 												getPositionOfNode(selected_node.id, "", false),
 												function (a: any) {
 													tree.edit(a, undefined, async (node, status, _c) => {
-														// Can't create entity.patch.json files
-														if (!status || !node.text || node.text.endsWith(".entity.patch.json")) {
+														// Can't create patch files
+														if (!status || !node.text || node.text.endsWith(".patch.json")) {
 															tree.delete_node(id)
 															return
 														}
@@ -225,9 +225,7 @@
 
 										tree.set_icon(
 											node.id,
-											icons.find((a) => newPath.split(".").at(-1)?.includes(a[0]))
-												? icons.find((a) => newPath.split(".").at(-1)?.includes(a[0]))![1]
-												: "fa-regular fa-file"
+											icons.find((a) => newPath.split(".").at(-1)?.includes(a[0])) ? icons.find((a) => newPath.split(".").at(-1)?.includes(a[0]))![1] : "fa-regular fa-file"
 										)
 
 										await event({
@@ -384,6 +382,70 @@
 													type: "fileBrowser",
 													data: {
 														type: "convertPatchToEntity",
+														data: {
+															path
+														}
+													}
+												}
+											})
+										}
+									}
+								}),
+						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".repository.json")
+							? {}
+							: {
+									convertRepoPatchToJsonPatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to JSON.patch.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert repository merge patch to JSON patch")
+
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+
+											await event({
+												type: "tool",
+												data: {
+													type: "fileBrowser",
+													data: {
+														type: "convertRepoPatchToJsonPatch",
+														data: {
+															path
+														}
+													}
+												}
+											})
+										}
+									}
+								}),
+						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".JSON.patch.json")
+							? {}
+							: {
+									convertRepoPatchToMergePatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to repository.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert repository JSON patch to merge patch")
+
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+
+											await event({
+												type: "tool",
+												data: {
+													type: "fileBrowser",
+													data: {
+														type: "convertRepoPatchToMergePatch",
 														data: {
 															path
 														}

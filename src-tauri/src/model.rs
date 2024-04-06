@@ -17,7 +17,7 @@ use crate::{
 	game_detection::GameInstall,
 	hash_list::HashList,
 	intellisense::Intellisense,
-	repository::RepositoryItem
+	repository::{RepositoryItem, RepositoryItemInformation}
 };
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -194,7 +194,8 @@ pub enum ResourceOverviewData {
 	MultiAudio {
 		name: String,
 		wav_paths: Vec<(String, PathBuf)>
-	}
+	},
+	Repository
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -262,6 +263,14 @@ strike! {
 				},
 
 				ConvertPatchToEntity {
+					path: PathBuf
+				},
+
+				ConvertRepoPatchToMergePatch {
+					path: PathBuf
+				},
+
+				ConvertRepoPatchToJsonPatch {
 					path: PathBuf
 				}
 			}),
@@ -518,6 +527,32 @@ strike! {
 					id: Uuid
 				}
 			})
+
+			RepositoryPatch(pub enum RepositoryPatchEditorEvent {
+				Initialise {
+					id: Uuid
+				},
+
+				CreateRepositoryItem {
+					id: Uuid
+				},
+
+				ResetModifications {
+					id: Uuid,
+					item: Uuid
+				},
+
+				ModifyItem {
+					id: Uuid,
+					item: Uuid,
+					data: String
+				},
+
+				SelectItem {
+					id: Uuid,
+					item: Uuid
+				}
+			})
 		}),
 
 		Global(pub enum GlobalEvent {
@@ -751,6 +786,45 @@ strike! {
 					reverse_dependencies: Vec<(String, String, Option<String>)>,
 
 					data: ResourceOverviewData
+				}
+			}),
+
+			RepositoryPatch(pub enum RepositoryPatchEditorRequest {
+				SetRepositoryItems {
+					id: Uuid,
+					items: Vec<(Uuid, RepositoryItemInformation)>
+				},
+
+				SetModifiedRepositoryItems {
+					id: Uuid,
+					modified: Vec<Uuid>
+				},
+
+				AddNewRepositoryItem {
+					id: Uuid,
+					new_item: (Uuid, RepositoryItemInformation)
+				},
+
+				RemoveRepositoryItem {
+					id: Uuid,
+					item: Uuid
+				},
+
+				SetMonacoContent {
+					id: Uuid,
+					item: Uuid,
+					orig_data: String,
+					data: String
+				},
+
+				DeselectMonaco {
+					id: Uuid
+				},
+
+				ModifyItemInformation {
+					id: Uuid,
+					item: Uuid,
+					info: RepositoryItemInformation
 				}
 			})
 		}),

@@ -474,4 +474,10 @@
 	:global(.code-font) {
 		font-family: "Fira Code", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
 	}
+
+	:global(.no-menu-spacing .bx--list-box__menu-item__option) {
+		padding-right: 0;
+		margin-left: 0.75rem;
+		margin-right: 0.5rem;
+	}
 </style>

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { TextEditorRequest, TextFileType } from "$lib/bindings-types"
 	import { event } from "$lib/utils"
-	import { onMount } from "svelte"
 	import Monaco from "./Monaco.svelte"
 
 	export let id: string
