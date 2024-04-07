@@ -7,7 +7,7 @@ use image::io::Reader as ImageReader;
 use indexmap::IndexMap;
 use rfd::AsyncFileDialog;
 use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
-use serde_json::{from_slice, to_vec, Value};
+use serde_json::{from_slice, from_value, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -20,7 +20,7 @@ use crate::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, JsonPatchType,
 		Request, ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
 	},
-	ores::parse_hashes_ores,
+	ores::{parse_hashes_ores, parse_json_ores, UnlockableItem},
 	repository::RepositoryItem,
 	resourcelib::{
 		convert_generic, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
@@ -135,6 +135,8 @@ pub fn initialise_resource_overview(
 
 				"AIRG" | "TBLU" | "RTLV" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "DSWB" | "GFXF" | "GIDX"
 				| "WSGB" | "ECPB" | "UICB" | "ENUM" => ResourceOverviewData::GenericRL,
+
+				"ORES" if hash == "0057C2C3941115CA" => ResourceOverviewData::Unlockables,
 
 				"ORES" => ResourceOverviewData::Ores,
 
@@ -373,7 +375,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				.to_owned()
 			};
 
-			// Only available for entities and the repository currently
+			// Only available for entities, the repository and unlockables currently
 
 			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
@@ -484,6 +486,41 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								id,
 								name: "pro.repo".into(),
 								editor_type: EditorType::RepositoryPatch {
+									patch_type: JsonPatchType::MergePatch
+								}
+							})
+						)?;
+
+						finish_task(app, task)?;
+					}
+
+					"ORES" if hash == "0057C2C3941115CA" => {
+						let task = start_task(app, "Loading unlockables")?;
+
+						let id = Uuid::new_v4();
+
+						let unlockables: Vec<UnlockableItem> = from_value(parse_json_ores(
+							&extract_latest_resource(resource_packages, hash_list, "0057C2C3941115CA")?.1
+						)?)?;
+
+						app_state.editor_states.write().await.insert(
+							id.to_owned(),
+							EditorState {
+								file: None,
+								data: EditorData::UnlockablesPatch {
+									base: unlockables.to_owned(),
+									current: unlockables,
+									patch_type: JsonPatchType::MergePatch
+								}
+							}
+						);
+
+						send_request(
+							app,
+							Request::Global(GlobalRequest::CreateTab {
+								id,
+								name: "config.unlockables".into(),
+								editor_type: EditorType::UnlockablesPatch {
 									patch_type: JsonPatchType::MergePatch
 								}
 							})

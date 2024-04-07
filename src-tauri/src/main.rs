@@ -47,7 +47,8 @@ use event_handling::{
 	entity_overrides::send_overrides_decorations,
 	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select},
 	repository_patch::handle_repository_patch_event,
-	resource_overview::{handle_resource_overview_event, initialise_resource_overview}
+	resource_overview::{handle_resource_overview_event, initialise_resource_overview},
+	unlockables_patch::handle_unlockables_patch_event
 };
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
@@ -67,7 +68,7 @@ use model::{
 	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
-use ores::parse_hashes_ores;
+use ores::{parse_hashes_ores, parse_json_ores, UnlockableItem};
 use quickentity_rs::{
 	apply_patch, convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn, convert_to_rt,
 	generate_patch,
@@ -641,6 +642,129 @@ fn event(app: AppHandle, event: Event) {
 												}
 											}
 
+											"unlockables.json" => {
+												let id = Uuid::new_v4();
+
+												if let Some(resource_packages) =
+													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
+													app_state.hash_list.load().as_ref()
+												{
+													let mut unlockables = to_value(
+														from_value::<Vec<UnlockableItem>>(parse_json_ores(
+															&extract_latest_resource(
+																resource_packages,
+																hash_list,
+																"0057C2C3941115CA"
+															)?
+															.1
+														)?)?
+														.into_iter()
+														.map(|x| {
+															(
+																x.data
+																	.get("Id")
+																	.expect("Unlockable did not have Id")
+																	.as_str()
+																	.expect("Id was not string")
+																	.to_owned(),
+																{
+																	let mut y = IndexMap::new();
+																	y.insert("Guid".into(), to_value(x.id).unwrap());
+																	y.extend(
+																		x.data
+																			.into_iter()
+																			.filter(|(key, _)| key != "Id")
+																	);
+																	y
+																}
+															)
+														})
+														.collect::<IndexMap<String, IndexMap<String, Value>>>()
+													)?;
+
+													let base = parse_json_ores(
+														&extract_latest_resource(
+															resource_packages,
+															hash_list,
+															"0057C2C3941115CA"
+														)?
+														.1
+													)?;
+
+													let patch: Value =
+														from_slice(&fs::read(&path).context("Couldn't read file")?)
+															.context("Invalid JSON")?;
+
+													json_patch::merge(&mut unlockables, &patch);
+
+													let unlockables = from_value::<
+														IndexMap<String, IndexMap<String, Value>>
+													>(unlockables)?
+													.into_iter()
+													.map(|(id, data)| UnlockableItem {
+														id: data
+															.get("Guid")
+															.expect("No Guid on unlockable item")
+															.as_str()
+															.expect("Guid was not string")
+															.try_into()
+															.expect("Guid was not valid UUID"),
+														data: {
+															let mut y = IndexMap::new();
+															y.insert("Id".into(), Value::String(id));
+															y.extend(data.into_iter().filter(|(key, _)| key != "Guid"));
+															y
+														}
+													})
+													.collect();
+
+													app_state.editor_states.write().await.insert(
+														id.to_owned(),
+														EditorState {
+															file: Some(path.to_owned()),
+															data: EditorData::UnlockablesPatch {
+																base: from_value(base)?,
+																current: unlockables,
+																patch_type: JsonPatchType::MergePatch
+															}
+														}
+													);
+
+													send_request(
+														&app,
+														Request::Global(GlobalRequest::CreateTab {
+															id,
+															name: path
+																.file_name()
+																.context("No file name")?
+																.to_string_lossy()
+																.into(),
+															editor_type: EditorType::UnlockablesPatch {
+																patch_type: JsonPatchType::MergePatch
+															}
+														})
+													)?;
+												} else {
+													send_request(
+														&app,
+														Request::Tool(ToolRequest::FileBrowser(
+															FileBrowserRequest::Select(None)
+														))
+													)?;
+
+													send_notification(
+														&app,
+														Notification {
+															kind: NotificationKind::Error,
+															title: "No game selected".into(),
+															subtitle: "You can't open patch files without a copy of \
+															           the game selected."
+																.into()
+														}
+													)?;
+												}
+											}
+
 											"JSON.patch.json" => {
 												let id = Uuid::new_v4();
 
@@ -684,12 +808,21 @@ fn event(app: AppHandle, event: Event) {
 																.1
 															)?;
 
-															let patch: Value = from_slice(
+															let patch = from_slice::<Value>(
 																&fs::read(&path).context("Couldn't read file")?
 															)
 															.context("Invalid JSON")?;
 
-															json_patch::merge(&mut repository, &patch);
+															let patch =
+																patch.get("patch").context("Patch had no patch key")?;
+
+															json_patch::patch(
+																&mut repository,
+																&from_value::<Vec<json_patch::PatchOperation>>(
+																	patch.to_owned()
+																)
+																.context("Invalid JSON patch")?
+															)?;
 
 															let repository = from_value::<
 																IndexMap<Uuid, IndexMap<String, Value>>
@@ -705,7 +838,7 @@ fn event(app: AppHandle, event: Event) {
 																	data: EditorData::RepositoryPatch {
 																		base: from_value(base)?,
 																		current: repository,
-																		patch_type: JsonPatchType::MergePatch
+																		patch_type: JsonPatchType::JsonPatch
 																	}
 																}
 															);
@@ -720,7 +853,155 @@ fn event(app: AppHandle, event: Event) {
 																		.to_string_lossy()
 																		.into(),
 																	editor_type: EditorType::RepositoryPatch {
-																		patch_type: JsonPatchType::MergePatch
+																		patch_type: JsonPatchType::JsonPatch
+																	}
+																})
+															)?;
+														} else {
+															send_request(
+																&app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::Select(None)
+																))
+															)?;
+
+															send_notification(
+																&app,
+																Notification {
+																	kind: NotificationKind::Error,
+																	title: "No game selected".into(),
+																	subtitle: "You can't open patch files without a \
+																	           copy of the game selected."
+																		.into()
+																}
+															)?;
+														}
+													}
+
+													"ORES"
+														if file
+															.get("file")
+															.context("Patch had no file key")?
+															.as_str()
+															.context("Type key was not string")?
+															== "0057C2C3941115CA" =>
+													{
+														let id = Uuid::new_v4();
+
+														if let Some(resource_packages) =
+															app_state.resource_packages.load().as_ref() && let Some(
+															hash_list
+														) =
+															app_state.hash_list.load().as_ref()
+														{
+															let mut unlockables = to_value(
+																from_value::<Vec<UnlockableItem>>(parse_json_ores(
+																	&extract_latest_resource(
+																		resource_packages,
+																		hash_list,
+																		"0057C2C3941115CA"
+																	)?
+																	.1
+																)?)?
+																.into_iter()
+																.map(|x| {
+																	(
+																		x.data
+																			.get("Id")
+																			.expect("Unlockable did not have Id")
+																			.as_str()
+																			.expect("Id was not string")
+																			.to_owned(),
+																		{
+																			let mut y = IndexMap::new();
+																			y.insert(
+																				"Guid".into(),
+																				to_value(x.id).unwrap()
+																			);
+																			y.extend(
+																				x.data
+																					.into_iter()
+																					.filter(|(key, _)| key != "Id")
+																			);
+																			y
+																		}
+																	)
+																})
+																.collect::<IndexMap<String, IndexMap<String, Value>>>()
+															)?;
+
+															let base = parse_json_ores(
+																&extract_latest_resource(
+																	resource_packages,
+																	hash_list,
+																	"0057C2C3941115CA"
+																)?
+																.1
+															)?;
+
+															let patch = from_slice::<Value>(
+																&fs::read(&path).context("Couldn't read file")?
+															)
+															.context("Invalid JSON")?;
+
+															let patch =
+																patch.get("patch").context("Patch had no patch key")?;
+
+															json_patch::patch(
+																&mut unlockables,
+																&from_value::<Vec<json_patch::PatchOperation>>(
+																	patch.to_owned()
+																)
+																.context("Invalid JSON patch")?
+															)?;
+
+															let unlockables = from_value::<
+																IndexMap<String, IndexMap<String, Value>>
+															>(unlockables)?
+															.into_iter()
+															.map(|(id, data)| UnlockableItem {
+																id: data
+																	.get("Guid")
+																	.expect("No Guid on unlockable item")
+																	.as_str()
+																	.expect("Guid was not string")
+																	.try_into()
+																	.expect("Guid was not valid UUID"),
+																data: {
+																	let mut y = IndexMap::new();
+																	y.insert("Id".into(), Value::String(id));
+																	y.extend(
+																		data.into_iter()
+																			.filter(|(key, _)| key != "Guid")
+																	);
+																	y
+																}
+															})
+															.collect();
+
+															app_state.editor_states.write().await.insert(
+																id.to_owned(),
+																EditorState {
+																	file: Some(path.to_owned()),
+																	data: EditorData::UnlockablesPatch {
+																		base: from_value(base)?,
+																		current: unlockables,
+																		patch_type: JsonPatchType::JsonPatch
+																	}
+																}
+															);
+
+															send_request(
+																&app,
+																Request::Global(GlobalRequest::CreateTab {
+																	id,
+																	name: path
+																		.file_name()
+																		.context("No file name")?
+																		.to_string_lossy()
+																		.into(),
+																	editor_type: EditorType::UnlockablesPatch {
+																		patch_type: JsonPatchType::JsonPatch
 																	}
 																})
 															)?;
@@ -776,8 +1057,8 @@ fn event(app: AppHandle, event: Event) {
 												}
 											}
 
-											"unlockables.json" | "dlge.json" | "locr.json" | "rtlv.json"
-											| "clng.json" | "ditl.json" | "material.json" | "contract.json" => {
+											"dlge.json" | "locr.json" | "rtlv.json" | "clng.json" | "ditl.json"
+											| "material.json" | "contract.json" => {
 												let id = Uuid::new_v4();
 
 												app_state.editor_states.write().await.insert(
@@ -1654,7 +1935,415 @@ fn event(app: AppHandle, event: Event) {
 														.replace(".repository.json", ".JSON.patch.json")
 												);
 												x
+											},
+											file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
+										})
+									)?;
+
+									fs::remove_file(&path)?;
+
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Success,
+											title: "File converted to JSON.patch.json".into(),
+											subtitle: "The patch file has been converted into a JSON.patch.json file."
+												.into()
+										}
+									)?;
+								} else {
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Error,
+											title: "No game selected".into(),
+											subtitle: "You can't convert between patch formats without a copy of the \
+											           game selected."
+												.into()
+										}
+									)?;
+								}
+							}
+
+							FileBrowserEvent::ConvertUnlockablesPatchToMergePatch { path } => {
+								if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+									.context("Invalid JSON")?
+									.get("file")
+									.context("Patch had no file key")?
+									.as_str()
+									.context("File key was not string")? == "0057C2C3941115CA"
+								{
+									if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+									{
+										let mut current = to_value(
+											from_value::<Vec<UnlockableItem>>(parse_json_ores(
+												&extract_latest_resource(
+													resource_packages,
+													hash_list,
+													"0057C2C3941115CA"
+												)?
+												.1
+											)?)?
+											.into_iter()
+											.map(|x| {
+												(
+													x.data
+														.get("Id")
+														.expect("Unlockable did not have Id")
+														.as_str()
+														.expect("Id was not string")
+														.to_owned(),
+													{
+														let mut y = IndexMap::new();
+														y.insert("Guid".into(), to_value(x.id).unwrap());
+														y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
+														y
+													}
+												)
+											})
+											.collect::<IndexMap<String, IndexMap<String, Value>>>()
+										)?;
+
+										let base = current.to_owned();
+
+										let patch: Vec<json_patch::PatchOperation> = from_value(
+											from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+												.context("Invalid JSON")?
+												.get("patch")
+												.context("No patch key")?
+												.to_owned()
+										)
+										.context("Invalid JSON patch")?;
+
+										json_patch::patch(&mut current, &patch)?;
+
+										let patch = json_patch::diff(&base, &current);
+
+										let mut merge_patch = json!({});
+
+										for operation in patch.0 {
+											match operation {
+												json_patch::PatchOperation::Add(json_patch::AddOperation {
+													path,
+													value
+												}) => {
+													let mut view = &mut merge_patch;
+
+													if path
+														.chars()
+														.skip(1)
+														.collect::<String>()
+														.split('/')
+														.last()
+														.unwrap()
+														.parse::<usize>()
+														.is_err()
+													{
+														for component in
+															path.chars().skip(1).collect::<String>().split('/')
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = value;
+													} else {
+														// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+														for component in path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.collect::<Vec<_>>()
+															.into_iter()
+															.rev()
+															.skip(1)
+															.rev()
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = current
+															.pointer(
+																&path
+																	.chars()
+																	.skip(1)
+																	.collect::<String>()
+																	.split('/')
+																	.collect::<Vec<_>>()
+																	.into_iter()
+																	.rev()
+																	.skip(1)
+																	.rev()
+																	.collect::<Vec<_>>()
+																	.join("/")
+															)
+															.unwrap()
+															.to_owned();
+													}
+												}
+
+												json_patch::PatchOperation::Remove(json_patch::RemoveOperation {
+													path
+												}) => {
+													let mut view = &mut merge_patch;
+
+													if path
+														.chars()
+														.skip(1)
+														.collect::<String>()
+														.split('/')
+														.last()
+														.unwrap()
+														.parse::<usize>()
+														.is_err()
+													{
+														for component in
+															path.chars().skip(1).collect::<String>().split('/')
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = Value::Null;
+													} else {
+														// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+														for component in path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.collect::<Vec<_>>()
+															.into_iter()
+															.rev()
+															.skip(1)
+															.rev()
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = current
+															.pointer(
+																&path
+																	.chars()
+																	.skip(1)
+																	.collect::<String>()
+																	.split('/')
+																	.collect::<Vec<_>>()
+																	.into_iter()
+																	.rev()
+																	.skip(1)
+																	.rev()
+																	.collect::<Vec<_>>()
+																	.join("/")
+															)
+															.unwrap()
+															.to_owned();
+													}
+												}
+
+												json_patch::PatchOperation::Replace(json_patch::ReplaceOperation {
+													path,
+													value
+												}) => {
+													let mut view = &mut merge_patch;
+
+													if path
+														.chars()
+														.skip(1)
+														.collect::<String>()
+														.split('/')
+														.last()
+														.unwrap()
+														.parse::<usize>()
+														.is_err()
+													{
+														for component in
+															path.chars().skip(1).collect::<String>().split('/')
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = value;
+													} else {
+														// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+														for component in path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.collect::<Vec<_>>()
+															.into_iter()
+															.rev()
+															.skip(1)
+															.rev()
+														{
+															view = view
+																.as_object_mut()
+																.unwrap()
+																.entry(component)
+																.or_insert(json!({}));
+														}
+
+														*view = current
+															.pointer(
+																&path
+																	.chars()
+																	.skip(1)
+																	.collect::<String>()
+																	.split('/')
+																	.collect::<Vec<_>>()
+																	.into_iter()
+																	.rev()
+																	.skip(1)
+																	.rev()
+																	.collect::<Vec<_>>()
+																	.join("/")
+															)
+															.unwrap()
+															.to_owned();
+													}
+												}
+
+												json_patch::PatchOperation::Move(_) => unreachable!(
+													"Calculation of JSON patch does not emit Move operations"
+												),
+
+												json_patch::PatchOperation::Copy(_) => unreachable!(
+													"Calculation of JSON patch does not emit Copy operations"
+												),
+
+												json_patch::PatchOperation::Test(_) => unreachable!(
+													"Calculation of JSON patch does not emit Test operations"
+												)
 											}
+										}
+
+										fs::write(
+											{
+												let mut x = path.to_owned();
+												x.pop();
+												x.push(
+													path.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.replace(".JSON.patch.json", ".unlockables.json")
+												);
+												x
+											},
+											to_vec(&merge_patch)?
+										)?;
+
+										fs::remove_file(&path)?;
+
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Success,
+												title: "File converted to unlockables.json".into(),
+												subtitle: "The patch file has been converted into a unlockables.json \
+												           file."
+													.into()
+											}
+										)?;
+									} else {
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Error,
+												title: "No game selected".into(),
+												subtitle: "You can't convert between patch formats without a copy of \
+												           the game selected."
+													.into()
+											}
+										)?;
+									}
+								} else {
+									send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Error,
+											title: "Not an unlockables patch".into(),
+											subtitle: "This patch is for a different type of file, so it can't be \
+											           converted to a unlockables.json file."
+												.into()
+										}
+									)?;
+								}
+							}
+
+							FileBrowserEvent::ConvertUnlockablesPatchToJsonPatch { path } => {
+								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+								{
+									let mut current = to_value(
+										from_value::<Vec<UnlockableItem>>(parse_json_ores(
+											&extract_latest_resource(resource_packages, hash_list, "0057C2C3941115CA")?
+												.1
+										)?)?
+										.into_iter()
+										.map(|x| {
+											(
+												x.data
+													.get("Id")
+													.expect("Unlockable did not have Id")
+													.as_str()
+													.expect("Id was not string")
+													.to_owned(),
+												{
+													let mut y = IndexMap::new();
+													y.insert("Guid".into(), to_value(x.id).unwrap());
+													y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
+													y
+												}
+											)
+										})
+										.collect::<IndexMap<String, IndexMap<String, Value>>>()
+									)?;
+
+									let base = current.to_owned();
+
+									let patch: Value = from_slice(&fs::read(&path).context("Couldn't read file")?)
+										.context("Invalid JSON")?;
+
+									json_patch::merge(&mut current, &patch);
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+											base,
+											current,
+											save_path: {
+												let mut x = path.to_owned();
+												x.pop();
+												x.push(
+													path.file_name()
+														.context("No file name")?
+														.to_string_lossy()
+														.replace(".unlockables.json", ".JSON.patch.json")
+												);
+												x
+											},
+											file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
 										})
 									)?;
 
@@ -1785,7 +2474,7 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							GameBrowserEvent::OpenInEditor(hash) => {
-								// Only available for entities and the repository currently
+								// Only available for entities, the repository and unlockables currently
 
 								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
 									&& let Some(install) = app_settings.load().game_install.as_ref()
@@ -1903,6 +2592,46 @@ fn event(app: AppHandle, event: Event) {
 													id,
 													name: "pro.repo".into(),
 													editor_type: EditorType::RepositoryPatch {
+														patch_type: JsonPatchType::MergePatch
+													}
+												})
+											)?;
+
+											finish_task(&app, task)?;
+										}
+
+										"ORES" if hash == "0057C2C3941115CA" => {
+											let task = start_task(&app, "Loading unlockables")?;
+
+											let id = Uuid::new_v4();
+
+											let unlockables: Vec<UnlockableItem> = from_value(parse_json_ores(
+												&extract_latest_resource(
+													resource_packages,
+													hash_list,
+													"0057C2C3941115CA"
+												)?
+												.1
+											)?)?;
+
+											app_state.editor_states.write().await.insert(
+												id.to_owned(),
+												EditorState {
+													file: None,
+													data: EditorData::UnlockablesPatch {
+														base: unlockables.to_owned(),
+														current: unlockables,
+														patch_type: JsonPatchType::MergePatch
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: "config.unlockables".into(),
+													editor_type: EditorType::UnlockablesPatch {
 														patch_type: JsonPatchType::MergePatch
 													}
 												})
@@ -3403,6 +4132,10 @@ fn event(app: AppHandle, event: Event) {
 						EditorEvent::RepositoryPatch(event) => {
 							handle_repository_patch_event(&app, event).await?;
 						}
+
+						EditorEvent::UnlockablesPatch(event) => {
+							handle_unlockables_patch_event(&app, event).await?;
+						}
 					},
 
 					Event::Global(event) => match event {
@@ -4056,7 +4789,8 @@ fn event(app: AppHandle, event: Event) {
 													Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 														base,
 														current,
-														save_path: file.to_owned()
+														save_path: file.to_owned(),
+														file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
 													})
 												)?;
 
@@ -4086,7 +4820,401 @@ fn event(app: AppHandle, event: Event) {
 														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 															base,
 															current,
-															save_path: save_handle.path().to_owned()
+															save_path: save_handle.path().to_owned(),
+															file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
+														})
+													)?;
+
+													send_request(
+														&app,
+														Request::Global(GlobalRequest::SetTabUnsaved {
+															id: tab,
+															unsaved: false
+														})
+													)?;
+												}
+											}
+
+											return;
+										}
+									}
+								}
+
+								EditorData::UnlockablesPatch {
+									base,
+									current,
+									patch_type
+								} => {
+									match patch_type {
+										JsonPatchType::MergePatch => {
+											let base = to_value(
+												base.iter()
+													.map(|x| {
+														(
+															x.data
+																.get("Id")
+																.expect("Unlockable did not have Id")
+																.as_str()
+																.expect("Id was not string")
+																.to_owned(),
+															{
+																let mut y = IndexMap::new();
+																y.insert("Guid".into(), to_value(x.id).unwrap());
+																y.extend(
+																	x.data
+																		.to_owned()
+																		.into_iter()
+																		.filter(|(key, _)| key != "Id")
+																);
+																y
+															}
+														)
+													})
+													.collect::<IndexMap<String, IndexMap<String, Value>>>()
+											)?;
+
+											let current = to_value(
+												current
+													.iter()
+													.map(|x| {
+														(
+															x.data
+																.get("Id")
+																.expect("Unlockable did not have Id")
+																.as_str()
+																.expect("Id was not string")
+																.to_owned(),
+															{
+																let mut y = IndexMap::new();
+																y.insert("Guid".into(), to_value(x.id).unwrap());
+																y.extend(
+																	x.data
+																		.to_owned()
+																		.into_iter()
+																		.filter(|(key, _)| key != "Id")
+																);
+																y
+															}
+														)
+													})
+													.collect::<IndexMap<String, IndexMap<String, Value>>>()
+											)?;
+
+											let patch = json_patch::diff(&base, &current);
+
+											let mut merge_patch = json!({});
+
+											for operation in patch.0 {
+												match operation {
+													json_patch::PatchOperation::Add(json_patch::AddOperation {
+														path,
+														value
+													}) => {
+														let mut view = &mut merge_patch;
+
+														if path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.last()
+															.unwrap()
+															.parse::<usize>()
+															.is_err()
+														{
+															for component in
+																path.chars().skip(1).collect::<String>().split('/')
+															{
+																view = view
+																	.as_object_mut()
+																	.unwrap()
+																	.entry(component)
+																	.or_insert(json!({}));
+															}
+
+															*view = value;
+														} else {
+															// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+															for component in path
+																.chars()
+																.skip(1)
+																.collect::<String>()
+																.split('/')
+																.collect::<Vec<_>>()
+																.into_iter()
+																.rev()
+																.skip(1)
+																.rev()
+															{
+																view = view
+																	.as_object_mut()
+																	.unwrap()
+																	.entry(component)
+																	.or_insert(json!({}));
+															}
+
+															*view = current
+																.pointer(
+																	&path
+																		.chars()
+																		.skip(1)
+																		.collect::<String>()
+																		.split('/')
+																		.collect::<Vec<_>>()
+																		.into_iter()
+																		.rev()
+																		.skip(1)
+																		.rev()
+																		.collect::<Vec<_>>()
+																		.join("/")
+																)
+																.unwrap()
+																.to_owned();
+														}
+													}
+
+													json_patch::PatchOperation::Remove(
+														json_patch::RemoveOperation { path }
+													) => {
+														let mut view = &mut merge_patch;
+
+														if path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.last()
+															.unwrap()
+															.parse::<usize>()
+															.is_err()
+														{
+															for component in
+																path.chars().skip(1).collect::<String>().split('/')
+															{
+																view = view
+																	.as_object_mut()
+																	.unwrap()
+																	.entry(component)
+																	.or_insert(json!({}));
+															}
+
+															*view = Value::Null;
+														} else {
+															// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+															for component in path
+																.chars()
+																.skip(1)
+																.collect::<String>()
+																.split('/')
+																.collect::<Vec<_>>()
+																.into_iter()
+																.rev()
+																.skip(1)
+																.rev()
+															{
+																view = view
+																	.as_object_mut()
+																	.unwrap()
+																	.entry(component)
+																	.or_insert(json!({}));
+															}
+
+															*view = current
+																.pointer(
+																	&path
+																		.chars()
+																		.skip(1)
+																		.collect::<String>()
+																		.split('/')
+																		.collect::<Vec<_>>()
+																		.into_iter()
+																		.rev()
+																		.skip(1)
+																		.rev()
+																		.collect::<Vec<_>>()
+																		.join("/")
+																)
+																.unwrap()
+																.to_owned();
+														}
+													}
+
+													json_patch::PatchOperation::Replace(
+														json_patch::ReplaceOperation { path, value }
+													) => {
+														let mut view = &mut merge_patch;
+
+														if path
+															.chars()
+															.skip(1)
+															.collect::<String>()
+															.split('/')
+															.last()
+															.unwrap()
+															.parse::<usize>()
+															.is_err()
+														{
+															for component in
+																path.chars().skip(1).collect::<String>().split('/')
+															{
+																view = view
+																	.as_object_mut()
+																	.unwrap()
+																	.entry(component)
+																	.or_insert(json!({}));
+															}
+
+															*view = value;
+														} else {
+															// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
+															for component in path
+																.chars()
+																.skip(1)
+																.collect::<String>()
+																.split('/')
+																.collect::<Vec<_>>()
+																.into_iter()
+																.rev()
+																.skip(1)
+																.rev()
+															{
+																view = view
+																	.as_object_mut()
+																	.unwrap()
+																	.entry(component)
+																	.or_insert(json!({}));
+															}
+
+															*view = current
+																.pointer(
+																	&path
+																		.chars()
+																		.skip(1)
+																		.collect::<String>()
+																		.split('/')
+																		.collect::<Vec<_>>()
+																		.into_iter()
+																		.rev()
+																		.skip(1)
+																		.rev()
+																		.collect::<Vec<_>>()
+																		.join("/")
+																)
+																.unwrap()
+																.to_owned();
+														}
+													}
+
+													json_patch::PatchOperation::Move(_) => unreachable!(
+														"Calculation of JSON patch does not emit Move operations"
+													),
+
+													json_patch::PatchOperation::Copy(_) => unreachable!(
+														"Calculation of JSON patch does not emit Copy operations"
+													),
+
+													json_patch::PatchOperation::Test(_) => unreachable!(
+														"Calculation of JSON patch does not emit Test operations"
+													)
+												}
+											}
+
+											serde_json::to_vec(&merge_patch)?
+										}
+
+										JsonPatchType::JsonPatch => {
+											let base = to_value(
+												base.iter()
+													.map(|x| {
+														(
+															x.data
+																.get("Id")
+																.expect("Unlockable did not have Id")
+																.as_str()
+																.expect("Id was not string")
+																.to_owned(),
+															{
+																let mut y = IndexMap::new();
+																y.insert("Guid".into(), to_value(x.id).unwrap());
+																y.extend(
+																	x.data
+																		.to_owned()
+																		.into_iter()
+																		.filter(|(key, _)| key != "Id")
+																);
+																y
+															}
+														)
+													})
+													.collect::<IndexMap<String, IndexMap<String, Value>>>()
+											)?;
+
+											let current = to_value(
+												current
+													.iter()
+													.map(|x| {
+														(
+															x.data
+																.get("Id")
+																.expect("Unlockable did not have Id")
+																.as_str()
+																.expect("Id was not string")
+																.to_owned(),
+															{
+																let mut y = IndexMap::new();
+																y.insert("Guid".into(), to_value(x.id).unwrap());
+																y.extend(
+																	x.data
+																		.to_owned()
+																		.into_iter()
+																		.filter(|(key, _)| key != "Id")
+																);
+																y
+															}
+														)
+													})
+													.collect::<IndexMap<String, IndexMap<String, Value>>>()
+											)?;
+
+											if let Some(file) = editor.file.as_ref() {
+												send_request(
+													&app,
+													Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+														base,
+														current,
+														save_path: file.to_owned(),
+														file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
+													})
+												)?;
+
+												send_request(
+													&app,
+													Request::Global(GlobalRequest::SetTabUnsaved {
+														id: tab,
+														unsaved: false
+													})
+												)?;
+											} else {
+												let mut dialog = AsyncFileDialog::new().set_title("Save file");
+
+												if let Some(project) = app_state.project.load().as_ref() {
+													dialog = dialog.set_directory(&project.path);
+												}
+
+												if let Some(save_handle) = dialog
+													.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
+													.save_file()
+													.await
+												{
+													editor.file = Some(save_handle.path().into());
+
+													send_request(
+														&app,
+														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+															base,
+															current,
+															save_path: save_handle.path().to_owned(),
+															file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
 														})
 													)?;
 
@@ -4158,6 +5286,11 @@ fn event(app: AppHandle, event: Event) {
 											EditorData::RepositoryPatch { patch_type, .. } => match patch_type {
 												JsonPatchType::MergePatch => "Repository merge patch",
 												JsonPatchType::JsonPatch => "Repository JSON patch"
+											},
+
+											EditorData::UnlockablesPatch { patch_type, .. } => match patch_type {
+												JsonPatchType::MergePatch => "Unlockables merge patch",
+												JsonPatchType::JsonPatch => "Unlockables JSON patch"
 											}
 										},
 										&[match &editor.data {
@@ -4192,6 +5325,11 @@ fn event(app: AppHandle, event: Event) {
 
 											EditorData::RepositoryPatch { patch_type, .. } => match patch_type {
 												JsonPatchType::MergePatch => "repository.json",
+												JsonPatchType::JsonPatch => "JSON.patch.json"
+											},
+
+											EditorData::UnlockablesPatch { patch_type, .. } => match patch_type {
+												JsonPatchType::MergePatch => "unlockables.json",
 												JsonPatchType::JsonPatch => "JSON.patch.json"
 											}
 										}]

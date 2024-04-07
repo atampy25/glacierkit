@@ -81,8 +81,8 @@
 					void writeTextFile(
 						request.data.data.save_path,
 						JSON.stringify({
-							file: "00204D1AFD76AB13",
-							type: "REPO",
+							file: request.data.data.file_and_type[0],
+							type: request.data.data.file_and_type[1],
 							patch
 						})
 					)

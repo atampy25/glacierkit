@@ -49,11 +49,11 @@ export type DependencyWithFlag = { resource: string; flag: string }
 
 export type Dynamics = { announcements: Announcement[] }
 
-export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent }
+export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorEvent }
 
-export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest }
+export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorRequest }
 
-export type EditorType = { type: "Nil" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" } | { type: "RepositoryPatch"; data: { patch_type: JsonPatchType } }
+export type EditorType = { type: "Nil" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" } | { type: "RepositoryPatch"; data: { patch_type: JsonPatchType } } | { type: "UnlockablesPatch"; data: { patch_type: JsonPatchType } }
 
 export type EditorValidity = { type: "Valid" } | { type: "Invalid"; data: string }
 
@@ -190,7 +190,7 @@ isArray: boolean;
  */
 refersTo: Ref[] }
 
-export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "normaliseQNFile"; data: { path: string } } | { type: "convertEntityToPatch"; data: { path: string } } | { type: "convertPatchToEntity"; data: { path: string } } | { type: "convertRepoPatchToMergePatch"; data: { path: string } } | { type: "convertRepoPatchToJsonPatch"; data: { path: string } }
+export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "normaliseQNFile"; data: { path: string } } | { type: "convertEntityToPatch"; data: { path: string } } | { type: "convertPatchToEntity"; data: { path: string } } | { type: "convertRepoPatchToMergePatch"; data: { path: string } } | { type: "convertRepoPatchToJsonPatch"; data: { path: string } } | { type: "convertUnlockablesPatchToMergePatch"; data: { path: string } } | { type: "convertUnlockablesPatchToJsonPatch"; data: { path: string } }
 
 export type FileBrowserRequest = { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "beginRename"; data: { old_path: string } } | { type: "finishRename"; data: { new_path: string } } | { type: "select"; data: string | null } | { type: "newTree"; data: { base_path: string; 
 /**
@@ -227,7 +227,7 @@ export type GameVersion = "h1" | "h2" | "h3"
 
 export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string }
 
-export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string } }
+export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } }
 
 export type JsonPatchType = { type: "MergePatch" } | { type: "JsonPatch" }
 
@@ -420,7 +420,7 @@ export type RepositoryPatchEditorRequest = { type: "setRepositoryItems"; data: {
 
 export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; data: EditorRequest } | { type: "global"; data: GlobalRequest }
 
-export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL" } | { type: "Ores" } | { type: "Image"; data: { image_path: string } } | { type: "Audio"; data: { wav_path: string } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } } | { type: "Repository" }
+export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL" } | { type: "Ores" } | { type: "Image"; data: { image_path: string } } | { type: "Audio"; data: { wav_path: string } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } } | { type: "Repository" } | { type: "Unlockables" }
 
 export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "followDependencyInNewTab"; data: { id: string; hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } } | { type: "extractAsRTGeneric"; data: { id: string } } | { type: "extractAsPng"; data: { id: string } } | { type: "extractAsWav"; data: { id: string } } | { type: "extractMultiWav"; data: { id: string } } | { type: "extractSpecificMultiWav"; data: { id: string; index: number } } | { type: "extractORESAsJson"; data: { id: string } }
 
@@ -540,4 +540,10 @@ export type TextFileType = { type: "Json" } | { type: "ManifestJson" } | { type:
 export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type: "gameBrowser"; data: GameBrowserEvent } | { type: "settings"; data: SettingsEvent }
 
 export type ToolRequest = { type: "fileBrowser"; data: FileBrowserRequest } | { type: "gameBrowser"; data: GameBrowserRequest } | { type: "settings"; data: SettingsRequest }
+
+export type UnlockableInformation = { type: "Access"; data: { id: string | null } } | { type: "EvergreenMastery"; data: { id: string | null } } | { type: "Disguise"; data: { id: string | null } } | { type: "AgencyPickup"; data: { id: string | null } } | { type: "Weapon"; data: { id: string | null } } | { type: "Gear"; data: { id: string | null } } | { type: "Location"; data: { id: string | null } } | { type: "Package"; data: { id: string | null } } | { type: "LoadoutUnlock"; data: { id: string | null } } | { type: "Unknown"; data: { id: string | null } }
+
+export type UnlockablesPatchEditorEvent = { type: "initialise"; data: { id: string } } | { type: "createUnlockable"; data: { id: string } } | { type: "resetModifications"; data: { id: string; unlockable: string } } | { type: "modifyUnlockable"; data: { id: string; unlockable: string; data: string } } | { type: "selectUnlockable"; data: { id: string; unlockable: string } }
+
+export type UnlockablesPatchEditorRequest = { type: "setUnlockables"; data: { id: string; unlockables: ([string, UnlockableInformation])[] } } | { type: "setModifiedUnlockables"; data: { id: string; modified: string[] } } | { type: "addNewUnlockable"; data: { id: string; new_unlockable: [string, UnlockableInformation] } } | { type: "removeUnlockable"; data: { id: string; unlockable: string } } | { type: "setMonacoContent"; data: { id: string; unlockable: string; orig_data: string; data: string } } | { type: "deselectMonaco"; data: { id: string } } | { type: "modifyUnlockableInformation"; data: { id: string; unlockable: string; info: UnlockableInformation } }
 

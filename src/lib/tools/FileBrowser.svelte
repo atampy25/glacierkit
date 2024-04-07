@@ -38,13 +38,13 @@
 	}
 
 	const icons = Object.entries({
-		json: "fa-regular fa-file-code",
-		md: "fa-regular fa-file-lines",
-		txt: "fa-regular fa-file-lines",
-		jpeg: "fa-regular fa-file-image",
-		jpg: "fa-regular fa-file-image",
-		png: "fa-regular fa-file-image",
-		webp: "fa-regular fa-file-image"
+		".json": "fa-regular fa-file-code",
+		".md": "fa-regular fa-file-lines",
+		".txt": "fa-regular fa-file-lines",
+		".jpeg": "fa-regular fa-file-image",
+		".jpg": "fa-regular fa-file-image",
+		".png": "fa-regular fa-file-image",
+		".webp": "fa-regular fa-file-image"
 	})
 
 	onMount(async () => {
@@ -423,6 +423,38 @@
 										}
 									}
 								}),
+						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".unlockables.json")
+							? {}
+							: {
+									convertUnlockablesPatchToJsonPatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to JSON.patch.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert unlockables merge patch to JSON patch")
+
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+
+											await event({
+												type: "tool",
+												data: {
+													type: "fileBrowser",
+													data: {
+														type: "convertUnlockablesPatchToJsonPatch",
+														data: {
+															path
+														}
+													}
+												}
+											})
+										}
+									}
+								}),
 						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".JSON.patch.json")
 							? {}
 							: {
@@ -446,6 +478,34 @@
 													type: "fileBrowser",
 													data: {
 														type: "convertRepoPatchToMergePatch",
+														data: {
+															path
+														}
+													}
+												}
+											})
+										}
+									},
+									convertUnlockablesPatchToMergePatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to unlockables.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert unlockables JSON patch to merge patch")
+
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
+
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+
+											await event({
+												type: "tool",
+												data: {
+													type: "fileBrowser",
+													data: {
+														type: "convertUnlockablesPatchToMergePatch",
 														data: {
 															path
 														}

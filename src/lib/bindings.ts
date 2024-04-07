@@ -18,7 +18,7 @@ export type CopiedEntityData = {
  * Which entity has been copied (and should be parented to the selection when pasting).
  */
 rootEntity: string; data: { [key in string]: SubEntity } }
-export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent }
+export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorEvent }
 export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent } | { type: "metadata"; data: EntityMetadataEvent } | { type: "overrides"; data: EntityOverridesEvent }
 export type EntityGeneralEvent = { type: "setShowReverseParentRefs"; data: { editor_id: string; show_reverse_parent_refs: boolean } }
 export type EntityMetaPaneEvent = { type: "jumpToReference"; data: { editor_id: string; reference: string } } | { type: "setNotes"; data: { editor_id: string; entity_id: string; notes: string } }
@@ -41,7 +41,7 @@ isArray: boolean;
  * The target entity (or entities) that will be accessed.
  */
 refersTo: Ref[] }
-export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "normaliseQNFile"; data: { path: string } } | { type: "convertEntityToPatch"; data: { path: string } } | { type: "convertPatchToEntity"; data: { path: string } } | { type: "convertRepoPatchToMergePatch"; data: { path: string } } | { type: "convertRepoPatchToJsonPatch"; data: { path: string } }
+export type FileBrowserEvent = { type: "select"; data: string | null } | { type: "create"; data: { path: string; is_folder: boolean } } | { type: "delete"; data: string } | { type: "rename"; data: { old_path: string; new_path: string } } | { type: "normaliseQNFile"; data: { path: string } } | { type: "convertEntityToPatch"; data: { path: string } } | { type: "convertPatchToEntity"; data: { path: string } } | { type: "convertRepoPatchToMergePatch"; data: { path: string } } | { type: "convertRepoPatchToJsonPatch"; data: { path: string } } | { type: "convertUnlockablesPatchToMergePatch"; data: { path: string } } | { type: "convertUnlockablesPatchToJsonPatch"; data: { path: string } }
 /**
  * A long-form reference to an entity, allowing for the specification of external scenes and/or an exposed entity.
  */
@@ -200,6 +200,7 @@ subsets?: { [key in string]: string[] } | null }
 export type SubType = "brick" | "scene" | "template"
 export type TextEditorEvent = { type: "initialise"; data: { id: string } } | { type: "updateContent"; data: { id: string; content: string } }
 export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type: "gameBrowser"; data: GameBrowserEvent } | { type: "settings"; data: SettingsEvent }
+export type UnlockablesPatchEditorEvent = { type: "initialise"; data: { id: string } } | { type: "createUnlockable"; data: { id: string } } | { type: "resetModifications"; data: { id: string; unlockable: string } } | { type: "modifyUnlockable"; data: { id: string; unlockable: string; data: string } } | { type: "selectUnlockable"; data: { id: string; unlockable: string } }
 
 /** tauri-specta globals **/
 

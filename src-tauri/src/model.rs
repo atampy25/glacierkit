@@ -17,6 +17,7 @@ use crate::{
 	game_detection::GameInstall,
 	hash_list::HashList,
 	intellisense::Intellisense,
+	ores::{UnlockableInformation, UnlockableItem},
 	repository::{RepositoryItem, RepositoryItemInformation}
 };
 
@@ -82,6 +83,11 @@ pub enum EditorData {
 		base: Vec<RepositoryItem>,
 		current: Vec<RepositoryItem>,
 		patch_type: JsonPatchType
+	},
+	UnlockablesPatch {
+		base: Vec<UnlockableItem>,
+		current: Vec<UnlockableItem>,
+		patch_type: JsonPatchType
 	}
 }
 
@@ -142,7 +148,8 @@ pub enum EditorType {
 	Text { file_type: TextFileType },
 	QNEntity,
 	QNPatch,
-	RepositoryPatch { patch_type: JsonPatchType }
+	RepositoryPatch { patch_type: JsonPatchType },
+	UnlockablesPatch { patch_type: JsonPatchType }
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -195,7 +202,8 @@ pub enum ResourceOverviewData {
 		name: String,
 		wav_paths: Vec<(String, PathBuf)>
 	},
-	Repository
+	Repository,
+	Unlockables
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -271,6 +279,14 @@ strike! {
 				},
 
 				ConvertRepoPatchToJsonPatch {
+					path: PathBuf
+				},
+
+				ConvertUnlockablesPatchToMergePatch {
+					path: PathBuf
+				},
+
+				ConvertUnlockablesPatchToJsonPatch {
 					path: PathBuf
 				}
 			}),
@@ -526,7 +542,7 @@ strike! {
 				ExtractORESAsJson {
 					id: Uuid
 				}
-			})
+			}),
 
 			RepositoryPatch(pub enum RepositoryPatchEditorEvent {
 				Initialise {
@@ -551,6 +567,32 @@ strike! {
 				SelectItem {
 					id: Uuid,
 					item: Uuid
+				}
+			}),
+
+			UnlockablesPatch(pub enum UnlockablesPatchEditorEvent {
+				Initialise {
+					id: Uuid
+				},
+
+				CreateUnlockable {
+					id: Uuid
+				},
+
+				ResetModifications {
+					id: Uuid,
+					unlockable: Uuid
+				},
+
+				ModifyUnlockable {
+					id: Uuid,
+					unlockable: Uuid,
+					data: String
+				},
+
+				SelectUnlockable {
+					id: Uuid,
+					unlockable: Uuid
 				}
 			})
 		}),
@@ -826,6 +868,45 @@ strike! {
 					item: Uuid,
 					info: RepositoryItemInformation
 				}
+			}),
+
+			UnlockablesPatch(pub enum UnlockablesPatchEditorRequest {
+				SetUnlockables {
+					id: Uuid,
+					unlockables: Vec<(Uuid, UnlockableInformation)>
+				},
+
+				SetModifiedUnlockables {
+					id: Uuid,
+					modified: Vec<Uuid>
+				},
+
+				AddNewUnlockable {
+					id: Uuid,
+					new_unlockable: (Uuid, UnlockableInformation)
+				},
+
+				RemoveUnlockable {
+					id: Uuid,
+					unlockable: Uuid
+				},
+
+				SetMonacoContent {
+					id: Uuid,
+					unlockable: Uuid,
+					orig_data: String,
+					data: String
+				},
+
+				DeselectMonaco {
+					id: Uuid
+				},
+
+				ModifyUnlockableInformation {
+					id: Uuid,
+					unlockable: Uuid,
+					info: UnlockableInformation
+				}
 			})
 		}),
 
@@ -851,7 +932,8 @@ strike! {
 			ComputeJSONPatchAndSave {
 				base: Value,
 				current: Value,
-				save_path: PathBuf
+				save_path: PathBuf,
+				file_and_type: (String, String)
 			}
 		})
 	}

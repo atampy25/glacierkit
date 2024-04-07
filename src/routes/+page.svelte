@@ -25,6 +25,7 @@
 	import ResourceOverviewEditor from "$lib/editors/resourceoverview/ResourceOverviewEditor.svelte"
 	import { trackEvent } from "@aptabase/tauri"
 	import RepositoryPatchEditor from "$lib/editors/repositorypatch/RepositoryPatchEditor.svelte"
+	import UnlockablesPatchEditor from "$lib/editors/unlockablespatch/UnlockablesPatchEditor.svelte"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -44,7 +45,9 @@
 		"Press F1 in any JSON editor to access the Command Palette, which lets you perform common operations like transforming text to lowercase/uppercase, or deleting duplicate lines.",
 		'You can use Find and Replace in any JSON editor with Ctrl-H, or by pressing F1 and typing "replace".',
 		"Right-click an entry in the Game Content panel to copy its hash or path.",
-		"You can right-click on a dependency in a Resource Overview to open it in a new tab."
+		"You can right-click on a dependency in a Resource Overview to open it in a new tab.",
+		"Convert between repository.json/unlockables.json files and JSON.patch.json files easily by right-clicking them in the Files panel.",
+		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files."
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]
@@ -97,6 +100,9 @@
 
 			case "RepositoryPatch":
 				return RepositoryPatchEditor
+
+			case "UnlockablesPatch":
+				return UnlockablesPatchEditor
 
 			default:
 				editorType satisfies never
@@ -235,6 +241,10 @@
 								break
 
 							case "repositoryPatch":
+								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								break
+
+							case "unlockablesPatch":
 								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
 								break
 

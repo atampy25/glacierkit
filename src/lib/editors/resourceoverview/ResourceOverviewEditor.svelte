@@ -560,7 +560,85 @@
 				<Button
 					icon={DocumentExport}
 					on:click={async () => {
-						trackEvent("Extract ORES as binary")
+						trackEvent("Extract repository to file")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+		{:else if data.type === "Unlockables"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={Edit}
+					on:click={async () => {
+						trackEvent("Open unlockables in editor")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "openInEditor",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Open in editor</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract unlockables as JSON")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractORESAsJson",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract as JSON</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract unlockables as binary")
 
 						await event({
 							type: "editor",

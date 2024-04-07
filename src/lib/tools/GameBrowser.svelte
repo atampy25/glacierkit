@@ -47,11 +47,11 @@
 			},
 			contextmenu: {
 				select_node: false,
-				items: (rightClickedNode: { original: { folder: boolean; path: string | null; hint: string | null; filetype: string } }, c: any) => {
+				items: (rightClickedNode: { id: string; original: { folder: boolean; path: string | null; hint: string | null; filetype: string } }, c: any) => {
 					return rightClickedNode.original.folder
 						? {}
 						: {
-								...(rightClickedNode.original.filetype === "TEMP" || rightClickedNode.original.filetype === "REPO"
+								...(rightClickedNode.original.filetype === "TEMP" || rightClickedNode.original.filetype === "REPO" || rightClickedNode.id === "0057C2C3941115CA"
 									? {
 											openInEditor: {
 												separator_before: false,

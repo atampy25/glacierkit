@@ -3,8 +3,11 @@ use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use anyhow::{Context, Result};
 use fn_error_context::context;
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use specta::Type;
 use tryvial::try_fn;
+use uuid::Uuid;
 
 #[try_fn]
 #[context("Couldn't read data as hashes ORES")]
@@ -198,4 +201,28 @@ pub fn generate_json_ores(data: &Value) -> Result<Vec<u8>> {
 	cursor.write_all(b"\x00\xED\xA5\xEB\x12\x08\x00\x00\x00\x01\x00\x00\x00\x08\x00\x00\x00")?;
 
 	ores
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct UnlockableItem {
+	#[serde(rename = "Guid")]
+	pub id: Uuid,
+
+	#[serde(flatten)]
+	pub data: IndexMap<String, Value>
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "data")]
+pub enum UnlockableInformation {
+	Access { id: Option<String> },
+	EvergreenMastery { id: Option<String> },
+	Disguise { id: Option<String> },
+	AgencyPickup { id: Option<String> },
+	Weapon { id: Option<String> },
+	Gear { id: Option<String> },
+	Location { id: Option<String> },
+	Package { id: Option<String> },
+	LoadoutUnlock { id: Option<String> },
+	Unknown { id: Option<String> }
 }
