@@ -220,7 +220,7 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 			};
 
 			send_request(
-				&app,
+				app,
 				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Overrides(
 					EntityOverridesRequest::Initialise {
 						editor_id,
@@ -264,7 +264,7 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 				)))
 			)?;
 
-			send_overrides_decorations(&app, editor_id, entity)?;
+			send_overrides_decorations(app, editor_id, entity)?;
 		}
 
 		EntityOverridesEvent::UpdatePropertyOverrides { editor_id, content } => {
@@ -285,10 +285,10 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 				if entity.property_overrides != deserialised {
 					entity.property_overrides = deserialised;
 
-					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::SetTabUnsaved {
 							id: editor_id,
 							unsaved: true
@@ -316,10 +316,10 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 				if entity.override_deletes != deserialised {
 					entity.override_deletes = deserialised;
 
-					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::SetTabUnsaved {
 							id: editor_id,
 							unsaved: true
@@ -347,10 +347,10 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 				if entity.pin_connection_overrides != deserialised {
 					entity.pin_connection_overrides = deserialised;
 
-					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::SetTabUnsaved {
 							id: editor_id,
 							unsaved: true
@@ -378,10 +378,10 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 				if entity.pin_connection_override_deletes != deserialised {
 					entity.pin_connection_override_deletes = deserialised;
 
-					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::SetTabUnsaved {
 							id: editor_id,
 							unsaved: true

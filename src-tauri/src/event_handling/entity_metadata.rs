@@ -1,12 +1,11 @@
 use anyhow::{anyhow, Context, Result};
-use arc_swap::ArcSwap;
 use fn_error_context::context;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 
 use crate::{
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
+		AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
 		EntityMetadataRequest, GlobalRequest, Request
 	},
 	rpkg::normalise_to_hash,

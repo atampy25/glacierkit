@@ -45,31 +45,29 @@ use entity::{
 use event_handling::{
 	entity_metadata::handle_entity_metadata_event,
 	entity_monaco::{handle_openfactory, handle_updatecontent},
-	entity_overrides::{handle_entity_overrides_event, send_overrides_decorations},
+	entity_overrides::handle_entity_overrides_event,
 	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select},
 	repository_patch::handle_repository_patch_event,
-	resource_overview::{handle_resource_overview_event, initialise_resource_overview},
+	resource_overview::handle_resource_overview_event,
 	unlockables_patch::handle_unlockables_patch_event
 };
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
-use image::io::Reader as ImageReader;
 use indexmap::IndexMap;
 use intellisense::Intellisense;
 use itertools::Itertools;
 use memmap2::Mmap;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
-	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataEvent, EntityMetadataRequest,
-	EntityMonacoEvent, EntityMonacoRequest, EntityOverridesEvent, EntityOverridesRequest, EntityTreeEvent,
-	EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent,
-	GameBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project, ProjectSettings, Request,
-	ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest, SearchFilter, SettingsEvent, SettingsRequest,
-	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent,
+	EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
+	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project,
+	ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest,
+	TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
-use ores::{parse_hashes_ores, parse_json_ores, UnlockableItem};
+use ores::{parse_json_ores, UnlockableItem};
 use quickentity_rs::{
 	apply_patch, convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn, convert_to_rt,
 	generate_patch,
@@ -79,23 +77,21 @@ use quickentity_rs::{
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use repository::RepositoryItem;
 use resourcelib::{
-	convert_generic, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
-	h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
-	h3_convert_binary_to_factory
+	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
+	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
 };
 use rfd::AsyncFileDialog;
-use rpkg::{ensure_entity_in_cache, extract_latest_overview_info, extract_latest_resource, normalise_to_hash};
+use rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
 use rpkg_rs::{
 	misc::ini_file_system::IniFileSystem,
 	runtime::resource::{
 		package_manager::PackageManager, resource_container::ResourceContainer, resource_package::ResourcePackage
 	}
 };
-use rpkg_tool::generate_rpkg_meta;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, from_value, json, to_string, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
-use tauri::{api::process::Command, async_runtime, AppHandle, Manager, State};
+use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tokio::sync::RwLock;
 use tryvial::try_fn;
@@ -4628,9 +4624,8 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 								.app_data_dir()
 								.context("Couldn't get app data dir")?
 								.join("hash_list.sml"),
-							serde_smile::to_vec(&hash_list).unwrap()
-						)
-						.unwrap();
+							serde_smile::to_vec(&hash_list)?
+						)?;
 
 						app_state.hash_list.store(Some(hash_list.into()));
 					}
