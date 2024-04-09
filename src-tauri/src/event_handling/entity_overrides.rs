@@ -1,8 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use quickentity_rs::qn_structs::{Entity, Ref};
-use serde_json::{from_slice, from_value, Value};
+use serde::Serialize;
+use serde_json::{from_slice, from_str, from_value, Value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -10,7 +11,10 @@ use uuid::Uuid;
 use crate::{
 	entity::get_ref_decoration,
 	finish_task,
-	model::{AppSettings, AppState, EditorRequest, EntityEditorRequest, EntityOverridesRequest, Request},
+	model::{
+		AppSettings, AppState, EditorData, EditorRequest, EntityEditorRequest, EntityOverridesEvent,
+		EntityOverridesRequest, GlobalRequest, Request
+	},
 	rpkg::extract_latest_resource,
 	send_request, start_task
 };
@@ -192,5 +196,199 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 		)?;
 
 		finish_task(app, task)?;
+	}
+}
+
+#[try_fn]
+#[context("Couldn't handle entity overrides event")]
+pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	match event {
+		EntityOverridesEvent::Initialise { editor_id } => {
+			let editor_state = app_state.editor_states.read().await;
+			let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+
+			let entity = match editor_state.data {
+				EditorData::QNEntity { ref entity, .. } => entity,
+				EditorData::QNPatch { ref current, .. } => current,
+
+				_ => {
+					Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+					panic!();
+				}
+			};
+
+			send_request(
+				&app,
+				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Overrides(
+					EntityOverridesRequest::Initialise {
+						editor_id,
+						property_overrides: {
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							entity.property_overrides.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						},
+						override_deletes: {
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							entity.override_deletes.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						},
+						pin_connection_overrides: {
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							entity.pin_connection_overrides.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						},
+						pin_connection_override_deletes: {
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							entity.pin_connection_override_deletes.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						}
+					}
+				)))
+			)?;
+
+			send_overrides_decorations(&app, editor_id, entity)?;
+		}
+
+		EntityOverridesEvent::UpdatePropertyOverrides { editor_id, content } => {
+			let mut editor_state = app_state.editor_states.write().await;
+			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+			let entity = match editor_state.data {
+				EditorData::QNEntity { ref mut entity, .. } => entity,
+				EditorData::QNPatch { ref mut current, .. } => current,
+
+				_ => {
+					Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+					panic!();
+				}
+			};
+
+			if let Ok(deserialised) = from_str(&content) {
+				if entity.property_overrides != deserialised {
+					entity.property_overrides = deserialised;
+
+					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+					send_request(
+						&app,
+						Request::Global(GlobalRequest::SetTabUnsaved {
+							id: editor_id,
+							unsaved: true
+						})
+					)?;
+				}
+			}
+		}
+
+		EntityOverridesEvent::UpdateOverrideDeletes { editor_id, content } => {
+			let mut editor_state = app_state.editor_states.write().await;
+			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+			let entity = match editor_state.data {
+				EditorData::QNEntity { ref mut entity, .. } => entity,
+				EditorData::QNPatch { ref mut current, .. } => current,
+
+				_ => {
+					Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+					panic!();
+				}
+			};
+
+			if let Ok(deserialised) = from_str(&content) {
+				if entity.override_deletes != deserialised {
+					entity.override_deletes = deserialised;
+
+					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+					send_request(
+						&app,
+						Request::Global(GlobalRequest::SetTabUnsaved {
+							id: editor_id,
+							unsaved: true
+						})
+					)?;
+				}
+			}
+		}
+
+		EntityOverridesEvent::UpdatePinConnectionOverrides { editor_id, content } => {
+			let mut editor_state = app_state.editor_states.write().await;
+			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+			let entity = match editor_state.data {
+				EditorData::QNEntity { ref mut entity, .. } => entity,
+				EditorData::QNPatch { ref mut current, .. } => current,
+
+				_ => {
+					Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+					panic!();
+				}
+			};
+
+			if let Ok(deserialised) = from_str(&content) {
+				if entity.pin_connection_overrides != deserialised {
+					entity.pin_connection_overrides = deserialised;
+
+					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+					send_request(
+						&app,
+						Request::Global(GlobalRequest::SetTabUnsaved {
+							id: editor_id,
+							unsaved: true
+						})
+					)?;
+				}
+			}
+		}
+
+		EntityOverridesEvent::UpdatePinConnectionOverrideDeletes { editor_id, content } => {
+			let mut editor_state = app_state.editor_states.write().await;
+			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+
+			let entity = match editor_state.data {
+				EditorData::QNEntity { ref mut entity, .. } => entity,
+				EditorData::QNPatch { ref mut current, .. } => current,
+
+				_ => {
+					Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+					panic!();
+				}
+			};
+
+			if let Ok(deserialised) = from_str(&content) {
+				if entity.pin_connection_override_deletes != deserialised {
+					entity.pin_connection_override_deletes = deserialised;
+
+					send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
+
+					send_request(
+						&app,
+						Request::Global(GlobalRequest::SetTabUnsaved {
+							id: editor_id,
+							unsaved: true
+						})
+					)?;
+				}
+			}
+		}
 	}
 }

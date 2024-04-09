@@ -43,8 +43,9 @@ use entity::{
 	CopiedEntityData
 };
 use event_handling::{
+	entity_metadata::handle_entity_metadata_event,
 	entity_monaco::{handle_openfactory, handle_updatecontent},
-	entity_overrides::send_overrides_decorations,
+	entity_overrides::{handle_entity_overrides_event, send_overrides_decorations},
 	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select},
 	repository_patch::handle_repository_patch_event,
 	resource_overview::{handle_resource_overview_event, initialise_resource_overview},
@@ -2694,473 +2695,10 @@ fn event(app: AppHandle, event: Event) {
 									}))
 								)?;
 
-								if let Some(path) = app_settings.load().game_install.as_ref() {
-									let task = start_task(&app, "Loading game files")?;
-
-									let game_version = app_state
-										.game_installs
-										.iter()
-										.find(|x| x.path == *path)
-										.context("No such game install")?
-										.version;
-
-									let mut thumbs = IniFileSystem::new();
-									thumbs.load(&path.join("thumbs.dat"))?;
-
-									let mut resource_packages: IndexMap<PathBuf, ResourcePackage> = IndexMap::new();
-
-									if let (Ok(proj_path), Ok(relative_runtime_path)) = (
-										thumbs.get_value("application", "PROJECT_PATH"),
-										thumbs.get_value("application", "RUNTIME_PATH")
-									) {
-										let mut package_manager =
-											PackageManager::new(&path.join(proj_path).join(relative_runtime_path));
-
-										let mut resource_container = ResourceContainer::default();
-
-										package_manager.initialize(&mut resource_container).map_err(|x| {
-											anyhow!("RPKG error in initialising resource container: {:?}", x)
-										})?;
-
-										for partition in package_manager.partition_infos {
-											resource_packages.extend(
-												vec![
-													0,
-													..ResourceContainer::get_patch_indices(
-														&package_manager.runtime_dir,
-														partition.index
-													)
-													.map_err(|x| {
-														anyhow!("RPKG error in getting patch indices: {:?}", x)
-													})?
-													.iter()
-													.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
-												]
-												.into_par_iter()
-												.rev()
-												.map(|patch| {
-													anyhow::Ok({
-														let rpkg_path =
-															Path::new(&package_manager.runtime_dir).join(format!(
-																"{}{}{}.rpkg",
-																match game_version {
-																	GameVersion::H1 | GameVersion::H2 =>
-																		if partition.index > 0 {
-																			"dlc"
-																		} else {
-																			"chunk"
-																		},
-
-																	GameVersion::H3 => "chunk"
-																},
-																match game_version {
-																	GameVersion::H1 | GameVersion::H2 =>
-																		if partition.index > 0 {
-																			partition.index - 1 // H1/H2 go chunk0, dlc0, dlc1
-																		} else {
-																			partition.index
-																		},
-																	GameVersion::H3 => partition.index
-																},
-																if patch > 0 {
-																	format!("patch{}", patch)
-																} else {
-																	"".into()
-																}
-															));
-
-														(rpkg_path.to_owned(), {
-															let package_file = File::open(&rpkg_path)?;
-
-															let mmap = unsafe { Mmap::map(&package_file)? };
-															let mut reader = Cursor::new(&mmap[..]);
-
-															reader
-																.read_ne_args((patch > 0,))
-																.context("Couldn't parse RPKG file")?
-														})
-													})
-												})
-												.collect::<Result<Vec<_>>>()?
-											);
-										}
-									} else {
-										Err(anyhow!("thumbs.dat was missing required properties"))?;
-										panic!();
-									}
-
-									finish_task(&app, task)?;
-
-									let task = start_task(&app, "Caching reverse references")?;
-
-									let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
-
-									for rpkg in resource_packages.values() {
-										for (resource_header, offset_info) in
-											rpkg.resource_entries.iter().enumerate().map(|(index, entry)| {
-												(rpkg.resource_metadata.get(index).unwrap(), entry)
-											}) {
-											for reference in resource_header
-												.m_references
-												.as_ref()
-												.map(|x| &x.reference_hash)
-												.unwrap_or(&Vec::new())
-											{
-												reverse_dependencies
-													.entry(reference.to_hex_string())
-													.or_default()
-													.insert(offset_info.runtime_resource_id.to_hex_string());
-											}
-										}
-									}
-
-									app_state.resource_packages.store(Some(resource_packages.into()));
-
-									app_state.resource_reverse_dependencies.store(Some(
-										reverse_dependencies
-											.into_iter()
-											.map(|(x, y)| (x, y.into_iter().collect()))
-											.collect::<HashMap<_, _>>()
-											.into()
-									));
-
-									finish_task(&app, task)?;
-								}
-
-								let task = start_task(&app, "Acquiring latest hash list")?;
-
-								let current_version =
-									app_state.hash_list.load().as_ref().map(|x| x.version).unwrap_or(0);
-
-								if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await {
-									if let Ok(data) = data.text().await {
-										let new_version = data
-											.trim()
-											.parse::<u16>()
-											.context("Online hash list version wasn't a number")?;
-
-										if current_version < new_version {
-											if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
-												if let Ok(data) = data.bytes().await {
-													let hash_list = HashList::from_slice(&data)?;
-
-													fs::write(
-														app.path_resolver()
-															.app_data_dir()
-															.context("Couldn't get app data dir")?
-															.join("hash_list.sml"),
-														serde_smile::to_vec(&hash_list).unwrap()
-													)
-													.unwrap();
-
-													app_state.hash_list.store(Some(hash_list.into()));
-												}
-											}
-										}
-									}
-								}
-
-								if let Some(install) = app_settings.load().game_install.as_ref() {
-									if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-										let game_version = app_state
-											.game_installs
-											.iter()
-											.try_find(|x| anyhow::Ok(x.path == *install))?
-											.context("No such game install")?
-											.version;
-
-										app_state.intellisense.store(Some(
-											Intellisense {
-												cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-												cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
-												uicb_prop_types: from_slice(include_bytes!(
-													"../assets/uicbPropTypes.json"
-												))
-												.unwrap(),
-												matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-												all_cppts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "CPPT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_asets: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "ASET")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_uicts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "UICT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_matts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "MATT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_wswts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "WSWT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_ecpts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "ECPT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_aibxs: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "AIBX")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_wsgts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "WSGT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect()
-											}
-											.into()
-										));
-									}
-								}
-
-								send_request(
-									&app,
-									Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
-										app_settings.load().game_install.is_some()
-											&& app_state.hash_list.load().is_some()
-									)))
-								)?;
-
-								finish_task(&app, task)?;
+								load_game_files(&app).await?;
 							}
 
 							SettingsEvent::ChangeGameInstall(path) => {
-								if let Some(path) = path.as_ref()
-									&& app_settings.load().game_install.as_ref() != Some(path)
-								{
-									let task = start_task(&app, "Loading game files")?;
-
-									let game_version = app_state
-										.game_installs
-										.iter()
-										.try_find(|x| anyhow::Ok(x.path == *path))?
-										.context("No such game install")?
-										.version;
-
-									let mut thumbs = IniFileSystem::new();
-									thumbs.load(&path.join("thumbs.dat"))?;
-
-									let mut resource_packages: IndexMap<PathBuf, ResourcePackage> = IndexMap::new();
-
-									if let (Ok(proj_path), Ok(relative_runtime_path)) = (
-										thumbs.get_value("application", "PROJECT_PATH"),
-										thumbs.get_value("application", "RUNTIME_PATH")
-									) {
-										let mut package_manager =
-											PackageManager::new(&path.join(proj_path).join(relative_runtime_path));
-
-										let mut resource_container = ResourceContainer::default();
-
-										package_manager.initialize(&mut resource_container).map_err(|x| {
-											anyhow!("RPKG error in initialising resource container: {:?}", x)
-										})?;
-
-										for partition in package_manager.partition_infos {
-											resource_packages.extend(
-												vec![
-													0,
-													..ResourceContainer::get_patch_indices(
-														&package_manager.runtime_dir,
-														partition.index
-													)
-													.map_err(|x| {
-														anyhow!("RPKG error in getting patch indices: {:?}", x)
-													})?
-													.iter()
-													.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
-												]
-												.into_par_iter()
-												.rev()
-												.map(|patch| {
-													anyhow::Ok({
-														let rpkg_path =
-															Path::new(&package_manager.runtime_dir).join(format!(
-																"{}{}{}.rpkg",
-																match game_version {
-																	GameVersion::H1 | GameVersion::H2 =>
-																		if partition.index > 0 {
-																			"dlc"
-																		} else {
-																			"chunk"
-																		},
-
-																	GameVersion::H3 => "chunk"
-																},
-																match game_version {
-																	GameVersion::H1 | GameVersion::H2 =>
-																		if partition.index > 0 {
-																			partition.index - 1 // H1/H2 go chunk0, dlc0, dlc1
-																		} else {
-																			partition.index
-																		},
-																	GameVersion::H3 => partition.index
-																},
-																if patch > 0 {
-																	format!("patch{}", patch)
-																} else {
-																	"".into()
-																}
-															));
-
-														(rpkg_path.to_owned(), {
-															let package_file = File::open(&rpkg_path)?;
-
-															let mmap = unsafe { Mmap::map(&package_file)? };
-															let mut reader = Cursor::new(&mmap[..]);
-
-															reader
-																.read_ne_args((patch > 0,))
-																.context("Couldn't parse RPKG file")?
-														})
-													})
-												})
-												.collect::<Result<Vec<_>>>()?
-											);
-										}
-									} else {
-										Err(anyhow!("thumbs.dat was missing required properties"))?;
-										panic!();
-									}
-
-									finish_task(&app, task)?;
-
-									let task = start_task(&app, "Caching reverse references")?;
-
-									let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
-
-									for rpkg in resource_packages.values() {
-										for (resource_header, offset_info) in
-											rpkg.resource_entries.iter().enumerate().map(|(index, entry)| {
-												(rpkg.resource_metadata.get(index).unwrap(), entry)
-											}) {
-											for reference in resource_header
-												.m_references
-												.as_ref()
-												.map(|x| &x.reference_hash)
-												.unwrap_or(&Vec::new())
-											{
-												reverse_dependencies
-													.entry(reference.to_hex_string())
-													.or_default()
-													.insert(offset_info.runtime_resource_id.to_hex_string());
-											}
-										}
-									}
-
-									app_state.resource_packages.store(Some(resource_packages.into()));
-
-									app_state.resource_reverse_dependencies.store(Some(
-										reverse_dependencies
-											.into_iter()
-											.map(|(x, y)| (x, y.into_iter().collect()))
-											.collect::<HashMap<_, _>>()
-											.into()
-									));
-
-									finish_task(&app, task)?;
-
-									if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-										app_state.intellisense.store(Some(
-											Intellisense {
-												cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-												cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
-												uicb_prop_types: from_slice(include_bytes!(
-													"../assets/uicbPropTypes.json"
-												))
-												.unwrap(),
-												matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-												all_cppts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "CPPT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_asets: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "ASET")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_uicts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "UICT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_matts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "MATT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_wswts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "WSWT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_ecpts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "ECPT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_aibxs: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "AIBX")
-													.map(|(hash, _)| hash.to_owned())
-													.collect(),
-												all_wsgts: hash_list
-													.entries
-													.iter()
-													.filter(|(_, entry)| entry.games.contains(game_version))
-													.filter(|(_, entry)| entry.resource_type == "WSGT")
-													.map(|(hash, _)| hash.to_owned())
-													.collect()
-											}
-											.into()
-										));
-									}
-								} else {
-									app_state.resource_packages.store(None);
-									app_state.intellisense.store(None);
-								}
-
 								let mut settings = (*app_settings.load_full()).to_owned();
 								settings.game_install = path;
 								fs::write(
@@ -3173,13 +2711,7 @@ fn event(app: AppHandle, event: Event) {
 								.unwrap();
 								app_settings.store(settings.into());
 
-								send_request(
-									&app,
-									Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
-										app_settings.load().game_install.is_some()
-											&& app_state.hash_list.load().is_some()
-									)))
-								)?;
+								load_game_files(&app).await?;
 							}
 
 							SettingsEvent::ChangeExtractModdedFiles(value) => {
@@ -3652,476 +3184,12 @@ fn event(app: AppHandle, event: Event) {
 								}
 							},
 
-							EntityEditorEvent::Metadata(event) => match event {
-								EntityMetadataEvent::Initialise { editor_id } => {
-									let editor_state = app_state.editor_states.read().await;
-									let editor_state = editor_state.get(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref entity, .. } => entity,
-										EditorData::QNPatch { ref current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-											EntityMetadataRequest::Initialise {
-												editor_id: editor_id.to_owned(),
-												factory_hash: entity.factory_hash.to_owned(),
-												blueprint_hash: entity.blueprint_hash.to_owned(),
-												root_entity: entity.root_entity.to_owned(),
-												sub_type: entity.sub_type.to_owned(),
-												external_scenes: entity.external_scenes.to_owned()
-											}
-										)))
-									)?;
-
-									// allow user to modify hash if there is no defined file we're writing to; will automatically convert editor state into entity editor rather than patch editor
-									// also allow user to modify hash if it's already an entity
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-											EntityMetadataRequest::SetHashModificationAllowed {
-												editor_id,
-												hash_modification_allowed: matches!(
-													editor_state.data,
-													EditorData::QNEntity { .. }
-												) || editor_state.file.is_none()
-											}
-										)))
-									)?;
-								}
-
-								EntityMetadataEvent::SetFactoryHash {
-									editor_id,
-									mut factory_hash
-								} => {
-									let mut editor_state = app_state.editor_states.write().await;
-
-									let mut is_patch_editor = false;
-
-									if factory_hash != normalise_to_hash(factory_hash.to_owned()) {
-										factory_hash = normalise_to_hash(factory_hash);
-
-										send_request(
-											&app,
-											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-												EntityMetadataRequest::SetFactoryHash {
-													editor_id: editor_id.to_owned(),
-													factory_hash: factory_hash.to_owned()
-												}
-											)))
-										)?;
-									}
-
-									{
-										let editor_state =
-											editor_state.get_mut(&editor_id).context("No such editor")?;
-
-										let entity = match editor_state.data {
-											EditorData::QNEntity { ref mut entity, .. } => entity,
-
-											EditorData::QNPatch { ref mut current, .. } => {
-												is_patch_editor = true;
-												current
-											}
-
-											_ => {
-												Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-												panic!();
-											}
-										};
-
-										entity.factory_hash = factory_hash;
-									}
-
-									// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity
-									if is_patch_editor {
-										let state = editor_state.remove(&editor_id).context("No such editor")?;
-
-										let EditorState {
-											data: EditorData::QNPatch { settings, current, .. },
-											file: None
-										} = state
-										else {
-											unreachable!();
-										};
-
-										editor_state.insert(
-											editor_id.to_owned(),
-											EditorState {
-												data: EditorData::QNEntity {
-													settings,
-													entity: current
-												},
-												file: None
-											}
-										);
-									}
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id,
-											unsaved: true
-										})
-									)?;
-								}
-
-								EntityMetadataEvent::SetBlueprintHash {
-									editor_id,
-									mut blueprint_hash
-								} => {
-									let mut editor_state = app_state.editor_states.write().await;
-
-									let mut is_patch_editor = false;
-
-									if blueprint_hash != normalise_to_hash(blueprint_hash.to_owned()) {
-										blueprint_hash = normalise_to_hash(blueprint_hash);
-
-										send_request(
-											&app,
-											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-												EntityMetadataRequest::SetBlueprintHash {
-													editor_id: editor_id.to_owned(),
-													blueprint_hash: blueprint_hash.to_owned()
-												}
-											)))
-										)?;
-									}
-
-									{
-										let editor_state =
-											editor_state.get_mut(&editor_id).context("No such editor")?;
-
-										let entity = match editor_state.data {
-											EditorData::QNEntity { ref mut entity, .. } => entity,
-
-											EditorData::QNPatch { ref mut current, .. } => {
-												is_patch_editor = true;
-												current
-											}
-
-											_ => {
-												Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-												panic!();
-											}
-										};
-
-										entity.blueprint_hash = blueprint_hash;
-									}
-
-									// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity
-									if is_patch_editor {
-										let state = editor_state.remove(&editor_id).context("No such editor")?;
-
-										let EditorState {
-											data: EditorData::QNPatch { settings, current, .. },
-											file: None
-										} = state
-										else {
-											unreachable!();
-										};
-
-										editor_state.insert(
-											editor_id.to_owned(),
-											EditorState {
-												data: EditorData::QNEntity {
-													settings,
-													entity: current
-												},
-												file: None
-											}
-										);
-									}
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id,
-											unsaved: true
-										})
-									)?;
-								}
-
-								EntityMetadataEvent::SetRootEntity { editor_id, root_entity } => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									entity.root_entity = root_entity;
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id,
-											unsaved: true
-										})
-									)?;
-								}
-
-								EntityMetadataEvent::SetSubType { editor_id, sub_type } => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									entity.sub_type = sub_type;
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id,
-											unsaved: true
-										})
-									)?;
-								}
-
-								EntityMetadataEvent::SetExternalScenes {
-									editor_id,
-									external_scenes
-								} => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									entity.external_scenes = external_scenes;
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id,
-											unsaved: true
-										})
-									)?;
-								}
-							},
-
-							EntityEditorEvent::Overrides(event) => match event {
-								EntityOverridesEvent::Initialise { editor_id } => {
-									let editor_state = app_state.editor_states.read().await;
-									let editor_state = editor_state.get(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref entity, .. } => entity,
-										EditorData::QNPatch { ref current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Overrides(
-											EntityOverridesRequest::Initialise {
-												editor_id,
-												property_overrides: {
-													let mut buf = Vec::new();
-													let formatter =
-														serde_json::ser::PrettyFormatter::with_indent(b"\t");
-													let mut ser =
-														serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-													entity.property_overrides.serialize(&mut ser)?;
-
-													String::from_utf8(buf)?
-												},
-												override_deletes: {
-													let mut buf = Vec::new();
-													let formatter =
-														serde_json::ser::PrettyFormatter::with_indent(b"\t");
-													let mut ser =
-														serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-													entity.override_deletes.serialize(&mut ser)?;
-
-													String::from_utf8(buf)?
-												},
-												pin_connection_overrides: {
-													let mut buf = Vec::new();
-													let formatter =
-														serde_json::ser::PrettyFormatter::with_indent(b"\t");
-													let mut ser =
-														serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-													entity.pin_connection_overrides.serialize(&mut ser)?;
-
-													String::from_utf8(buf)?
-												},
-												pin_connection_override_deletes: {
-													let mut buf = Vec::new();
-													let formatter =
-														serde_json::ser::PrettyFormatter::with_indent(b"\t");
-													let mut ser =
-														serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-													entity.pin_connection_override_deletes.serialize(&mut ser)?;
-
-													String::from_utf8(buf)?
-												}
-											}
-										)))
-									)?;
-
-									send_overrides_decorations(&app, editor_id, entity)?;
-								}
-
-								EntityOverridesEvent::UpdatePropertyOverrides { editor_id, content } => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									if let Ok(deserialised) = from_str(&content) {
-										if entity.property_overrides != deserialised {
-											entity.property_overrides = deserialised;
-
-											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
-
-											send_request(
-												&app,
-												Request::Global(GlobalRequest::SetTabUnsaved {
-													id: editor_id,
-													unsaved: true
-												})
-											)?;
-										}
-									}
-								}
-
-								EntityOverridesEvent::UpdateOverrideDeletes { editor_id, content } => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									if let Ok(deserialised) = from_str(&content) {
-										if entity.override_deletes != deserialised {
-											entity.override_deletes = deserialised;
-
-											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
-
-											send_request(
-												&app,
-												Request::Global(GlobalRequest::SetTabUnsaved {
-													id: editor_id,
-													unsaved: true
-												})
-											)?;
-										}
-									}
-								}
-
-								EntityOverridesEvent::UpdatePinConnectionOverrides { editor_id, content } => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									if let Ok(deserialised) = from_str(&content) {
-										if entity.pin_connection_overrides != deserialised {
-											entity.pin_connection_overrides = deserialised;
-
-											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
-
-											send_request(
-												&app,
-												Request::Global(GlobalRequest::SetTabUnsaved {
-													id: editor_id,
-													unsaved: true
-												})
-											)?;
-										}
-									}
-								}
-
-								EntityOverridesEvent::UpdatePinConnectionOverrideDeletes { editor_id, content } => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
-
-									let entity = match editor_state.data {
-										EditorData::QNEntity { ref mut entity, .. } => entity,
-										EditorData::QNPatch { ref mut current, .. } => current,
-
-										_ => {
-											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
-											panic!();
-										}
-									};
-
-									if let Ok(deserialised) = from_str(&content) {
-										if entity.pin_connection_override_deletes != deserialised {
-											entity.pin_connection_override_deletes = deserialised;
-
-											send_overrides_decorations(&app, editor_id.to_owned(), entity)?;
-
-											send_request(
-												&app,
-												Request::Global(GlobalRequest::SetTabUnsaved {
-													id: editor_id,
-													unsaved: true
-												})
-											)?;
-										}
-									}
-								}
+							EntityEditorEvent::Metadata(event) => {
+								handle_entity_metadata_event(&app, event).await?;
+							}
+
+							EntityEditorEvent::Overrides(event) => {
+								handle_entity_overrides_event(&app, event).await?;
 							}
 						},
 
@@ -5402,6 +4470,262 @@ fn event(app: AppHandle, event: Event) {
 				.expect("Couldn't send error report to frontend");
 		}
 	});
+}
+
+#[try_fn]
+#[context("Couldn't load game files")]
+pub async fn load_game_files(app: &AppHandle) -> Result<()> {
+	let app_state = app.state::<AppState>();
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+
+	if let Some(path) = app_settings.load().game_install.as_ref() {
+		let task = start_task(app, "Loading game files")?;
+
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.find(|x| x.path == *path)
+			.context("No such game install")?
+			.version;
+
+		let mut thumbs = IniFileSystem::new();
+		thumbs.load(&path.join("thumbs.dat"))?;
+
+		let mut resource_packages: IndexMap<PathBuf, ResourcePackage> = IndexMap::new();
+
+		if let (Ok(proj_path), Ok(relative_runtime_path)) = (
+			thumbs.get_value("application", "PROJECT_PATH"),
+			thumbs.get_value("application", "RUNTIME_PATH")
+		) {
+			let mut package_manager = PackageManager::new(&path.join(proj_path).join(relative_runtime_path));
+
+			let mut resource_container = ResourceContainer::default();
+
+			package_manager
+				.initialize(&mut resource_container)
+				.map_err(|x| anyhow!("RPKG error in initialising resource container: {:?}", x))?;
+
+			for partition in package_manager.partition_infos {
+				resource_packages.extend(
+					vec![
+						0,
+						..ResourceContainer::get_patch_indices(&package_manager.runtime_dir, partition.index)
+							.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
+							.iter()
+							.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
+					]
+					.into_par_iter()
+					.rev()
+					.map(|patch| {
+						anyhow::Ok({
+							let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
+								"{}{}{}.rpkg",
+								match game_version {
+									GameVersion::H1 | GameVersion::H2 =>
+										if partition.index > 0 {
+											"dlc"
+										} else {
+											"chunk"
+										},
+
+									GameVersion::H3 => "chunk"
+								},
+								match game_version {
+									GameVersion::H1 | GameVersion::H2 =>
+										if partition.index > 0 {
+											partition.index - 1 // H1/H2 go chunk0, dlc0, dlc1
+										} else {
+											partition.index
+										},
+									GameVersion::H3 => partition.index
+								},
+								if patch > 0 {
+									format!("patch{}", patch)
+								} else {
+									"".into()
+								}
+							));
+
+							(rpkg_path.to_owned(), {
+								let package_file = File::open(&rpkg_path)?;
+
+								let mmap = unsafe { Mmap::map(&package_file)? };
+								let mut reader = Cursor::new(&mmap[..]);
+
+								reader.read_ne_args((patch > 0,)).context("Couldn't parse RPKG file")?
+							})
+						})
+					})
+					.collect::<Result<Vec<_>>>()?
+				);
+			}
+		} else {
+			Err(anyhow!("thumbs.dat was missing required properties"))?;
+			panic!();
+		}
+
+		finish_task(app, task)?;
+
+		let task = start_task(app, "Caching reverse references")?;
+
+		let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
+
+		for rpkg in resource_packages.values() {
+			for (resource_header, offset_info) in rpkg
+				.resource_entries
+				.iter()
+				.enumerate()
+				.map(|(index, entry)| (rpkg.resource_metadata.get(index).unwrap(), entry))
+			{
+				for reference in resource_header
+					.m_references
+					.as_ref()
+					.map(|x| &x.reference_hash)
+					.unwrap_or(&Vec::new())
+				{
+					reverse_dependencies
+						.entry(reference.to_hex_string())
+						.or_default()
+						.insert(offset_info.runtime_resource_id.to_hex_string());
+				}
+			}
+		}
+
+		app_state.resource_packages.store(Some(resource_packages.into()));
+
+		app_state.resource_reverse_dependencies.store(Some(
+			reverse_dependencies
+				.into_iter()
+				.map(|(x, y)| (x, y.into_iter().collect()))
+				.collect::<HashMap<_, _>>()
+				.into()
+		));
+
+		finish_task(app, task)?;
+	} else {
+		app_state.resource_packages.store(None);
+		app_state.resource_reverse_dependencies.store(None);
+	}
+
+	let task = start_task(app, "Acquiring latest hash list")?;
+
+	let current_version = app_state.hash_list.load().as_ref().map(|x| x.version).unwrap_or(0);
+
+	if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await {
+		if let Ok(data) = data.text().await {
+			let new_version = data
+				.trim()
+				.parse::<u16>()
+				.context("Online hash list version wasn't a number")?;
+
+			if current_version < new_version {
+				if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
+					if let Ok(data) = data.bytes().await {
+						let hash_list = HashList::from_slice(&data)?;
+
+						fs::write(
+							app.path_resolver()
+								.app_data_dir()
+								.context("Couldn't get app data dir")?
+								.join("hash_list.sml"),
+							serde_smile::to_vec(&hash_list).unwrap()
+						)
+						.unwrap();
+
+						app_state.hash_list.store(Some(hash_list.into()));
+					}
+				}
+			}
+		}
+	}
+
+	if let Some(install) = app_settings.load().game_install.as_ref() {
+		if let Some(hash_list) = app_state.hash_list.load().as_ref() {
+			let game_version = app_state
+				.game_installs
+				.iter()
+				.try_find(|x| anyhow::Ok(x.path == *install))?
+				.context("No such game install")?
+				.version;
+
+			app_state.intellisense.store(Some(
+				Intellisense {
+					cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+					cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
+					uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json")).unwrap(),
+					matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+					all_cppts: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "CPPT")
+						.map(|(hash, _)| hash.to_owned())
+						.collect(),
+					all_asets: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "ASET")
+						.map(|(hash, _)| hash.to_owned())
+						.collect(),
+					all_uicts: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "UICT")
+						.map(|(hash, _)| hash.to_owned())
+						.collect(),
+					all_matts: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "MATT")
+						.map(|(hash, _)| hash.to_owned())
+						.collect(),
+					all_wswts: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "WSWT")
+						.map(|(hash, _)| hash.to_owned())
+						.collect(),
+					all_ecpts: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "ECPT")
+						.map(|(hash, _)| hash.to_owned())
+						.collect(),
+					all_aibxs: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "AIBX")
+						.map(|(hash, _)| hash.to_owned())
+						.collect(),
+					all_wsgts: hash_list
+						.entries
+						.iter()
+						.filter(|(_, entry)| entry.games.contains(game_version))
+						.filter(|(_, entry)| entry.resource_type == "WSGT")
+						.map(|(hash, _)| hash.to_owned())
+						.collect()
+				}
+				.into()
+			));
+		}
+	} else {
+		app_state.intellisense.store(None);
+	}
+
+	send_request(
+		app,
+		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
+			app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
+		)))
+	)?;
+
+	finish_task(app, task)?;
 }
 
 #[try_fn]

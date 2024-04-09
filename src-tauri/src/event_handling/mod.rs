@@ -1,3 +1,4 @@
+pub mod entity_metadata;
 pub mod entity_monaco;
 pub mod entity_overrides;
 pub mod entity_tree;
