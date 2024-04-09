@@ -132,7 +132,6 @@ pub struct GameBrowserEntry {
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "type", content = "data")]
 pub enum TextFileType {
 	Json,
 	ManifestJson,
@@ -153,7 +152,6 @@ pub enum EditorType {
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "type", content = "data")]
 pub enum JsonPatchType {
 	MergePatch,
 	JsonPatch

@@ -71,7 +71,7 @@
 		{#each reverseRefs as ref}
 			<ClickableTile
 				on:click={async () => {
-					trackEvent("Jump to reference from meta pane")
+					trackEvent("Jump to reverse reference in meta pane")
 
 					await event({
 						type: "editor",

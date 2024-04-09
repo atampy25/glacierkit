@@ -541,7 +541,7 @@
 				<Button
 					icon={Edit}
 					on:click={async () => {
-						trackEvent("Open repository in editor")
+						trackEvent("Open repository in editor from resource overview")
 
 						await event({
 							type: "editor",
@@ -600,7 +600,7 @@
 				<Button
 					icon={Edit}
 					on:click={async () => {
-						trackEvent("Open unlockables in editor")
+						trackEvent("Open unlockables in editor from resource overview")
 
 						await event({
 							type: "editor",

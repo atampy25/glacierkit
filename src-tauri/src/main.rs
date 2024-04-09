@@ -4532,6 +4532,14 @@ fn event(app: AppHandle, event: Event) {
 									current,
 									patch_type
 								} => {
+									app.track_event(
+										"Editor saved",
+										Some(json!({
+											"file_type": "RepositoryPatch",
+											"json_patch_type": patch_type
+										}))
+									);
+
 									match patch_type {
 										JsonPatchType::MergePatch => {
 											let base = to_value(
@@ -4845,6 +4853,14 @@ fn event(app: AppHandle, event: Event) {
 									current,
 									patch_type
 								} => {
+									app.track_event(
+										"Editor saved",
+										Some(json!({
+											"file_type": "UnlockablesPatch",
+											"json_patch_type": patch_type
+										}))
+									);
+
 									match patch_type {
 										JsonPatchType::MergePatch => {
 											let base = to_value(
@@ -5354,7 +5370,7 @@ fn event(app: AppHandle, event: Event) {
 					}
 				}
 			} {
-				app.track_event("Error", Some(json!({"error":format!("{:?}", e)})));
+				app.track_event("Error", Some(json!({ "error": format!("{:?}", e) })));
 				send_request(
 					&app,
 					Request::Global(GlobalRequest::ErrorReport {
@@ -5381,7 +5397,7 @@ fn event(app: AppHandle, event: Event) {
 				_ => format!("{:?}", e)
 			};
 
-			cloned_app.track_event("Error", Some(json!({"error":error.to_owned()})));
+			cloned_app.track_event("Error", Some(json!({ "error": error.to_owned() })));
 			send_request(&cloned_app, Request::Global(GlobalRequest::ErrorReport { error }))
 				.expect("Couldn't send error report to frontend");
 		}

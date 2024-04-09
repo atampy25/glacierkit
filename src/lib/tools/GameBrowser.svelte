@@ -51,7 +51,7 @@
 					return rightClickedNode.original.folder
 						? {}
 						: {
-								...(rightClickedNode.original.filetype === "TEMP" || rightClickedNode.original.filetype === "REPO" || rightClickedNode.id === "0057C2C3941115CA"
+								...(rightClickedNode.original.filetype === "TEMP"
 									? {
 											openInEditor: {
 												separator_before: false,
@@ -63,7 +63,63 @@
 													const tree = jQuery.jstree!.reference(b.reference)
 													const selected_node = tree.get_node(b.reference)
 
-													trackEvent("Open QN entity in editor from game tree", { filetype: selected_node.original.filetype })
+													trackEvent("Open QN entity in editor from game tree")
+
+													await event({
+														type: "tool",
+														data: {
+															type: "gameBrowser",
+															data: {
+																type: "openInEditor",
+																data: selected_node.id
+															}
+														}
+													})
+												}
+											}
+										}
+									: {}),
+								...(rightClickedNode.original.filetype === "REPO"
+									? {
+											openInEditor: {
+												separator_before: false,
+												separator_after: false,
+												_disabled: false,
+												label: "Open in Editor",
+												icon: "fa-regular fa-pen-to-square",
+												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+													const tree = jQuery.jstree!.reference(b.reference)
+													const selected_node = tree.get_node(b.reference)
+
+													trackEvent("Open repository in editor from game tree")
+
+													await event({
+														type: "tool",
+														data: {
+															type: "gameBrowser",
+															data: {
+																type: "openInEditor",
+																data: selected_node.id
+															}
+														}
+													})
+												}
+											}
+										}
+									: {}),
+								...(rightClickedNode.id === "0057C2C3941115CA"
+									? {
+											openInEditor: {
+												separator_before: false,
+												separator_after: false,
+												_disabled: false,
+												label: "Open in Editor",
+												icon: "fa-regular fa-pen-to-square",
+												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+													const tree = jQuery.jstree!.reference(b.reference)
+													const selected_node = tree.get_node(b.reference)
+
+													trackEvent("Open unlockables in editor from game tree")
 
 													await event({
 														type: "tool",
