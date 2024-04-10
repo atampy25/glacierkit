@@ -63,6 +63,8 @@ image = "0.25.1"
 hex = "0.4.3"
 serde_with = "3.7.0"
 json-patch = "1.2.0"
+tokio-tungstenite = "0.21.0"
+futures-util = "0.3.30"
 
 [target.'cfg(linux)'.dependencies]
 fork = "0.1.22"

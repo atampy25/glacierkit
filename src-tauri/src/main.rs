@@ -23,6 +23,7 @@ pub mod rpkg;
 pub mod rpkg_tool;
 pub mod show_in_folder;
 pub mod wwev;
+pub mod editor_connection;
 
 use std::{
 	collections::{HashMap, HashSet},

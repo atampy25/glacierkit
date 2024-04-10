@@ -1,6 +1,6 @@
 use std::{
 	collections::HashMap,
-	fs::File,
+	fs::{self, File},
 	io::{Read, Seek, SeekFrom},
 	path::PathBuf
 };
@@ -20,6 +20,7 @@ use rpkg_rs::{
 	encryption::md5_engine::Md5Engine,
 	runtime::resource::{resource_package::ResourcePackage, runtime_resource_id::RuntimeResourceID}
 };
+use tauri::api::path::data_dir;
 use tryvial::try_fn;
 use velcro::vec;
 

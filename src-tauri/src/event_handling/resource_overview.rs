@@ -178,7 +178,12 @@ pub fn initialise_resource_overview(
 
 								Command::new_sidecar("vgmstream-cli")?
 									.current_dir(data_dir.join("temp"))
-									.args([&format!("{}.wem", temp_file_id), "-o", &format!("{}.wav", temp_file_id)])
+									.args([
+										&format!("{}.wem", temp_file_id),
+										"-L",
+										"-o",
+										&format!("{}.wav", temp_file_id)
+									])
 									.run()
 									.context("VGMStream command failed")?;
 
@@ -205,7 +210,12 @@ pub fn initialise_resource_overview(
 
 								Command::new_sidecar("vgmstream-cli")?
 									.current_dir(data_dir.join("temp"))
-									.args([&format!("{}.wem", temp_file_id), "-o", &format!("{}.wav", temp_file_id)])
+									.args([
+										&format!("{}.wem", temp_file_id),
+										"-L",
+										"-o",
+										&format!("{}.wav", temp_file_id)
+									])
 									.run()
 									.context("VGMStream command failed")?;
 
@@ -235,7 +245,12 @@ pub fn initialise_resource_overview(
 
 					Command::new_sidecar("vgmstream-cli")?
 						.current_dir(data_dir.join("temp"))
-						.args([&format!("{}.wem", temp_file_id), "-o", &format!("{}.wav", temp_file_id)])
+						.args([
+							&format!("{}.wem", temp_file_id),
+							"-L",
+							"-o",
+							&format!("{}.wav", temp_file_id)
+						])
 						.run()
 						.context("VGMStream command failed")?;
 
@@ -1020,6 +1035,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						.current_dir(data_dir.join("temp"))
 						.args([
 							&format!("{}.wem", temp_file_id),
+							"-L",
 							"-o",
 							save_handle.path().to_string_lossy().as_ref()
 						])
@@ -1071,6 +1087,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.current_dir(data_dir.join("temp"))
 									.args([
 										&format!("{}.wem", temp_file_id),
+										"-L",
 										"-o",
 										save_handle
 											.path()
@@ -1103,6 +1120,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.current_dir(data_dir.join("temp"))
 									.args([
 										&format!("{}.wem", temp_file_id),
+										"-L",
 										"-o",
 										save_handle
 											.path()
@@ -1168,6 +1186,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.current_dir(data_dir.join("temp"))
 								.args([
 									&format!("{}.wem", temp_file_id),
+									"-L",
 									"-o",
 									save_handle.path().to_string_lossy().as_ref()
 								])
@@ -1197,6 +1216,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.current_dir(data_dir.join("temp"))
 								.args([
 									&format!("{}.wem", temp_file_id),
+									"-L",
 									"-o",
 									save_handle.path().to_string_lossy().as_ref()
 								])
