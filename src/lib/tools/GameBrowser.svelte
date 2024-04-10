@@ -319,7 +319,13 @@
 					}`,
 					text:
 						(params ? `[${path.split("/").at(-1)}](${params})` : path.split("/").at(-1)) +
-						((platformType === ".entitytype" && (path.endsWith(".class") || path.endsWith(".aspect") || path.endsWith(".entitytype") || path.endsWith(".entitytemplate"))) ||
+						((platformType === ".entitytype" &&
+							(path.endsWith(".class") ||
+								path.endsWith(".aspect") ||
+								path.endsWith(".brick") ||
+								path.endsWith(".entity") ||
+								path.endsWith(".entitytype") ||
+								path.endsWith(".entitytemplate"))) ||
 						platformType === ".wwisebank" ||
 						platformType === ".gfx" ||
 						platformType === ".wes" ||

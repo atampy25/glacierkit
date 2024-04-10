@@ -4,7 +4,7 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 use indexmap::IndexMap;
 use notify::RecommendedWatcher;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
-use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
+use rpkg_rs::runtime::resource::{partition_manager::PartitionManager, resource_package::ResourcePackage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
@@ -45,7 +45,7 @@ pub struct AppState {
 	pub hash_list: ArcSwapOption<HashList>,
 	pub fs_watcher: ArcSwapOption<RecommendedWatcher>,
 	pub editor_states: Arc<RwLock<HashMap<Uuid, EditorState>>>,
-	pub resource_packages: ArcSwapOption<IndexMap<PathBuf, ResourcePackage>>,
+	pub game_files: ArcSwapOption<PartitionManager>,
 
 	/// Resource -> Resources which depend on it
 	pub resource_reverse_dependencies: ArcSwapOption<HashMap<String, Vec<String>>>,

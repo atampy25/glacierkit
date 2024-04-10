@@ -229,7 +229,7 @@ export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { t
 
 export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } }
 
-export type JsonPatchType = { type: "MergePatch" } | { type: "JsonPatch" }
+export type JsonPatchType = "MergePatch" | "JsonPatch"
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key in string]: JsonValue }
 
@@ -535,7 +535,7 @@ export type TextEditorEvent = { type: "initialise"; data: { id: string } } | { t
 
 export type TextEditorRequest = { type: "replaceContent"; data: { id: string; content: string } } | { type: "setFileType"; data: { id: string; file_type: TextFileType } }
 
-export type TextFileType = { type: "Json" } | { type: "ManifestJson" } | { type: "PlainText" } | { type: "Markdown" }
+export type TextFileType = "Json" | "ManifestJson" | "PlainText" | "Markdown"
 
 export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type: "gameBrowser"; data: GameBrowserEvent } | { type: "settings"; data: SettingsEvent }
 

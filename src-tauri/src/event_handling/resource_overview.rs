@@ -6,7 +6,7 @@ use fn_error_context::context;
 use image::io::Reader as ImageReader;
 use indexmap::IndexMap;
 use rfd::AsyncFileDialog;
-use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
+use rpkg_rs::runtime::resource::{partition_manager::PartitionManager, resource_package::ResourcePackage};
 use serde_json::{from_slice, from_value, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tryvial::try_fn;
@@ -41,12 +41,12 @@ pub fn initialise_resource_overview(
 	app_state: &State<AppState>,
 	id: Uuid,
 	hash: &String,
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	game_files: &PartitionManager,
 	resource_reverse_dependencies: &Arc<HashMap<String, Vec<String>>>,
 	install: &PathBuf,
 	hash_list: &Arc<HashList>
 ) -> Result<()> {
-	let (filetype, chunk_patch, deps) = extract_latest_overview_info(resource_packages, hash)?;
+	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, hash)?;
 
 	send_request(
 		app,
@@ -109,7 +109,7 @@ pub fn initialise_resource_overview(
 			{
 				"TEMP" => {
 					ensure_entity_in_cache(
-						resource_packages,
+						game_files,
 						&app_state.cached_entities,
 						app_state
 							.game_installs
@@ -146,7 +146,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 					ImageReader::new(Cursor::new(res_data))
 						.with_guessed_format()?
@@ -163,7 +163,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (res_meta, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 					let mut wav_paths = vec![];
 
@@ -204,7 +204,7 @@ pub fn initialise_resource_overview(
 									.context("No such WWEM dependency")?
 									.hash;
 
-								let (_, wem_data) = extract_latest_resource(resource_packages, hash_list, wwem_hash)?;
+								let (_, wem_data) = extract_latest_resource(game_files, hash_list, wwem_hash)?;
 
 								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
@@ -239,7 +239,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
 
@@ -289,7 +289,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			let task = start_task(&app, format!("Loading resource overview for {}", hash))?;
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
@@ -299,7 +299,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					&app_state,
 					id,
 					hash,
-					resource_packages,
+					game_files,
 					resource_reverse_dependencies,
 					install,
 					hash_list
@@ -326,7 +326,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			let task = start_task(&app, format!("Loading resource overview for {}", hash))?;
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
@@ -336,7 +336,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					&app_state,
 					id,
 					hash,
-					resource_packages,
+					game_files,
 					resource_reverse_dependencies,
 					install,
 					hash_list
@@ -392,7 +392,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			// Only available for entities, the repository and unlockables currently
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
@@ -413,7 +413,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							.context("No such game install")?;
 
 						ensure_entity_in_cache(
-							resource_packages,
+							game_files,
 							&app_state.cached_entities,
 							game_install_data.version,
 							hash_list,
@@ -481,7 +481,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						let id = Uuid::new_v4();
 
 						let repository: Vec<RepositoryItem> =
-							from_slice(&extract_latest_resource(resource_packages, hash_list, "00204D1AFD76AB13")?.1)?;
+							from_slice(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?;
 
 						app_state.editor_states.write().await.insert(
 							id.to_owned(),
@@ -515,7 +515,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						let id = Uuid::new_v4();
 
 						let unlockables: Vec<UnlockableItem> = from_value(parse_json_ores(
-							&extract_latest_resource(resource_packages, hash_list, "0057C2C3941115CA")?.1
+							&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
 						)?)?;
 
 						app_state.editor_states.write().await.insert(
@@ -562,10 +562,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (metadata, data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+				let (metadata, data) = extract_latest_resource(game_files, hash_list, hash)?;
 				let metadata_file = generate_rpkg_meta(&metadata)?;
 
 				let file_type = hash_list
@@ -613,12 +613,12 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				ensure_entity_in_cache(
-					resource_packages,
+					game_files,
 					&app_state.cached_entities,
 					app_state
 						.game_installs
@@ -665,11 +665,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (metadata, data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+				let (metadata, data) = extract_latest_resource(game_files, hash_list, hash)?;
 				let metadata_file = generate_rpkg_meta(&metadata)?;
 
 				let data = match app_state
@@ -733,7 +733,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
@@ -744,15 +744,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.context("No such game install")?
 					.version;
 
-				ensure_entity_in_cache(
-					resource_packages,
-					&app_state.cached_entities,
-					game_version,
-					hash_list,
-					hash
-				)?;
+				ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
-				let (metadata, data) = extract_latest_resource(resource_packages, hash_list, &{
+				let (metadata, data) = extract_latest_resource(game_files, hash_list, &{
 					let entity = app_state.cached_entities.read();
 					let entity = entity.get(hash).unwrap();
 					entity.blueprint_hash.to_owned()
@@ -798,7 +792,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
@@ -809,15 +803,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.context("No such game install")?
 					.version;
 
-				ensure_entity_in_cache(
-					resource_packages,
-					&app_state.cached_entities,
-					game_version,
-					hash_list,
-					hash
-				)?;
+				ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
-				let (metadata, data) = extract_latest_resource(resource_packages, hash_list, &{
+				let (metadata, data) = extract_latest_resource(game_files, hash_list, &{
 					let entity = app_state.cached_entities.read();
 					let entity = entity.get(hash).unwrap();
 					entity.blueprint_hash.to_owned()
@@ -880,7 +868,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
@@ -891,7 +879,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.context("No such game install")?
 					.version;
 
-				let (res_meta, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -933,10 +921,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+				let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -970,10 +958,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+				let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1008,7 +996,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
@@ -1023,7 +1011,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.save_file()
 					.await
 				{
-					let (_, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
@@ -1058,7 +1046,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let mut dialog = AsyncFileDialog::new().set_title("Extract all WAVs to folder");
@@ -1070,7 +1058,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(save_handle) = dialog.pick_folder().await {
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
-					let (res_meta, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 					let wwev = parse_wwev(&res_data)?;
 
@@ -1112,7 +1100,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("No such WWEM dependency")?
 									.hash;
 
-								let (_, wem_data) = extract_latest_resource(resource_packages, hash_list, wwem_hash)?;
+								let (_, wem_data) = extract_latest_resource(game_files, hash_list, wwem_hash)?;
 
 								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
@@ -1152,7 +1140,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
@@ -1169,7 +1157,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				{
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
-					let (res_meta, res_data) = extract_latest_resource(resource_packages, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 					let wwev = parse_wwev(&res_data)?;
 
@@ -1208,7 +1196,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.context("No such WWEM dependency")?
 								.hash;
 
-							let (_, wem_data) = extract_latest_resource(resource_packages, hash_list, wwem_hash)?;
+							let (_, wem_data) = extract_latest_resource(game_files, hash_list, wwem_hash)?;
 
 							fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 

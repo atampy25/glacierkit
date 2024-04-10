@@ -7,7 +7,7 @@ use itertools::Itertools;
 use parking_lot::RwLock;
 use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};
 use rand::{seq::SliceRandom, thread_rng};
-use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
+use rpkg_rs::runtime::resource::{partition_manager::PartitionManager, resource_package::ResourcePackage};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_value, Value};
 use specta::Type;
@@ -590,7 +590,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 }
 
 pub fn get_ref_decoration(
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	game_files: &PartitionManager,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
 	hash_list: &HashList,
@@ -605,7 +605,7 @@ pub fn get_ref_decoration(
 
 			Ref::Full(reference) => Some((reference.entity_ref.to_owned(), {
 				ensure_entity_in_cache(
-					resource_packages,
+					game_files,
 					cached_entities,
 					game_version,
 					hash_list,
@@ -633,7 +633,7 @@ pub fn get_ref_decoration(
 #[try_fn]
 #[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
 pub fn get_decorations(
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	game_files: &PartitionManager,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	hash_list: &HashList,
 	game_version: GameVersion,
@@ -642,11 +642,10 @@ pub fn get_decorations(
 ) -> Result<Vec<(String, String)>> {
 	let mut decorations = vec![];
 
-	let repository =
-		from_slice::<Vec<Value>>(&extract_latest_resource(resource_packages, hash_list, "00204D1AFD76AB13")?.1)?;
+	let repository = from_slice::<Vec<Value>>(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?;
 
 	if let Some(decoration) = get_ref_decoration(
-		resource_packages,
+		game_files,
 		cached_entities,
 		game_version,
 		hash_list,
@@ -676,7 +675,7 @@ pub fn get_decorations(
 	for property_data in sub_entity.properties.as_ref().unwrap_or(&Default::default()).values() {
 		if property_data.property_type == "SEntityTemplateReference" {
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				cached_entities,
 				game_version,
 				hash_list,
@@ -689,14 +688,9 @@ pub fn get_decorations(
 			for reference in
 				from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
 			{
-				if let Some(decoration) = get_ref_decoration(
-					resource_packages,
-					cached_entities,
-					game_version,
-					hash_list,
-					entity,
-					&reference
-				) {
+				if let Some(decoration) =
+					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, &reference)
+				{
 					decorations.push(decoration);
 				}
 			}
@@ -794,7 +788,7 @@ pub fn get_decorations(
 		for property_data in properties.values() {
 			if property_data.property_type == "SEntityTemplateReference" {
 				if let Some(decoration) = get_ref_decoration(
-					resource_packages,
+					game_files,
 					cached_entities,
 					game_version,
 					hash_list,
@@ -807,14 +801,9 @@ pub fn get_decorations(
 				for reference in
 					from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
 				{
-					if let Some(decoration) = get_ref_decoration(
-						resource_packages,
-						cached_entities,
-						game_version,
-						hash_list,
-						entity,
-						&reference
-					) {
+					if let Some(decoration) =
+						get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, &reference)
+					{
 						decorations.push(decoration);
 					}
 				}
@@ -911,14 +900,9 @@ pub fn get_decorations(
 					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
 				};
 
-				if let Some(decoration) = get_ref_decoration(
-					resource_packages,
-					cached_entities,
-					game_version,
-					hash_list,
-					entity,
-					reference
-				) {
+				if let Some(decoration) =
+					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
+				{
 					decorations.push(decoration);
 				}
 			}
@@ -938,14 +922,9 @@ pub fn get_decorations(
 					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
 				};
 
-				if let Some(decoration) = get_ref_decoration(
-					resource_packages,
-					cached_entities,
-					game_version,
-					hash_list,
-					entity,
-					reference
-				) {
+				if let Some(decoration) =
+					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
+				{
 					decorations.push(decoration);
 				}
 			}
@@ -965,14 +944,9 @@ pub fn get_decorations(
 					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
 				};
 
-				if let Some(decoration) = get_ref_decoration(
-					resource_packages,
-					cached_entities,
-					game_version,
-					hash_list,
-					entity,
-					reference
-				) {
+				if let Some(decoration) =
+					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
+				{
 					decorations.push(decoration);
 				}
 			}
@@ -987,7 +961,7 @@ pub fn get_decorations(
 	{
 		for alias_data in aliases {
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				cached_entities,
 				game_version,
 				hash_list,
@@ -1006,14 +980,9 @@ pub fn get_decorations(
 		.values()
 	{
 		for reference in &exposed_entity.refers_to {
-			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
-				cached_entities,
-				game_version,
-				hash_list,
-				entity,
-				reference
-			) {
+			if let Some(decoration) =
+				get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
+			{
 				decorations.push(decoration);
 			}
 		}
@@ -1026,7 +995,7 @@ pub fn get_decorations(
 		.values()
 	{
 		if let Some(decoration) = get_ref_decoration(
-			resource_packages,
+			game_files,
 			cached_entities,
 			game_version,
 			hash_list,
@@ -1040,7 +1009,7 @@ pub fn get_decorations(
 	for member_of in sub_entity.subsets.as_ref().unwrap_or(&Default::default()).values() {
 		for parental_entity in member_of {
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				cached_entities,
 				game_version,
 				hash_list,
@@ -1058,7 +1027,7 @@ pub fn get_decorations(
 		.map(|entry| entry.resource_type == "MATT")
 		.unwrap_or(false)
 	{
-		if let Some(mati) = extract_latest_metadata(resource_packages, hash_list, &sub_entity.factory)?
+		if let Some(mati) = extract_latest_metadata(game_files, hash_list, &sub_entity.factory)?
 			.hash_reference_data
 			.into_iter()
 			.find(|x| {
@@ -1068,7 +1037,7 @@ pub fn get_decorations(
 					.map(|entry| entry.resource_type == "MATI")
 					.unwrap_or(false)
 			}) {
-			if let Some(mate) = extract_latest_metadata(resource_packages, hash_list, &mati.hash)?
+			if let Some(mate) = extract_latest_metadata(game_files, hash_list, &mati.hash)?
 				.hash_reference_data
 				.into_iter()
 				.find(|x| {
@@ -1078,7 +1047,7 @@ pub fn get_decorations(
 						.map(|entry| entry.resource_type == "MATE")
 						.unwrap_or(false)
 				}) {
-				let mate_data = extract_latest_resource(resource_packages, hash_list, &mate.hash)?.1;
+				let mate_data = extract_latest_resource(game_files, hash_list, &mate.hash)?.1;
 
 				let mut beginning = mate_data.len() - 1;
 				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {

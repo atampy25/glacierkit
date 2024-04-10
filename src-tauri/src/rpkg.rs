@@ -16,9 +16,9 @@ use quickentity_rs::{
 	qn_structs::Entity,
 	rpkg_structs::{ResourceDependency, ResourceMeta}
 };
-use rpkg_rs::{
-	encryption::md5_engine::Md5Engine,
-	runtime::resource::{resource_package::ResourcePackage, runtime_resource_id::RuntimeResourceID}
+use rpkg_rs::runtime::resource::{
+	partition_manager::PartitionManager, resource_package::ResourcePackage, resource_partition::PatchId,
+	runtime_resource_id::RuntimeResourceID
 };
 use tauri::api::path::data_dir;
 use tryvial::try_fn;
@@ -36,62 +36,30 @@ use crate::{
 /// Extract the latest copy of a resource by its hash or path.
 #[context("Couldn't extract resource {}", resource)]
 pub fn extract_latest_resource(
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	game_files: &PartitionManager,
 	hash_list: &HashList,
 	resource: &str
 ) -> Result<(ResourceMeta, Vec<u8>)> {
 	let resource = normalise_to_hash(resource.into());
 
-	let resource_id = RuntimeResourceID {
-		id: u64::from_str_radix(&resource, 16)?
-	};
+	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
 
-	for (rpkg_path, rpkg) in resource_packages {
-		if let Some((resource_header, offset_info)) = rpkg
-			.resource_entries
-			.iter()
-			.enumerate()
-			.find(|(_, entry)| entry.runtime_resource_id == resource_id)
-			.map(|(index, entry)| (rpkg.resource_metadata.get(index).unwrap(), entry))
+	for partition in game_files.get_all_partitions().into_iter().rev() {
+		if let Some((info, _)) = partition
+			.get_latest_resources()?
+			.into_iter()
+			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
-			let final_size = offset_info.compressed_size_and_is_scrambled_flag & 0x7FFFFFFF;
-			let is_lz4ed = final_size != 0;
-			let is_scrambled = offset_info.compressed_size_and_is_scrambled_flag & 0x80000000 == 0x80000000;
-
-			let mut package_file = File::open(rpkg_path)?;
-			package_file.seek(SeekFrom::Start(offset_info.data_offset))?;
-
-			let mut extracted = vec![
-				0;
-				if is_lz4ed {
-					final_size
-				} else {
-					resource_header.data_size
-				} as usize
-			];
-
-			package_file.read_exact(&mut extracted)?;
-
-			// Unscramble the data
-			if is_scrambled {
-				let xor_key = vec![0xdc, 0x45, 0xa6, 0x9c, 0xd3, 0x72, 0x4c, 0xab];
-
-				extracted = extracted
-					.iter()
-					.enumerate()
-					.map(|(index, byte)| byte ^ xor_key[index % xor_key.len()])
-					.collect();
-			}
-
 			let rpkg_style_meta = ResourceMeta {
-				hash_offset: offset_info.data_offset,
-				hash_size: offset_info.compressed_size_and_is_scrambled_flag,
-				hash_size_final: resource_header.data_size,
-				hash_value: offset_info.runtime_resource_id.to_hex_string(),
-				hash_size_in_memory: resource_header.system_memory_requirement,
-				hash_size_in_video_memory: resource_header.video_memory_requirement,
-				hash_resource_type: resource_header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
-				hash_reference_data: resource_header
+				hash_offset: info.entry.data_offset,
+				hash_size: info.entry.compressed_size_and_is_scrambled_flag,
+				hash_size_final: info.header.data_size,
+				hash_value: info.entry.runtime_resource_id.to_hex_string(),
+				hash_size_in_memory: info.header.system_memory_requirement,
+				hash_size_in_video_memory: info.header.video_memory_requirement,
+				hash_resource_type: info.header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
+				hash_reference_data: info
+					.header
 					.m_references
 					.as_ref()
 					.map(|refs| {
@@ -115,25 +83,16 @@ pub fn extract_latest_resource(
 							.collect()
 					})
 					.unwrap_or(vec![]),
-				hash_reference_table_size: resource_header.references_chunk_size,
-				hash_reference_table_dummy: resource_header.states_chunk_size
+				hash_reference_table_size: info.header.references_chunk_size,
+				hash_reference_table_dummy: info.header.states_chunk_size
 			};
 
-			// Decompress the data
-			if is_lz4ed {
-				let mut decompressed = vec![0; resource_header.data_size as usize];
-
-				let size = decompress_to_buffer(&extracted, Some(resource_header.data_size as i32), &mut decompressed)
-					.context("Couldn't decompress data")?;
-
-				if size == resource_header.data_size as usize {
-					return Ok((rpkg_style_meta, decompressed));
-				} else {
-					bail!("Decompressed size didn't match defined size");
-				}
-			} else {
-				return Ok((rpkg_style_meta, extracted));
-			}
+			return Ok((
+				rpkg_style_meta,
+				partition
+					.get_resource(&resource_id)
+					.context("Couldn't extract resource using rpkg-rs")?
+			));
 		}
 	}
 
@@ -143,33 +102,30 @@ pub fn extract_latest_resource(
 /// Get the metadata of the latest copy of a resource by its hash or path. Faster than fully extracting the resource.
 #[context("Couldn't extract metadata for resource {}", resource)]
 pub fn extract_latest_metadata(
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	game_files: &PartitionManager,
 	hash_list: &HashList,
 	resource: &str
 ) -> Result<ResourceMeta> {
 	let resource = normalise_to_hash(resource.into());
 
-	let resource_id = RuntimeResourceID {
-		id: u64::from_str_radix(&resource, 16)?
-	};
+	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
 
-	for rpkg in resource_packages.values() {
-		if let Some((resource_header, offset_info)) = rpkg
-			.resource_entries
-			.iter()
-			.enumerate()
-			.find(|(_, entry)| entry.runtime_resource_id == resource_id)
-			.map(|(index, entry)| (rpkg.resource_metadata.get(index).unwrap(), entry))
+	for partition in game_files.get_all_partitions().into_iter().rev() {
+		if let Some((info, _)) = partition
+			.get_latest_resources()?
+			.into_iter()
+			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
-			return Ok(ResourceMeta {
-				hash_offset: offset_info.data_offset,
-				hash_size: offset_info.compressed_size_and_is_scrambled_flag,
-				hash_size_final: resource_header.data_size,
-				hash_value: offset_info.runtime_resource_id.to_hex_string(),
-				hash_size_in_memory: resource_header.system_memory_requirement,
-				hash_size_in_video_memory: resource_header.video_memory_requirement,
-				hash_resource_type: resource_header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
-				hash_reference_data: resource_header
+			let rpkg_style_meta = ResourceMeta {
+				hash_offset: info.entry.data_offset,
+				hash_size: info.entry.compressed_size_and_is_scrambled_flag,
+				hash_size_final: info.header.data_size,
+				hash_value: info.entry.runtime_resource_id.to_hex_string(),
+				hash_size_in_memory: info.header.system_memory_requirement,
+				hash_size_in_video_memory: info.header.video_memory_requirement,
+				hash_resource_type: info.header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
+				hash_reference_data: info
+					.header
 					.m_references
 					.as_ref()
 					.map(|refs| {
@@ -193,55 +149,46 @@ pub fn extract_latest_metadata(
 							.collect()
 					})
 					.unwrap_or(vec![]),
-				hash_reference_table_size: resource_header.references_chunk_size,
-				hash_reference_table_dummy: resource_header.states_chunk_size
-			});
+				hash_reference_table_size: info.header.references_chunk_size,
+				hash_reference_table_dummy: info.header.states_chunk_size
+			};
+
+			return Ok(rpkg_style_meta);
 		}
 	}
 
 	bail!("Couldn't find the resource in any RPKG");
 }
 
-/// Get miscellaneous information for the latest copy of a resource by its hash.
-#[context("Couldn't extract overview info for resource {}", resource)]
+/// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource by its hash.
+#[context("Couldn't extract overview info for resource {}", hash)]
 pub fn extract_latest_overview_info(
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
-	resource: &str
+	game_files: &PartitionManager,
+	hash: &str
 ) -> Result<(String, String, Vec<(String, String)>)> {
-	let resource_id = RuntimeResourceID {
-		id: u64::from_str_radix(resource, 16)?
-	};
+	let resource_id = RuntimeResourceID::from_hex_string(hash)?;
 
-	for (path, rpkg) in resource_packages.iter() {
-		if let Some(resource_header) = rpkg
-			.resource_entries
-			.iter()
-			.enumerate()
-			.find(|(_, entry)| entry.runtime_resource_id == resource_id)
-			.map(|(index, _)| rpkg.resource_metadata.get(index).unwrap())
+	for partition in game_files.get_all_partitions().into_iter().rev() {
+		if let Some((info, patchlevel)) = partition
+			.get_latest_resources()?
+			.into_iter()
+			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
 			return Ok((
-				resource_header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
-				path.file_name()
-					.unwrap()
-					.to_string_lossy()
-					.split('.')
-					.next()
-					.unwrap()
-					.into(),
-				resource_header
-					.m_references
-					.as_ref()
-					.map(|refs| {
-						refs.reference_flags
-							.iter()
-							.zip(refs.reference_hash.iter())
-							.map(|(flag, hash)| {
-								(hash.to_hex_string(), format!("{:02X}", flag.to_owned().into_bytes()[0]))
-							})
-							.collect()
+				info.get_type(),
+				match patchlevel {
+					PatchId::Base => partition.get_partition_info().id.to_string(),
+					PatchId::Patch(level) => format!("{}patch{}", partition.get_partition_info().id, level)
+				},
+				info.get_all_references()
+					.into_iter()
+					.map(|(res_id, flag)| {
+						(
+							res_id.to_hex_string(),
+							format!("{:02X}", flag.to_owned().into_bytes()[0])
+						)
 					})
-					.unwrap_or(vec![])
+					.collect()
 			));
 		}
 	}
@@ -253,7 +200,7 @@ pub fn extract_latest_overview_info(
 #[try_fn]
 #[context("Couldn't ensure caching of entity {}", factory_hash)]
 pub fn ensure_entity_in_cache(
-	resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+	resource_packages: &PartitionManager,
 	cached_entities: &RwLock<HashMap<String, Entity>>,
 	game_version: GameVersion,
 	hash_list: &HashList,
@@ -318,6 +265,13 @@ pub fn normalise_to_hash(hash_or_path: String) -> String {
 	if hash_or_path.starts_with('0') {
 		hash_or_path
 	} else {
-		format!("{:0>16X}", Md5Engine::compute(&hash_or_path.to_lowercase()))
+		format!("{:0>16X}", {
+			let digest = md5::compute(&hash_or_path.to_lowercase());
+			let mut hash = 0u64;
+			for i in 1..8 {
+				hash |= u64::from(digest[i]) << (8 * (7 - i));
+			}
+			hash
+		})
 	}
 }

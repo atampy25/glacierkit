@@ -137,7 +137,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						})
 					)?;
 
-					if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+					if let Some(game_files) = app_state.game_files.load().as_ref()
 						&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 						&& let Some(install) = app_settings.load().game_install.as_ref()
 					{
@@ -151,7 +151,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						let task = start_task(app, "Updating decorations")?;
 
 						let decorations = get_decorations(
-							resource_packages,
+							game_files,
 							&app_state.cached_entities,
 							hash_list,
 							game_version,
@@ -237,11 +237,11 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 
 	if let Some(install) = app_settings.load().game_install.as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-		&& let Some(resource_packages) = app_state.resource_packages.load().as_deref()
+		&& let Some(game_files) = app_state.game_files.load().as_deref()
 	{
 		let factory = normalise_to_hash(factory);
 
-		if let Ok((filetype, _, _)) = extract_latest_overview_info(resource_packages, &factory) {
+		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, &factory) {
 			if filetype == "TEMP" {
 				let task = start_task(app, format!("Loading entity {}", factory))?;
 
@@ -252,7 +252,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 					.context("No such game install")?;
 
 				ensure_entity_in_cache(
-					resource_packages,
+					game_files,
 					&app_state.cached_entities,
 					game_install_data.version,
 					hash_list,

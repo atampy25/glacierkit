@@ -9,6 +9,7 @@
 #![feature(async_closure)]
 #![feature(cursor_remaining)]
 
+pub mod editor_connection;
 pub mod entity;
 pub mod event_handling;
 pub mod game_detection;
@@ -23,7 +24,6 @@ pub mod rpkg;
 pub mod rpkg_tool;
 pub mod show_in_folder;
 pub mod wwev;
-pub mod editor_connection;
 
 use std::{
 	collections::{HashMap, HashSet},
@@ -85,9 +85,7 @@ use rfd::AsyncFileDialog;
 use rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
 use rpkg_rs::{
 	misc::ini_file_system::IniFileSystem,
-	runtime::resource::{
-		package_manager::PackageManager, resource_container::ResourceContainer, resource_package::ResourcePackage
-	}
+	runtime::resource::{package_defs::PackageDefinitionSource, partition_manager::PartitionManager}
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, from_value, json, to_string, to_value, to_vec, Value};
@@ -193,7 +191,7 @@ fn main() {
 					.into(),
 				fs_watcher: None.into(),
 				editor_states: RwLock::new(HashMap::new()).into(),
-				resource_packages: None.into(),
+				game_files: None.into(),
 				resource_reverse_dependencies: None.into(),
 				cached_entities: parking_lot::RwLock::new(HashMap::new()).into(),
 				intellisense: None.into()
@@ -354,17 +352,16 @@ fn event(app: AppHandle, event: Event) {
 											"entity.patch.json" => {
 												let id = Uuid::new_v4();
 
-												if let Some(resource_packages) =
-													app_state.resource_packages.load().as_ref() && let Some(install) =
-													app_settings.load().game_install.as_ref() && let Some(hash_list) =
-													app_state.hash_list.load().as_ref()
+												if let Some(game_files) = app_state.game_files.load().as_ref()
+													&& let Some(install) = app_settings.load().game_install.as_ref()
+													&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 												{
 													let patch: Patch =
 														from_slice(&fs::read(&path).context("Couldn't read file")?)
 															.context("Invalid entity")?;
 
 													ensure_entity_in_cache(
-														resource_packages,
+														game_files,
 														&app_state.cached_entities,
 														app_state
 															.game_installs
@@ -553,14 +550,13 @@ fn event(app: AppHandle, event: Event) {
 											"repository.json" => {
 												let id = Uuid::new_v4();
 
-												if let Some(resource_packages) =
-													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
-													app_state.hash_list.load().as_ref()
+												if let Some(game_files) = app_state.game_files.load().as_ref()
+													&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 												{
 													let mut repository = to_value(
 														from_slice::<Vec<RepositoryItem>>(
 															&extract_latest_resource(
-																resource_packages,
+																game_files,
 																hash_list,
 																"00204D1AFD76AB13"
 															)?
@@ -573,7 +569,7 @@ fn event(app: AppHandle, event: Event) {
 
 													let base = from_slice::<Value>(
 														&extract_latest_resource(
-															resource_packages,
+															game_files,
 															hash_list,
 															"00204D1AFD76AB13"
 														)?
@@ -643,14 +639,13 @@ fn event(app: AppHandle, event: Event) {
 											"unlockables.json" => {
 												let id = Uuid::new_v4();
 
-												if let Some(resource_packages) =
-													app_state.resource_packages.load().as_ref() && let Some(hash_list) =
-													app_state.hash_list.load().as_ref()
+												if let Some(game_files) = app_state.game_files.load().as_ref()
+													&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 												{
 													let mut unlockables = to_value(
 														from_value::<Vec<UnlockableItem>>(parse_json_ores(
 															&extract_latest_resource(
-																resource_packages,
+																game_files,
 																hash_list,
 																"0057C2C3941115CA"
 															)?
@@ -682,7 +677,7 @@ fn event(app: AppHandle, event: Event) {
 
 													let base = parse_json_ores(
 														&extract_latest_resource(
-															resource_packages,
+															game_files,
 															hash_list,
 															"0057C2C3941115CA"
 														)?
@@ -777,16 +772,13 @@ fn event(app: AppHandle, event: Event) {
 													.context("Type key was not string")?
 												{
 													"REPO" => {
-														if let Some(resource_packages) =
-															app_state.resource_packages.load().as_ref() && let Some(
-															hash_list
-														) =
-															app_state.hash_list.load().as_ref()
+														if let Some(game_files) = app_state.game_files.load().as_ref()
+															&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 														{
 															let mut repository = to_value(
 																from_slice::<Vec<RepositoryItem>>(
 																	&extract_latest_resource(
-																		resource_packages,
+																		game_files,
 																		hash_list,
 																		"00204D1AFD76AB13"
 																	)?
@@ -799,7 +791,7 @@ fn event(app: AppHandle, event: Event) {
 
 															let base = from_slice::<Value>(
 																&extract_latest_resource(
-																	resource_packages,
+																	game_files,
 																	hash_list,
 																	"00204D1AFD76AB13"
 																)?
@@ -886,16 +878,13 @@ fn event(app: AppHandle, event: Event) {
 													{
 														let id = Uuid::new_v4();
 
-														if let Some(resource_packages) =
-															app_state.resource_packages.load().as_ref() && let Some(
-															hash_list
-														) =
-															app_state.hash_list.load().as_ref()
+														if let Some(game_files) = app_state.game_files.load().as_ref()
+															&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 														{
 															let mut unlockables = to_value(
 																from_value::<Vec<UnlockableItem>>(parse_json_ores(
 																	&extract_latest_resource(
-																		resource_packages,
+																		game_files,
 																		hash_list,
 																		"0057C2C3941115CA"
 																	)?
@@ -930,7 +919,7 @@ fn event(app: AppHandle, event: Event) {
 
 															let base = parse_json_ores(
 																&extract_latest_resource(
-																	resource_packages,
+																	game_files,
 																	hash_list,
 																	"0057C2C3941115CA"
 																)?
@@ -1287,12 +1276,12 @@ fn event(app: AppHandle, event: Event) {
 										let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 											.context("Invalid entity")?;
 
-										if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+										if let Some(game_files) = app_state.game_files.load().as_ref()
 											&& let Some(install) = app_settings.load().game_install.as_ref()
 											&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 										{
 											ensure_entity_in_cache(
-												resource_packages,
+												game_files,
 												&app_state.cached_entities,
 												app_state
 													.game_installs
@@ -1382,7 +1371,7 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							FileBrowserEvent::ConvertEntityToPatch { path } => {
-								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+								if let Some(game_files) = app_state.game_files.load().as_ref()
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
@@ -1414,7 +1403,7 @@ fn event(app: AppHandle, event: Event) {
 
 									// `ensure_entity_in_cache` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
 									let (temp_meta, temp_data) = extract_latest_resource(
-										resource_packages,
+										game_files,
 										hash_list,
 										&normalise_to_hash(entity.factory_hash.to_owned())
 									)?;
@@ -1439,7 +1428,7 @@ fn event(app: AppHandle, event: Event) {
 										.hash;
 
 									let (tblu_meta, tblu_data) =
-										extract_latest_resource(resource_packages, hash_list, blueprint_hash)?;
+										extract_latest_resource(game_files, hash_list, blueprint_hash)?;
 
 									let blueprint = match game_version {
 										GameVersion::H1 => convert_2016_blueprint_to_modern(
@@ -1504,12 +1493,12 @@ fn event(app: AppHandle, event: Event) {
 								let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 									.context("Invalid entity")?;
 
-								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+								if let Some(game_files) = app_state.game_files.load().as_ref()
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
 									ensure_entity_in_cache(
-										resource_packages,
+										game_files,
 										&app_state.cached_entities,
 										app_state
 											.game_installs
@@ -1594,17 +1583,12 @@ fn event(app: AppHandle, event: Event) {
 									.as_str()
 									.context("Type key was not string")? == "REPO"
 								{
-									if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									if let Some(game_files) = app_state.game_files.load().as_ref()
 										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 									{
 										let mut current = to_value(
 											from_slice::<Vec<RepositoryItem>>(
-												&extract_latest_resource(
-													resource_packages,
-													hash_list,
-													"00204D1AFD76AB13"
-												)?
-												.1
+												&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1
 											)?
 											.into_iter()
 											.map(|x| (x.id, x.data))
@@ -1898,13 +1882,12 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							FileBrowserEvent::ConvertRepoPatchToJsonPatch { path } => {
-								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+								if let Some(game_files) = app_state.game_files.load().as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
 									let mut current = to_value(
 										from_slice::<Vec<RepositoryItem>>(
-											&extract_latest_resource(resource_packages, hash_list, "00204D1AFD76AB13")?
-												.1
+											&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1
 										)?
 										.into_iter()
 										.map(|x| (x.id, x.data))
@@ -1971,17 +1954,12 @@ fn event(app: AppHandle, event: Event) {
 									.as_str()
 									.context("File key was not string")? == "0057C2C3941115CA"
 								{
-									if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+									if let Some(game_files) = app_state.game_files.load().as_ref()
 										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 									{
 										let mut current = to_value(
 											from_value::<Vec<UnlockableItem>>(parse_json_ores(
-												&extract_latest_resource(
-													resource_packages,
-													hash_list,
-													"0057C2C3941115CA"
-												)?
-												.1
+												&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
 											)?)?
 											.into_iter()
 											.map(|x| {
@@ -2290,13 +2268,12 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							FileBrowserEvent::ConvertUnlockablesPatchToJsonPatch { path } => {
-								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+								if let Some(game_files) = app_state.game_files.load().as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
 									let mut current = to_value(
 										from_value::<Vec<UnlockableItem>>(parse_json_ores(
-											&extract_latest_resource(resource_packages, hash_list, "0057C2C3941115CA")?
-												.1
+											&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
 										)?)?
 										.into_iter()
 										.map(|x| {
@@ -2474,7 +2451,7 @@ fn event(app: AppHandle, event: Event) {
 							GameBrowserEvent::OpenInEditor(hash) => {
 								// Only available for entities, the repository and unlockables currently
 
-								if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+								if let Some(game_files) = app_state.game_files.load().as_ref()
 									&& let Some(install) = app_settings.load().game_install.as_ref()
 									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 								{
@@ -2495,7 +2472,7 @@ fn event(app: AppHandle, event: Event) {
 												.context("No such game install")?;
 
 											ensure_entity_in_cache(
-												resource_packages,
+												game_files,
 												&app_state.cached_entities,
 												game_install_data.version,
 												hash_list,
@@ -2564,12 +2541,7 @@ fn event(app: AppHandle, event: Event) {
 											let id = Uuid::new_v4();
 
 											let repository: Vec<RepositoryItem> = from_slice(
-												&extract_latest_resource(
-													resource_packages,
-													hash_list,
-													"00204D1AFD76AB13"
-												)?
-												.1
+												&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1
 											)?;
 
 											app_state.editor_states.write().await.insert(
@@ -2604,12 +2576,7 @@ fn event(app: AppHandle, event: Event) {
 											let id = Uuid::new_v4();
 
 											let unlockables: Vec<UnlockableItem> = from_value(parse_json_ores(
-												&extract_latest_resource(
-													resource_packages,
-													hash_list,
-													"0057C2C3941115CA"
-												)?
-												.1
+												&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
 											)?)?;
 
 											app_state.editor_states.write().await.insert(
@@ -4485,110 +4452,110 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			.context("No such game install")?
 			.version;
 
-		let mut thumbs = IniFileSystem::new();
-		thumbs.load(&path.join("thumbs.dat"))?;
+		let thumbs = IniFileSystem::from(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
 
-		let mut resource_packages: IndexMap<PathBuf, ResourcePackage> = IndexMap::new();
+		let thumbs = thumbs
+			.get_root()
+			.get_section("application")
+			.context("Couldn't get application section")?;
 
-		if let (Ok(proj_path), Ok(relative_runtime_path)) = (
-			thumbs.get_value("application", "PROJECT_PATH"),
-			thumbs.get_value("application", "RUNTIME_PATH")
-		) {
-			let mut package_manager = PackageManager::new(&path.join(proj_path).join(relative_runtime_path));
+		let (Some(proj_path), Some(relative_runtime_path)) =
+			(thumbs.get_option("PROJECT_PATH"), thumbs.get_option("RUNTIME_PATH"))
+		else {
+			bail!("thumbs.dat was missing required properties");
+		};
 
-			let mut resource_container = ResourceContainer::default();
+		let mut partition_manager = PartitionManager::new(path.join(proj_path).join(relative_runtime_path));
 
-			package_manager
-				.initialize(&mut resource_container)
-				.map_err(|x| anyhow!("RPKG error in initialising resource container: {:?}", x))?;
+		let mut partitions = match game_version {
+			GameVersion::H1 => PackageDefinitionSource::HM2016(fs::read(
+				path.join(proj_path)
+					.join(relative_runtime_path)
+					.join("packagedefinition.txt")
+			)?)
+			.read()
+			.context("Couldn't read packagedefinition")?,
 
-			for partition in package_manager.partition_infos {
-				resource_packages.extend(
-					vec![
-						0,
-						..ResourceContainer::get_patch_indices(&package_manager.runtime_dir, partition.index)
-							.map_err(|x| anyhow!("RPKG error in getting patch indices: {:?}", x))?
-							.iter()
-							.filter(|&&x| x <= 9 || app_settings.load().extract_modded_files),
-					]
-					.into_par_iter()
-					.rev()
-					.map(|patch| {
-						anyhow::Ok({
-							let rpkg_path = Path::new(&package_manager.runtime_dir).join(format!(
-								"{}{}{}.rpkg",
-								match game_version {
-									GameVersion::H1 | GameVersion::H2 =>
-										if partition.index > 0 {
-											"dlc"
-										} else {
-											"chunk"
-										},
+			GameVersion::H2 => PackageDefinitionSource::HM2(fs::read(
+				path.join(proj_path)
+					.join(relative_runtime_path)
+					.join("packagedefinition.txt")
+			)?)
+			.read()
+			.context("Couldn't read packagedefinition")?,
 
-									GameVersion::H3 => "chunk"
-								},
-								match game_version {
-									GameVersion::H1 | GameVersion::H2 =>
-										if partition.index > 0 {
-											partition.index - 1 // H1/H2 go chunk0, dlc0, dlc1
-										} else {
-											partition.index
-										},
-									GameVersion::H3 => partition.index
-								},
-								if patch > 0 {
-									format!("patch{}", patch)
-								} else {
-									"".into()
-								}
-							));
+			GameVersion::H3 => PackageDefinitionSource::HM3(fs::read(
+				path.join(proj_path)
+					.join(relative_runtime_path)
+					.join("packagedefinition.txt")
+			)?)
+			.read()
+			.context("Couldn't read packagedefinition")?
+		};
 
-							(rpkg_path.to_owned(), {
-								let package_file = File::open(&rpkg_path)?;
-
-								let mmap = unsafe { Mmap::map(&package_file)? };
-								let mut reader = Cursor::new(&mmap[..]);
-
-								reader.read_ne_args((patch > 0,)).context("Couldn't parse RPKG file")?
-							})
-						})
-					})
-					.collect::<Result<Vec<_>>>()?
-				);
+		if !app_settings.load().extract_modded_files {
+			for partition in &mut partitions {
+				partition.patch_level = 9;
 			}
-		} else {
-			Err(anyhow!("thumbs.dat was missing required properties"))?;
-			panic!();
 		}
 
 		finish_task(app, task)?;
 
+		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
+
+		let mut last_index = 0;
+		let mut last_progress = 0;
+		let mut loading_task = start_task(app, format!("Loading {} (0%)", partition_names[last_index]))?;
+
+		partition_manager
+			.mount_partitions(PackageDefinitionSource::Custom(partitions), |cur_partition, state| {
+				if cur_partition < partition_names.len() {
+					if cur_partition != last_index {
+						last_index = cur_partition;
+						last_progress = 0;
+
+						finish_task(app, loading_task).expect("Couldn't send data to frontend");
+						loading_task = start_task(app, format!("Loading {} (0%)", partition_names[last_index]))
+							.expect("Couldn't send data to frontend");
+					}
+
+					if (((state.install_progress * 10.0).round() * 10.0) as u8) != last_progress {
+						last_progress = ((state.install_progress * 10.0).round() * 10.0) as u8;
+
+						finish_task(app, loading_task).expect("Couldn't send data to frontend");
+						loading_task = start_task(
+							app,
+							format!("Loading {} ({}%)", partition_names[last_index], last_progress)
+						)
+						.expect("Couldn't send data to frontend");
+					}
+				}
+			})
+			.context("Couldn't mount partitions")?;
+
+		finish_task(app, loading_task)?;
 		let task = start_task(app, "Caching reverse references")?;
 
 		let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
 
-		for rpkg in resource_packages.values() {
-			for (resource_header, offset_info) in rpkg
-				.resource_entries
-				.iter()
-				.enumerate()
-				.map(|(index, entry)| (rpkg.resource_metadata.get(index).unwrap(), entry))
-			{
-				for reference in resource_header
-					.m_references
-					.as_ref()
-					.map(|x| &x.reference_hash)
-					.unwrap_or(&Vec::new())
-				{
-					reverse_dependencies
-						.entry(reference.to_hex_string())
-						.or_default()
-						.insert(offset_info.runtime_resource_id.to_hex_string());
-				}
+		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
+		let mut resources = HashMap::new();
+		for partition in partition_manager.get_all_partitions().into_iter().rev() {
+			for (resource, _) in partition.get_latest_resources()? {
+				resources.insert(resource.get_rrid(), resource.get_all_references());
 			}
 		}
 
-		app_state.resource_packages.store(Some(resource_packages.into()));
+		for (resource_id, resource_references) in resources {
+			for (reference_id, _) in resource_references {
+				reverse_dependencies
+					.entry(reference_id.to_hex_string())
+					.or_default()
+					.insert(resource_id.to_hex_string());
+			}
+		}
+
+		app_state.game_files.store(Some(partition_manager.into()));
 
 		app_state.resource_reverse_dependencies.store(Some(
 			reverse_dependencies
@@ -4600,7 +4567,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		finish_task(app, task)?;
 	} else {
-		app_state.resource_packages.store(None);
+		app_state.game_files.store(None);
 		app_state.resource_reverse_dependencies.store(None);
 	}
 

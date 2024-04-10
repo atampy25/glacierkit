@@ -25,7 +25,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 	let app_state = app.state::<AppState>();
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 
-	if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+	if let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
@@ -39,14 +39,14 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 		let task = start_task(app, "Updating override decorations")?;
 
 		let repository =
-			from_slice::<Vec<Value>>(&extract_latest_resource(resource_packages, hash_list, "00204D1AFD76AB13")?.1)?;
+			from_slice::<Vec<Value>>(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?;
 
 		let mut decorations = vec![];
 
 		for property_override in entity.property_overrides.iter() {
 			for reference in property_override.entities.iter() {
 				if let Some(decoration) = get_ref_decoration(
-					resource_packages,
+					game_files,
 					&app_state.cached_entities,
 					game_version,
 					hash_list,
@@ -60,7 +60,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 			for property_data in property_override.properties.values() {
 				if property_data.property_type == "SEntityTemplateReference" {
 					if let Some(decoration) = get_ref_decoration(
-						resource_packages,
+						game_files,
 						&app_state.cached_entities,
 						game_version,
 						hash_list,
@@ -74,7 +74,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 						from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
 					{
 						if let Some(decoration) = get_ref_decoration(
-							resource_packages,
+							game_files,
 							&app_state.cached_entities,
 							game_version,
 							hash_list,
@@ -129,7 +129,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 
 		for reference in entity.override_deletes.iter() {
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
@@ -142,7 +142,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 
 		for pin_connection_override in entity.pin_connection_overrides.iter() {
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
@@ -153,7 +153,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 			}
 
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
@@ -166,7 +166,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 
 		for pin_connection_override_delete in entity.pin_connection_override_deletes.iter() {
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
@@ -177,7 +177,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 			}
 
 			if let Some(decoration) = get_ref_decoration(
-				resource_packages,
+				game_files,
 				&app_state.cached_entities,
 				game_version,
 				hash_list,

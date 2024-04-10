@@ -16,7 +16,7 @@ use quickentity_rs::{
 	RAD2DEG
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rpkg_rs::runtime::resource::resource_package::ResourcePackage;
+use rpkg_rs::runtime::resource::{partition_manager::PartitionManager, resource_package::ResourcePackage};
 use serde_json::{from_value, json, to_value, Value};
 use tryvial::try_fn;
 
@@ -60,7 +60,7 @@ impl Intellisense {
 	#[context("Couldn't get properties for CPPT {}", cppt)]
 	fn get_cppt_properties(
 		&self,
-		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+		game_files: &PartitionManager,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		cppt: &str
@@ -71,7 +71,7 @@ impl Intellisense {
 			}
 		}
 
-		let extracted = extract_latest_resource(resource_packages, hash_list, cppt)?;
+		let extracted = extract_latest_resource(game_files, hash_list, cppt)?;
 
 		let cppt_data = match game_version {
 			GameVersion::H1 => h2016_convert_cppt(&extracted.1)?,
@@ -327,7 +327,7 @@ impl Intellisense {
 	#[context("Couldn't get properties for MATT {}", matt)]
 	fn get_matt_properties(
 		&self,
-		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+		game_files: &PartitionManager,
 		hash_list: &HashList,
 		matt: &str
 	) -> Result<Vec<MaterialProperty>> {
@@ -337,10 +337,10 @@ impl Intellisense {
 			}
 		}
 
-		let (matt_meta, matt_data) = extract_latest_resource(resource_packages, hash_list, matt)?;
+		let (matt_meta, matt_data) = extract_latest_resource(game_files, hash_list, matt)?;
 
 		let (_, matb_data) = extract_latest_resource(
-			resource_packages,
+			game_files,
 			hash_list,
 			&matt_meta
 				.hash_reference_data
@@ -372,7 +372,7 @@ impl Intellisense {
 	#[context("Couldn't get properties for sub-entity {} in {}", sub_entity, entity.factory_hash)]
 	pub fn get_properties(
 		&self,
-		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+		game_files: &PartitionManager,
 		cached_entities: &RwLock<HashMap<String, Entity>>,
 		hash_list: &HashList,
 		game_version: GameVersion,
@@ -396,7 +396,7 @@ impl Intellisense {
 						for alias in aliases {
 							if let Ref::Short(Some(ent)) = &alias.original_entity {
 								if let Some(data) = self.get_specific_property(
-									resource_packages,
+									game_files,
 									cached_entities,
 									hash_list,
 									game_version,
@@ -432,18 +432,14 @@ impl Intellisense {
 		found.extend(
 			{
 				if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
-					extract_latest_metadata(
-						resource_packages,
-						hash_list,
-						&normalise_to_hash(targeted.factory.to_owned())
-					)?
-					.hash_reference_data
-					.into_iter()
-					.rev()
-					.skip(1)
-					.rev()
-					.map(|x| normalise_to_hash(x.hash))
-					.collect_vec()
+					extract_latest_metadata(game_files, hash_list, &normalise_to_hash(targeted.factory.to_owned()))?
+						.hash_reference_data
+						.into_iter()
+						.rev()
+						.skip(1)
+						.rev()
+						.map(|x| normalise_to_hash(x.hash))
+						.collect_vec()
 				} else {
 					vec![normalise_to_hash(targeted.factory.to_owned())]
 				}
@@ -455,23 +451,23 @@ impl Intellisense {
 
 					if self.all_cppts.contains(&factory) {
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list, game_version, &factory)?
+							self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 					} else if self.all_uicts.contains(&factory) {
 						// All UI controls have the properties of ZUIControlEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list, game_version, "002C4526CC9753E6")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "002C4526CC9753E6")?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 
 						for entry in convert_uicb(
 							&extract_latest_resource(
-								resource_packages,
+								game_files,
 								hash_list,
-								&extract_latest_metadata(resource_packages, hash_list, &factory)?
+								&extract_latest_metadata(game_files, hash_list, &factory)?
 									.hash_reference_data
 									.into_iter()
 									.find(|x| {
@@ -513,12 +509,12 @@ impl Intellisense {
 					} else if self.all_matts.contains(&factory) {
 						// All materials have the properties of ZRenderMaterialEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list, game_version, "00B4B11DA327CAD0")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "00B4B11DA327CAD0")?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 
-						for property in self.get_matt_properties(resource_packages, hash_list, &factory)? {
+						for property in self.get_matt_properties(game_files, hash_list, &factory)? {
 							match property.data {
 								MaterialPropertyData::Texture(texture) => {
 									found.push((
@@ -663,22 +659,22 @@ impl Intellisense {
 					} else if self.all_wswts.contains(&factory) {
 						// All switch groups have the properties of ZAudioSwitchEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list, game_version, "00797DC916520C4D")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "00797DC916520C4D")?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 					} else if self.all_ecpts.contains(&factory) {
 						// All extended CPP entities have the properties of ZMaterialOverwriteAspect
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list, game_version, "00D3003AAA7B3817")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "00D3003AAA7B3817")?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 
 						let ecpb_data = extract_latest_resource(
-							resource_packages,
+							game_files,
 							hash_list,
-							&extract_latest_metadata(resource_packages, hash_list, &factory)?
+							&extract_latest_metadata(game_files, hash_list, &factory)?
 								.hash_reference_data
 								.into_iter()
 								.find(|x| {
@@ -729,20 +725,20 @@ impl Intellisense {
 					} else if self.all_aibxs.contains(&factory) {
 						// All behaviour trees have the properties of ZBehaviorTreeEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list, game_version, "0028607138892D70")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "0028607138892D70")?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 					} else if self.all_wsgts.contains(&factory) {
 						// All state groups have the properties of ZAudioStateEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(resource_packages, hash_list, game_version, "000D409686293996")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "000D409686293996")?
 						{
 							found.push((prop_name, prop_type, default_val, false));
 						}
 					} else {
 						match ensure_entity_in_cache(
-							resource_packages,
+							game_files,
 							cached_entities,
 							game_version,
 							hash_list,
@@ -756,7 +752,7 @@ impl Intellisense {
 									.to_owned();
 
 								found.extend(self.get_properties(
-									resource_packages,
+									game_files,
 									cached_entities,
 									hash_list,
 									game_version,
@@ -792,7 +788,7 @@ impl Intellisense {
 	#[context("Couldn't get property {} of sub-entity {} in {}", property_to_find, sub_entity, entity.factory_hash)]
 	pub fn get_specific_property(
 		&self,
-		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+		game_files: &PartitionManager,
 		cached_entities: &RwLock<HashMap<String, Entity>>,
 		hash_list: &HashList,
 		game_version: GameVersion,
@@ -813,7 +809,7 @@ impl Intellisense {
 					// Avoids issues from an entity having a property alias to itself
 					if ent != sub_entity && property_to_find == alias.original_property {
 						if let Some(data) = self.get_specific_property(
-							resource_packages,
+							game_files,
 							cached_entities,
 							hash_list,
 							game_version,
@@ -842,24 +838,20 @@ impl Intellisense {
 		}
 
 		for factory in if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
-			extract_latest_metadata(
-				resource_packages,
-				hash_list,
-				&normalise_to_hash(targeted.factory.to_owned())
-			)?
-			.hash_reference_data
-			.into_iter()
-			.rev()
-			.skip(1)
-			.rev()
-			.map(|x| normalise_to_hash(x.hash))
-			.collect_vec()
+			extract_latest_metadata(game_files, hash_list, &normalise_to_hash(targeted.factory.to_owned()))?
+				.hash_reference_data
+				.into_iter()
+				.rev()
+				.skip(1)
+				.rev()
+				.map(|x| normalise_to_hash(x.hash))
+				.collect_vec()
 		} else {
 			vec![normalise_to_hash(targeted.factory.to_owned())]
 		} {
 			if self.all_cppts.contains(&factory) {
 				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(resource_packages, hash_list, game_version, &factory)?
+					self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
 				{
 					if prop_name == property_to_find {
 						return Ok(Some((prop_type, default_val, false)));
@@ -868,7 +860,7 @@ impl Intellisense {
 			} else if self.all_uicts.contains(&factory) {
 				// All UI controls have the properties of ZUIControlEntity
 				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(resource_packages, hash_list, game_version, "002C4526CC9753E6")?
+					self.get_cppt_properties(game_files, hash_list, game_version, "002C4526CC9753E6")?
 				{
 					if prop_name == property_to_find {
 						return Ok(Some((prop_type, default_val, false)));
@@ -877,9 +869,9 @@ impl Intellisense {
 
 				for entry in convert_uicb(
 					&extract_latest_resource(
-						resource_packages,
+						game_files,
 						hash_list,
-						&extract_latest_metadata(resource_packages, hash_list, &factory)?
+						&extract_latest_metadata(game_files, hash_list, &factory)?
 							.hash_reference_data
 							.into_iter()
 							.find(|x| {
@@ -922,14 +914,14 @@ impl Intellisense {
 			} else if self.all_matts.contains(&factory) {
 				// All materials have the properties of ZRenderMaterialEntity
 				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(resource_packages, hash_list, game_version, "00B4B11DA327CAD0")?
+					self.get_cppt_properties(game_files, hash_list, game_version, "00B4B11DA327CAD0")?
 				{
 					if prop_name == property_to_find {
 						return Ok(Some((prop_type, default_val, false)));
 					}
 				}
 
-				for property in self.get_matt_properties(resource_packages, hash_list, &factory)? {
+				for property in self.get_matt_properties(game_files, hash_list, &factory)? {
 					match property.data {
 						MaterialPropertyData::Texture(texture) => {
 							if property.name == property_to_find {
@@ -1087,7 +1079,7 @@ impl Intellisense {
 			} else if self.all_wswts.contains(&factory) {
 				// All switch groups have the properties of ZAudioSwitchEntity
 				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(resource_packages, hash_list, game_version, "00797DC916520C4D")?
+					self.get_cppt_properties(game_files, hash_list, game_version, "00797DC916520C4D")?
 				{
 					if prop_name == property_to_find {
 						return Ok(Some((prop_type, default_val, false)));
@@ -1096,7 +1088,7 @@ impl Intellisense {
 			} else if self.all_ecpts.contains(&factory) {
 				// All extended CPP entities have the properties of ZMaterialOverwriteAspect
 				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(resource_packages, hash_list, game_version, "00D3003AAA7B3817")?
+					self.get_cppt_properties(game_files, hash_list, game_version, "00D3003AAA7B3817")?
 				{
 					if prop_name == property_to_find {
 						return Ok(Some((prop_type, default_val, false)));
@@ -1104,9 +1096,9 @@ impl Intellisense {
 				}
 
 				let ecpb_data = extract_latest_resource(
-					resource_packages,
+					game_files,
 					hash_list,
-					&extract_latest_metadata(resource_packages, hash_list, &factory)?
+					&extract_latest_metadata(game_files, hash_list, &factory)?
 						.hash_reference_data
 						.into_iter()
 						.find(|x| {
@@ -1158,7 +1150,7 @@ impl Intellisense {
 			} else if self.all_aibxs.contains(&factory) {
 				// All behaviour trees have the properties of ZBehaviorTreeEntity
 				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(resource_packages, hash_list, game_version, "0028607138892D70")?
+					self.get_cppt_properties(game_files, hash_list, game_version, "0028607138892D70")?
 				{
 					if prop_name == property_to_find {
 						return Ok(Some((prop_type, default_val, false)));
@@ -1167,7 +1159,7 @@ impl Intellisense {
 			} else if self.all_wsgts.contains(&factory) {
 				// All state groups have the properties of ZAudioStateEntity
 				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(resource_packages, hash_list, game_version, "000D409686293996")?
+					self.get_cppt_properties(game_files, hash_list, game_version, "000D409686293996")?
 				{
 					if prop_name == property_to_find {
 						return Ok(Some((prop_type, default_val, false)));
@@ -1175,7 +1167,7 @@ impl Intellisense {
 				}
 			} else {
 				match ensure_entity_in_cache(
-					resource_packages,
+					game_files,
 					cached_entities,
 					game_version,
 					hash_list,
@@ -1189,7 +1181,7 @@ impl Intellisense {
 							.to_owned();
 
 						if let Some(data) = self.get_specific_property(
-							resource_packages,
+							game_files,
 							cached_entities,
 							hash_list,
 							game_version,
@@ -1218,7 +1210,7 @@ impl Intellisense {
 	#[context("Couldn't get pins for sub-entity {} in {}", sub_entity, entity.factory_hash)]
 	pub fn get_pins(
 		&self,
-		resource_packages: &IndexMap<PathBuf, ResourcePackage>,
+		game_files: &PartitionManager,
 		cached_entities: &RwLock<HashMap<String, Entity>>,
 		hash_list: &HashList,
 		game_version: GameVersion,
@@ -1311,18 +1303,14 @@ impl Intellisense {
 
 		let (fac_input, fac_output): (Vec<_>, Vec<_>) = {
 			if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
-				extract_latest_metadata(
-					resource_packages,
-					hash_list,
-					&normalise_to_hash(targeted.factory.to_owned())
-				)?
-				.hash_reference_data
-				.into_iter()
-				.rev()
-				.skip(1)
-				.rev()
-				.map(|x| normalise_to_hash(x.hash))
-				.collect_vec()
+				extract_latest_metadata(game_files, hash_list, &normalise_to_hash(targeted.factory.to_owned()))?
+					.hash_reference_data
+					.into_iter()
+					.rev()
+					.skip(1)
+					.rev()
+					.map(|x| normalise_to_hash(x.hash))
+					.collect_vec()
 			} else {
 				vec![normalise_to_hash(targeted.factory.to_owned())]
 			}
@@ -1345,9 +1333,9 @@ impl Intellisense {
 
 					for entry in convert_uicb(
 						&extract_latest_resource(
-							resource_packages,
+							game_files,
 							hash_list,
-							&extract_latest_metadata(resource_packages, hash_list, &factory)?
+							&extract_latest_metadata(game_files, hash_list, &factory)?
 								.hash_reference_data
 								.into_iter()
 								.find(|x| {
@@ -1378,7 +1366,7 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 
-					for property in self.get_matt_properties(resource_packages, hash_list, &factory)? {
+					for property in self.get_matt_properties(game_files, hash_list, &factory)? {
 						if !matches!(property.data, MaterialPropertyData::Texture(_)) {
 							input.push(property.name);
 						}
@@ -1389,7 +1377,7 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 
-					let wswt_meta = extract_latest_metadata(resource_packages, hash_list, &factory)?;
+					let wswt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
 
 					let dswb_hash = &wswt_meta
 						.hash_reference_data
@@ -1406,13 +1394,13 @@ impl Intellisense {
 
 					let dswb_data = match game_version {
 						GameVersion::H1 => {
-							h2016_convert_dswb(&extract_latest_resource(resource_packages, hash_list, dswb_hash)?.1)?
+							h2016_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
 						}
 						GameVersion::H2 => {
-							h2_convert_dswb(&extract_latest_resource(resource_packages, hash_list, dswb_hash)?.1)?
+							h2_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
 						}
 						GameVersion::H3 => {
-							h3_convert_dswb(&extract_latest_resource(resource_packages, hash_list, dswb_hash)?.1)?
+							h3_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
 						}
 					};
 
@@ -1433,7 +1421,7 @@ impl Intellisense {
 					input.extend(cppt_data.0.to_owned());
 					output.extend(cppt_data.1.to_owned());
 
-					let wsgt_meta = extract_latest_metadata(resource_packages, hash_list, &factory)?;
+					let wsgt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
 
 					let wsgb_hash = &wsgt_meta
 						.hash_reference_data
@@ -1450,20 +1438,20 @@ impl Intellisense {
 
 					let wsgb_data = match game_version {
 						GameVersion::H1 => {
-							h2016_convert_wsgb(&extract_latest_resource(resource_packages, hash_list, wsgb_hash)?.1)?
+							h2016_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
 						}
 						GameVersion::H2 => {
-							h2_convert_wsgb(&extract_latest_resource(resource_packages, hash_list, wsgb_hash)?.1)?
+							h2_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
 						}
 						GameVersion::H3 => {
-							h3_convert_wsgb(&extract_latest_resource(resource_packages, hash_list, wsgb_hash)?.1)?
+							h3_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
 						}
 					};
 
 					input.extend(wsgb_data.m_aSwitches);
 				} else {
 					match ensure_entity_in_cache(
-						resource_packages,
+						game_files,
 						cached_entities,
 						game_version,
 						hash_list,
@@ -1477,7 +1465,7 @@ impl Intellisense {
 								.to_owned();
 
 							let found = self.get_pins(
-								resource_packages,
+								game_files,
 								cached_entities,
 								hash_list,
 								game_version,

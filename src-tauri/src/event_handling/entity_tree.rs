@@ -144,7 +144,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 	finish_task(app, task)?;
 
 	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+		&& let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
@@ -164,7 +164,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 					editor_id: editor_id.to_owned(),
 					entity_id: id.to_owned(),
 					properties: intellisense.get_properties(
-						resource_packages,
+						game_files,
 						&app_state.cached_entities,
 						hash_list,
 						game_version,
@@ -173,7 +173,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 						true
 					)?,
 					pins: intellisense.get_pins(
-						resource_packages,
+						game_files,
 						&app_state.cached_entities,
 						hash_list,
 						game_version,
@@ -190,7 +190,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		let task = start_task(app, format!("Computing decorations for {}", id))?;
 
 		let decorations = get_decorations(
-			resource_packages,
+			game_files,
 			&app_state.cached_entities,
 			hash_list,
 			game_version,
@@ -1127,7 +1127,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 	let sub_entity = entity.entities.get(&entity_id).context("No such entity")?;
 
 	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+		&& let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
@@ -1145,7 +1145,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 			.unwrap_or(false)
 		{
 			ensure_entity_in_cache(
-				resource_packages,
+				game_files,
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
@@ -1159,7 +1159,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 
 			(
 				intellisense.get_properties(
-					resource_packages,
+					game_files,
 					&app_state.cached_entities,
 					hash_list,
 					game_version,
@@ -1168,7 +1168,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 					false
 				)?,
 				intellisense.get_pins(
-					resource_packages,
+					game_files,
 					&app_state.cached_entities,
 					hash_list,
 					game_version,
@@ -1180,7 +1180,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 		} else {
 			(
 				intellisense.get_properties(
-					resource_packages,
+					game_files,
 					&app_state.cached_entities,
 					hash_list,
 					game_version,
@@ -1189,7 +1189,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 					true
 				)?,
 				intellisense.get_pins(
-					resource_packages,
+					game_files,
 					&app_state.cached_entities,
 					hash_list,
 					game_version,
@@ -1286,7 +1286,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 		}
 	};
 
-	if let Some(resource_packages) = app_state.resource_packages.load().as_ref()
+	if let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
@@ -1314,7 +1314,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 				.as_str()
 			{
 				"TEMP" => {
-					let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, &file)?;
+					let (temp_meta, temp_data) = extract_latest_resource(game_files, hash_list, &file)?;
 
 					let factory = match game_version {
 						GameVersion::H1 => convert_2016_factory_to_modern(
@@ -1374,7 +1374,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"CPPT" => {
-					let (cppt_meta, cppt_data) = extract_latest_resource(resource_packages, hash_list, &file)?;
+					let (cppt_meta, cppt_data) = extract_latest_resource(game_files, hash_list, &file)?;
 
 					let factory =
 						match game_version {
@@ -1432,7 +1432,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"ASET" => {
-					let blueprint_hash = extract_latest_metadata(resource_packages, hash_list, &file)?
+					let blueprint_hash = extract_latest_metadata(game_files, hash_list, &file)?
 						.hash_reference_data
 						.into_iter()
 						.last()
@@ -1471,7 +1471,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"UICT" => {
-					let blueprint_hash = extract_latest_metadata(resource_packages, hash_list, &file)?
+					let blueprint_hash = extract_latest_metadata(game_files, hash_list, &file)?
 						.hash_reference_data
 						.into_iter()
 						.last()
@@ -1520,13 +1520,11 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let blueprint_hash = {
 						let mut blueprint_hash = String::new();
 
-						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+						for dep in extract_latest_metadata(game_files, hash_list, &file)?
 							.hash_reference_data
 							.into_iter()
 						{
-							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
-								== "MATB"
-							{
+							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "MATB" {
 								blueprint_hash = dep.hash.to_owned();
 								break;
 							}
@@ -1581,11 +1579,11 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let blueprint_hash = {
 						let mut blueprint_hash = String::new();
 
-						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+						for dep in extract_latest_metadata(game_files, hash_list, &file)?
 							.hash_reference_data
 							.into_iter()
 						{
-							let metadata = extract_latest_metadata(resource_packages, hash_list, &dep.hash)?;
+							let metadata = extract_latest_metadata(game_files, hash_list, &dep.hash)?;
 
 							if metadata.hash_resource_type == "WSWB" || metadata.hash_resource_type == "DSWB" {
 								blueprint_hash = dep.hash.to_owned();
@@ -1642,13 +1640,11 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let blueprint_hash = {
 						let mut blueprint_hash = String::new();
 
-						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+						for dep in extract_latest_metadata(game_files, hash_list, &file)?
 							.hash_reference_data
 							.into_iter()
 						{
-							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
-								== "ECPB"
-							{
+							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "ECPB" {
 								blueprint_hash = dep.hash.to_owned();
 								break;
 							}
@@ -1703,13 +1699,11 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let blueprint_hash = {
 						let mut blueprint_hash = String::new();
 
-						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+						for dep in extract_latest_metadata(game_files, hash_list, &file)?
 							.hash_reference_data
 							.into_iter()
 						{
-							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
-								== "AIBB"
-							{
+							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "AIBB" {
 								blueprint_hash = dep.hash.to_owned();
 								break;
 							}
@@ -1764,13 +1758,11 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let blueprint_hash = {
 						let mut blueprint_hash = String::new();
 
-						for dep in extract_latest_metadata(resource_packages, hash_list, &file)?
+						for dep in extract_latest_metadata(game_files, hash_list, &file)?
 							.hash_reference_data
 							.into_iter()
 						{
-							if extract_latest_metadata(resource_packages, hash_list, &dep.hash)?.hash_resource_type
-								== "WSGB"
-							{
+							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "WSGB" {
 								blueprint_hash = dep.hash.to_owned();
 								break;
 							}
