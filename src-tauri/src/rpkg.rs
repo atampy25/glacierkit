@@ -33,7 +33,7 @@ pub fn extract_latest_resource(
 
 	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
 
-	for partition in game_files.get_all_partitions().into_iter().rev() {
+	for partition in game_files.get_all_partitions() {
 		if let Some((info, _)) = partition
 			.get_latest_resources()
 			.into_iter()
@@ -41,8 +41,8 @@ pub fn extract_latest_resource(
 		{
 			let rpkg_style_meta = ResourceMeta {
 				hash_offset: info.get_data_offset(),
-				hash_size: (info.get_compressed_size() | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
-					as u32,
+				hash_size: (info.get_compressed_size().unwrap_or(0)
+					| (if info.get_is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
 				hash_size_final: info.get_size(),
 				hash_value: resource_id.to_hex_string(),
 				hash_size_in_memory: info.get_system_memory_requirement(),
@@ -93,7 +93,7 @@ pub fn extract_latest_metadata(
 
 	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
 
-	for partition in game_files.get_all_partitions().into_iter().rev() {
+	for partition in game_files.get_all_partitions() {
 		if let Some((info, _)) = partition
 			.get_latest_resources()
 			.into_iter()
@@ -101,8 +101,8 @@ pub fn extract_latest_metadata(
 		{
 			let rpkg_style_meta = ResourceMeta {
 				hash_offset: info.get_data_offset(),
-				hash_size: (info.get_compressed_size() | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
-					as u32,
+				hash_size: (info.get_compressed_size().unwrap_or(0)
+					| (if info.get_is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
 				hash_size_final: info.get_size(),
 				hash_value: resource_id.to_hex_string(),
 				hash_size_in_memory: info.get_system_memory_requirement(),
@@ -145,7 +145,7 @@ pub fn extract_latest_overview_info(
 ) -> Result<(String, String, Vec<(String, String)>)> {
 	let resource_id = RuntimeResourceID::from_hex_string(hash)?;
 
-	for partition in game_files.get_all_partitions().into_iter().rev() {
+	for partition in game_files.get_all_partitions() {
 		if let Some((info, patchlevel)) = partition
 			.get_latest_resources()
 			.into_iter()

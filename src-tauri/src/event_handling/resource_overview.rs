@@ -6,7 +6,7 @@ use fn_error_context::context;
 use image::io::Reader as ImageReader;
 
 use rfd::AsyncFileDialog;
-use rpkg_rs::runtime::resource::{partition_manager::PartitionManager};
+use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
 use serde_json::{from_slice, from_value, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tryvial::try_fn;

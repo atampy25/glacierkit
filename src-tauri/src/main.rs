@@ -72,7 +72,7 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
-use rayon::iter::{IndexedParallelIterator,  ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use repository::RepositoryItem;
 use resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
@@ -4515,8 +4515,9 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 							.expect("Couldn't send data to frontend");
 					}
 
-					if (((state.install_progress * 10.0).round() * 10.0) as u8) != last_progress {
-						last_progress = ((state.install_progress * 10.0).round() * 10.0) as u8;
+					let progress = ((state.install_progress * 10.0).round() * 10.0) as u8;
+					if progress != last_progress {
+						last_progress = progress;
 
 						finish_task(app, loading_task).expect("Couldn't send data to frontend");
 						loading_task = start_task(
@@ -4552,9 +4553,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 					.insert(res_id_str.to_owned());
 			}
 
-			reverse_dependencies
-				.entry(res_id_str)
-				.or_default();
+			reverse_dependencies.entry(res_id_str).or_default();
 		}
 
 		app_state.game_files.store(Some(partition_manager.into()));
