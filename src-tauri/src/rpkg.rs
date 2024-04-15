@@ -1,15 +1,7 @@
-use std::{
-	collections::HashMap,
-	fs::{self, File},
-	io::{Read, Seek, SeekFrom},
-	path::PathBuf
-};
+use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context, Result};
 use fn_error_context::context;
-use indexmap::IndexMap;
-use itertools::Itertools;
-use lz4::block::decompress_to_buffer;
 use parking_lot::RwLock;
 use quickentity_rs::{
 	convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn,
@@ -17,12 +9,9 @@ use quickentity_rs::{
 	rpkg_structs::{ResourceDependency, ResourceMeta}
 };
 use rpkg_rs::runtime::resource::{
-	partition_manager::PartitionManager, resource_package::ResourcePackage, resource_partition::PatchId,
-	runtime_resource_id::RuntimeResourceID
+	partition_manager::PartitionManager, resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
 };
-use tauri::api::path::data_dir;
 use tryvial::try_fn;
-use velcro::vec;
 
 use crate::{
 	game_detection::GameVersion,
@@ -46,45 +35,39 @@ pub fn extract_latest_resource(
 
 	for partition in game_files.get_all_partitions().into_iter().rev() {
 		if let Some((info, _)) = partition
-			.get_latest_resources()?
+			.get_latest_resources()
 			.into_iter()
 			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
 			let rpkg_style_meta = ResourceMeta {
-				hash_offset: info.entry.data_offset,
-				hash_size: info.entry.compressed_size_and_is_scrambled_flag,
-				hash_size_final: info.header.data_size,
-				hash_value: info.entry.runtime_resource_id.to_hex_string(),
-				hash_size_in_memory: info.header.system_memory_requirement,
-				hash_size_in_video_memory: info.header.video_memory_requirement,
-				hash_resource_type: info.header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
+				hash_offset: info.get_data_offset(),
+				hash_size: (info.get_compressed_size() | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
+					as u32,
+				hash_size_final: info.get_size(),
+				hash_value: resource_id.to_hex_string(),
+				hash_size_in_memory: info.get_system_memory_requirement(),
+				hash_size_in_video_memory: info.get_video_memory_requirement(),
+				hash_resource_type: info.get_type(),
 				hash_reference_data: info
-					.header
-					.m_references
-					.as_ref()
-					.map(|refs| {
-						refs.reference_flags
-							.iter()
-							.zip(refs.reference_hash.iter())
-							.map(|(flag, hash)| ResourceDependency {
-								flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
-								hash: hash_list
-									.entries
-									.get(&hash.to_hex_string())
-									.map(|entry| {
-										entry
-											.path
-											.as_ref()
-											.map(|x| x.to_owned())
-											.unwrap_or(hash.to_hex_string())
-									})
+					.get_all_references()
+					.iter()
+					.map(|(hash, flag)| ResourceDependency {
+						flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
+						hash: hash_list
+							.entries
+							.get(&hash.to_hex_string())
+							.map(|entry| {
+								entry
+									.path
+									.as_ref()
+									.map(|x| x.to_owned())
 									.unwrap_or(hash.to_hex_string())
 							})
-							.collect()
+							.unwrap_or(hash.to_hex_string())
 					})
-					.unwrap_or(vec![]),
-				hash_reference_table_size: info.header.references_chunk_size,
-				hash_reference_table_dummy: info.header.states_chunk_size
+					.collect(),
+				hash_reference_table_size: info.get_reference_chunk_size() as u32,
+				hash_reference_table_dummy: info.get_states_chunk_size() as u32
 			};
 
 			return Ok((
@@ -112,45 +95,39 @@ pub fn extract_latest_metadata(
 
 	for partition in game_files.get_all_partitions().into_iter().rev() {
 		if let Some((info, _)) = partition
-			.get_latest_resources()?
+			.get_latest_resources()
 			.into_iter()
 			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
 			let rpkg_style_meta = ResourceMeta {
-				hash_offset: info.entry.data_offset,
-				hash_size: info.entry.compressed_size_and_is_scrambled_flag,
-				hash_size_final: info.header.data_size,
-				hash_value: info.entry.runtime_resource_id.to_hex_string(),
-				hash_size_in_memory: info.header.system_memory_requirement,
-				hash_size_in_video_memory: info.header.video_memory_requirement,
-				hash_resource_type: info.header.m_type.iter().rev().map(|x| char::from(*x)).join(""),
+				hash_offset: info.get_data_offset(),
+				hash_size: (info.get_compressed_size() | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
+					as u32,
+				hash_size_final: info.get_size(),
+				hash_value: resource_id.to_hex_string(),
+				hash_size_in_memory: info.get_system_memory_requirement(),
+				hash_size_in_video_memory: info.get_video_memory_requirement(),
+				hash_resource_type: info.get_type(),
 				hash_reference_data: info
-					.header
-					.m_references
-					.as_ref()
-					.map(|refs| {
-						refs.reference_flags
-							.iter()
-							.zip(refs.reference_hash.iter())
-							.map(|(flag, hash)| ResourceDependency {
-								flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
-								hash: hash_list
-									.entries
-									.get(&hash.to_hex_string())
-									.map(|entry| {
-										entry
-											.path
-											.as_ref()
-											.map(|x| x.to_owned())
-											.unwrap_or(hash.to_hex_string())
-									})
+					.get_all_references()
+					.iter()
+					.map(|(hash, flag)| ResourceDependency {
+						flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
+						hash: hash_list
+							.entries
+							.get(&hash.to_hex_string())
+							.map(|entry| {
+								entry
+									.path
+									.as_ref()
+									.map(|x| x.to_owned())
 									.unwrap_or(hash.to_hex_string())
 							})
-							.collect()
+							.unwrap_or(hash.to_hex_string())
 					})
-					.unwrap_or(vec![]),
-				hash_reference_table_size: info.header.references_chunk_size,
-				hash_reference_table_dummy: info.header.states_chunk_size
+					.collect(),
+				hash_reference_table_size: info.get_reference_chunk_size() as u32,
+				hash_reference_table_dummy: info.get_states_chunk_size() as u32
 			};
 
 			return Ok(rpkg_style_meta);
@@ -170,7 +147,7 @@ pub fn extract_latest_overview_info(
 
 	for partition in game_files.get_all_partitions().into_iter().rev() {
 		if let Some((info, patchlevel)) = partition
-			.get_latest_resources()?
+			.get_latest_resources()
 			.into_iter()
 			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
@@ -181,7 +158,7 @@ pub fn extract_latest_overview_info(
 					PatchId::Patch(level) => format!("{}patch{}", partition.get_partition_info().id, level)
 				},
 				info.get_all_references()
-					.into_iter()
+					.iter()
 					.map(|(res_id, flag)| {
 						(
 							res_id.to_hex_string(),
@@ -212,7 +189,8 @@ pub fn ensure_entity_in_cache(
 		}
 	}
 
-	let (temp_meta, temp_data) = extract_latest_resource(resource_packages, hash_list, factory_hash)?;
+	let (temp_meta, temp_data) =
+		extract_latest_resource(resource_packages, hash_list, factory_hash).context("Couldn't extract TEMP")?;
 
 	if temp_meta.hash_resource_type != "TEMP" {
 		bail!("Given factory was not a TEMP");
@@ -238,7 +216,8 @@ pub fn ensure_entity_in_cache(
 		.context("Blueprint referenced in factory does not exist in dependencies")?
 		.hash;
 
-	let (tblu_meta, tblu_data) = extract_latest_resource(resource_packages, hash_list, blueprint_hash)?;
+	let (tblu_meta, tblu_data) =
+		extract_latest_resource(resource_packages, hash_list, blueprint_hash).context("Couldn't extract TBLU")?;
 
 	let blueprint = match game_version {
 		GameVersion::H1 => convert_2016_blueprint_to_modern(

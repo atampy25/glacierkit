@@ -27,18 +27,16 @@ pub mod wwev;
 
 use std::{
 	collections::{HashMap, HashSet},
-	fs::{self, File},
+	fs,
 	future::Future,
-	io::Cursor,
 	ops::Deref,
-	path::{Path, PathBuf},
+	path::Path,
 	sync::Arc
 };
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
-use binrw::BinReaderExt;
 use entity::{
 	calculate_reverse_references, get_local_reference, get_recursive_children, is_valid_entity_blueprint,
 	CopiedEntityData
@@ -58,7 +56,6 @@ use hash_list::HashList;
 use indexmap::IndexMap;
 use intellisense::Intellisense;
 use itertools::Itertools;
-use memmap2::Mmap;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
 	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent,
@@ -75,7 +72,7 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator,  ParallelIterator};
 use repository::RepositoryItem;
 use resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
@@ -97,7 +94,6 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
-use wwev::{parse_wwev, WwiseEventData};
 
 const HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
@@ -4541,18 +4537,24 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
 		let mut resources = HashMap::new();
 		for partition in partition_manager.get_all_partitions().into_iter().rev() {
-			for (resource, _) in partition.get_latest_resources()? {
+			for (resource, _) in partition.get_latest_resources() {
 				resources.insert(resource.get_rrid(), resource.get_all_references());
 			}
 		}
 
 		for (resource_id, resource_references) in resources {
+			let res_id_str = resource_id.to_hex_string();
+
 			for (reference_id, _) in resource_references {
 				reverse_dependencies
 					.entry(reference_id.to_hex_string())
 					.or_default()
-					.insert(resource_id.to_hex_string());
+					.insert(res_id_str.to_owned());
 			}
+
+			reverse_dependencies
+				.entry(res_id_str)
+				.or_default();
 		}
 
 		app_state.game_files.store(Some(partition_manager.into()));

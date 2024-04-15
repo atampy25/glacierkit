@@ -159,7 +159,6 @@ dependencies = [
  "arboard 3.3.2",
  "arc-swap",
  "async-recursion",
- "binrw",
  "brotli-decompressor",
  "enumset",
  "fn-error-context",
@@ -172,9 +171,7 @@ dependencies = [
  "json-patch",
  "keyvalues-serde",
  "lazy_static",
- "lz4",
  "md5",
- "memmap2 0.9.4",
  "notify",
  "parking_lot",
  "quickentity-rs",
@@ -4686,7 +4683,7 @@ dependencies = [
 
 [[package]]
 name = "rpkg-rs"
-version = "0.1.1"
+version = "0.1.4"
 dependencies = [
  "binrw",
  "byteorder",
