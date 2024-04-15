@@ -1,8 +1,8 @@
 use std::io::{Cursor, Read};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use fn_error_context::context;
-use quickentity_rs::rpkg_structs::ResourceMeta;
+
 use tryvial::try_fn;
 
 /// A Wwise event; a parsed WWEV file.

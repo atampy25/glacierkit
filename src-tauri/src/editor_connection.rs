@@ -1,7 +1,7 @@
 use anyhow::{Context, Error, Result};
 use fn_error_context::context;
 use futures_util::{
-	stream::{SplitSink, SplitStream},
+	stream::{SplitSink},
 	StreamExt
 };
 use indexmap::IndexMap;

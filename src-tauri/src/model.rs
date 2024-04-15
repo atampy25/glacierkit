@@ -1,10 +1,10 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
-use indexmap::IndexMap;
+
 use notify::RecommendedWatcher;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
-use rpkg_rs::runtime::resource::{partition_manager::PartitionManager, resource_package::ResourcePackage};
+use rpkg_rs::runtime::resource::{partition_manager::PartitionManager};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;

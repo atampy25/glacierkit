@@ -245,7 +245,7 @@ pub fn normalise_to_hash(hash_or_path: String) -> String {
 		hash_or_path
 	} else {
 		format!("{:0>16X}", {
-			let digest = md5::compute(&hash_or_path.to_lowercase());
+			let digest = md5::compute(hash_or_path.to_lowercase());
 			let mut hash = 0u64;
 			for i in 1..8 {
 				hash |= u64::from(digest[i]) << (8 * (7 - i));

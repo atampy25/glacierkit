@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use fn_error_context::context;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
-use serde_json::{from_str, from_value, to_string, Value};
+use serde_json::{from_str, from_value, Value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
 	finish_task,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, GlobalRequest, RepositoryPatchEditorEvent,
+		AppState, EditorData, EditorRequest, GlobalRequest, RepositoryPatchEditorEvent,
 		RepositoryPatchEditorRequest, Request
 	},
 	repository::{RepositoryItem, RepositoryItemInformation},

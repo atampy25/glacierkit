@@ -1,12 +1,11 @@
 use std::{
 	collections::{HashMap, HashSet},
-	path::PathBuf,
 	sync::Arc
 };
 
 use anyhow::{bail, Context, Result};
 use fn_error_context::context;
-use indexmap::IndexMap;
+
 use itertools::Itertools;
 use parking_lot::RwLock;
 use quickentity_rs::{
@@ -16,7 +15,7 @@ use quickentity_rs::{
 	RAD2DEG
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rpkg_rs::runtime::resource::{partition_manager::PartitionManager, resource_package::ResourcePackage};
+use rpkg_rs::runtime::resource::{partition_manager::PartitionManager};
 use serde_json::{from_value, json, to_value, Value};
 use tryvial::try_fn;
 

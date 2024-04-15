@@ -4,9 +4,9 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use image::io::Reader as ImageReader;
-use indexmap::IndexMap;
+
 use rfd::AsyncFileDialog;
-use rpkg_rs::runtime::resource::{partition_manager::PartitionManager, resource_package::ResourcePackage};
+use rpkg_rs::runtime::resource::{partition_manager::PartitionManager};
 use serde_json::{from_slice, from_value, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tryvial::try_fn;
@@ -287,7 +287,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			let task = start_task(&app, format!("Loading resource overview for {}", hash))?;
+			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
@@ -295,7 +295,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				initialise_resource_overview(
-					&app,
+					app,
 					&app_state,
 					id,
 					hash,
@@ -306,7 +306,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				)?;
 			}
 
-			finish_task(&app, task)?;
+			finish_task(app, task)?;
 		}
 
 		ResourceOverviewEvent::FollowDependency { id, new_hash } => {
@@ -324,7 +324,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			*hash = new_hash.to_owned();
 
-			let task = start_task(&app, format!("Loading resource overview for {}", hash))?;
+			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
@@ -332,7 +332,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				initialise_resource_overview(
-					&app,
+					app,
 					&app_state,
 					id,
 					hash,
@@ -343,7 +343,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				)?;
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::RenameTab {
 						id,
 						new_name: format!("Resource overview ({new_hash})")
@@ -351,7 +351,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				)?;
 			}
 
-			finish_task(&app, task)?;
+			finish_task(app, task)?;
 		}
 
 		ResourceOverviewEvent::FollowDependencyInNewTab { hash, .. } => {
@@ -366,7 +366,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			);
 
 			send_request(
-				&app,
+				app,
 				Request::Global(GlobalRequest::CreateTab {
 					id,
 					name: format!("Resource overview ({hash})"),
@@ -476,7 +476,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					}
 
 					"REPO" => {
-						let task = start_task(&app, "Loading repository")?;
+						let task = start_task(app, "Loading repository")?;
 
 						let id = Uuid::new_v4();
 
