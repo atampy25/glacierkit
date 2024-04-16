@@ -79,7 +79,7 @@ pub fn extract_latest_resource(
 		}
 	}
 
-	bail!("Couldn't find the resource in any RPKG");
+	bail!("Couldn't find the resource in any partition");
 }
 
 /// Get the metadata of the latest copy of a resource by its hash or path. Faster than fully extracting the resource.
@@ -134,7 +134,7 @@ pub fn extract_latest_metadata(
 		}
 	}
 
-	bail!("Couldn't find the resource in any RPKG");
+	bail!("Couldn't find the resource in any partition");
 }
 
 /// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource by its hash.

@@ -2369,7 +2369,10 @@ fn event(app: AppHandle, event: Event) {
 							GameBrowserEvent::Search(query, filter) => {
 								let task = start_task(&app, format!("Searching game files for {}", query))?;
 
-								if let Some(install) = app_settings.load().game_install.as_ref() {
+								if let Some(install) = app_settings.load().game_install.as_ref()
+									&& let Some(resource_reverse_dependencies) =
+										app_state.resource_reverse_dependencies.load().as_ref()
+								{
 									let install = app_state
 										.game_installs
 										.iter()
@@ -2403,7 +2406,6 @@ fn event(app: AppHandle, event: Event) {
 												entries: hash_list
 													.entries
 													.iter()
-													.filter(|(_, entry)| entry.games.contains(install.version))
 													.filter(|(_, entry)| {
 														matches!(filter, SearchFilter::All)
 															|| filter_includes.iter().any(|&x| x == entry.resource_type)
@@ -2428,6 +2430,9 @@ fn event(app: AppHandle, event: Event) {
 																.to_lowercase()
 																.contains(y) || hash.to_lowercase().contains(y)
 														})
+													})
+													.filter(|(hash, _)| {
+														resource_reverse_dependencies.contains_key(*hash)
 													})
 													.map(|(hash, entry)| GameBrowserEntry {
 														hash: hash.to_owned(),
@@ -4603,81 +4608,74 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		}
 	}
 
-	if let Some(install) = app_settings.load().game_install.as_ref() {
-		if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-			let game_version = app_state
-				.game_installs
-				.iter()
-				.try_find(|x| anyhow::Ok(x.path == *install))?
-				.context("No such game install")?
-				.version;
-
-			app_state.intellisense.store(Some(
-				Intellisense {
-					cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-					cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
-					uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json")).unwrap(),
-					matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
-					all_cppts: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "CPPT")
-						.map(|(hash, _)| hash.to_owned())
-						.collect(),
-					all_asets: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "ASET")
-						.map(|(hash, _)| hash.to_owned())
-						.collect(),
-					all_uicts: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "UICT")
-						.map(|(hash, _)| hash.to_owned())
-						.collect(),
-					all_matts: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "MATT")
-						.map(|(hash, _)| hash.to_owned())
-						.collect(),
-					all_wswts: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "WSWT")
-						.map(|(hash, _)| hash.to_owned())
-						.collect(),
-					all_ecpts: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "ECPT")
-						.map(|(hash, _)| hash.to_owned())
-						.collect(),
-					all_aibxs: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "AIBX")
-						.map(|(hash, _)| hash.to_owned())
-						.collect(),
-					all_wsgts: hash_list
-						.entries
-						.iter()
-						.filter(|(_, entry)| entry.games.contains(game_version))
-						.filter(|(_, entry)| entry.resource_type == "WSGT")
-						.map(|(hash, _)| hash.to_owned())
-						.collect()
-				}
-				.into()
-			));
-		}
+	if let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
+	{
+		app_state.intellisense.store(Some(
+			Intellisense {
+				cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+				cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
+				uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json")).unwrap(),
+				matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+				all_cppts: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "CPPT")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect(),
+				all_asets: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "ASET")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect(),
+				all_uicts: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "UICT")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect(),
+				all_matts: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "MATT")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect(),
+				all_wswts: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "WSWT")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect(),
+				all_ecpts: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "ECPT")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect(),
+				all_aibxs: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "AIBX")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect(),
+				all_wsgts: hash_list
+					.entries
+					.iter()
+					.filter(|(_, entry)| entry.resource_type == "WSGT")
+					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+					.map(|(hash, _)| hash.to_owned())
+					.collect()
+			}
+			.into()
+		));
 	} else {
 		app_state.intellisense.store(None);
 	}

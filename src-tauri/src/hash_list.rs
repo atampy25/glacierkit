@@ -37,8 +37,7 @@ pub struct HashList {
 pub struct HashData {
 	pub resource_type: String,
 	pub path: Option<String>,
-	pub hint: Option<String>,
-	pub games: EnumSet<GameVersion>
+	pub hint: Option<String>
 }
 
 impl HashList {
@@ -69,24 +68,7 @@ impl HashList {
 						HashData {
 							resource_type: entry.resource_type,
 							path: (!entry.path.is_empty()).then_some(entry.path),
-							hint: (!entry.hint.is_empty()).then_some(entry.hint),
-							games: {
-								let mut games = EnumSet::new();
-
-								if entry.game_flags & 0b000010 == 0b000010 {
-									games.insert(GameVersion::H1);
-								}
-
-								if entry.game_flags & 0b000100 == 0b000100 {
-									games.insert(GameVersion::H2);
-								}
-
-								if entry.game_flags & 0b001000 == 0b001000 {
-									games.insert(GameVersion::H3);
-								}
-
-								games
-							}
+							hint: (!entry.hint.is_empty()).then_some(entry.hint)
 						}
 					)
 				})
