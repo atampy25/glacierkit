@@ -3,7 +3,7 @@ use std::{
 	sync::Arc
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
 
@@ -16,7 +16,8 @@ use quickentity_rs::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
-use serde_json::{from_value, json, to_string, to_value, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{from_value, json, to_value, Value};
 use tryvial::try_fn;
 
 use crate::{
@@ -32,12 +33,28 @@ use crate::{
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CPPTPinsInfo {
+	#[serde(rename = "in")]
+	pub inputs: Vec<CPPTPinInfo>,
+
+	#[serde(rename = "out")]
+	pub outputs: Vec<CPPTPinInfo>
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CPPTPinInfo {
+	#[serde(rename = "pin")]
+	pub name: String,
+
+	pub description: String
+}
+
 pub struct Intellisense {
 	/// CPPT -> Property -> (Type, Value)
 	pub cppt_properties: Arc<DashMap<String, HashMap<String, (String, Value)>>>,
 
-	/// CPPT -> (Input, Output)
-	pub cppt_pins: HashMap<String, (Vec<String>, Vec<String>)>,
+	pub cppt_pins: HashMap<String, CPPTPinsInfo>,
 
 	/// Property type as enum -> String version
 	pub uicb_prop_types: HashMap<String, String>,
@@ -1343,13 +1360,13 @@ impl Intellisense {
 
 				if self.all_cppts.contains(&factory) {
 					let cppt_data = self.cppt_pins.get(&factory).context("No such CPPT in pins")?;
-					input.extend(cppt_data.0.to_owned());
-					output.extend(cppt_data.1.to_owned());
+					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 				} else if self.all_uicts.contains(&factory) {
 					// All UI controls have the pins of ZUIControlEntity
 					let cppt_data = self.cppt_pins.get("002C4526CC9753E6").context("No such CPPT in pins")?;
-					input.extend(cppt_data.0.to_owned());
-					output.extend(cppt_data.1.to_owned());
+					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
 					for entry in convert_uicb(
 						&extract_latest_resource(
@@ -1383,8 +1400,8 @@ impl Intellisense {
 				} else if self.all_matts.contains(&factory) {
 					// All materials have the pins of ZRenderMaterialEntity
 					let cppt_data = self.cppt_pins.get("00B4B11DA327CAD0").context("No such CPPT in pins")?;
-					input.extend(cppt_data.0.to_owned());
-					output.extend(cppt_data.1.to_owned());
+					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
 					for property in self.get_matt_properties(game_files, hash_list, &factory)? {
 						if !matches!(property.data, MaterialPropertyData::Texture(_)) {
@@ -1394,8 +1411,8 @@ impl Intellisense {
 				} else if self.all_wswts.contains(&factory) {
 					// All switch groups have the pins of ZAudioSwitchEntity
 					let cppt_data = self.cppt_pins.get("00797DC916520C4D").context("No such CPPT in pins")?;
-					input.extend(cppt_data.0.to_owned());
-					output.extend(cppt_data.1.to_owned());
+					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
 					let wswt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
 
@@ -1428,18 +1445,18 @@ impl Intellisense {
 				} else if self.all_ecpts.contains(&factory) {
 					// All extended CPP entities have the pins of ZMaterialOverwriteAspect
 					let cppt_data = self.cppt_pins.get("00D3003AAA7B3817").context("No such CPPT in pins")?;
-					input.extend(cppt_data.0.to_owned());
-					output.extend(cppt_data.1.to_owned());
+					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 				} else if self.all_aibxs.contains(&factory) {
 					// All behaviour trees have the pins of ZBehaviorTreeEntity
 					let cppt_data = self.cppt_pins.get("0028607138892D70").context("No such CPPT in pins")?;
-					input.extend(cppt_data.0.to_owned());
-					output.extend(cppt_data.1.to_owned());
+					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 				} else if self.all_wsgts.contains(&factory) {
 					// All state groups have the pins of ZAudioStateEntity
 					let cppt_data = self.cppt_pins.get("000D409686293996").context("No such CPPT in pins")?;
-					input.extend(cppt_data.0.to_owned());
-					output.extend(cppt_data.1.to_owned());
+					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
 					let wsgt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
 
