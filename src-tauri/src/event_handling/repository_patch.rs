@@ -13,8 +13,8 @@ use uuid::Uuid;
 use crate::{
 	finish_task,
 	model::{
-		AppState, EditorData, EditorRequest, GlobalRequest, RepositoryPatchEditorEvent,
-		RepositoryPatchEditorRequest, Request
+		AppState, EditorData, EditorRequest, GlobalRequest, RepositoryPatchEditorEvent, RepositoryPatchEditorRequest,
+		Request
 	},
 	repository::{RepositoryItem, RepositoryItemInformation},
 	send_request, start_task
@@ -198,8 +198,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 
 	match event {
 		RepositoryPatchEditorEvent::Initialise { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Loading repository items")?;
 
@@ -239,8 +238,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 		}
 
 		RepositoryPatchEditorEvent::CreateRepositoryItem { id } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Creating repository item")?;
 
@@ -289,8 +287,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 		}
 
 		RepositoryPatchEditorEvent::ResetModifications { id, item } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Resetting changes")?;
 
@@ -348,8 +345,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 		}
 
 		RepositoryPatchEditorEvent::ModifyItem { id, item, data } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Saving repository item")?;
 
@@ -409,8 +405,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 		}
 
 		RepositoryPatchEditorEvent::SelectItem { id, item } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Selecting repository item")?;
 

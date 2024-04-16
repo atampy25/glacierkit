@@ -63,6 +63,7 @@ json-patch = "1.2.0"
 tokio-tungstenite = "0.21.0"
 futures-util = "0.3.30"
 md5 = "0.7.0"
+dashmap = { version = "5.5.3", features = ["inline"] }
 
 [target.'cfg(linux)'.dependencies]
 fork = "0.1.22"

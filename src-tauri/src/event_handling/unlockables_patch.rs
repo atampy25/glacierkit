@@ -95,8 +95,7 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 
 	match event {
 		UnlockablesPatchEditorEvent::Initialise { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Loading unlockables")?;
 
@@ -136,8 +135,7 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 		}
 
 		UnlockablesPatchEditorEvent::CreateUnlockable { id } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Creating unlockable")?;
 
@@ -200,8 +198,7 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 		}
 
 		UnlockablesPatchEditorEvent::ResetModifications { id, unlockable } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Resetting changes")?;
 
@@ -259,8 +256,7 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 		}
 
 		UnlockablesPatchEditorEvent::ModifyUnlockable { id, unlockable, data } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Saving unlockable")?;
 
@@ -323,8 +319,7 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 		}
 
 		UnlockablesPatchEditorEvent::SelectUnlockable { id, unlockable } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Selecting unlockable")?;
 

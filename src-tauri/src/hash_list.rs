@@ -1,12 +1,9 @@
 use std::{collections::HashMap, io::Read};
 
 use anyhow::{Context, Result};
-use enumset::EnumSet;
 use fn_error_context::context;
 use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
-
-use crate::game_detection::GameVersion;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

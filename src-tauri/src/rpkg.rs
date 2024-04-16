@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use anyhow::{anyhow, bail, Context, Result};
+use dashmap::DashMap;
 use fn_error_context::context;
-use parking_lot::RwLock;
 use quickentity_rs::{
 	convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn,
 	qn_structs::Entity,
@@ -178,13 +176,13 @@ pub fn extract_latest_overview_info(
 #[context("Couldn't ensure caching of entity {}", factory_hash)]
 pub fn ensure_entity_in_cache(
 	resource_packages: &PartitionManager,
-	cached_entities: &RwLock<HashMap<String, Entity>>,
+	cached_entities: &DashMap<String, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
 	factory_hash: &str
 ) -> Result<()> {
 	{
-		if cached_entities.read().contains_key(factory_hash) {
+		if cached_entities.contains_key(factory_hash) {
 			return Ok(());
 		}
 	}
@@ -235,9 +233,7 @@ pub fn ensure_entity_in_cache(
 	let entity = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, true)
 		.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-	cached_entities
-		.write()
-		.insert(factory_hash.to_owned(), entity.to_owned());
+	cached_entities.insert(factory_hash.to_owned(), entity.to_owned());
 }
 
 pub fn normalise_to_hash(hash_or_path: String) -> String {

@@ -121,8 +121,7 @@ pub fn initialise_resource_overview(
 						hash
 					)?;
 
-					let entity = app_state.cached_entities.read();
-					let entity = entity.get(hash).unwrap();
+					let entity = app_state.cached_entities.get(hash).unwrap();
 
 					ResourceOverviewData::Entity {
 						blueprint_hash: entity.blueprint_hash.to_owned(),
@@ -275,8 +274,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 	match event {
 		ResourceOverviewEvent::Initialise { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -310,8 +308,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::FollowDependency { id, new_hash } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref mut hash, .. } => hash,
@@ -357,7 +354,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		ResourceOverviewEvent::FollowDependencyInNewTab { hash, .. } => {
 			let id = Uuid::new_v4();
 
-			app_state.editor_states.write().await.insert(
+			app_state.editor_states.insert(
 				id.to_owned(),
 				EditorState {
 					file: None,
@@ -377,8 +374,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 		ResourceOverviewEvent::OpenInEditor { id } => {
 			let hash = {
-				let editor_state = app_state.editor_states.read().await;
-				let editor_state = editor_state.get(&id).context("No such editor")?;
+				let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+
 				match editor_state.data {
 					EditorData::ResourceOverview { ref hash, .. } => hash,
 
@@ -420,7 +417,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							&hash
 						)?;
 
-						let entity = app_state.cached_entities.read().get(&hash).unwrap().to_owned();
+						let entity = app_state.cached_entities.get(&hash).unwrap().to_owned();
 
 						let default_tab_name = format!(
 							"{} ({})",
@@ -451,7 +448,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 						let id = Uuid::new_v4();
 
-						app_state.editor_states.write().await.insert(
+						app_state.editor_states.insert(
 							id.to_owned(),
 							EditorState {
 								file: None,
@@ -483,7 +480,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						let repository: Vec<RepositoryItem> =
 							from_slice(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?;
 
-						app_state.editor_states.write().await.insert(
+						app_state.editor_states.insert(
 							id.to_owned(),
 							EditorState {
 								file: None,
@@ -518,7 +515,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
 						)?)?;
 
-						app_state.editor_states.write().await.insert(
+						app_state.editor_states.insert(
 							id.to_owned(),
 							EditorState {
 								file: None,
@@ -550,8 +547,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractAsFile { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -601,8 +597,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractAsQN { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -631,9 +626,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				)?;
 
 				let entity_json = {
-					let entity = app_state.cached_entities.read();
-					let entity = entity.get(hash).unwrap();
-					to_vec(entity)?
+					let entity = app_state.cached_entities.get(hash).unwrap();
+					to_vec(&*entity)?
 				};
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract entity");
@@ -653,8 +647,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractTEMPAsRT { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -721,8 +714,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractTBLUAsFile { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -747,8 +739,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
 				let (metadata, data) = extract_latest_resource(game_files, hash_list, &{
-					let entity = app_state.cached_entities.read();
-					let entity = entity.get(hash).unwrap();
+					let entity = app_state.cached_entities.get(hash).unwrap();
 					entity.blueprint_hash.to_owned()
 				})?;
 
@@ -780,8 +771,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractTBLUAsRT { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -806,8 +796,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
 				let (metadata, data) = extract_latest_resource(game_files, hash_list, &{
-					let entity = app_state.cached_entities.read();
-					let entity = entity.get(hash).unwrap();
+					let entity = app_state.cached_entities.get(hash).unwrap();
 					entity.blueprint_hash.to_owned()
 				})?;
 
@@ -856,8 +845,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractAsRTGeneric { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -909,8 +897,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractORESAsJson { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -946,8 +933,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractAsPng { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -984,8 +970,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractAsWav { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -1034,8 +1019,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractMultiWav { id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,
@@ -1128,8 +1112,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 		}
 
 		ResourceOverviewEvent::ExtractSpecificMultiWav { id, index } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref hash, .. } => hash,

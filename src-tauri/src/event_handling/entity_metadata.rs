@@ -19,8 +19,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 
 	match event {
 		EntityMetadataEvent::Initialise { editor_id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref entity, .. } => entity,
@@ -64,8 +63,6 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 			editor_id,
 			mut factory_hash
 		} => {
-			let mut editor_state = app_state.editor_states.write().await;
-
 			let mut is_patch_editor = false;
 
 			if factory_hash != normalise_to_hash(factory_hash.to_owned()) {
@@ -83,7 +80,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 			}
 
 			{
-				let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+				let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 				let entity = match editor_state.data {
 					EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -104,7 +101,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 
 			// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity
 			if is_patch_editor {
-				let state = editor_state.remove(&editor_id).context("No such editor")?;
+				let (_, state) = app_state.editor_states.remove(&editor_id).context("No such editor")?;
 
 				let EditorState {
 					data: EditorData::QNPatch { settings, current, .. },
@@ -114,7 +111,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 					unreachable!();
 				};
 
-				editor_state.insert(
+				app_state.editor_states.insert(
 					editor_id.to_owned(),
 					EditorState {
 						data: EditorData::QNEntity {
@@ -139,8 +136,6 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 			editor_id,
 			mut blueprint_hash
 		} => {
-			let mut editor_state = app_state.editor_states.write().await;
-
 			let mut is_patch_editor = false;
 
 			if blueprint_hash != normalise_to_hash(blueprint_hash.to_owned()) {
@@ -158,7 +153,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 			}
 
 			{
-				let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+				let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 				let entity = match editor_state.data {
 					EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -179,7 +174,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 
 			// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity
 			if is_patch_editor {
-				let state = editor_state.remove(&editor_id).context("No such editor")?;
+				let (_, state) = app_state.editor_states.remove(&editor_id).context("No such editor")?;
 
 				let EditorState {
 					data: EditorData::QNPatch { settings, current, .. },
@@ -189,7 +184,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 					unreachable!();
 				};
 
-				editor_state.insert(
+				app_state.editor_states.insert(
 					editor_id.to_owned(),
 					EditorState {
 						data: EditorData::QNEntity {
@@ -211,8 +206,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 		}
 
 		EntityMetadataEvent::SetRootEntity { editor_id, root_entity } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -236,8 +230,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 		}
 
 		EntityMetadataEvent::SetSubType { editor_id, sub_type } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -264,8 +257,7 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 			editor_id,
 			external_scenes
 		} => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,

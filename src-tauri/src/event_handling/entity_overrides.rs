@@ -206,8 +206,7 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 
 	match event {
 		EntityOverridesEvent::Initialise { editor_id } => {
-			let editor_state = app_state.editor_states.read().await;
-			let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref entity, .. } => entity,
@@ -268,8 +267,7 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 		}
 
 		EntityOverridesEvent::UpdatePropertyOverrides { editor_id, content } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -299,8 +297,7 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 		}
 
 		EntityOverridesEvent::UpdateOverrideDeletes { editor_id, content } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -330,8 +327,7 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 		}
 
 		EntityOverridesEvent::UpdatePinConnectionOverrides { editor_id, content } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -361,8 +357,7 @@ pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverrid
 		}
 
 		EntityOverridesEvent::UpdatePinConnectionOverrideDeletes { editor_id, content } => {
-			let mut editor_state = app_state.editor_states.write().await;
-			let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,

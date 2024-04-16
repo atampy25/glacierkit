@@ -1,15 +1,15 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use anyhow::{Context, Result};
+use dashmap::DashMap;
 use fn_error_context::context;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use parking_lot::RwLock;
 use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};
 use rand::{seq::SliceRandom, thread_rng};
-use rpkg_rs::runtime::resource::{partition_manager::PartitionManager};
+use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, from_value, Value};
+use serde_json::{from_value, Value};
 use specta::Type;
 use tryvial::try_fn;
 use velcro::vec;
@@ -18,6 +18,7 @@ use crate::{
 	game_detection::GameVersion,
 	hash_list::HashList,
 	model::EditorValidity,
+	repository::RepositoryItem,
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
 
@@ -591,7 +592,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 
 pub fn get_ref_decoration(
 	game_files: &PartitionManager,
-	cached_entities: &RwLock<HashMap<String, Entity>>,
+	cached_entities: &DashMap<String, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
 	entity: &Entity,
@@ -614,7 +615,6 @@ pub fn get_ref_decoration(
 				.ok()?;
 
 				cached_entities
-					.read()
 					.get(&normalise_to_hash(
 						reference.external_scene.as_ref().expect("Not a local reference").into()
 					))
@@ -634,15 +634,14 @@ pub fn get_ref_decoration(
 #[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
 pub fn get_decorations(
 	game_files: &PartitionManager,
-	cached_entities: &RwLock<HashMap<String, Entity>>,
+	cached_entities: &DashMap<String, Entity>,
+	repository: &[RepositoryItem],
 	hash_list: &HashList,
 	game_version: GameVersion,
 	sub_entity: &SubEntity,
 	entity: &Entity
 ) -> Result<Vec<(String, String)>> {
 	let mut decorations = vec![];
-
-	let repository = from_slice::<Vec<Value>>(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?;
 
 	if let Some(decoration) = get_ref_decoration(
 		game_files,
@@ -697,18 +696,10 @@ pub fn get_decorations(
 		} else if property_data.property_type == "ZGuid" {
 			let repository_id = from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
 
-			if let Some(repo_item) = repository.iter().try_find(|x| {
-				anyhow::Ok(
-					x.get("ID_")
-						.context("No ID on repository item")?
-						.as_str()
-						.context("ID was not string")?
-						== repository_id
-				)
-			})? {
-				if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+			if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
+				if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
 					decorations.push((
-						repository_id,
+						repository_id.to_string(),
 						name.as_str().context("Name or CommonName was not string")?.to_owned()
 					));
 				}
@@ -717,18 +708,10 @@ pub fn get_decorations(
 			for repository_id in
 				from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
 			{
-				if let Some(repo_item) = repository.iter().try_find(|x| {
-					anyhow::Ok(
-						x.get("ID_")
-							.context("No ID on repository item")?
-							.as_str()
-							.context("ID was not string")?
-							== repository_id
-					)
-				})? {
-					if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+				if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
+					if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
 						decorations.push((
-							repository_id,
+							repository_id.to_string(),
 							name.as_str().context("Name or CommonName was not string")?.to_owned()
 						));
 					}
@@ -810,18 +793,10 @@ pub fn get_decorations(
 			} else if property_data.property_type == "ZGuid" {
 				let repository_id = from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
 
-				if let Some(repo_item) = repository.iter().try_find(|x| {
-					anyhow::Ok(
-						x.get("ID_")
-							.context("No ID on repository item")?
-							.as_str()
-							.context("ID was not string")?
-							== repository_id
-					)
-				})? {
-					if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+				if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
+					if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
 						decorations.push((
-							repository_id,
+							repository_id.to_string(),
 							name.as_str().context("Name or CommonName was not string")?.to_owned()
 						));
 					}
@@ -830,17 +805,10 @@ pub fn get_decorations(
 				for repository_id in
 					from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
 				{
-					if let Some(repo_item) = repository.iter().try_find(|x| {
-						anyhow::Ok(
-							x.get("ID_")
-								.context("No ID on repository item")?
-								.as_str()
-								.context("ID was not string")? == repository_id
-						)
-					})? {
-						if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+					if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
+						if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
 							decorations.push((
-								repository_id,
+								repository_id.to_string(),
 								name.as_str().context("Name or CommonName was not string")?.to_owned()
 							));
 						}

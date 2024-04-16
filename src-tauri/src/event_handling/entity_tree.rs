@@ -46,8 +46,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let editor_state = app_state.editor_states.read().await;
-	let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref entity, .. } => entity,
@@ -147,6 +146,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
+		&& let Some(repository) = app_state.repository.load().as_ref()
 	{
 		let game_version = app_state
 			.game_installs
@@ -192,6 +192,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		let decorations = get_decorations(
 			game_files,
 			&app_state.cached_entities,
+			repository,
 			hash_list,
 			game_version,
 			entity.entities.get(&id).context("No such entity")?,
@@ -225,8 +226,7 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 
 	let task = start_task(app, format!("Deleting entity {}", id))?;
 
-	let mut editor_state = app_state.editor_states.write().await;
-	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -580,8 +580,7 @@ pub async fn handle_paste(
 		)
 	)?;
 
-	let mut editor_state = app_state.editor_states.write().await;
-	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -1111,8 +1110,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 
 	let task = start_task(app, format!("Showing help menu for {}", entity_id))?;
 
-	let editor_state = app_state.editor_states.read().await;
-	let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref entity, .. } => entity,
@@ -1152,8 +1150,8 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 				&normalise_to_hash(sub_entity.factory.to_owned())
 			)?;
 
-			let underlying_entity = app_state.cached_entities.read();
-			let underlying_entity = underlying_entity
+			let underlying_entity = app_state
+				.cached_entities
 				.get(&normalise_to_hash(sub_entity.factory.to_owned()))
 				.unwrap();
 
@@ -1163,7 +1161,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 					&app_state.cached_entities,
 					hash_list,
 					game_version,
-					underlying_entity,
+					&underlying_entity,
 					&underlying_entity.root_entity,
 					false
 				)?,
@@ -1172,7 +1170,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 					&app_state.cached_entities,
 					hash_list,
 					game_version,
-					underlying_entity,
+					&underlying_entity,
 					&underlying_entity.root_entity,
 					false
 				)?
@@ -1273,8 +1271,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 
 	let task = start_task(app, format!("Adding {}", file))?;
 
-	let mut editor_state = app_state.editor_states.write().await;
-	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,

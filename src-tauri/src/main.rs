@@ -37,6 +37,7 @@ use std::{
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use entity::{
 	calculate_reverse_references, get_local_reference, get_recursive_children, is_valid_entity_blueprint,
 	CopiedEntityData
@@ -72,7 +73,6 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use repository::RepositoryItem;
 use resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
@@ -89,7 +89,6 @@ use serde_json::{from_slice, from_str, from_value, json, to_string, to_value, to
 use show_in_folder::show_in_folder;
 use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
-use tokio::sync::RwLock;
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
@@ -186,10 +185,11 @@ fn main() {
 					.and_then(|x| serde_smile::from_slice(&x).ok())
 					.into(),
 				fs_watcher: None.into(),
-				editor_states: RwLock::new(HashMap::new()).into(),
+				editor_states: DashMap::new().into(),
 				game_files: None.into(),
 				resource_reverse_dependencies: None.into(),
-				cached_entities: parking_lot::RwLock::new(HashMap::new()).into(),
+				cached_entities: DashMap::new().into(),
+				repository: None.into(),
 				intellisense: None.into()
 			});
 
@@ -275,12 +275,11 @@ fn event(app: AppHandle, event: Event) {
 									)?;
 
 									let existing = {
-										let guard = app_state.editor_states.read().await;
-
-										guard
+										app_state
+											.editor_states
 											.iter()
-											.find(|(_, x)| x.file.as_ref().map(|x| x == &path).unwrap_or(false))
-											.map(|(x, _)| x.to_owned())
+											.find(|x| x.file.as_ref().map(|x| x == &path).unwrap_or(false))
+											.map(|x| x.key().to_owned())
 									};
 
 									if let Some(existing) = existing {
@@ -320,7 +319,7 @@ fn event(app: AppHandle, event: Event) {
 												}
 												entity.comments = comments;
 
-												app_state.editor_states.write().await.insert(
+												app_state.editor_states.insert(
 													id.to_owned(),
 													EditorState {
 														file: Some(path.to_owned()),
@@ -371,7 +370,6 @@ fn event(app: AppHandle, event: Event) {
 
 													let mut entity = app_state
 														.cached_entities
-														.read()
 														.get(&normalise_to_hash(patch.factory_hash.to_owned()))
 														.unwrap()
 														.to_owned();
@@ -398,7 +396,7 @@ fn event(app: AppHandle, event: Event) {
 													}
 													entity.comments = comments;
 
-													app_state.editor_states.write().await.insert(
+													app_state.editor_states.insert(
 														id.to_owned(),
 														EditorState {
 															file: Some(path.to_owned()),
@@ -455,7 +453,7 @@ fn event(app: AppHandle, event: Event) {
 														TextFileType::Json
 													};
 
-												app_state.editor_states.write().await.insert(
+												app_state.editor_states.insert(
 													id.to_owned(),
 													EditorState {
 														file: Some(path.to_owned()),
@@ -484,7 +482,7 @@ fn event(app: AppHandle, event: Event) {
 											"txt" => {
 												let id = Uuid::new_v4();
 
-												app_state.editor_states.write().await.insert(
+												app_state.editor_states.insert(
 													id.to_owned(),
 													EditorState {
 														file: Some(path.to_owned()),
@@ -515,7 +513,7 @@ fn event(app: AppHandle, event: Event) {
 											"md" => {
 												let id = Uuid::new_v4();
 
-												app_state.editor_states.write().await.insert(
+												app_state.editor_states.insert(
 													id.to_owned(),
 													EditorState {
 														file: Some(path.to_owned()),
@@ -546,31 +544,16 @@ fn event(app: AppHandle, event: Event) {
 											"repository.json" => {
 												let id = Uuid::new_v4();
 
-												if let Some(game_files) = app_state.game_files.load().as_ref()
-													&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-												{
+												if let Some(cached_repository) = app_state.repository.load().as_ref() {
 													let mut repository = to_value(
-														from_slice::<Vec<RepositoryItem>>(
-															&extract_latest_resource(
-																game_files,
-																hash_list,
-																"00204D1AFD76AB13"
-															)?
-															.1
-														)?
-														.into_iter()
-														.map(|x| (x.id, x.data))
-														.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+														cached_repository
+															.iter()
+															.cloned()
+															.map(|x| (x.id, x.data))
+															.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
 													)?;
 
-													let base = from_slice::<Value>(
-														&extract_latest_resource(
-															game_files,
-															hash_list,
-															"00204D1AFD76AB13"
-														)?
-														.1
-													)?;
+													let base = to_value(cached_repository)?;
 
 													let patch: Value =
 														from_slice(&fs::read(&path).context("Couldn't read file")?)
@@ -585,7 +568,7 @@ fn event(app: AppHandle, event: Event) {
 													.map(|(id, data)| RepositoryItem { id, data })
 													.collect();
 
-													app_state.editor_states.write().await.insert(
+													app_state.editor_states.insert(
 														id.to_owned(),
 														EditorState {
 															file: Some(path.to_owned()),
@@ -707,7 +690,7 @@ fn event(app: AppHandle, event: Event) {
 													})
 													.collect();
 
-													app_state.editor_states.write().await.insert(
+													app_state.editor_states.insert(
 														id.to_owned(),
 														EditorState {
 															file: Some(path.to_owned()),
@@ -768,31 +751,19 @@ fn event(app: AppHandle, event: Event) {
 													.context("Type key was not string")?
 												{
 													"REPO" => {
-														if let Some(game_files) = app_state.game_files.load().as_ref()
-															&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+														if let Some(cached_repository) =
+															app_state.repository.load().as_ref()
 														{
 															let mut repository = to_value(
-																from_slice::<Vec<RepositoryItem>>(
-																	&extract_latest_resource(
-																		game_files,
-																		hash_list,
-																		"00204D1AFD76AB13"
-																	)?
-																	.1
-																)?
-																.into_iter()
-																.map(|x| (x.id, x.data))
-																.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+																cached_repository
+																	.iter()
+																	.cloned()
+																	.map(|x| (x.id, x.data))
+																	.collect::<IndexMap<Uuid, IndexMap<String, Value>>>(
+																	)
 															)?;
 
-															let base = from_slice::<Value>(
-																&extract_latest_resource(
-																	game_files,
-																	hash_list,
-																	"00204D1AFD76AB13"
-																)?
-																.1
-															)?;
+															let base = to_value(cached_repository)?;
 
 															let patch = from_slice::<Value>(
 																&fs::read(&path).context("Couldn't read file")?
@@ -817,7 +788,7 @@ fn event(app: AppHandle, event: Event) {
 															.map(|(id, data)| RepositoryItem { id, data })
 															.collect();
 
-															app_state.editor_states.write().await.insert(
+															app_state.editor_states.insert(
 																id.to_owned(),
 																EditorState {
 																	file: Some(path.to_owned()),
@@ -962,7 +933,7 @@ fn event(app: AppHandle, event: Event) {
 															})
 															.collect();
 
-															app_state.editor_states.write().await.insert(
+															app_state.editor_states.insert(
 																id.to_owned(),
 																EditorState {
 																	file: Some(path.to_owned()),
@@ -1010,7 +981,7 @@ fn event(app: AppHandle, event: Event) {
 													}
 
 													_ => {
-														app_state.editor_states.write().await.insert(
+														app_state.editor_states.insert(
 															id.to_owned(),
 															EditorState {
 																file: Some(path.to_owned()),
@@ -1044,7 +1015,7 @@ fn event(app: AppHandle, event: Event) {
 											| "material.json" | "contract.json" => {
 												let id = Uuid::new_v4();
 
-												app_state.editor_states.write().await.insert(
+												app_state.editor_states.insert(
 													id.to_owned(),
 													EditorState {
 														file: Some(path.to_owned()),
@@ -1077,7 +1048,7 @@ fn event(app: AppHandle, event: Event) {
 
 												let id = Uuid::new_v4();
 
-												app_state.editor_states.write().await.insert(
+												app_state.editor_states.insert(
 													id.to_owned(),
 													EditorState {
 														file: Some(path.to_owned()),
@@ -1291,7 +1262,6 @@ fn event(app: AppHandle, event: Event) {
 
 											let mut entity = app_state
 												.cached_entities
-												.read()
 												.get(&normalise_to_hash(patch.factory_hash.to_owned()))
 												.unwrap()
 												.to_owned();
@@ -1508,7 +1478,6 @@ fn event(app: AppHandle, event: Event) {
 
 									let mut entity = app_state
 										.cached_entities
-										.read()
 										.get(&normalise_to_hash(patch.factory_hash.to_owned()))
 										.unwrap()
 										.to_owned();
@@ -1579,16 +1548,14 @@ fn event(app: AppHandle, event: Event) {
 									.as_str()
 									.context("Type key was not string")? == "REPO"
 								{
-									if let Some(game_files) = app_state.game_files.load().as_ref()
-										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+									if let Some(cached_repository) = app_state.repository.load().as_ref()
 									{
 										let mut current = to_value(
-											from_slice::<Vec<RepositoryItem>>(
-												&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1
-											)?
-											.into_iter()
-											.map(|x| (x.id, x.data))
-											.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+											cached_repository
+												.iter()
+												.cloned()
+												.map(|x| (x.id, x.data))
+												.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
 										)?;
 
 										let base = current.to_owned();
@@ -1878,16 +1845,13 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							FileBrowserEvent::ConvertRepoPatchToJsonPatch { path } => {
-								if let Some(game_files) = app_state.game_files.load().as_ref()
-									&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-								{
+								if let Some(cached_repository) = app_state.repository.load().as_ref() {
 									let mut current = to_value(
-										from_slice::<Vec<RepositoryItem>>(
-											&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1
-										)?
-										.into_iter()
-										.map(|x| (x.id, x.data))
-										.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+										cached_repository
+											.iter()
+											.cloned()
+											.map(|x| (x.id, x.data))
+											.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
 									)?;
 
 									let base = current.to_owned();
@@ -2348,7 +2312,7 @@ fn event(app: AppHandle, event: Event) {
 							GameBrowserEvent::Select(hash) => {
 								let id = Uuid::new_v4();
 
-								app_state.editor_states.write().await.insert(
+								app_state.editor_states.insert(
 									id.to_owned(),
 									EditorState {
 										file: None,
@@ -2480,8 +2444,7 @@ fn event(app: AppHandle, event: Event) {
 												&hash
 											)?;
 
-											let entity =
-												app_state.cached_entities.read().get(&hash).unwrap().to_owned();
+											let entity = app_state.cached_entities.get(&hash).unwrap().to_owned();
 
 											let default_tab_name = format!(
 												"{} ({})",
@@ -2512,7 +2475,7 @@ fn event(app: AppHandle, event: Event) {
 
 											let id = Uuid::new_v4();
 
-											app_state.editor_states.write().await.insert(
+											app_state.editor_states.insert(
 												id.to_owned(),
 												EditorState {
 													file: None,
@@ -2545,7 +2508,7 @@ fn event(app: AppHandle, event: Event) {
 												&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1
 											)?;
 
-											app_state.editor_states.write().await.insert(
+											app_state.editor_states.insert(
 												id.to_owned(),
 												EditorState {
 													file: None,
@@ -2580,7 +2543,7 @@ fn event(app: AppHandle, event: Event) {
 												&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
 											)?)?;
 
-											app_state.editor_states.write().await.insert(
+											app_state.editor_states.insert(
 												id.to_owned(),
 												EditorState {
 													file: None,
@@ -2698,8 +2661,7 @@ fn event(app: AppHandle, event: Event) {
 					Event::Editor(event) => match event {
 						EditorEvent::Text(event) => match event {
 							TextEditorEvent::Initialise { id } => {
-								let editor_state = app_state.editor_states.read().await;
-								let editor_state = editor_state.get(&id).context("No such editor")?;
+								let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 								let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
 									Err(anyhow!("Editor {} is not a text editor", id))?;
@@ -2724,8 +2686,8 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							TextEditorEvent::UpdateContent { id, content } => {
-								let mut editor_state = app_state.editor_states.write().await;
-								let editor_state = editor_state.get_mut(&id).context("No such editor")?;
+								let mut editor_state =
+									app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 								let EditorData::Text {
 									file_type,
@@ -2753,8 +2715,8 @@ fn event(app: AppHandle, event: Event) {
 									editor_id,
 									show_reverse_parent_refs
 								} => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+									let mut editor_state =
+										app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 									let settings = match editor_state.data {
 										EditorData::QNEntity { ref mut settings, .. } => settings,
@@ -2772,8 +2734,8 @@ fn event(app: AppHandle, event: Event) {
 
 							EntityEditorEvent::Tree(event) => match event {
 								EntityTreeEvent::Initialise { editor_id } => {
-									let editor_state = app_state.editor_states.read().await;
-									let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+									let editor_state =
+										app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 									let entity = match editor_state.data {
 										EditorData::QNEntity { ref entity, .. } => entity,
@@ -2845,8 +2807,8 @@ fn event(app: AppHandle, event: Event) {
 								}
 
 								EntityTreeEvent::Create { editor_id, id, content } => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+									let mut editor_state =
+										app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 									let entity = match editor_state.data {
 										EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2878,8 +2840,8 @@ fn event(app: AppHandle, event: Event) {
 									id,
 									new_name
 								} => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+									let mut editor_state =
+										app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 									let entity = match editor_state.data {
 										EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2928,8 +2890,8 @@ fn event(app: AppHandle, event: Event) {
 									id,
 									new_parent
 								} => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+									let mut editor_state =
+										app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 									let entity = match editor_state.data {
 										EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2976,8 +2938,8 @@ fn event(app: AppHandle, event: Event) {
 								EntityTreeEvent::Copy { editor_id, id } => {
 									let task = start_task(&app, format!("Copying entity {} and its children", id))?;
 
-									let editor_state = app_state.editor_states.read().await;
-									let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+									let editor_state =
+										app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 									let entity = match editor_state.data {
 										EditorData::QNEntity { ref entity, .. } => entity,
@@ -3023,8 +2985,8 @@ fn event(app: AppHandle, event: Event) {
 								EntityTreeEvent::Search { editor_id, query } => {
 									let task = start_task(&app, format!("Searching for {}", query))?;
 
-									let editor_state = app_state.editor_states.read().await;
-									let editor_state = editor_state.get(&editor_id).context("No such editor")?;
+									let editor_state =
+										app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 									let entity = match editor_state.data {
 										EditorData::QNEntity { ref entity, .. } => entity,
@@ -3122,8 +3084,8 @@ fn event(app: AppHandle, event: Event) {
 									entity_id,
 									notes
 								} => {
-									let mut editor_state = app_state.editor_states.write().await;
-									let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+									let mut editor_state =
+										app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 									let entity = match editor_state.data {
 										EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -3450,8 +3412,6 @@ fn event(app: AppHandle, event: Event) {
 							if let Some(tab) = tab {
 								if let Some(file) = app_state
 									.editor_states
-									.read()
-									.await
 									.get(&tab)
 									.context("No such editor")?
 									.file
@@ -3473,12 +3433,7 @@ fn event(app: AppHandle, event: Event) {
 						}
 
 						GlobalEvent::RemoveTab(tab) => {
-							let old = app_state
-								.editor_states
-								.write()
-								.await
-								.remove(&tab)
-								.context("No such editor")?;
+							let (_, old) = app_state.editor_states.remove(&tab).context("No such editor")?;
 
 							if old.file.is_some() {
 								send_request(
@@ -3491,8 +3446,7 @@ fn event(app: AppHandle, event: Event) {
 						}
 
 						GlobalEvent::SaveTab(tab) => {
-							let mut guard = app_state.editor_states.write().await;
-							let editor = guard.get_mut(&tab).context("No such editor")?;
+							let mut editor = app_state.editor_states.get_mut(&tab).context("No such editor")?;
 
 							let data_to_save = match &editor.data {
 								EditorData::Nil => {
@@ -4608,6 +4562,9 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		}
 	}
 
+	finish_task(app, task)?;
+	let task = start_task(app, "Setting up intellisense")?;
+
 	if let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
 	{
@@ -4688,6 +4645,19 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	)?;
 
 	finish_task(app, task)?;
+
+	if let Some(game_files) = app_state.game_files.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+	{
+		let task = start_task(app, "Caching repository")?;
+
+		app_state.repository.store(Some(
+			from_slice::<Vec<RepositoryItem>>(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?
+				.into()
+		));
+
+		finish_task(app, task)?;
+	}
 }
 
 #[try_fn]

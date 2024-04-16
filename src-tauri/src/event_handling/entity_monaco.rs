@@ -28,8 +28,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let mut editor_state = app_state.editor_states.write().await;
-	let editor_state = editor_state.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -85,6 +84,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							}
 						}
 					}
+
 					let mut reverse_parent_refs: HashSet<String> = HashSet::new();
 
 					for entity_data in entity.entities.values() {
@@ -140,6 +140,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 					if let Some(game_files) = app_state.game_files.load().as_ref()
 						&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 						&& let Some(install) = app_settings.load().game_install.as_ref()
+						&& let Some(repository) = app_state.repository.load().as_ref()
 					{
 						let game_version = app_state
 							.game_installs
@@ -153,6 +154,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						let decorations = get_decorations(
 							game_files,
 							&app_state.cached_entities,
+							repository,
 							hash_list,
 							game_version,
 							entity.entities.get(&entity_id).context("No such entity")?,
@@ -259,7 +261,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 					&factory
 				)?;
 
-				let entity = app_state.cached_entities.read().get(&factory).unwrap().to_owned();
+				let entity = app_state.cached_entities.get(&factory).unwrap().to_owned();
 
 				let default_tab_name = format!(
 					"{} ({})",
@@ -290,7 +292,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 
 				let id = Uuid::new_v4();
 
-				app_state.editor_states.write().await.insert(
+				app_state.editor_states.insert(
 					id.to_owned(),
 					EditorState {
 						file: None,
@@ -315,7 +317,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 			} else {
 				let id = Uuid::new_v4();
 
-				app_state.editor_states.write().await.insert(
+				app_state.editor_states.insert(
 					id.to_owned(),
 					EditorState {
 						file: None,

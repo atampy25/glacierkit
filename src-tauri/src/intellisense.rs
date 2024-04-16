@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
+use dashmap::DashMap;
 use fn_error_context::context;
 
 use itertools::Itertools;
@@ -366,13 +367,13 @@ impl Intellisense {
 
 	/// Get the names, types, default values and post-init status of all properties of a given sub-entity.
 	///
-	/// Will deadlock if a read or write lock is already held on `cached_entities` by the same thread.
+	/// May deadlock if a reference is already held on `cached_entities` by the same thread.
 	#[try_fn]
 	#[context("Couldn't get properties for sub-entity {} in {}", sub_entity, entity.factory_hash)]
 	pub fn get_properties(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &RwLock<HashMap<String, Entity>>,
+		cached_entities: &DashMap<String, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -745,7 +746,6 @@ impl Intellisense {
 						) {
 							Ok(_) => {
 								let extracted = cached_entities
-									.read()
 									.get(&normalise_to_hash(factory.to_owned()))
 									.expect("Ensured")
 									.to_owned();
@@ -788,7 +788,7 @@ impl Intellisense {
 	pub fn get_specific_property(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &RwLock<HashMap<String, Entity>>,
+		cached_entities: &DashMap<String, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -1174,7 +1174,6 @@ impl Intellisense {
 				) {
 					Ok(_) => {
 						let extracted = cached_entities
-							.read()
 							.get(&normalise_to_hash(factory.to_owned()))
 							.expect("Ensured")
 							.to_owned();
@@ -1210,7 +1209,7 @@ impl Intellisense {
 	pub fn get_pins(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &RwLock<HashMap<String, Entity>>,
+		cached_entities: &DashMap<String, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -1458,7 +1457,6 @@ impl Intellisense {
 					) {
 						Ok(_) => {
 							let extracted = cached_entities
-								.read()
 								.get(&normalise_to_hash(factory.to_owned()))
 								.expect("Ensured")
 								.to_owned();

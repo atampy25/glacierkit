@@ -2,14 +2,14 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 
+use dashmap::DashMap;
 use notify::RecommendedWatcher;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
-use rpkg_rs::runtime::resource::{partition_manager::PartitionManager};
+use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
 use structstruck::strike;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
@@ -44,13 +44,14 @@ pub struct AppState {
 	pub project: ArcSwapOption<Project>,
 	pub hash_list: ArcSwapOption<HashList>,
 	pub fs_watcher: ArcSwapOption<RecommendedWatcher>,
-	pub editor_states: Arc<RwLock<HashMap<Uuid, EditorState>>>,
+	pub editor_states: Arc<DashMap<Uuid, EditorState>>,
 	pub game_files: ArcSwapOption<PartitionManager>,
 
 	/// Resource -> Resources which depend on it
 	pub resource_reverse_dependencies: ArcSwapOption<HashMap<String, Vec<String>>>,
 
-	pub cached_entities: Arc<parking_lot::RwLock<HashMap<String, Entity>>>,
+	pub cached_entities: Arc<DashMap<String, Entity>>,
+	pub repository: ArcSwapOption<Vec<RepositoryItem>>,
 	pub intellisense: ArcSwapOption<Intellisense>
 }
 
