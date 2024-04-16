@@ -1,6 +1,9 @@
 {
-	"1": "int32",
-	"2": "float32",
-	"3": "ZString",
-	"4": "bool"
+	"E_ATTRIBUTE_TYPE_VOID": "void",
+	"E_ATTRIBUTE_TYPE_INT": "int32",
+	"E_ATTRIBUTE_TYPE_FLOAT": "float32",
+	"E_ATTRIBUTE_TYPE_STRING": "ZString",
+	"E_ATTRIBUTE_TYPE_BOOL": "bool",
+	"E_ATTRIBUTE_TYPE_ENTITYREF": "SEntityTemplateReference",
+	"E_ATTRIBUTE_TYPE_OBJECT": "SEntityTemplateReference"
 }

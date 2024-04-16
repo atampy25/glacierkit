@@ -1548,8 +1548,7 @@ fn event(app: AppHandle, event: Event) {
 									.as_str()
 									.context("Type key was not string")? == "REPO"
 								{
-									if let Some(cached_repository) = app_state.repository.load().as_ref()
-									{
+									if let Some(cached_repository) = app_state.repository.load().as_ref() {
 										let mut current = to_value(
 											cached_repository
 												.iter()
@@ -2374,9 +2373,6 @@ fn event(app: AppHandle, event: Event) {
 														matches!(filter, SearchFilter::All)
 															|| filter_includes.iter().any(|&x| x == entry.resource_type)
 													})
-													.filter(|(_, entry)| {
-														!is_valid_entity_blueprint(&entry.resource_type)
-													})
 													.filter(|(hash, entry)| {
 														query.split(' ').all(|y| {
 															entry
@@ -2628,18 +2624,21 @@ fn event(app: AppHandle, event: Event) {
 
 							SettingsEvent::ChangeGameInstall(path) => {
 								let mut settings = (*app_settings.load_full()).to_owned();
-								settings.game_install = path;
-								fs::write(
-									app.path_resolver()
-										.app_data_dir()
-										.context("Couldn't get app data dir")?
-										.join("settings.json"),
-									to_vec(&settings).unwrap()
-								)
-								.unwrap();
-								app_settings.store(settings.into());
 
-								load_game_files(&app).await?;
+								if path != settings.game_install {
+									settings.game_install = path;
+									fs::write(
+										app.path_resolver()
+											.app_data_dir()
+											.context("Couldn't get app data dir")?
+											.join("settings.json"),
+										to_vec(&settings).unwrap()
+									)
+									.unwrap();
+									app_settings.store(settings.into());
+
+									load_game_files(&app).await?;
+								}
 							}
 
 							SettingsEvent::ChangeExtractModdedFiles(value) => {

@@ -16,7 +16,7 @@ use quickentity_rs::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
-use serde_json::{from_value, json, to_value, Value};
+use serde_json::{from_value, json, to_string, to_value, Value};
 use tryvial::try_fn;
 
 use crate::{
@@ -27,7 +27,7 @@ use crate::{
 	resourcelib::{
 		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2016_convert_ecpb, h2016_convert_wsgb, h2_convert_cppt,
 		h2_convert_dswb, h2_convert_ecpb, h2_convert_wsgb, h3_convert_cppt, h3_convert_dswb, h3_convert_ecpb,
-		h3_convert_wsgb, EExtendedPropertyType
+		h3_convert_wsgb, EAttributeKind, EExtendedPropertyType
 	},
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
 };
@@ -39,8 +39,8 @@ pub struct Intellisense {
 	/// CPPT -> (Input, Output)
 	pub cppt_pins: HashMap<String, (Vec<String>, Vec<String>)>,
 
-	/// Property type as number -> String version
-	pub uicb_prop_types: HashMap<u8, String>,
+	/// Property type as enum -> String version
+	pub uicb_prop_types: HashMap<String, String>,
 
 	pub matt_properties: Arc<DashMap<String, Vec<MaterialProperty>>>,
 
@@ -489,13 +489,13 @@ impl Intellisense {
 									)?
 									.1
 								)?
-								.m_aPins
+								.m_aAttributes
 								{
 									// Property
-									if entry.m_nUnk00 == 0 {
+									if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
 										let prop_type = self
 											.uicb_prop_types
-											.get(&entry.m_nUnk01)
+											.get(&to_string(&entry.m_eType)?)
 											.context("Unknown UICB property type")?;
 
 										// We can't get the actual default values, if there are any, so we just use sensible defaults
@@ -507,7 +507,7 @@ impl Intellisense {
 												"float32" => to_value(0)?,
 												"ZString" => to_value("")?,
 												"bool" => to_value(false)?,
-												_ => bail!("UICB property types has unknown type")
+												_ => Value::Null
 											},
 											false
 										));
@@ -910,29 +910,27 @@ impl Intellisense {
 					)?
 					.1
 				)?
-				.m_aPins
+				.m_aAttributes
 				{
 					// Property
-					if entry.m_nUnk00 == 0 {
+					if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
 						let prop_type = self
 							.uicb_prop_types
-							.get(&entry.m_nUnk01)
+							.get(&to_string(&entry.m_eType)?)
 							.context("Unknown UICB property type")?;
 
 						// We can't get the actual default values, if there are any, so we just use sensible defaults
-						if entry.m_sName == property_to_find {
-							return Ok(Some((
-								prop_type.into(),
-								match prop_type.as_ref() {
-									"int32" => to_value(0)?,
-									"float32" => to_value(0)?,
-									"ZString" => to_value("")?,
-									"bool" => to_value(false)?,
-									_ => bail!("UICB property types has unknown type")
-								},
-								false
-							)));
-						}
+						return Ok(Some((
+							prop_type.into(),
+							match prop_type.as_ref() {
+								"int32" => to_value(0)?,
+								"float32" => to_value(0)?,
+								"ZString" => to_value("")?,
+								"bool" => to_value(false)?,
+								_ => Value::Null
+							},
+							false
+						)));
 					}
 				}
 			} else if self.all_matts.contains(&factory) {
@@ -1372,12 +1370,12 @@ impl Intellisense {
 						)?
 						.1
 					)?
-					.m_aPins
+					.m_aAttributes
 					{
-						if entry.m_nUnk00 == 1 {
+						if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_INPUT_PIN {
 							// Input pin
 							input.push(entry.m_sName);
-						} else if entry.m_nUnk00 == 2 {
+						} else if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_OUTPUT_PIN {
 							// Output pin
 							output.push(entry.m_sName);
 						}

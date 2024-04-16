@@ -344,21 +344,41 @@ pub fn h3_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UIControlData {
-	// ResourceLib thinks everything is a pin for some reason
-	pub m_aPins: Vec<UIControlDataEntry>
+pub struct SUIControlBlueprint {
+	pub m_aAttributes: Vec<SAttributeInfo>,
+	pub m_aSpecialMethods: Vec<String>
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UIControlDataEntry {
-	pub m_nUnk00: u8,
-	pub m_nUnk01: u8,
+pub struct SAttributeInfo {
+	pub m_eKind: EAttributeKind,
+	pub m_eType: EAttributeType,
 	pub m_sName: String
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[allow(non_camel_case_types)]
+pub enum EAttributeKind {
+	E_ATTRIBUTE_KIND_PROPERTY,
+	E_ATTRIBUTE_KIND_INPUT_PIN,
+	E_ATTRIBUTE_KIND_OUTPUT_PIN
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[allow(non_camel_case_types)]
+pub enum EAttributeType {
+	E_ATTRIBUTE_TYPE_VOID,
+	E_ATTRIBUTE_TYPE_INT,
+	E_ATTRIBUTE_TYPE_FLOAT,
+	E_ATTRIBUTE_TYPE_STRING,
+	E_ATTRIBUTE_TYPE_BOOL,
+	E_ATTRIBUTE_TYPE_ENTITYREF,
+	E_ATTRIBUTE_TYPE_OBJECT
 }
 
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib UICB")]
-pub fn convert_uicb(data: &[u8]) -> Result<UIControlData> {
+pub fn convert_uicb(data: &[u8]) -> Result<SUIControlBlueprint> {
 	let _lock = CONVERTER_MUTEX.lock();
 
 	unsafe {
@@ -383,7 +403,7 @@ pub fn convert_uicb(data: &[u8]) -> Result<UIControlData> {
 			.to_str()
 			.context("Couldn't convert CStr to str")?
 		)
-		.context("Couldn't deserialise returned JsonString as SwitchGroup")?;
+		.context("Couldn't deserialise returned JsonString as SUIControlBlueprint")?;
 
 		(*converter).FreeJsonString.unwrap()(json_string);
 

@@ -312,12 +312,20 @@
 							AIRG: "fa-solid fa-route",
 							AIBX: "fa-regular fa-user",
 							AIBZ: "fa-regular fa-user",
-							AIBB: "fa-regular fa-user",
 							YSHP: "fa-solid fa-baseball-bat-ball",
-							ALOC: "fa-solid fa-car-burst"
+							ALOC: "fa-solid fa-car-burst",
+							TBLU: "fa-regular fa-square",
+							CBLU: "fa-regular fa-square",
+							ASEB: "fa-regular fa-square",
+							UICB: "fa-regular fa-square",
+							MATB: "fa-regular fa-square",
+							WSWB: "fa-regular fa-square",
+							DSWB: "fa-regular fa-square",
+							ECPB: "fa-regular fa-square",
+							WSGB: "fa-regular fa-square"
 						}[entry.filetype] || "fa-regular fa-file"
 					}`,
-					text:
+					text: (
 						(params ? `[${path.split("/").at(-1)}](${params})` : path.split("/").at(-1)) +
 						((platformType === ".entitytype" &&
 							(path.endsWith(".class") ||
@@ -331,7 +339,8 @@
 						platformType === ".wes" ||
 						path.endsWith(platformType)
 							? ""
-							: platformType),
+							: platformType)
+					).replace(/\.entityblueprint$/g, " (blueprint)"),
 					folder: false,
 					path: entry.path,
 					filetype: entry.filetype
@@ -375,7 +384,16 @@
 							AIBZ: "fa-regular fa-user",
 							AIBB: "fa-regular fa-user",
 							YSHP: "fa-solid fa-baseball-bat-ball",
-							ALOC: "fa-solid fa-car-burst"
+							ALOC: "fa-solid fa-car-burst",
+							TBLU: "fa-regular fa-square",
+							CBLU: "fa-regular fa-square",
+							ASEB: "fa-regular fa-square",
+							UICB: "fa-regular fa-square",
+							MATB: "fa-regular fa-square",
+							WSWB: "fa-regular fa-square",
+							DSWB: "fa-regular fa-square",
+							ECPB: "fa-regular fa-square",
+							WSGB: "fa-regular fa-square"
 						}[entry.filetype] || "fa-regular fa-file"
 					}`,
 					text: entry.hint ? `${entry.hint} (${entry.hash}.${entry.filetype})` : `${entry.hash}.${entry.filetype}`,
