@@ -4562,6 +4562,13 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		}
 	}
 
+	send_request(
+		app,
+		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
+			app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
+		)))
+	)?;
+
 	finish_task(app, task)?;
 	let task = start_task(app, "Setting up intellisense")?;
 
@@ -4570,10 +4577,10 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	{
 		app_state.intellisense.store(Some(
 			Intellisense {
-				cppt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+				cppt_properties: DashMap::new().into(),
 				cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
 				uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json")).unwrap(),
-				matt_properties: parking_lot::RwLock::new(HashMap::new()).into(),
+				matt_properties: DashMap::new().into(),
 				all_cppts: hash_list
 					.entries
 					.iter()
@@ -4636,13 +4643,6 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	} else {
 		app_state.intellisense.store(None);
 	}
-
-	send_request(
-		app,
-		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
-			app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
-		)))
-	)?;
 
 	finish_task(app, task)?;
 
