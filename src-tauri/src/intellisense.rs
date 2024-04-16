@@ -495,7 +495,7 @@ impl Intellisense {
 									if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
 										let prop_type = self
 											.uicb_prop_types
-											.get(&to_string(&entry.m_eType)?)
+											.get(to_value(entry.m_eType)?.as_str().unwrap())
 											.context("Unknown UICB property type")?;
 
 										// We can't get the actual default values, if there are any, so we just use sensible defaults
@@ -916,7 +916,7 @@ impl Intellisense {
 					if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
 						let prop_type = self
 							.uicb_prop_types
-							.get(&to_string(&entry.m_eType)?)
+							.get(to_value(entry.m_eType)?.as_str().unwrap())
 							.context("Unknown UICB property type")?;
 
 						// We can't get the actual default values, if there are any, so we just use sensible defaults
