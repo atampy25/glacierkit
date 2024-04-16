@@ -1,14 +1,16 @@
 use std::{collections::HashMap, fs, io::Cursor, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
-use image::io::Reader as ImageReader;
+use image::{io::Reader as ImageReader, ImageFormat};
 
 use rfd::AsyncFileDialog;
-use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
-use serde_json::{from_slice, from_value, to_vec, Value};
+use rpkg_rs::{runtime::resource::partition_manager::PartitionManager, GlacierResource};
+use serde_json::{from_slice, from_value, json, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
+use tauri_plugin_aptabase::EventTracker;
+use tex_rs::texture_map::TextureMap;
 use tryvial::try_fn;
 use uuid::Uuid;
 
@@ -29,9 +31,9 @@ use crate::{
 	},
 	rpkg::{ensure_entity_in_cache, extract_latest_overview_info, extract_latest_resource},
 	rpkg_tool::generate_rpkg_meta,
-	send_request, start_task,
+	send_notification, send_request, start_task,
 	wwev::{parse_wwev, WwiseEventData},
-	RunCommandExt
+	Notification, NotificationKind, RunCommandExt
 };
 
 #[try_fn]
@@ -42,6 +44,7 @@ pub fn initialise_resource_overview(
 	id: Uuid,
 	hash: &String,
 	game_files: &PartitionManager,
+	game_version: GameVersion,
 	resource_reverse_dependencies: &Arc<HashMap<String, Vec<String>>>,
 	install: &PathBuf,
 	hash_list: &Arc<HashList>
@@ -153,7 +156,85 @@ pub fn initialise_resource_overview(
 						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
 
 					ResourceOverviewData::Image {
-						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id))
+						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+						dds_data: None
+					}
+				}
+
+				"TEXT" => {
+					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let temp_file_id = Uuid::new_v4();
+
+					fs::create_dir_all(data_dir.join("temp"))?;
+
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+
+					let mut texture = TextureMap::process_data(
+						match game_version {
+							GameVersion::H1 => rpkg_rs::WoaVersion::HM2016,
+							GameVersion::H2 => rpkg_rs::WoaVersion::HM2,
+							GameVersion::H3 => rpkg_rs::WoaVersion::HM3
+						},
+						res_data
+					)
+					.context("Couldn't process texture data")?;
+
+					let (_, texd_data) = extract_latest_resource(
+						game_files,
+						hash_list,
+						&res_meta
+							.hash_reference_data
+							.first()
+							.context("No TEXD dependency on TEXT")?
+							.hash
+					)?;
+
+					texture
+						.set_mipblock1_data(
+							&texd_data,
+							match game_version {
+								GameVersion::H1 => tex_rs::WoaVersion::HM2016,
+								GameVersion::H2 => tex_rs::WoaVersion::HM2,
+								GameVersion::H3 => tex_rs::WoaVersion::HM3
+							}
+						)
+						.context("Couldn't process TEXD data")?;
+
+					let dds_data = tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
+
+					ImageReader::new(Cursor::new(dds_data))
+						.with_guessed_format()?
+						.decode()?
+						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
+
+					ResourceOverviewData::Image {
+						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+						dds_data: Some((
+							match texture.get_header().interpret_as {
+								tex_rs::texture_map::TextureType::Colour => "Colour",
+								tex_rs::texture_map::TextureType::Normal => "Normal",
+								tex_rs::texture_map::TextureType::Height => "Height",
+								tex_rs::texture_map::TextureType::CompoundNormal => "Compound Normal",
+								tex_rs::texture_map::TextureType::Billboard => "Billboard",
+								tex_rs::texture_map::TextureType::Projection => "Projection",
+								tex_rs::texture_map::TextureType::Emission => "Emission",
+								tex_rs::texture_map::TextureType::UNKNOWN64 => "Unknown"
+							}
+							.into(),
+							match texture.get_header().format {
+								tex_rs::texture_map::RenderFormat::R16G16B16A16 => "R16G16B16A16",
+								tex_rs::texture_map::RenderFormat::R8G8B8A8 => "R8G8B8A8",
+								tex_rs::texture_map::RenderFormat::R8G8 => "R8G8",
+								tex_rs::texture_map::RenderFormat::A8 => "A8",
+								tex_rs::texture_map::RenderFormat::DXT1 => "DXT1",
+								tex_rs::texture_map::RenderFormat::DXT3 => "DXT3",
+								tex_rs::texture_map::RenderFormat::DXT5 => "DXT5",
+								tex_rs::texture_map::RenderFormat::BC4 => "BC4",
+								tex_rs::texture_map::RenderFormat::BC5 => "BC5",
+								tex_rs::texture_map::RenderFormat::BC7 => "BC7"
+							}
+							.into()
+						))
 					}
 				}
 
@@ -292,12 +373,20 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
+				let game_version = app_state
+					.game_installs
+					.iter()
+					.try_find(|x| anyhow::Ok(x.path == *install))?
+					.context("No such game install")?
+					.version;
+
 				initialise_resource_overview(
 					app,
 					&app_state,
 					id,
 					hash,
 					game_files,
+					game_version,
 					resource_reverse_dependencies,
 					install,
 					hash_list
@@ -328,12 +417,20 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
+				let game_version = app_state
+					.game_installs
+					.iter()
+					.try_find(|x| anyhow::Ok(x.path == *install))?
+					.context("No such game install")?
+					.version;
+
 				initialise_resource_overview(
 					app,
 					&app_state,
 					id,
 					hash,
 					game_files,
+					game_version,
 					resource_reverse_dependencies,
 					install,
 					hash_list
@@ -932,7 +1029,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsPng { id } => {
+		ResourceOverviewEvent::ExtractAsImage { id } => {
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
@@ -946,8 +1043,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
-				let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+				let game_version = app_state
+					.game_installs
+					.iter()
+					.try_find(|x| anyhow::Ok(x.path == *install))?
+					.context("No such game install")?
+					.version;
+
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -958,13 +1063,115 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(save_handle) = dialog
 					.set_file_name(&format!("{}.png", hash))
 					.add_filter("PNG file", &["png"])
+					.add_filter("JPEG file", &["jpg"])
+					.add_filter("TGA file", &["tga"])
+					.add_filter("DDS file", &["dds"])
 					.save_file()
 					.await
 				{
-					ImageReader::new(Cursor::new(res_data))
-						.with_guessed_format()?
-						.decode()?
-						.save(save_handle.path())?;
+					app.track_event(
+						"Extract image file as image format",
+						Some(json!({
+							"format": save_handle
+									.path()
+									.file_name()
+									.context("No file name")?
+									.to_str()
+									.context("Filename was invalid string")?
+									.split('.')
+									.last()
+									.unwrap_or("None")
+						}))
+					);
+
+					match res_meta.hash_resource_type.as_str() {
+						"GFXI" => {
+							let reader = ImageReader::new(Cursor::new(res_data.to_owned())).with_guessed_format()?;
+
+							if save_handle
+								.path()
+								.file_name()
+								.context("No file name")?
+								.to_str()
+								.context("Filename was invalid string")?
+								.ends_with(".dds")
+							{
+								match reader.format().context("Couldn't get format")? {
+									ImageFormat::Dds => {
+										fs::write(save_handle.path(), res_data)?;
+									}
+
+									_ => {
+										send_notification(
+											app,
+											Notification {
+												kind: NotificationKind::Error,
+												title: "DDS encoding not supported".into(),
+												subtitle: "The image is not natively in DDS format and cannot be \
+												           re-encoded as DDS. Please choose another format."
+													.into()
+											}
+										)?;
+									}
+								}
+							} else {
+								reader.decode()?.save(save_handle.path())?;
+							}
+						}
+
+						"TEXT" => {
+							let mut texture = TextureMap::process_data(
+								match game_version {
+									GameVersion::H1 => rpkg_rs::WoaVersion::HM2016,
+									GameVersion::H2 => rpkg_rs::WoaVersion::HM2,
+									GameVersion::H3 => rpkg_rs::WoaVersion::HM3
+								},
+								res_data
+							)
+							.context("Couldn't process texture data")?;
+
+							let (_, texd_data) = extract_latest_resource(
+								game_files,
+								hash_list,
+								&res_meta
+									.hash_reference_data
+									.first()
+									.context("No TEXD dependency on TEXT")?
+									.hash
+							)?;
+
+							texture
+								.set_mipblock1_data(
+									&texd_data,
+									match game_version {
+										GameVersion::H1 => tex_rs::WoaVersion::HM2016,
+										GameVersion::H2 => tex_rs::WoaVersion::HM2,
+										GameVersion::H3 => tex_rs::WoaVersion::HM3
+									}
+								)
+								.context("Couldn't process TEXD data")?;
+
+							let dds_data =
+								tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
+
+							let reader = ImageReader::new(Cursor::new(dds_data.to_owned())).with_guessed_format()?;
+
+							if save_handle
+								.path()
+								.file_name()
+								.context("No file name")?
+								.to_str()
+								.context("Filename was invalid string")?
+								.ends_with(".dds")
+							{
+								fs::write(save_handle.path(), dds_data)?;
+							} else {
+								reader.decode()?.save(save_handle.path())?;
+							}
+						}
+
+						_ => bail!("Unsupported resource type")
+					}
 				}
 			}
 		}

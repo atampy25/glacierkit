@@ -192,7 +192,8 @@ pub enum ResourceOverviewData {
 	GenericRL,
 	Ores,
 	Image {
-		image_path: PathBuf
+		image_path: PathBuf,
+		dds_data: Option<(String, String)>
 	},
 	Audio {
 		wav_path: PathBuf
@@ -521,7 +522,7 @@ strike! {
 					id: Uuid
 				},
 
-				ExtractAsPng {
+				ExtractAsImage {
 					id: Uuid
 				},
 

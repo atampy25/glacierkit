@@ -65,6 +65,7 @@ futures-util = "0.3.30"
 md5 = "0.7.0"
 dashmap = { version = "5.5.3", features = ["inline"] }
 measure_time = "0.8.2"
+tex-rs = { path = "../../GlacierFormats-rs/tex-rs" }
 
 [target.'cfg(linux)'.dependencies]
 fork = "0.1.22"

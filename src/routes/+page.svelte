@@ -47,7 +47,8 @@
 		"Right-click an entry in the Game Content panel to copy its hash or path.",
 		"You can right-click on a dependency in a Resource Overview to open it in a new tab.",
 		"Convert between repository.json/unlockables.json files and JSON.patch.json files easily by right-clicking them in the Files panel.",
-		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files."
+		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
+		"Separate search terms with spaces to find only files which match all search terms."
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]

@@ -20,6 +20,8 @@
 	let reverseDependencies: [string, string, string | null][] = []
 	let data: ResourceOverviewData | null = null
 
+	let previewImage: any = null
+
 	onMount(async () => {
 		await event({
 			type: "editor",
@@ -212,27 +214,44 @@
 				</div>
 			</div>
 			<h4 class="mb-1">Preview</h4>
-			<img class="mb-4 h-[33%] w-fit" src={convertFileSrc(data.data.image_path)} alt="Resource preview" />
+			{#if previewImage}
+				<div class="text-neutral-400 mb-3 flex items-center gap-4">
+					<span>Resolution: {previewImage.naturalWidth}x{previewImage.naturalHeight}</span>
+					{#if data.data.dds_data}
+						<span>Type: {data.data.dds_data[0]}</span>
+						<span>Format: {data.data.dds_data[1]}</span>
+					{/if}
+				</div>
+			{/if}
+			<img
+				class="mb-4 h-[33%] w-fit"
+				bind:this={previewImage}
+				on:load={() => {
+					previewImage = previewImage
+				}}
+				src={convertFileSrc(data.data.image_path)}
+				alt="Resource preview"
+			/>
 			<h4 class="mb-1">Actions</h4>
 			<div class="flex flex-wrap gap-2 mb-4">
 				<Button
 					icon={DocumentExport}
 					on:click={async () => {
-						trackEvent("Extract image file as PNG")
+						// Analytics tracked on Rust end
 
 						await event({
 							type: "editor",
 							data: {
 								type: "resourceOverview",
 								data: {
-									type: "extractAsPng",
+									type: "extractAsImage",
 									data: {
 										id
 									}
 								}
 							}
 						})
-					}}>Extract as PNG</Button
+					}}>Extract image</Button
 				>
 				<Button
 					icon={DocumentExport}
