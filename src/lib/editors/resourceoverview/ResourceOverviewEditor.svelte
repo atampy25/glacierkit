@@ -338,26 +338,30 @@
 			<h4 class="mb-1">Preview</h4>
 			<div class="mb-4">
 				<div class="text-neutral-400 mb-2">{data.data.name}</div>
-				<MultiWaveformPlayer
-					src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
-					on:download={async ({ detail }) => {
-						trackEvent("Extract specific audio from WWEV file as WAV")
+				{#if data.data.wav_paths.length}
+					<MultiWaveformPlayer
+						src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
+						on:download={async ({ detail }) => {
+							trackEvent("Extract specific audio from WWEV file as WAV")
 
-						await event({
-							type: "editor",
-							data: {
-								type: "resourceOverview",
+							await event({
+								type: "editor",
 								data: {
-									type: "extractSpecificMultiWav",
+									type: "resourceOverview",
 									data: {
-										id,
-										index: detail
+										type: "extractSpecificMultiWav",
+										data: {
+											id,
+											index: detail
+										}
 									}
 								}
-							}
-						})
-					}}
-				/>
+							})
+						}}
+					/>
+				{:else}
+					<div class="-mt-1 text-lg">No linked audio</div>
+				{/if}
 			</div>
 			<h4 class="mb-1">Actions</h4>
 			<div class="flex flex-wrap gap-2 mb-4">
