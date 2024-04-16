@@ -32,7 +32,9 @@
 				},
 				check_callback: false,
 				force_text: true,
-				keyboard: {}
+				keyboard: {
+					f2: () => {}
+				}
 			},
 			search: {
 				fuzzy: true,

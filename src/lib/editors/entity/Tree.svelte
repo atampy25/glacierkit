@@ -59,7 +59,9 @@
 				},
 				check_callback: true,
 				force_text: true,
-				keyboard: {}
+				keyboard: {
+					f2: () => {}
+				}
 			},
 			search: {
 				fuzzy: false,
