@@ -1670,6 +1670,45 @@
 			}
 		]
 	},
+	"00A7792A4CA762F1": {
+		"_comment": "[modules:/zaudioevent.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "Break",
+				"description": ""
+			},
+			{
+				"pin": "Send",
+				"description": ""
+			},
+			{
+				"pin": "Stop",
+				"description": ""
+			},
+			{
+				"pin": "Enable",
+				"description": ""
+			}
+		],
+		"out": [
+			{
+				"pin": "MainEventEnded",
+				"description": ""
+			},
+			{
+				"pin": "Duration",
+				"description": ""
+			},
+			{
+				"pin": "StopEventEnded",
+				"description": ""
+			},
+			{
+				"pin": "Marker",
+				"description": ""
+			}
+		]
+	},
 	"0059205D6AA9EA4A": {
 		"_comment": "[modules:/zmathaddsubstract.class].pc_entitytype",
 		"in": [
@@ -9925,6 +9964,16 @@
 			}
 		]
 	},
+	"00EBD3190B4A9CA8": {
+		"_comment": "[modules:/zaudiolevelmeter.class].pc_entitytype",
+		"in": [],
+		"out": [
+			{
+				"pin": "Output",
+				"description": ""
+			}
+		]
+	},
 	"00EC7802A77CDA70": {
 		"_comment": "[modules:/zconverttovoidentity_svector3.class].pc_entitytype",
 		"in": [
@@ -16986,6 +17035,16 @@
 		],
 		"out": []
 	},
+	"0040F6F738D39B45": {
+		"_comment": "[modules:/zaudiostate.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "SetToDefault",
+				"description": ""
+			}
+		],
+		"out": []
+	},
 	"00CFE1E2635CFE5D": {
 		"_comment": "[modules:/zactorpickerfilterlos.class].pc_entitytype",
 		"in": [],
@@ -17061,6 +17120,11 @@
 	},
 	"000E7DD7B1196AB0": {
 		"_comment": "[modules:/zaudioemitterproxyentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00127528CFD8B8E6": {
+		"_comment": "[modules:/zaudioemitterproxy.class].pc_entitytype",
 		"in": [],
 		"out": []
 	},
@@ -17984,6 +18048,11 @@
 		"in": [],
 		"out": []
 	},
+	"00DB2E4A917D5FC8": {
+		"_comment": "[modules:/iflavoridlehandler.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
 	"0020BBE6824D89EB": {
 		"_comment": "[modules:/zspatialtransformrestoreentity.class].pc_entitytype",
 		"in": [
@@ -18391,6 +18460,24 @@
 	},
 	"00B9E3BC098A15E2": {
 		"_comment": "[modules:/zaudioglobalparamentity.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "SetValue",
+				"description": ""
+			},
+			{
+				"pin": "Send",
+				"description": ""
+			},
+			{
+				"pin": "Reset",
+				"description": ""
+			}
+		],
+		"out": []
+	},
+	"009A25EC092B7072": {
+		"_comment": "[modules:/zaudioglobalparam.class].pc_entitytype",
 		"in": [
 			{
 				"pin": "SetValue",
@@ -22947,6 +23034,11 @@
 		"in": [],
 		"out": []
 	},
+	"00E1473D5F55209D": {
+		"_comment": "[modules:/zaudioemitter.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
 	"0066F2436FCA3FC6": {
 		"_comment": "[modules:/zclothsphere.class].pc_entitytype",
 		"in": [
@@ -24021,6 +24113,16 @@
 		],
 		"out": []
 	},
+	"0092F489B7FAA100": {
+		"_comment": "[modules:/zaudioswitch.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "SetToDefault",
+				"description": ""
+			}
+		],
+		"out": []
+	},
 	"004865C9995F11B5": {
 		"_comment": "[modules:/zclothcharacterentity.class].pc_entitytype",
 		"in": [
@@ -24213,6 +24315,24 @@
 	},
 	"00DCF0E1D329F426": {
 		"_comment": "[modules:/zaudioparamentity.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "SetValue",
+				"description": ""
+			},
+			{
+				"pin": "Send",
+				"description": ""
+			},
+			{
+				"pin": "Reset",
+				"description": ""
+			}
+		],
+		"out": []
+	},
+	"00A892846481490A": {
+		"_comment": "[modules:/zaudioparam.class].pc_entitytype",
 		"in": [
 			{
 				"pin": "SetValue",
@@ -26290,6 +26410,11 @@
 	},
 	"0072CC7064620A02": {
 		"_comment": "[modules:/zaudioglobaleventsentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00AC8D274BB7E628": {
+		"_comment": "[modules:/zaudioglobalevents.class].pc_entitytype",
 		"in": [],
 		"out": []
 	},
