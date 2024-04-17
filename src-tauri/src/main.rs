@@ -74,7 +74,9 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{
+	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator
+};
 use repository::RepositoryItem;
 use resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
@@ -2355,6 +2357,8 @@ fn event(app: AppHandle, event: Event) {
 										SearchFilter::Sound => &["WBNK", "WWFX", "WWEV", "WWES", "WWEM"]
 									};
 
+									let query_terms = query.split(' ').collect_vec();
+
 									if let Some(hash_list) = app_state.hash_list.load().deref() {
 										send_request(
 											&app,
@@ -2368,41 +2372,68 @@ fn event(app: AppHandle, event: Event) {
 													},
 													install.platform
 												),
-												entries: hash_list
-													.entries
-													.par_iter()
-													.filter(|(_, entry)| {
-														matches!(filter, SearchFilter::All)
-															|| filter_includes.iter().any(|&x| x == entry.resource_type)
-													})
-													.filter(|(hash, entry)| {
-														query.split(' ').all(|y| {
-															entry
-																.path
-																.as_deref()
-																.unwrap_or("")
-																.to_lowercase()
-																.contains(y) || entry
-																.hint
-																.as_deref()
-																.unwrap_or("")
-																.to_lowercase()
-																.contains(y) || entry
-																.resource_type
-																.to_lowercase()
-																.contains(y) || hash.to_lowercase().contains(y)
-														})
-													})
-													.filter(|(hash, _)| {
-														resource_reverse_dependencies.contains_key(*hash)
-													})
-													.map(|(hash, entry)| GameBrowserEntry {
-														hash: hash.to_owned(),
-														path: entry.path.to_owned(),
-														hint: entry.hint.to_owned(),
-														filetype: entry.resource_type.to_owned()
-													})
-													.collect()
+												entries: {
+													if matches!(filter, SearchFilter::All) {
+														hash_list
+															.entries
+															.par_iter()
+															.filter(|(hash, entry)| {
+																query_terms.iter().all(|&y| {
+																	format!(
+																		"{}{}{}.{}",
+																		entry.path.as_deref().unwrap_or(""),
+																		entry.hint.as_deref().unwrap_or(""),
+																		hash,
+																		entry.resource_type
+																	)
+																	.to_lowercase()
+																	.contains(y)
+																})
+															})
+															.filter(|(hash, _)| {
+																resource_reverse_dependencies.contains_key(*hash)
+															})
+															.map(|(hash, entry)| GameBrowserEntry {
+																hash: hash.to_owned(),
+																path: entry.path.to_owned(),
+																hint: entry.hint.to_owned(),
+																filetype: entry.resource_type.to_owned()
+															})
+															.collect()
+													} else {
+														hash_list
+															.entries
+															.par_iter()
+															.filter(|(_, entry)| {
+																filter_includes
+																	.iter()
+																	.any(|&x| x == entry.resource_type)
+															})
+															.filter(|(hash, entry)| {
+																query_terms.iter().all(|&y| {
+																	format!(
+																		"{}{}{}.{}",
+																		entry.path.as_deref().unwrap_or(""),
+																		entry.hint.as_deref().unwrap_or(""),
+																		hash,
+																		entry.resource_type
+																	)
+																	.to_lowercase()
+																	.contains(y)
+																})
+															})
+															.filter(|(hash, _)| {
+																resource_reverse_dependencies.contains_key(*hash)
+															})
+															.map(|(hash, entry)| GameBrowserEntry {
+																hash: hash.to_owned(),
+																path: entry.path.to_owned(),
+																hint: entry.hint.to_owned(),
+																filetype: entry.resource_type.to_owned()
+															})
+															.collect()
+													}
+												}
 											}))
 										)?;
 									}
@@ -4493,34 +4524,47 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		finish_task(app, loading_task)?;
 		let task = start_task(app, "Caching reverse references")?;
 
-		let mut reverse_dependencies: HashMap<String, HashSet<String>> = HashMap::new();
+		let mut reverse_dependencies: DashMap<String, HashSet<String>> = DashMap::new();
 
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
-		let mut resources = HashMap::new();
-		for partition in partition_manager.get_all_partitions().into_iter().rev() {
-			for (resource, _) in partition.get_latest_resources() {
-				resources.insert(resource.get_rrid(), resource.get_all_references());
-			}
-		}
+		let resources = partition_manager
+			.get_all_partitions()
+			.into_par_iter()
+			.rev()
+			.flat_map(|partition| {
+				partition
+					.get_latest_resources()
+					.into_par_iter()
+					.map(|(resource, _)| (resource.get_rrid(), resource.get_all_references()))
+			})
+			.collect::<HashMap<_, _>>();
 
-		for (resource_id, resource_references) in resources {
-			let res_id_str = resource_id.to_hex_string();
+		reverse_dependencies.par_extend(
+			resources
+				.par_iter()
+				.map(|(x, _)| (x.to_hex_string(), Default::default()))
+		);
 
-			for (reference_id, _) in resource_references {
-				reverse_dependencies
-					.entry(reference_id.to_hex_string())
-					.or_default()
-					.insert(res_id_str.to_owned());
-			}
+		resources
+			.into_par_iter()
+			.flat_map(|(resource_id, resource_references)| {
+				let res_id_str = resource_id.to_hex_string();
 
-			reverse_dependencies.entry(res_id_str).or_default();
-		}
+				resource_references
+					.par_iter()
+					.map(move |(reference_id, _)| (reference_id.to_hex_string(), res_id_str.to_owned()))
+			})
+			.for_each(|(key, value)| {
+				if let Some(mut x) = reverse_dependencies.get_mut(&key) {
+					x.insert(value);
+				}
+			});
 
 		app_state.game_files.store(Some(partition_manager.into()));
 
 		app_state.resource_reverse_dependencies.store(Some(
 			reverse_dependencies
-				.into_iter()
+				.into_par_iter()
 				.map(|(x, y)| (x, y.into_iter().collect()))
 				.collect::<HashMap<_, _>>()
 				.into()
