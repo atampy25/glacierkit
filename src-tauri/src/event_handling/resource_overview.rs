@@ -179,38 +179,35 @@ pub fn initialise_resource_overview(
 					)
 					.context("Couldn't process texture data")?;
 
-					let (_, texd_data) = extract_latest_resource(
-						game_files,
-						hash_list,
-						&res_meta
-							.hash_reference_data
-							.first()
-							.context("No TEXD dependency on TEXT")?
-							.hash
-					)?;
+					if let Some(texd_depend) = res_meta.hash_reference_data.first() {
+						let (_, texd_data) = extract_latest_resource(game_files, hash_list, &texd_depend.hash)?;
 
-					texture
-						.set_mipblock1_data(
-							&texd_data,
-							match game_version {
-								GameVersion::H1 => tex_rs::WoaVersion::HM2016,
-								GameVersion::H2 => tex_rs::WoaVersion::HM2,
-								GameVersion::H3 => tex_rs::WoaVersion::HM3
-							}
-						)
-						.context("Couldn't process TEXD data")?;
+						texture
+							.set_mipblock1_data(
+								&texd_data,
+								match game_version {
+									GameVersion::H1 => tex_rs::WoaVersion::HM2016,
+									GameVersion::H2 => tex_rs::WoaVersion::HM2,
+									GameVersion::H3 => tex_rs::WoaVersion::HM3
+								}
+							)
+							.context("Couldn't process TEXD data")?;
+					}
 
-					let dds_data = tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
+					let tga_data = tex_rs::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
 
-					ImageReader::new(Cursor::new(dds_data))
-						.with_guessed_format()?
+					let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
+
+					reader.set_format(image::ImageFormat::Tga);
+
+					reader
 						.decode()?
 						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
 
 					ResourceOverviewData::Image {
 						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
 						dds_data: Some((
-							match texture.get_header().interpret_as {
+							match texture.get_header().type_ {
 								tex_rs::texture_map::TextureType::Colour => "Colour",
 								tex_rs::texture_map::TextureType::Normal => "Normal",
 								tex_rs::texture_map::TextureType::Height => "Height",
@@ -1130,31 +1127,20 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							)
 							.context("Couldn't process texture data")?;
 
-							let (_, texd_data) = extract_latest_resource(
-								game_files,
-								hash_list,
-								&res_meta
-									.hash_reference_data
-									.first()
-									.context("No TEXD dependency on TEXT")?
-									.hash
-							)?;
+							if let Some(texd_depend) = res_meta.hash_reference_data.first() {
+								let (_, texd_data) = extract_latest_resource(game_files, hash_list, &texd_depend.hash)?;
 
-							texture
-								.set_mipblock1_data(
-									&texd_data,
-									match game_version {
-										GameVersion::H1 => tex_rs::WoaVersion::HM2016,
-										GameVersion::H2 => tex_rs::WoaVersion::HM2,
-										GameVersion::H3 => tex_rs::WoaVersion::HM3
-									}
-								)
-								.context("Couldn't process TEXD data")?;
-
-							let dds_data =
-								tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
-
-							let reader = ImageReader::new(Cursor::new(dds_data.to_owned())).with_guessed_format()?;
+								texture
+									.set_mipblock1_data(
+										&texd_data,
+										match game_version {
+											GameVersion::H1 => tex_rs::WoaVersion::HM2016,
+											GameVersion::H2 => tex_rs::WoaVersion::HM2,
+											GameVersion::H3 => tex_rs::WoaVersion::HM3
+										}
+									)
+									.context("Couldn't process TEXD data")?;
+							}
 
 							if save_handle
 								.path()
@@ -1164,9 +1150,30 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.context("Filename was invalid string")?
 								.ends_with(".dds")
 							{
+								let dds_data =
+									tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
+
 								fs::write(save_handle.path(), dds_data)?;
 							} else {
-								reader.decode()?.save(save_handle.path())?;
+								let tga_data =
+									tex_rs::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
+
+								let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
+
+								reader.set_format(image::ImageFormat::Tga);
+
+								if save_handle
+									.path()
+									.file_name()
+									.context("No file name")?
+									.to_str()
+									.context("Filename was invalid string")?
+									.ends_with(".tga")
+								{
+									fs::write(save_handle.path(), tga_data)?;
+								} else {
+									reader.decode()?.save(save_handle.path())?;
+								}
 							}
 						}
 
