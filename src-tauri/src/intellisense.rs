@@ -1497,8 +1497,7 @@ impl Intellisense {
 						Ok(_) => {
 							let extracted = cached_entities
 								.get(&normalise_to_hash(factory.to_owned()))
-								.expect("Ensured")
-								.to_owned();
+								.expect("Ensured");
 
 							let found = self.get_pins(
 								game_files,

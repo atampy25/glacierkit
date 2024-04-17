@@ -157,30 +157,39 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 
 		let task = start_task(app, format!("Gathering intellisense data for {}", id))?;
 
+		let (properties, pins) = rayon::join(
+			|| {
+				intellisense.get_properties(
+					game_files,
+					&app_state.cached_entities,
+					hash_list,
+					game_version,
+					entity,
+					&id,
+					true
+				)
+			},
+			|| {
+				intellisense.get_pins(
+					game_files,
+					&app_state.cached_entities,
+					hash_list,
+					game_version,
+					entity,
+					&id,
+					false
+				)
+			}
+		);
+
 		send_request(
 			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::UpdateIntellisense {
 					editor_id: editor_id.to_owned(),
 					entity_id: id.to_owned(),
-					properties: intellisense.get_properties(
-						game_files,
-						&app_state.cached_entities,
-						hash_list,
-						game_version,
-						entity,
-						&id,
-						true
-					)?,
-					pins: intellisense.get_pins(
-						game_files,
-						&app_state.cached_entities,
-						hash_list,
-						game_version,
-						entity,
-						&id,
-						false
-					)?
+					properties: properties?,
+					pins: pins?
 				}
 			)))
 		)?;
