@@ -7,7 +7,7 @@
 
 	let monacoEditor: Monaco
 
-	let fileType: TextFileType["type"] = "PlainText"
+	let fileType: TextFileType = "PlainText"
 
 	export async function handleRequest(request: TextEditorRequest) {
 		console.log(`Text editor ${id} handling request`, request)
@@ -18,7 +18,7 @@
 				break
 
 			case "setFileType":
-				fileType = request.data.file_type.type
+				fileType = request.data.file_type
 				monacoEditor.setFileType(request.data.file_type)
 				break
 

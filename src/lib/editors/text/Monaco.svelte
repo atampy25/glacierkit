@@ -49,7 +49,7 @@
 		const model = editor.getModel()
 
 		if (model) {
-			switch (fileType.type) {
+			switch (fileType) {
 				case "Json":
 					monaco.editor.setModelLanguage(model, "json")
 					break
