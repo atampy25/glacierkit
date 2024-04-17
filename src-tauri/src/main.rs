@@ -57,6 +57,7 @@ use hash_list::HashList;
 use indexmap::IndexMap;
 use intellisense::Intellisense;
 use itertools::Itertools;
+use measure_time::print_time;
 use model::{
 	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
 	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent,
@@ -73,6 +74,7 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use repository::RepositoryItem;
 use resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
@@ -2368,7 +2370,7 @@ fn event(app: AppHandle, event: Event) {
 												),
 												entries: hash_list
 													.entries
-													.iter()
+													.par_iter()
 													.filter(|(_, entry)| {
 														matches!(filter, SearchFilter::All)
 															|| filter_includes.iter().any(|&x| x == entry.resource_type)

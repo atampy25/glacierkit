@@ -215,7 +215,7 @@
 			</div>
 			<h4 class="mb-1">Preview</h4>
 			{#if previewImage}
-				<div class="text-neutral-400 mb-3 flex items-center gap-4">
+				<div class="text-neutral-400 mb-2 flex items-center gap-4">
 					<span>Resolution: {previewImage.naturalWidth}x{previewImage.naturalHeight}</span>
 					{#if data.data.dds_data}
 						<span>Type: {data.data.dds_data[0]}</span>
