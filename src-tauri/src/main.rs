@@ -25,7 +25,13 @@ pub mod rpkg_tool;
 pub mod show_in_folder;
 pub mod wwev;
 
-use std::{fs, future::Future, ops::Deref, path::Path, sync::Arc};
+use std::{
+	fs,
+	future::Future,
+	ops::{Deref, DerefMut},
+	path::Path,
+	sync::Arc
+};
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
@@ -38,7 +44,7 @@ use event_handling::{
 	entity_overrides::handle_entity_overrides_event,
 	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select},
 	repository_patch::handle_repository_patch_event,
-	resource_overview::handle_resource_overview_event,
+	resource_overview::{handle_resource_overview_event, initialise_resource_overview},
 	unlockables_patch::handle_unlockables_patch_event
 };
 use fn_error_context::context;
@@ -2613,7 +2619,10 @@ fn event(app: AppHandle, event: Event) {
 									send_request(
 										&app,
 										Request::Global(GlobalRequest::InitialiseDynamics {
-											dynamics: req.json().await.context("Couldn't deserialise dynamics response")?,
+											dynamics: req
+												.json()
+												.await
+												.context("Couldn't deserialise dynamics response")?,
 											seen_announcements: app_settings.load().seen_announcements.to_owned()
 										})
 									)?;
@@ -4427,6 +4436,12 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	let app_state = app.state::<AppState>();
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 
+	app_state.game_files.store(None);
+	app_state.resource_reverse_dependencies.store(None);
+	app_state.intellisense.store(None);
+	app_state.repository.store(None);
+	app_state.cached_entities.clear();
+
 	if let Some(path) = app_settings.load().game_install.as_ref() {
 		let task = start_task(app, "Loading game files")?;
 
@@ -4573,9 +4588,6 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		));
 
 		finish_task(app, task)?;
-	} else {
-		app_state.game_files.store(None);
-		app_state.resource_reverse_dependencies.store(None);
 	}
 
 	let task = start_task(app, "Acquiring latest hash list")?;
@@ -4617,11 +4629,12 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	)?;
 
 	finish_task(app, task)?;
-	let task = start_task(app, "Setting up intellisense")?;
 
 	if let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
 	{
+		let task = start_task(app, "Setting up intellisense")?;
+
 		app_state.intellisense.store(Some(
 			Intellisense {
 				cppt_properties: DashMap::new().into(),
@@ -4687,11 +4700,9 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			}
 			.into()
 		));
-	} else {
-		app_state.intellisense.store(None);
-	}
 
-	finish_task(app, task)?;
+		finish_task(app, task)?
+	};
 
 	if let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
@@ -4702,6 +4713,43 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			from_slice::<Vec<RepositoryItem>>(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?
 				.into()
 		));
+
+		finish_task(app, task)?;
+	}
+
+	if let Some(game_files) = app_state.game_files.load().as_ref()
+		&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+	{
+		let task = start_task(app, "Refreshing editors")?;
+
+		for editor in app_state.editor_states.iter_mut() {
+			if let EditorData::ResourceOverview { ref hash } = editor.data {
+				let task = start_task(app, format!("Refreshing resource overview for {}", hash))?;
+
+				let game_version = app_state
+					.game_installs
+					.iter()
+					.try_find(|x| anyhow::Ok(x.path == *install))?
+					.context("No such game install")?
+					.version;
+
+				initialise_resource_overview(
+					app,
+					&app_state,
+					editor.key().to_owned(),
+					hash,
+					game_files,
+					game_version,
+					resource_reverse_dependencies,
+					install,
+					hash_list
+				)?;
+
+				finish_task(app, task)?;
+			}
+		}
 
 		finish_task(app, task)?;
 	}
