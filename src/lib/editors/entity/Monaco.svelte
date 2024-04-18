@@ -200,7 +200,7 @@
 		destroyFunc.run()
 	})
 
-	const debouncedUpdateFunction = { run: debounce(async (_: string) => {}, 1000) }
+	const debouncedUpdateFunction = { run: debounce(async (_: string) => {}, 500) }
 
 	onMount(async () => {
 		editor = monaco.editor.create(el, {
@@ -512,7 +512,7 @@
 							}
 						}
 					})
-				}, 1000)
+				}, 500)
 				editor.setValue(request.data.content)
 				break
 

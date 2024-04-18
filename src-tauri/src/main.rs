@@ -2607,20 +2607,17 @@ fn event(app: AppHandle, event: Event) {
 
 						ToolEvent::Settings(event) => match event {
 							SettingsEvent::Initialise => {
-								send_request(
-									&app,
-									Request::Global(GlobalRequest::InitialiseDynamics {
-										dynamics: reqwest::get(
-											"https://hitman-resources.netlify.app/glacierkit/dynamics.json"
-										)
-										.await?
-										.json()
-										.await
-										.ok()
-										.unwrap_or_default(),
-										seen_announcements: app_settings.load().seen_announcements.to_owned()
-									})
-								)?;
+								if let Ok(req) =
+									reqwest::get("https://hitman-resources.netlify.app/glacierkit/dynamics.json").await
+								{
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::InitialiseDynamics {
+											dynamics: req.json().await.context("Couldn't deserialise dynamics response")?,
+											seen_announcements: app_settings.load().seen_announcements.to_owned()
+										})
+									)?;
+								}
 
 								let selected_install_info = app_settings
 									.load()
