@@ -3,7 +3,7 @@ use arc_swap::ArcSwap;
 use fn_error_context::context;
 use quickentity_rs::qn_structs::{Entity, Ref};
 use serde::Serialize;
-use serde_json::{from_slice, from_str, from_value, Value};
+use serde_json::{from_str, from_value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -15,7 +15,6 @@ use crate::{
 		AppSettings, AppState, EditorData, EditorRequest, EntityEditorRequest, EntityOverridesEvent,
 		EntityOverridesRequest, GlobalRequest, Request
 	},
-	rpkg::extract_latest_resource,
 	send_request, start_task
 };
 
@@ -28,6 +27,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 	if let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
+		&& let Some(repository) = app_state.repository.load().as_ref()
 	{
 		let game_version = app_state
 			.game_installs
@@ -37,9 +37,6 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 			.version;
 
 		let task = start_task(app, "Updating override decorations")?;
-
-		let repository =
-			from_slice::<Vec<Value>>(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?;
 
 		let mut decorations = vec![];
 
@@ -88,15 +85,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 					let repository_id =
 						from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
 
-					if let Some(repo_item) = repository.iter().try_find(|x| {
-						anyhow::Ok(
-							x.get("ID_")
-								.context("No ID on repository item")?
-								.as_str()
-								.context("ID was not string")? == repository_id
-						)
-					})? {
-						if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+					if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
+						if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
 							decorations.push((
 								repository_id,
 								name.as_str().context("Name or CommonName was not string")?.to_owned()
@@ -107,15 +97,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 					for repository_id in
 						from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
 					{
-						if let Some(repo_item) = repository.iter().try_find(|x| {
-							anyhow::Ok(
-								x.get("ID_")
-									.context("No ID on repository item")?
-									.as_str()
-									.context("ID was not string")? == repository_id
-							)
-						})? {
-							if let Some(name) = repo_item.get("Name").or(repo_item.get("CommonName")) {
+						if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
+							if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
 								decorations.push((
 									repository_id,
 									name.as_str().context("Name or CommonName was not string")?.to_owned()

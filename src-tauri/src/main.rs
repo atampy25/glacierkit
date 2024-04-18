@@ -2524,9 +2524,19 @@ fn event(app: AppHandle, event: Event) {
 
 											let id = Uuid::new_v4();
 
-											let repository: Vec<RepositoryItem> = from_slice(
-												&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1
-											)?;
+											let repository: Vec<RepositoryItem> =
+												if let Some(x) = app_state.repository.load().as_ref() {
+													x.par_iter().cloned().collect()
+												} else {
+													from_slice(
+														&extract_latest_resource(
+															game_files,
+															hash_list,
+															"00204D1AFD76AB13"
+														)?
+														.1
+													)?
+												};
 
 											app_state.editor_states.insert(
 												id.to_owned(),

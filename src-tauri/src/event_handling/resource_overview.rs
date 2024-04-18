@@ -5,6 +5,7 @@ use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::HashMap;
 use image::{io::Reader as ImageReader, ImageFormat};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
 use rpkg_rs::{runtime::resource::partition_manager::PartitionManager, GlacierResource};
 use serde_json::{from_slice, from_value, json, to_vec, Value};
@@ -571,8 +572,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 						let id = Uuid::new_v4();
 
-						let repository: Vec<RepositoryItem> =
-							from_slice(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?;
+						let repository: Vec<RepositoryItem> = if let Some(x) = app_state.repository.load().as_ref() {
+							x.par_iter().cloned().collect()
+						} else {
+							from_slice(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?
+						};
 
 						app_state.editor_states.insert(
 							id.to_owned(),
