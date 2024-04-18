@@ -1,12 +1,9 @@
-use std::{
-	collections::{HashMap, HashSet},
-	sync::Arc
-};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
-
+use hashbrown::{HashMap, HashSet};
 use itertools::Itertools;
 use quickentity_rs::{
 	qn_structs::{Entity, Ref, RefMaybeConstantValue, RefWithConstantValue},

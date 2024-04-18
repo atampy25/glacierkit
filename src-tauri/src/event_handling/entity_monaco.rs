@@ -1,8 +1,7 @@
-use std::collections::HashSet;
-
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use hashbrown::HashSet;
 use quickentity_rs::qn_structs::Ref;
 
 use serde_json::from_str;

@@ -66,6 +66,7 @@ md5 = "0.7.0"
 dashmap = { version = "5.5.3", features = ["inline", "rayon"] }
 measure_time = "0.8.2"
 tex-rs = { path = "../../GlacierFormats-rs/tex-rs" }
+hashbrown = { version = "0.14.3", features = ["rayon", "serde"] }
 
 [target.'cfg(linux)'.dependencies]
 fork = "0.1.22"

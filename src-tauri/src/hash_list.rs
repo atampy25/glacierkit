@@ -1,7 +1,8 @@
-use std::{collections::HashMap, io::Read};
+use std::io::Read;
 
 use anyhow::{Context, Result};
 use fn_error_context::context;
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
 

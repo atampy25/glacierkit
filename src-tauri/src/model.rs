@@ -1,8 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 
 use dashmap::DashMap;
+use hashbrown::HashMap;
 use notify::RecommendedWatcher;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
 use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
@@ -760,7 +761,7 @@ strike! {
 				MetaPane(pub enum EntityMetaPaneRequest {
 					SetReverseRefs {
 						editor_id: Uuid,
-						entity_names: HashMap<String, String>,
+						entity_names: std::collections::HashMap<String, String>,
 						reverse_refs: Vec<ReverseReference>
 					},
 

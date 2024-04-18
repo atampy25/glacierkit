@@ -1,5 +1,4 @@
 use std::{
-	collections::{HashMap, HashSet},
 	io::{BufReader, Cursor},
 	ops::Deref
 };
@@ -7,6 +6,7 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use hashbrown::{HashMap, HashSet};
 use itertools::Itertools;
 use quickentity_rs::{
 	apply_patch, convert_2016_factory_to_modern,

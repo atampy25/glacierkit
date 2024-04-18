@@ -25,23 +25,13 @@ pub mod rpkg_tool;
 pub mod show_in_folder;
 pub mod wwev;
 
-use std::{
-	collections::{HashMap, HashSet},
-	fs,
-	future::Future,
-	ops::Deref,
-	path::Path,
-	sync::Arc
-};
+use std::{fs, future::Future, ops::Deref, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
-use entity::{
-	calculate_reverse_references, get_local_reference, get_recursive_children, is_valid_entity_blueprint,
-	CopiedEntityData
-};
+use entity::{calculate_reverse_references, get_local_reference, get_recursive_children, CopiedEntityData};
 use event_handling::{
 	entity_metadata::handle_entity_metadata_event,
 	entity_monaco::{handle_openfactory, handle_updatecontent},
@@ -54,6 +44,7 @@ use event_handling::{
 use fn_error_context::context;
 use game_detection::{detect_installs, GameVersion};
 use hash_list::HashList;
+use hashbrown::{HashMap, HashSet};
 use indexmap::IndexMap;
 use intellisense::Intellisense;
 use itertools::Itertools;
@@ -2377,6 +2368,9 @@ fn event(app: AppHandle, event: Event) {
 														hash_list
 															.entries
 															.par_iter()
+															.filter(|(hash, _)| {
+																resource_reverse_dependencies.contains_key(*hash)
+															})
 															.filter(|(hash, entry)| {
 																query_terms.iter().all(|&y| {
 																	format!(
@@ -2390,9 +2384,6 @@ fn event(app: AppHandle, event: Event) {
 																	.contains(y)
 																})
 															})
-															.filter(|(hash, _)| {
-																resource_reverse_dependencies.contains_key(*hash)
-															})
 															.map(|(hash, entry)| GameBrowserEntry {
 																hash: hash.to_owned(),
 																path: entry.path.to_owned(),
@@ -2404,6 +2395,9 @@ fn event(app: AppHandle, event: Event) {
 														hash_list
 															.entries
 															.par_iter()
+															.filter(|(hash, _)| {
+																resource_reverse_dependencies.contains_key(*hash)
+															})
 															.filter(|(_, entry)| {
 																filter_includes
 																	.iter()
@@ -2421,9 +2415,6 @@ fn event(app: AppHandle, event: Event) {
 																	.to_lowercase()
 																	.contains(y)
 																})
-															})
-															.filter(|(hash, _)| {
-																resource_reverse_dependencies.contains_key(*hash)
 															})
 															.map(|(hash, entry)| GameBrowserEntry {
 																hash: hash.to_owned(),
@@ -4524,7 +4515,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		finish_task(app, loading_task)?;
 		let task = start_task(app, "Caching reverse references")?;
 
-		let mut reverse_dependencies: DashMap<String, HashSet<String>> = DashMap::new();
+		let mut reverse_dependencies: DashMap<String, Vec<String>> = DashMap::new();
 
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
 		let resources = partition_manager
@@ -4538,6 +4529,10 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 					.map(|(resource, _)| (resource.get_rrid(), resource.get_all_references()))
 			})
 			.collect::<HashMap<_, _>>();
+
+		reverse_dependencies
+			.try_reserve(resources.len())
+			.map_err(|e| anyhow!("Reserve error: {e:?}"))?;
 
 		reverse_dependencies.par_extend(
 			resources
@@ -4556,7 +4551,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			})
 			.for_each(|(key, value)| {
 				if let Some(mut x) = reverse_dependencies.get_mut(&key) {
-					x.insert(value);
+					x.push(value);
 				}
 			});
 
@@ -4565,7 +4560,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		app_state.resource_reverse_dependencies.store(Some(
 			reverse_dependencies
 				.into_par_iter()
-				.map(|(x, y)| (x, y.into_iter().collect()))
+				.map(|(x, y)| (x, y.into_iter().dedup().collect()))
 				.collect::<HashMap<_, _>>()
 				.into()
 		));

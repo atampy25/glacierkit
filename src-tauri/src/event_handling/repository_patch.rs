@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use anyhow::{bail, Context, Result};
 use fn_error_context::context;
+use hashbrown::HashMap;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;

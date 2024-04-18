@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use anyhow::{Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
+use hashbrown::HashMap;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};

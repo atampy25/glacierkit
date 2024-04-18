@@ -1,5 +1,4 @@
 use std::{
-	collections::HashMap,
 	fs,
 	os::windows::process::CommandExt,
 	path::{Path, PathBuf},
@@ -9,6 +8,7 @@ use std::{
 use anyhow::{bail, Context, Result};
 use enumset::EnumSetType;
 use fn_error_context::context;
+use hashbrown::HashMap;
 use itertools::Itertools;
 use registry::{Data, Hive, Security};
 use serde::{Deserialize, Serialize};

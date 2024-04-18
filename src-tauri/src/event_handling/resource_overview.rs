@@ -1,10 +1,10 @@
-use std::{collections::HashMap, fs, io::Cursor, path::PathBuf, sync::Arc};
+use std::{fs, io::Cursor, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use hashbrown::HashMap;
 use image::{io::Reader as ImageReader, ImageFormat};
-
 use rfd::AsyncFileDialog;
 use rpkg_rs::{runtime::resource::partition_manager::PartitionManager, GlacierResource};
 use serde_json::{from_slice, from_value, json, to_vec, Value};
