@@ -26,6 +26,9 @@
 	import { trackEvent } from "@aptabase/tauri"
 	import RepositoryPatchEditor from "$lib/editors/repositorypatch/RepositoryPatchEditor.svelte"
 	import UnlockablesPatchEditor from "$lib/editors/unlockablespatch/UnlockablesPatchEditor.svelte"
+	import Search from "carbon-icons-svelte/lib/Search.svelte"
+	import ContentSearch from "$lib/tools/ContentSearch.svelte"
+	import ContentSearchResultsEditor from "$lib/editors/contentsearchresults/ContentSearchResultsEditor.svelte"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -68,6 +71,11 @@
 			icon: Box,
 			component: GameBrowser
 		},
+		ContentSearch: {
+			name: "Advanced search",
+			icon: Search,
+			component: ContentSearch
+		},
 		TextTransformer: {
 			name: "Text tools",
 			icon: TextSelection,
@@ -104,6 +112,9 @@
 
 			case "UnlockablesPatch":
 				return UnlockablesPatchEditor
+
+			case "ContentSearchResults":
+				return ContentSearchResultsEditor
 
 			default:
 				editorType satisfies never
@@ -147,6 +158,10 @@
 
 							case "gameBrowser":
 								void toolComponents.GameBrowser.handleRequest?.(request.data.data)
+								break
+
+							case "contentSearch":
+								void toolComponents.ContentSearch.handleRequest?.(request.data.data)
 								break
 
 							default:
@@ -246,6 +261,10 @@
 								break
 
 							case "unlockablesPatch":
+								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								break
+
+							case "contentSearchResults":
 								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
 								break
 

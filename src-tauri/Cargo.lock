@@ -173,6 +173,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.14.3",
  "hex",
+ "hrtime",
  "image 0.25.1",
  "indexmap 2.2.6",
  "itertools 0.12.1",
@@ -186,6 +187,7 @@ dependencies = [
  "quickentity-rs",
  "rand 0.8.5",
  "rayon",
+ "regex",
  "registry",
  "reqwest",
  "rfd",
@@ -2543,6 +2545,12 @@ checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
 dependencies = [
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "hrtime"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a80870ee775a6b862265eb04a8d61d1b1ef8e4c423154a52ba6a1e3ff24836c"
 
 [[package]]
 name = "html5ever"

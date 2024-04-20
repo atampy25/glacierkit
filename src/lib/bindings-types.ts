@@ -27,6 +27,18 @@ name: string;
  */
 text: string }
 
+export type ContentSearchEvent = { type: "search"; data: [string, string[], boolean] }
+
+export type ContentSearchRequest = { type: "setEnabled"; data: boolean }
+
+export type ContentSearchResultsEvent = { type: "initialise"; data: { id: string } } | { type: "openResourceOverview"; data: { id: string; hash: string } }
+
+export type ContentSearchResultsRequest = { type: "initialise"; data: { id: string; 
+/**
+ * Hash, type, path/hint
+ */
+results: ([string, string, string | null])[] } }
+
 export type CopiedEntityData = { 
 /**
  * Which entity has been copied (and should be parented to the selection when pasting).
@@ -49,11 +61,11 @@ export type DependencyWithFlag = { resource: string; flag: string }
 
 export type Dynamics = { announcements: Announcement[] }
 
-export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorEvent }
+export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorEvent } | { type: "contentSearchResults"; data: ContentSearchResultsEvent }
 
-export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorRequest }
+export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorRequest } | { type: "contentSearchResults"; data: ContentSearchResultsRequest }
 
-export type EditorType = { type: "Nil" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" } | { type: "RepositoryPatch"; data: { patch_type: JsonPatchType } } | { type: "UnlockablesPatch"; data: { patch_type: JsonPatchType } }
+export type EditorType = { type: "Nil" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" } | { type: "RepositoryPatch"; data: { patch_type: JsonPatchType } } | { type: "UnlockablesPatch"; data: { patch_type: JsonPatchType } } | { type: "ContentSearchResults" }
 
 export type EditorValidity = { type: "Valid" } | { type: "Invalid"; data: string }
 
@@ -537,9 +549,9 @@ export type TextEditorRequest = { type: "replaceContent"; data: { id: string; co
 
 export type TextFileType = "Json" | "ManifestJson" | "PlainText" | "Markdown"
 
-export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type: "gameBrowser"; data: GameBrowserEvent } | { type: "settings"; data: SettingsEvent }
+export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type: "gameBrowser"; data: GameBrowserEvent } | { type: "settings"; data: SettingsEvent } | { type: "contentSearch"; data: ContentSearchEvent }
 
-export type ToolRequest = { type: "fileBrowser"; data: FileBrowserRequest } | { type: "gameBrowser"; data: GameBrowserRequest } | { type: "settings"; data: SettingsRequest }
+export type ToolRequest = { type: "fileBrowser"; data: FileBrowserRequest } | { type: "gameBrowser"; data: GameBrowserRequest } | { type: "settings"; data: SettingsRequest } | { type: "contentSearch"; data: ContentSearchRequest }
 
 export type UnlockableInformation = { type: "Access"; data: { id: string | null } } | { type: "EvergreenMastery"; data: { id: string | null } } | { type: "Disguise"; data: { id: string | null } } | { type: "AgencyPickup"; data: { id: string | null } } | { type: "Weapon"; data: { id: string | null } } | { type: "Gear"; data: { id: string | null } } | { type: "Location"; data: { id: string | null } } | { type: "Package"; data: { id: string | null } } | { type: "LoadoutUnlock"; data: { id: string | null } } | { type: "Unknown"; data: { id: string | null } }
 

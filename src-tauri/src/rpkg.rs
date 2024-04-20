@@ -7,7 +7,8 @@ use quickentity_rs::{
 	rpkg_structs::{ResourceDependency, ResourceMeta}
 };
 use rpkg_rs::runtime::resource::{
-	partition_manager::PartitionManager, resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
+	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_partition::PatchId,
+	runtime_resource_id::RuntimeResourceID
 };
 use tryvial::try_fn;
 
@@ -19,6 +20,62 @@ use crate::{
 		h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
 	}
 };
+
+pub fn convert_resource_info_to_rpkg_meta_no_hl(info: &ResourceInfo) -> ResourceMeta {
+	ResourceMeta {
+		hash_offset: info.get_data_offset(),
+		hash_size: (info.get_compressed_size().unwrap_or(0) | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
+			as u32,
+		hash_size_final: info.get_size(),
+		hash_value: info.get_rrid().to_hex_string(),
+		hash_size_in_memory: info.get_system_memory_requirement(),
+		hash_size_in_video_memory: info.get_video_memory_requirement(),
+		hash_resource_type: info.get_type(),
+		hash_reference_data: info
+			.get_all_references()
+			.iter()
+			.map(|(hash, flag)| ResourceDependency {
+				flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
+				hash: hash.to_hex_string()
+			})
+			.collect(),
+		hash_reference_table_size: info.get_reference_chunk_size() as u32,
+		hash_reference_table_dummy: info.get_states_chunk_size() as u32
+	}
+}
+
+pub fn convert_resource_info_to_rpkg_meta(hash_list: &HashList, info: &ResourceInfo) -> ResourceMeta {
+	ResourceMeta {
+		hash_offset: info.get_data_offset(),
+		hash_size: (info.get_compressed_size().unwrap_or(0) | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
+			as u32,
+		hash_size_final: info.get_size(),
+		hash_value: info.get_rrid().to_hex_string(),
+		hash_size_in_memory: info.get_system_memory_requirement(),
+		hash_size_in_video_memory: info.get_video_memory_requirement(),
+		hash_resource_type: info.get_type(),
+		hash_reference_data: info
+			.get_all_references()
+			.iter()
+			.map(|(hash, flag)| ResourceDependency {
+				flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
+				hash: hash_list
+					.entries
+					.get(&hash.to_hex_string())
+					.map(|entry| {
+						entry
+							.path
+							.as_ref()
+							.map(|x| x.to_owned())
+							.unwrap_or_else(|| hash.to_hex_string())
+					})
+					.unwrap_or_else(|| hash.to_hex_string())
+			})
+			.collect(),
+		hash_reference_table_size: info.get_reference_chunk_size() as u32,
+		hash_reference_table_dummy: info.get_states_chunk_size() as u32
+	}
+}
 
 /// Extract the latest copy of a resource by its hash or path.
 #[context("Couldn't extract resource {}", resource)]
@@ -37,39 +94,8 @@ pub fn extract_latest_resource(
 			.into_iter()
 			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
-			let rpkg_style_meta = ResourceMeta {
-				hash_offset: info.get_data_offset(),
-				hash_size: (info.get_compressed_size().unwrap_or(0)
-					| (if info.get_is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
-				hash_size_final: info.get_size(),
-				hash_value: resource_id.to_hex_string(),
-				hash_size_in_memory: info.get_system_memory_requirement(),
-				hash_size_in_video_memory: info.get_video_memory_requirement(),
-				hash_resource_type: info.get_type(),
-				hash_reference_data: info
-					.get_all_references()
-					.iter()
-					.map(|(hash, flag)| ResourceDependency {
-						flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
-						hash: hash_list
-							.entries
-							.get(&hash.to_hex_string())
-							.map(|entry| {
-								entry
-									.path
-									.as_ref()
-									.map(|x| x.to_owned())
-									.unwrap_or(hash.to_hex_string())
-							})
-							.unwrap_or(hash.to_hex_string())
-					})
-					.collect(),
-				hash_reference_table_size: info.get_reference_chunk_size() as u32,
-				hash_reference_table_dummy: info.get_states_chunk_size() as u32
-			};
-
 			return Ok((
-				rpkg_style_meta,
+				convert_resource_info_to_rpkg_meta(hash_list, info),
 				partition
 					.get_resource(&resource_id)
 					.context("Couldn't extract resource using rpkg-rs")?
@@ -97,38 +123,7 @@ pub fn extract_latest_metadata(
 			.into_iter()
 			.find(|(x, _)| *x.get_rrid() == resource_id)
 		{
-			let rpkg_style_meta = ResourceMeta {
-				hash_offset: info.get_data_offset(),
-				hash_size: (info.get_compressed_size().unwrap_or(0)
-					| (if info.get_is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
-				hash_size_final: info.get_size(),
-				hash_value: resource_id.to_hex_string(),
-				hash_size_in_memory: info.get_system_memory_requirement(),
-				hash_size_in_video_memory: info.get_video_memory_requirement(),
-				hash_resource_type: info.get_type(),
-				hash_reference_data: info
-					.get_all_references()
-					.iter()
-					.map(|(hash, flag)| ResourceDependency {
-						flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
-						hash: hash_list
-							.entries
-							.get(&hash.to_hex_string())
-							.map(|entry| {
-								entry
-									.path
-									.as_ref()
-									.map(|x| x.to_owned())
-									.unwrap_or(hash.to_hex_string())
-							})
-							.unwrap_or(hash.to_hex_string())
-					})
-					.collect(),
-				hash_reference_table_size: info.get_reference_chunk_size() as u32,
-				hash_reference_table_dummy: info.get_states_chunk_size() as u32
-			};
-
-			return Ok(rpkg_style_meta);
+			return Ok(convert_resource_info_to_rpkg_meta(hash_list, info));
 		}
 	}
 

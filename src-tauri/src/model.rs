@@ -90,6 +90,9 @@ pub enum EditorData {
 		base: Vec<UnlockableItem>,
 		current: Vec<UnlockableItem>,
 		patch_type: JsonPatchType
+	},
+	ContentSearchResults {
+		results: Vec<(String, String, Option<String>)>
 	}
 }
 
@@ -150,7 +153,8 @@ pub enum EditorType {
 	QNEntity,
 	QNPatch,
 	RepositoryPatch { patch_type: JsonPatchType },
-	UnlockablesPatch { patch_type: JsonPatchType }
+	UnlockablesPatch { patch_type: JsonPatchType },
+	ContentSearchResults
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -302,6 +306,10 @@ strike! {
 				Initialise,
 				ChangeGameInstall(Option<PathBuf>),
 				ChangeExtractModdedFiles(bool)
+			}),
+
+			ContentSearch(pub enum ContentSearchEvent {
+				Search(String, Vec<String>, bool)
 			})
 		}),
 
@@ -595,6 +603,17 @@ strike! {
 					id: Uuid,
 					unlockable: Uuid
 				}
+			}),
+
+			ContentSearchResults(pub enum ContentSearchResultsEvent {
+				Initialise {
+					id: Uuid
+				},
+
+				OpenResourceOverview {
+					id: Uuid,
+					hash: String
+				}
 			})
 		}),
 
@@ -659,6 +678,10 @@ strike! {
 					settings: AppSettings
 				},
 				ChangeProjectSettings(ProjectSettings)
+			}),
+
+			ContentSearch(pub enum ContentSearchRequest {
+				SetEnabled(bool)
 			})
 		}),
 
@@ -907,6 +930,15 @@ strike! {
 					id: Uuid,
 					unlockable: Uuid,
 					info: UnlockableInformation
+				}
+			}),
+
+			ContentSearchResults(pub enum ContentSearchResultsRequest {
+				Initialise {
+					id: Uuid,
+
+					/// Hash, type, path/hint
+					results: Vec<(String, String, Option<String>)>
 				}
 			})
 		}),

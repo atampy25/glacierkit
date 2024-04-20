@@ -51,6 +51,7 @@
 				data = request.data.data
 				break
 
+			// No exhaustivity check, only one request type
 			// default:
 			// 	request satisfies never
 			// 	break

@@ -39,6 +39,7 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use entity::{calculate_reverse_references, get_local_reference, get_recursive_children, CopiedEntityData};
 use event_handling::{
+	content_search::start_content_search,
 	entity_metadata::handle_entity_metadata_event,
 	entity_monaco::{handle_openfactory, handle_updatecontent},
 	entity_overrides::handle_entity_overrides_event,
@@ -56,12 +57,7 @@ use intellisense::Intellisense;
 use itertools::Itertools;
 use measure_time::print_time;
 use model::{
-	AppSettings, AppState, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
-	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent,
-	EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
-	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project,
-	ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest,
-	TextFileType, ToolEvent, ToolRequest
+	AppSettings, AppState, ContentSearchEvent, ContentSearchRequest, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project, ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use ores::{parse_json_ores, UnlockableItem};
@@ -71,8 +67,9 @@ use quickentity_rs::{
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
-use rayon::iter::{
-	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator
+use rayon::{
+	iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator},
+	ThreadPoolBuilder
 };
 use repository::RepositoryItem;
 use resourcelib::{
@@ -2379,15 +2376,17 @@ fn event(app: AppHandle, event: Event) {
 															})
 															.filter(|(hash, entry)| {
 																query_terms.iter().all(|&y| {
-																	format!(
+																	let mut s = format!(
 																		"{}{}{}.{}",
 																		entry.path.as_deref().unwrap_or(""),
 																		entry.hint.as_deref().unwrap_or(""),
 																		hash,
 																		entry.resource_type
-																	)
-																	.to_lowercase()
-																	.contains(y)
+																	);
+
+																	s.make_ascii_lowercase();
+
+																	s.contains(y)
 																})
 															})
 															.map(|(hash, entry)| GameBrowserEntry {
@@ -2411,15 +2410,17 @@ fn event(app: AppHandle, event: Event) {
 															})
 															.filter(|(hash, entry)| {
 																query_terms.iter().all(|&y| {
-																	format!(
+																	let mut s = format!(
 																		"{}{}{}.{}",
 																		entry.path.as_deref().unwrap_or(""),
 																		entry.hint.as_deref().unwrap_or(""),
 																		hash,
 																		entry.resource_type
-																	)
-																	.to_lowercase()
-																	.contains(y)
+																	);
+
+																	s.make_ascii_lowercase();
+
+																	s.contains(y)
 																})
 															})
 															.map(|(hash, entry)| GameBrowserEntry {
@@ -2693,6 +2694,12 @@ fn event(app: AppHandle, event: Event) {
 								)
 								.unwrap();
 								app_settings.store(settings.into());
+							}
+						},
+
+						ToolEvent::ContentSearch(event) => match event {
+							ContentSearchEvent::Search(query, filetypes, use_qn_format) => {
+								start_content_search(&app, query, filetypes, use_qn_format)?;
 							}
 						}
 					},
@@ -3046,8 +3053,9 @@ fn event(app: AppHandle, event: Event) {
 													.entities
 													.iter()
 													.filter(|(id, ent)| {
-														format!("{}{}", id, to_string(ent).unwrap().to_lowercase())
-															.contains(&query)
+														let mut s = format!("{}{}", id, to_string(ent).unwrap());
+														s.make_ascii_lowercase();
+														s.contains(&query)
 													})
 													.map(|(id, _)| id.to_owned())
 													.collect()
@@ -3169,6 +3177,50 @@ fn event(app: AppHandle, event: Event) {
 
 						EditorEvent::UnlockablesPatch(event) => {
 							handle_unlockables_patch_event(&app, event).await?;
+						}
+
+						EditorEvent::ContentSearchResults(event) => match event {
+							ContentSearchResultsEvent::Initialise { id } => {
+								let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+
+								let results = match editor_state.data {
+									EditorData::ContentSearchResults { ref results, .. } => results,
+					
+									_ => {
+										Err(anyhow!("Editor {} is not a content search results page", id))?;
+										panic!();
+									}
+								};
+								
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::ContentSearchResults(ContentSearchResultsRequest::Initialise {
+										id,
+										results: results.to_owned()
+									}))
+								)?;
+							}
+
+							ContentSearchResultsEvent::OpenResourceOverview { hash ,.. } => {
+								let id = Uuid::new_v4();
+					
+								app_state.editor_states.insert(
+									id.to_owned(),
+									EditorState {
+										file: None,
+										data: EditorData::ResourceOverview { hash: hash.to_owned() }
+									}
+								);
+					
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::CreateTab {
+										id,
+										name: format!("Resource overview ({hash})"),
+										editor_type: EditorType::ResourceOverview
+									})
+								)?;
+							}
 						}
 					},
 
@@ -3495,6 +3547,11 @@ fn event(app: AppHandle, event: Event) {
 
 								EditorData::ResourceOverview { .. } => {
 									Err(anyhow!("Editor is a resource overview"))?;
+									panic!();
+								}
+
+								EditorData::ContentSearchResults { .. } => {
+									Err(anyhow!("Editor is a content search results page"))?;
 									panic!();
 								}
 
@@ -4306,6 +4363,11 @@ fn event(app: AppHandle, event: Event) {
 												panic!();
 											}
 
+											EditorData::ContentSearchResults { .. } => {
+												Err(anyhow!("Editor is a content search results page"))?;
+												panic!();
+											}
+
 											EditorData::Text {
 												file_type: TextFileType::PlainText,
 												..
@@ -4343,6 +4405,11 @@ fn event(app: AppHandle, event: Event) {
 
 											EditorData::ResourceOverview { .. } => {
 												Err(anyhow!("Editor is a resource overview"))?;
+												panic!();
+											}
+
+											EditorData::ContentSearchResults { .. } => {
+												Err(anyhow!("Editor is a content search results page"))?;
 												panic!();
 											}
 
@@ -4624,6 +4691,13 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	send_request(
 		app,
 		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
+			app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
+		)))
+	)?;
+
+	send_request(
+		app,
+		Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetEnabled(
 			app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
 		)))
 	)?;

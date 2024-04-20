@@ -1059,3 +1059,94 @@ pub fn convert_generic<T: DeserializeOwned>(data: &[u8], game: GameVersion, reso
 		}
 	}
 }
+
+#[try_fn]
+#[context("Couldn't convert binary data to ResourceLib format")]
+pub fn convert_generic_str(data: &[u8], game: GameVersion, resource_type: &str) -> Result<String> {
+	let _lock = CONVERTER_MUTEX.lock();
+
+	unsafe {
+		match game {
+			GameVersion::H1 => {
+				let converter = HM2016_GetConverterForResource(CString::new(resource_type)?.as_ptr());
+
+				if converter.is_null() {
+					bail!("Couldn't get ResourceLib converter")
+				}
+
+				let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+				if json_string.is_null() {
+					bail!("Couldn't convert data to JsonString")
+				}
+
+				let res = CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+					(*json_string).JsonData.cast(),
+					(*json_string).StrSize + 1 // include the null byte in the slice
+				))
+				.context("Couldn't construct CStr from JsonString data")?
+				.to_str()
+				.context("Couldn't convert CStr to str")?
+				.to_owned();
+
+				(*converter).FreeJsonString.unwrap()(json_string);
+
+				res
+			}
+
+			GameVersion::H2 => {
+				let converter = HM2_GetConverterForResource(CString::new(resource_type)?.as_ptr());
+
+				if converter.is_null() {
+					bail!("Couldn't get ResourceLib converter")
+				}
+
+				let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+				if json_string.is_null() {
+					bail!("Couldn't convert data to JsonString")
+				}
+
+				let res = CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+					(*json_string).JsonData.cast(),
+					(*json_string).StrSize + 1 // include the null byte in the slice
+				))
+				.context("Couldn't construct CStr from JsonString data")?
+				.to_str()
+				.context("Couldn't convert CStr to str")?
+				.to_owned();
+
+				(*converter).FreeJsonString.unwrap()(json_string);
+
+				res
+			}
+
+			GameVersion::H3 => {
+				let converter = HM3_GetConverterForResource(CString::new(resource_type)?.as_ptr());
+
+				if converter.is_null() {
+					bail!("Couldn't get ResourceLib converter")
+				}
+
+				let json_string = (*converter).FromMemoryToJsonString.unwrap()(data.as_ptr().cast(), data.len());
+
+				if json_string.is_null() {
+					bail!("Couldn't convert data to JsonString")
+				}
+
+				let res = CStr::from_bytes_with_nul(std::slice::from_raw_parts(
+					(*json_string).JsonData.cast(),
+					(*json_string).StrSize + 1 // include the null byte in the slice
+				))
+				.context("Couldn't construct CStr from JsonString data")?
+				.to_str()
+				.context("Couldn't convert CStr to str")?
+				.to_owned();
+
+				(*converter).FreeJsonString.unwrap()(json_string);
+
+				res
+			}
+		}
+	}
+}
