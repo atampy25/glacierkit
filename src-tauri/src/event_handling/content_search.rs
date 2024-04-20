@@ -230,23 +230,27 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 			let percent = ((((progress * 1000) as f32) / (total_resources as f32)) * 100.0).round() as u8;
 			if percent != last_percent {
 				last_percent = percent;
+
 				finish_task(app, progress_task)?;
+
+				let secs_remaining = ((Instant::now() - start_time).as_secs_f32() / ((progress * 1000) as f32)
+					* ((total_resources - (progress * 1000)) as f32)) as u64;
+
 				progress_task = start_task(
 					app,
 					format!(
-						"Searching game files for \"{}\": {}%, {} remaining",
+						"Searching game files for \"{}\": {}%, {}{} remaining",
 						query,
 						last_percent,
-						hrtime::from_sec(
-							((Instant::now() - start_time).as_secs_f32() / ((progress * 1000) as f32)
-								* ((total_resources - (progress * 1000)) as f32)) as u64
-						)
+						hrtime::from_sec(secs_remaining),
+						if secs_remaining <= 60 { "s" } else { "" }
 					)
 				)?;
 			}
 		}
 
 		finish_task(app, progress_task)?;
+		progress_task = start_task(app, format!("Preparing search results for \"{}\"", query))?;
 
 		let results = matching_ids
 			.into_iter()
@@ -284,5 +288,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 				editor_type: EditorType::ContentSearchResults
 			})
 		)?;
+
+		finish_task(app, progress_task)?;
 	}
 }
