@@ -14,6 +14,7 @@ use structstruck::strike;
 use uuid::Uuid;
 
 use crate::{
+	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
 	game_detection::GameInstall,
 	hash_list::HashList,
@@ -53,7 +54,9 @@ pub struct AppState {
 
 	pub cached_entities: Arc<DashMap<String, Entity>>,
 	pub repository: ArcSwapOption<Vec<RepositoryItem>>,
-	pub intellisense: ArcSwapOption<Intellisense>
+	pub intellisense: ArcSwapOption<Intellisense>,
+
+	pub editor_connection: EditorConnection
 }
 
 #[derive(Debug)]
@@ -396,6 +399,31 @@ strike! {
 						editor_id: Uuid,
 						parent_id: String,
 						file: String
+					},
+
+					SelectEntityInEditor {
+						editor_id: Uuid,
+						entity_id: String
+					},
+
+					MoveEntityToPlayer {
+						editor_id: Uuid,
+						entity_id: String
+					},
+
+					RotateEntityAsPlayer {
+						editor_id: Uuid,
+						entity_id: String
+					},
+
+					MoveEntityToCamera {
+						editor_id: Uuid,
+						entity_id: String
+					},
+
+					RotateEntityAsCamera {
+						editor_id: Uuid,
+						entity_id: String
 					}
 				}),
 
@@ -740,6 +768,11 @@ strike! {
 					SetTemplates {
 						editor_id: Uuid,
 						templates: Vec<PastableTemplateCategory>
+					},
+
+					SetEditorConnectionAvailable {
+						editor_id: Uuid,
+						editor_connection_available: bool
 					}
 				}),
 

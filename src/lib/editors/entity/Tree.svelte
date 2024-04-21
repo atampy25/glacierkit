@@ -47,6 +47,8 @@
 
 	let templates: PastableTemplateCategory[] = []
 
+	let editorConnectionAvailable = false
+
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
 			core: {
@@ -372,6 +374,149 @@
 								])
 							)
 						},
+						...(editorConnectionAvailable
+							? {
+									editorConnection: {
+										separator_before: true,
+										separator_after: false,
+										label: "Editor",
+										icon: "fa-solid fa-right-left",
+										action: false,
+										submenu: {
+											selectInEditor: {
+												separator_before: false,
+												separator_after: false,
+												label: "Select in Editor",
+												icon: "fas fa-highlighter",
+												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+													let d = tree.get_node(b.reference)
+
+													await event({
+														type: "editor",
+														data: {
+															type: "entity",
+															data: {
+																type: "tree",
+																data: {
+																	type: "selectEntityInEditor",
+																	data: {
+																		editor_id: editorID,
+																		entity_id: d.id
+																	}
+																}
+															}
+														}
+													})
+												}
+											},
+											moveToPlayerPosition: {
+												separator_before: false,
+												separator_after: false,
+												label: "Move to Player Position",
+												icon: "fa-solid fa-location-dot",
+												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+													let d = tree.get_node(b.reference)
+
+													await event({
+														type: "editor",
+														data: {
+															type: "entity",
+															data: {
+																type: "tree",
+																data: {
+																	type: "moveEntityToPlayer",
+																	data: {
+																		editor_id: editorID,
+																		entity_id: d.id
+																	}
+																}
+															}
+														}
+													})
+												}
+											},
+											rotateAsPlayer: {
+												separator_before: false,
+												separator_after: false,
+												label: "Adjust Rotation to Player",
+												icon: "fa-solid fa-location-dot",
+												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+													let d = tree.get_node(b.reference)
+
+													await event({
+														type: "editor",
+														data: {
+															type: "entity",
+															data: {
+																type: "tree",
+																data: {
+																	type: "rotateEntityAsPlayer",
+																	data: {
+																		editor_id: editorID,
+																		entity_id: d.id
+																	}
+																}
+															}
+														}
+													})
+												}
+											},
+											moveToCameraPosition: {
+												separator_before: false,
+												separator_after: false,
+												label: "Move to Camera Position",
+												icon: "fa-solid fa-location-dot",
+												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+													let d = tree.get_node(b.reference)
+
+													await event({
+														type: "editor",
+														data: {
+															type: "entity",
+															data: {
+																type: "tree",
+																data: {
+																	type: "moveEntityToCamera",
+																	data: {
+																		editor_id: editorID,
+																		entity_id: d.id
+																	}
+																}
+															}
+														}
+													})
+												}
+											},
+											rotateAsCamera: {
+												separator_before: false,
+												separator_after: false,
+												label: "Adjust Rotation to Camera",
+												icon: "fa-solid fa-location-dot",
+												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+													let d = tree.get_node(b.reference)
+
+													await event({
+														type: "editor",
+														data: {
+															type: "entity",
+															data: {
+																type: "tree",
+																data: {
+																	type: "rotateEntityAsCamera",
+																	data: {
+																		editor_id: editorID,
+																		entity_id: d.id
+																	}
+																}
+															}
+														}
+													})
+												}
+											}
+										}
+									}
+								}
+							: {}),
 						copyID: {
 							separator_before: false,
 							separator_after: false,
@@ -551,6 +696,10 @@
 
 			case "setTemplates":
 				templates = request.data.templates
+				break
+
+			case "setEditorConnectionAvailable":
+				editorConnectionAvailable = request.data.editor_connection_available
 				break
 
 			default:

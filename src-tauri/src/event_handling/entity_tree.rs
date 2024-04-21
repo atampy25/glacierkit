@@ -11,7 +11,7 @@ use itertools::Itertools;
 use quickentity_rs::{
 	apply_patch, convert_2016_factory_to_modern,
 	patch_structs::{Patch, PatchOperation, SubEntityOperation},
-	qn_structs::{FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity}
+	qn_structs::{FullRef, Property, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity}
 };
 use serde::Serialize;
 use serde_json::{from_value, json, to_value, Value};
@@ -1867,6 +1867,588 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 			}
 		)?;
 	}
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
+#[context("Couldn't handle select entity in editor event")]
+pub async fn handle_selectentityineditor(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Selecting {} in editor", entity_id))?;
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	app_state
+		.editor_connection
+		.select_entity(&entity_id, &entity.blueprint_hash);
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
+#[context("Couldn't handle move entity to player event")]
+pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Moving {} to player position", entity_id))?;
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let player_transform = app_state.editor_connection.get_player_transform().await?;
+
+	let property = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.get_or_insert_default()
+		.entry("m_mTransform".into())
+		.or_insert(Property {
+			property_type: "SMatrix43".into(),
+			value: json!({
+				"rotation": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				},
+				"position": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				}
+			}),
+			post_init: None
+		});
+
+	property.value.as_object_mut().unwrap().insert(
+		"position".into(),
+		json!({
+			"x": player_transform.position.x,
+			"y": player_transform.position.y,
+			"z": player_transform.position.z
+		})
+	);
+
+	let _ = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"));
+
+	if let Some(intellisense) = app_state.intellisense.load().as_ref()
+		&& let Some(game_files) = app_state.game_files.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+	{
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.try_find(|x| anyhow::Ok(x.path == *install))?
+			.context("No such game install")?
+			.version;
+
+		if intellisense
+			.get_properties(
+				game_files,
+				&app_state.cached_entities,
+				hash_list,
+				game_version,
+				entity,
+				&entity_id,
+				true
+			)?
+			.into_iter()
+			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
+		{
+			entity
+				.entities
+				.get_mut(&entity_id)
+				.context("No such entity")?
+				.properties
+				.as_mut()
+				.unwrap()
+				.insert(
+					String::from("m_eRoomBehaviour"),
+					Property {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						value: Value::String("ROOM_DYNAMIC".into()),
+						post_init: None
+					}
+				);
+		}
+	}
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
+
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	entity
+		.entities
+		.get(&entity_id)
+		.context("No such entity")?
+		.serialize(&mut ser)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::ReplaceContentIfSameEntityID {
+				editor_id: editor_id.to_owned(),
+				entity_id,
+				content: String::from_utf8(buf)?
+			}
+		)))
+	)?;
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
+#[context("Couldn't handle rotate entity as player event")]
+pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Adjusting {} to player rotation", entity_id))?;
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let player_transform = app_state.editor_connection.get_player_transform().await?;
+
+	let property = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.get_or_insert_default()
+		.entry("m_mTransform".into())
+		.or_insert(Property {
+			property_type: "SMatrix43".into(),
+			value: json!({
+				"rotation": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				},
+				"position": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				}
+			}),
+			post_init: None
+		});
+
+	property.value.as_object_mut().unwrap().insert(
+		"rotation".into(),
+		json!({
+			"x": player_transform.rotation.x,
+			"y": player_transform.rotation.y,
+			"z": player_transform.rotation.z
+		})
+	);
+
+	let _ = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"));
+
+	if let Some(intellisense) = app_state.intellisense.load().as_ref()
+		&& let Some(game_files) = app_state.game_files.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+	{
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.try_find(|x| anyhow::Ok(x.path == *install))?
+			.context("No such game install")?
+			.version;
+
+		if intellisense
+			.get_properties(
+				game_files,
+				&app_state.cached_entities,
+				hash_list,
+				game_version,
+				entity,
+				&entity_id,
+				true
+			)?
+			.into_iter()
+			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
+		{
+			entity
+				.entities
+				.get_mut(&entity_id)
+				.context("No such entity")?
+				.properties
+				.as_mut()
+				.unwrap()
+				.insert(
+					String::from("m_eRoomBehaviour"),
+					Property {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						value: Value::String("ROOM_DYNAMIC".into()),
+						post_init: None
+					}
+				);
+		}
+	}
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
+
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	entity
+		.entities
+		.get(&entity_id)
+		.context("No such entity")?
+		.serialize(&mut ser)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::ReplaceContentIfSameEntityID {
+				editor_id: editor_id.to_owned(),
+				entity_id,
+				content: String::from_utf8(buf)?
+			}
+		)))
+	)?;
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
+#[context("Couldn't handle move entity to camera event")]
+pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Moving {} to camera position", entity_id))?;
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
+
+	let property = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.get_or_insert_default()
+		.entry("m_mTransform".into())
+		.or_insert(Property {
+			property_type: "SMatrix43".into(),
+			value: json!({
+				"rotation": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				},
+				"position": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				}
+			}),
+			post_init: None
+		});
+
+	property.value.as_object_mut().unwrap().insert(
+		"position".into(),
+		json!({
+			"x": camera_transform.position.x,
+			"y": camera_transform.position.y,
+			"z": camera_transform.position.z
+		})
+	);
+
+	let _ = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"));
+
+	if let Some(intellisense) = app_state.intellisense.load().as_ref()
+		&& let Some(game_files) = app_state.game_files.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+	{
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.try_find(|x| anyhow::Ok(x.path == *install))?
+			.context("No such game install")?
+			.version;
+
+		if intellisense
+			.get_properties(
+				game_files,
+				&app_state.cached_entities,
+				hash_list,
+				game_version,
+				entity,
+				&entity_id,
+				true
+			)?
+			.into_iter()
+			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
+		{
+			entity
+				.entities
+				.get_mut(&entity_id)
+				.context("No such entity")?
+				.properties
+				.as_mut()
+				.unwrap()
+				.insert(
+					String::from("m_eRoomBehaviour"),
+					Property {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						value: Value::String("ROOM_DYNAMIC".into()),
+						post_init: None
+					}
+				);
+		}
+	}
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
+
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	entity
+		.entities
+		.get(&entity_id)
+		.context("No such entity")?
+		.serialize(&mut ser)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::ReplaceContentIfSameEntityID {
+				editor_id: editor_id.to_owned(),
+				entity_id,
+				content: String::from_utf8(buf)?
+			}
+		)))
+	)?;
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
+#[context("Couldn't handle rotate entity as camera event")]
+pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Adjusting {} to camera rotation", entity_id))?;
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
+
+	let property = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.get_or_insert_default()
+		.entry("m_mTransform".into())
+		.or_insert(Property {
+			property_type: "SMatrix43".into(),
+			value: json!({
+				"rotation": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				},
+				"position": {
+					"x": 0,
+					"y": 0,
+					"z": 0
+				}
+			}),
+			post_init: None
+		});
+
+	property.value.as_object_mut().unwrap().insert(
+		"rotation".into(),
+		json!({
+			"x": camera_transform.rotation.x,
+			"y": camera_transform.rotation.y,
+			"z": camera_transform.rotation.z
+		})
+	);
+
+	let _ = entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"));
+
+	if let Some(intellisense) = app_state.intellisense.load().as_ref()
+		&& let Some(game_files) = app_state.game_files.load().as_ref()
+		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+		&& let Some(install) = app_settings.load().game_install.as_ref()
+	{
+		let game_version = app_state
+			.game_installs
+			.iter()
+			.try_find(|x| anyhow::Ok(x.path == *install))?
+			.context("No such game install")?
+			.version;
+
+		if intellisense
+			.get_properties(
+				game_files,
+				&app_state.cached_entities,
+				hash_list,
+				game_version,
+				entity,
+				&entity_id,
+				true
+			)?
+			.into_iter()
+			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
+		{
+			entity
+				.entities
+				.get_mut(&entity_id)
+				.context("No such entity")?
+				.properties
+				.as_mut()
+				.unwrap()
+				.insert(
+					String::from("m_eRoomBehaviour"),
+					Property {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						value: Value::String("ROOM_DYNAMIC".into()),
+						post_init: None
+					}
+				);
+		}
+	}
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
+
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	entity
+		.entities
+		.get(&entity_id)
+		.context("No such entity")?
+		.serialize(&mut ser)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::ReplaceContentIfSameEntityID {
+				editor_id: editor_id.to_owned(),
+				entity_id,
+				content: String::from_utf8(buf)?
+			}
+		)))
+	)?;
 
 	finish_task(app, task)?;
 }

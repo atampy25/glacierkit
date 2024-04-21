@@ -8,6 +8,7 @@
 #![feature(let_chains)]
 #![feature(async_closure)]
 #![feature(cursor_remaining)]
+#![feature(option_get_or_insert_default)]
 
 pub mod editor_connection;
 pub mod entity;
@@ -30,20 +31,24 @@ use std::{
 	future::Future,
 	ops::{Deref, DerefMut},
 	path::Path,
-	sync::Arc
+	sync::Arc,
+	time::Duration
 };
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
+use editor_connection::EditorConnection;
 use entity::{calculate_reverse_references, get_local_reference, get_recursive_children, CopiedEntityData};
 use event_handling::{
 	content_search::start_content_search,
 	entity_metadata::handle_entity_metadata_event,
 	entity_monaco::{handle_openfactory, handle_updatecontent},
 	entity_overrides::handle_entity_overrides_event,
-	entity_tree::{handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_paste, handle_select},
+	entity_tree::{
+		handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_moveentitytocamera, handle_moveentitytoplayer, handle_paste, handle_rotateentityascamera, handle_rotateentityasplayer, handle_select, handle_selectentityineditor
+	},
 	repository_patch::handle_repository_patch_event,
 	resource_overview::{handle_resource_overview_event, initialise_resource_overview},
 	unlockables_patch::handle_unlockables_patch_event
@@ -57,7 +62,13 @@ use intellisense::Intellisense;
 use itertools::Itertools;
 use measure_time::print_time;
 use model::{
-	AppSettings, AppState, ContentSearchEvent, ContentSearchRequest, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project, ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	AppSettings, AppState, ContentSearchEvent, ContentSearchRequest, ContentSearchResultsEvent,
+	ContentSearchResultsRequest, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
+	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent,
+	EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
+	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project,
+	ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest,
+	TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use ores::{parse_json_ores, UnlockableItem};
@@ -65,7 +76,7 @@ use quickentity_rs::{
 	apply_patch, convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn, convert_to_rt,
 	generate_patch,
 	patch_structs::Patch,
-	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
+	qn_structs::{CommentEntity, Entity, Property, Ref, SubEntity, SubType}
 };
 use rayon::{
 	iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator},
@@ -188,7 +199,8 @@ fn main() {
 				resource_reverse_dependencies: None.into(),
 				cached_entities: DashMap::new().into(),
 				repository: None.into(),
-				intellisense: None.into()
+				intellisense: None.into(),
+				editor_connection: EditorConnection::new(app.handle())
 			});
 
 			Ok(())
@@ -201,51 +213,6 @@ fn main() {
 				handler.flush_events_blocking();
 			}
 		});
-}
-
-fn spawn_fallible<F>(app: &AppHandle, task: F)
-where
-	F: Future<Output = Result<()>> + Send + 'static
-{
-	let cloned_app1 = app.clone();
-	let cloned_app2 = app.clone();
-
-	async_runtime::spawn(async move {
-		if let Err(e) = async_runtime::spawn(async move {
-			if let Err::<_, Error>(e) = task.await {
-				send_request(
-					&cloned_app1,
-					Request::Global(GlobalRequest::ErrorReport {
-						error: format!("{:?}", e)
-					})
-				)
-				.expect("Couldn't send error report to frontend");
-			}
-		})
-		.await
-		{
-			send_request(
-				&cloned_app2,
-				Request::Global(GlobalRequest::ErrorReport {
-					error: match e {
-						tauri::Error::JoinError(x) if x.is_panic() => {
-							let x = x.into_panic();
-							let payload = x
-								.downcast_ref::<String>()
-								.map(String::as_str)
-								.or_else(|| x.downcast_ref::<&str>().cloned())
-								.unwrap_or("<non string panic payload>");
-
-							format!("Thread panic: {}", payload)
-						}
-
-						_ => format!("{:?}", e)
-					}
-				})
-			)
-			.expect("Couldn't send error report to frontend");
-		}
-	});
 }
 
 #[tauri::command]
@@ -2661,6 +2628,19 @@ fn event(app: AppHandle, event: Event) {
 								)?;
 
 								load_game_files(&app).await?;
+
+								let app = app.clone();
+
+								async_runtime::spawn(async move {
+									let mut interval = tokio::time::interval(Duration::from_secs(10));
+
+									loop {
+										interval.tick().await;
+
+										// Attempt to connect every 10 seconds; it doesn't matter if it fails or is already connected
+										let _ = app.state::<AppState>().editor_connection.connect().await;
+									}
+								});
 							}
 
 							SettingsEvent::ChangeGameInstall(path) => {
@@ -2840,9 +2820,22 @@ fn event(app: AppHandle, event: Event) {
 										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 											EntityTreeRequest::SetTemplates {
-												editor_id,
+												editor_id: editor_id.to_owned(),
 												templates: from_slice(include_bytes!("../assets/templates.json"))
 													.unwrap()
+											}
+										)))
+									)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+											EntityTreeRequest::SetEditorConnectionAvailable {
+												editor_id,
+												editor_connection_available: app_state
+													.editor_connection
+													.is_connected()
+													.await
 											}
 										)))
 									)?;
@@ -3085,6 +3078,26 @@ fn event(app: AppHandle, event: Event) {
 								} => {
 									handle_gamebrowseradd(&app, editor_id, parent_id, file).await?;
 								}
+
+								EntityTreeEvent::SelectEntityInEditor { editor_id, entity_id } => {
+									handle_selectentityineditor(&app, editor_id, entity_id).await?;
+								}
+
+								EntityTreeEvent::MoveEntityToPlayer { editor_id, entity_id } => {
+									handle_moveentitytoplayer(&app, editor_id, entity_id).await?;
+								}
+
+								EntityTreeEvent::RotateEntityAsPlayer { editor_id, entity_id } => {
+									handle_rotateentityasplayer(&app, editor_id, entity_id).await?;
+								}
+
+								EntityTreeEvent::MoveEntityToCamera { editor_id, entity_id } => {
+									handle_moveentitytocamera(&app, editor_id, entity_id).await?;
+								}
+
+								EntityTreeEvent::RotateEntityAsCamera { editor_id, entity_id } => {
+									handle_rotateentityascamera(&app, editor_id, entity_id).await?;
+								}
 							},
 
 							EntityEditorEvent::Monaco(event) => match event {
@@ -3185,25 +3198,27 @@ fn event(app: AppHandle, event: Event) {
 
 								let results = match editor_state.data {
 									EditorData::ContentSearchResults { ref results, .. } => results,
-					
+
 									_ => {
 										Err(anyhow!("Editor {} is not a content search results page", id))?;
 										panic!();
 									}
 								};
-								
+
 								send_request(
 									&app,
-									Request::Editor(EditorRequest::ContentSearchResults(ContentSearchResultsRequest::Initialise {
-										id,
-										results: results.to_owned()
-									}))
+									Request::Editor(EditorRequest::ContentSearchResults(
+										ContentSearchResultsRequest::Initialise {
+											id,
+											results: results.to_owned()
+										}
+									))
 								)?;
 							}
 
-							ContentSearchResultsEvent::OpenResourceOverview { hash ,.. } => {
+							ContentSearchResultsEvent::OpenResourceOverview { hash, .. } => {
 								let id = Uuid::new_v4();
-					
+
 								app_state.editor_states.insert(
 									id.to_owned(),
 									EditorState {
@@ -3211,7 +3226,7 @@ fn event(app: AppHandle, event: Event) {
 										data: EditorData::ResourceOverview { hash: hash.to_owned() }
 									}
 								);
-					
+
 								send_request(
 									&app,
 									Request::Global(GlobalRequest::CreateTab {

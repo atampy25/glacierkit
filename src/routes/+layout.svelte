@@ -7,7 +7,7 @@
 	import "$lib/crc32"
 
 	import { appWindow } from "@tauri-apps/api/window"
-	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
+	import { ComposedModal, HeaderNavItem, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import { beforeUpdate, onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
