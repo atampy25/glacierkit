@@ -1,33 +1,48 @@
-use std::sync::{
-	atomic::{AtomicBool, Ordering},
-	Arc
+use std::{
+	sync::{
+		atomic::{AtomicBool, Ordering},
+		Arc
+	},
+	time::Duration
 };
 
 use anyhow::{anyhow, Context, Error, Result};
+use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use indexmap::IndexMap;
-use quickentity_rs::{convert_qn_property_value_to_rt, qn_structs::Property};
+use quickentity_rs::{
+	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn, qn_structs::Property,
+	rt_structs::SEntityTemplatePropertyValue
+};
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{from_value, Value};
+use specta::Type;
 use tauri::{async_runtime::spawn, AppHandle, Manager};
 use tokio::{
 	net::TcpStream,
 	sync::{broadcast, Mutex}
 };
+use tokio_stream::wrappers::ReceiverStream;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tryvial::try_fn;
 
 use crate::{
-	model::{AppState, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, GlobalRequest, Request},
+	handle_event,
+	model::{
+		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, Event,
+		GlobalRequest, Request
+	},
 	send_request
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
+#[serde(tag = "source")]
+#[serde(rename_all = "camelCase")]
 pub enum EntitySelector {
-	GameEntity { id: String, tblu: String },
-	EditorEntity { id: String, byEditor: bool }
+	Game { id: String, tblu: String },
+	Editor { id: String }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,7 +52,7 @@ pub enum PropertyID {
 	Known(String)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Vec3 {
 	pub x: f64,
@@ -45,7 +60,7 @@ pub struct Vec3 {
 	pub z: f64
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Rotation {
 	yaw: f64,
@@ -53,7 +68,7 @@ pub struct Rotation {
 	roll: f64
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Transform {
 	position: Vec3,
@@ -61,11 +76,13 @@ pub struct Transform {
 	scale: Vec3
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct QNTransform {
-	pub position: Vec3,
 	pub rotation: Vec3,
+	pub position: Vec3,
+
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub scale: Option<Vec3>
 }
 
@@ -117,56 +134,91 @@ pub enum SDKEditorRequest {
 	},
 
 	ListEntities {
-		editor_only: bool
+		editorOnly: bool,
+
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
 	},
 
 	GetEntityDetails {
-		entity: EntitySelector
+		entity: EntitySelector,
+
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
 	},
 
-	GetHitmanEntity,
+	GetHitmanEntity {
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
+	},
 
-	GetCameraEntity,
+	GetCameraEntity {
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
+	},
 
-	RebuildEntityTree
+	RebuildEntityTree {
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
+	}
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertyValue {
 	#[serde(rename = "type")]
-	property_type: String,
-	data: Value
+	pub property_type: String,
+	pub data: Value
 }
 
-/// No support for editor entities currently, but that's fine as they don't exist anyway
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "source")]
 #[serde(rename_all = "camelCase")]
-pub struct EntityBaseDetails {
-	id: String,
-	tblu: String,
-	name: Option<String>,
+pub enum EntityBaseDetails {
+	Game {
+		id: String,
+		tblu: String
+		// name: Option<String>,
 
-	#[serde(rename = "type")]
-	ty: String
+		// #[serde(rename = "type")]
+		// ty: String
+	},
+	Editor {
+		id: String
+		// name: Option<String>,
+
+		// #[serde(rename = "type")]
+		// ty: String
+	}
 }
 
-/// No support for editor entities currently, but that's fine as they don't exist anyway
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "source")]
 #[serde(rename_all = "camelCase")]
-pub struct EntityDetails {
-	id: String,
-	tblu: String,
-	name: Option<String>,
+pub enum EntityDetails {
+	Game {
+		id: String,
+		tblu: String,
+		// name: Option<String>,
 
-	#[serde(rename = "type")]
-	ty: String,
+		// #[serde(rename = "type")]
+		// ty: String,
+		// parent: Option<EntitySelector>,
+		transform: Option<Value>,
+		// relativeTransform: Option<Transform>,
+		properties: IndexMap<String, PropertyValue> // interfaces: Vec<String>
+	},
+	Editor {
+		id: String,
+		// name: Option<String>,
 
-	parent: Option<EntitySelector>,
-	transform: Option<Transform>,
-	relative_transform: Option<Transform>,
-	properties: IndexMap<String, PropertyValue>,
-	interfaces: Vec<String>
+		// #[serde(rename = "type")]
+		// ty: String,
+		// parent: Option<EntitySelector>,
+		transform: Option<Value>,
+		// relativeTransform: Option<Transform>,
+		properties: IndexMap<String, PropertyValue> // interfaces: Vec<String>
+	}
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -176,7 +228,10 @@ pub enum SDKEditorEvent {
 	Welcome,
 
 	Error {
-		message: String
+		message: String,
+
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
 	},
 
 	EntitySelected {
@@ -217,19 +272,29 @@ pub enum SDKEditorEvent {
 	},
 
 	EntityList {
-		entities: Vec<EntityBaseDetails>
+		entities: Vec<EntityBaseDetails>,
+		msgId: Option<i64>
 	},
 
 	EntityDetails {
-		entity: EntityDetails
+		entity: EntityDetails,
+
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
 	},
 
 	HitmanEntity {
-		entity: EntityDetails
+		entity: EntityDetails,
+
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
 	},
 
 	CameraEntity {
-		entity: EntityDetails
+		entity: EntityDetails,
+
+		#[serde(skip_serializing_if = "Option::is_none")]
+		msgId: Option<i64>
 	},
 
 	EntityTreeRebuilt
@@ -238,6 +303,7 @@ pub enum SDKEditorEvent {
 pub struct EditorConnection {
 	sender: Arc<Mutex<Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>>>,
 	events: broadcast::Sender<SDKEditorEvent>,
+	debounced_events: tokio::sync::mpsc::Sender<SDKEditorEvent>,
 	entity_tree_loaded: Arc<AtomicBool>,
 	app: AppHandle
 }
@@ -246,10 +312,94 @@ impl EditorConnection {
 	pub fn new(app: AppHandle) -> Self {
 		let (sender, _) = broadcast::channel(32);
 
+		let (tx, rx) = tokio::sync::mpsc::channel(32);
+
+		let mut recvr = debounced(ReceiverStream::new(rx), Duration::from_millis(500));
+
+		let _app = app.clone();
+
+		spawn(async move {
+			let app = _app;
+
+			while let Some(evt) = recvr.next().await {
+				match evt {
+					SDKEditorEvent::EntityTransformUpdated {
+						entity: EntityDetails::Game {
+							id,
+							tblu,
+							mut properties,
+							..
+						}
+					} => {
+						let transform = properties
+							.swap_remove("m_mTransform")
+							.expect("No m_mTransform on entity whose transform was updated");
+
+						handle_event(
+							&app,
+							Event::EditorConnection(EditorConnectionEvent::EntityTransformUpdated(
+								id,
+								tblu,
+								from_value(
+									convert_rt_property_value_to_qn(
+										&SEntityTemplatePropertyValue {
+											property_type: transform.property_type,
+											property_value: transform.data
+										},
+										&Default::default(),
+										&Default::default(),
+										&Default::default(),
+										false
+									)
+									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
+									.expect("Couldn't convert transform value to QN")
+								)
+								.expect("Couldn't parse QN transform")
+							))
+						);
+					}
+
+					SDKEditorEvent::EntityPropertyChanged {
+						entity: EntityDetails::Game { id, tblu, .. },
+						property,
+						value
+					} => {
+						handle_event(
+							&app,
+							Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged(
+								id,
+								tblu,
+								match property {
+									PropertyID::Unknown(id) => id.to_string(),
+									PropertyID::Known(name) => name
+								},
+								value.property_type.to_owned(),
+								convert_rt_property_value_to_qn(
+									&SEntityTemplatePropertyValue {
+										property_type: value.property_type,
+										property_value: value.data
+									},
+									&Default::default(),
+									&Default::default(),
+									&Default::default(),
+									false
+								)
+								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
+								.expect("Couldn't convert new property value to QN")
+							))
+						);
+					}
+
+					_ => panic!("This event kind should not be debounced")
+				}
+			}
+		});
+
 		Self {
 			sender: Mutex::new(None).into(),
 			events: sender,
 			entity_tree_loaded: AtomicBool::new(false).into(),
+			debounced_events: tx,
 			app
 		}
 	}
@@ -301,12 +451,8 @@ impl EditorConnection {
 								_ => {
 									let msg = msg.to_text().context("Couldn't convert message to text")?;
 
-									// serde_json is apparently broken and will error if you don't deserialise as Value first
-									let msg: Value =
-										serde_json::from_str(msg).context("Couldn't parse message as JSON")?;
-
-									let msg = serde_json::from_value(msg)
-										.context("Couldn't parse message as SDKEditorEvent")?;
+									let msg: SDKEditorEvent = serde_json::from_str(msg)
+										.with_context(|| format!("Couldn't parse message {msg:?} as SDKEditorEvent"))?;
 
 									// It's ok if there are no listeners
 									let _ = events.send(msg);
@@ -347,16 +493,37 @@ impl EditorConnection {
 
 			let entity_tree_loaded = self.entity_tree_loaded.clone();
 
+			let app = self.app.clone();
+
+			let debounced_events = self.debounced_events.clone();
+
 			spawn(async move {
 				loop {
-					if let Ok(event) = receiver.recv().await {
-						match event {
+					if let Ok(evt) = receiver.recv().await {
+						match evt {
 							SDKEditorEvent::EntityTreeRebuilt => {
 								entity_tree_loaded.store(true, Ordering::SeqCst);
 							}
 
 							SDKEditorEvent::SceneClearing { .. } | SDKEditorEvent::SceneLoading { .. } => {
 								entity_tree_loaded.store(false, Ordering::SeqCst);
+							}
+
+							SDKEditorEvent::EntitySelected {
+								entity: EntityDetails::Game { id, tblu, .. }
+							} => {
+								handle_event(
+									&app,
+									Event::EditorConnection(EditorConnectionEvent::EntitySelected(id, tblu))
+								);
+							}
+
+							SDKEditorEvent::EntityTransformUpdated { .. }
+							| SDKEditorEvent::EntityPropertyChanged { .. } => {
+								debounced_events
+									.send(evt)
+									.await
+									.expect("Couldn't queue debounced event");
 							}
 
 							_ => {}
@@ -420,7 +587,7 @@ impl EditorConnection {
 				.as_mut()
 				.context("Not connected")?
 				.send(Message::Text(serde_json::to_string(
-					&SDKEditorRequest::RebuildEntityTree
+					&SDKEditorRequest::RebuildEntityTree { msgId: None }
 				)?))
 				.await?;
 
@@ -453,7 +620,7 @@ impl EditorConnection {
 	#[context("Couldn't select entity {:?}", entity_id)]
 	pub async fn select_entity(&self, entity_id: &str, tblu: &str) -> Result<()> {
 		self.send_request(SDKEditorRequest::SelectEntity {
-			entity: EntitySelector::GameEntity {
+			entity: EntitySelector::Game {
 				id: entity_id.to_owned(),
 				tblu: tblu.to_owned()
 			}
@@ -464,16 +631,23 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't get player transform")]
 	pub async fn get_player_transform(&self) -> Result<QNTransform> {
-		self.send_request(SDKEditorRequest::GetHitmanEntity).await?;
+		let msg_id: i64 = thread_rng().gen();
+		self.send_request(SDKEditorRequest::GetHitmanEntity { msgId: Some(msg_id) })
+			.await?;
 
-		let SDKEditorEvent::HitmanEntity { entity } = self
-			.wait_for_event(|evt| matches!(evt, SDKEditorEvent::HitmanEntity { .. }))
+		let SDKEditorEvent::HitmanEntity { entity, .. } = self
+			.wait_for_event(|evt| matches!(evt, SDKEditorEvent::HitmanEntity { msgId: Some(x), .. } if *x == msg_id))
 			.await?
 		else {
 			unreachable!()
 		};
 
-		let transform = entity.transform.context("Returned hitman entity had no transform")?;
+		let EntityDetails::Game { transform, .. } = entity else {
+			unreachable!()
+		};
+
+		let transform = transform.context("Returned hitman entity had no transform")?;
+		let transform: Transform = from_value(transform).context("Invalid transform")?;
 
 		QNTransform {
 			position: transform.position,
@@ -496,16 +670,23 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't get camera transform")]
 	pub async fn get_camera_transform(&self) -> Result<QNTransform> {
-		self.send_request(SDKEditorRequest::GetCameraEntity).await?;
+		let msg_id: i64 = thread_rng().gen();
+		self.send_request(SDKEditorRequest::GetCameraEntity { msgId: Some(msg_id) })
+			.await?;
 
-		let SDKEditorEvent::CameraEntity { entity } = self
-			.wait_for_event(|evt| matches!(evt, SDKEditorEvent::CameraEntity { .. }))
+		let SDKEditorEvent::CameraEntity { entity, .. } = self
+			.wait_for_event(|evt| matches!(evt, SDKEditorEvent::CameraEntity { msgId: Some(x), .. } if *x == msg_id))
 			.await?
 		else {
 			unreachable!()
 		};
 
-		let transform = entity.transform.context("Returned camera entity had no transform")?;
+		let EntityDetails::Editor { transform, .. } = entity else {
+			unreachable!()
+		};
+
+		let transform = transform.context("Returned camera entity had no transform")?;
+		let transform: Transform = from_value(transform).context("Invalid transform")?;
 
 		QNTransform {
 			position: transform.position,
@@ -529,7 +710,7 @@ impl EditorConnection {
 	#[context("Couldn't set property {property} on {entity_id}")]
 	pub async fn set_property(&self, entity_id: &str, tblu: &str, property: &str, value: PropertyValue) -> Result<()> {
 		self.send_request(SDKEditorRequest::SetEntityProperty {
-			entity: EntitySelector::GameEntity {
+			entity: EntitySelector::Game {
 				id: entity_id.to_owned(),
 				tblu: tblu.to_owned()
 			},

@@ -1510,7 +1510,7 @@ impl Intellisense {
 							output.extend(found.1);
 						}
 
-						Err(e) if format!("{:?}", e).contains("Couldn't find the resource in any RPKG") => {}
+						Err(e) if format!("{:?}", e).contains("Couldn't find the resource in any partition") => {}
 
 						x => {
 							x?;

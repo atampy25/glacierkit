@@ -11,6 +11,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	editor_connection::PropertyValue,
 	entity::{check_local_references_exist, get_decorations, is_valid_entity_blueprint, is_valid_entity_factory},
 	finish_task,
 	model::{
@@ -20,6 +21,51 @@ use crate::{
 	rpkg::{ensure_entity_in_cache, extract_latest_overview_info, normalise_to_hash},
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
+
+const SAFE_TO_SYNC: [&str; 42] = [
+	"SMatrix43",
+	"float32",
+	"bool",
+	"SColorRGB",
+	"ZString",
+	"SVector3",
+	"int32",
+	"uint8",
+	"SVector2",
+	"uint32",
+	"ZGuid",
+	"ZCurve",
+	"SColorRGBA",
+	"ZGameTime",
+	"TArray<ZGameTime>",
+	"TArray<bool>",
+	"TArray<SGaitTransitionEntry>",
+	"TArray<SMapMarkerData>",
+	"uint64",
+	"TArray<int32>",
+	"TArray<SConversationPart>",
+	"SBodyPartDamageMultipliers",
+	"TArray<SVector2>",
+	"TArray<ZSharedSensorDef.SVisibilitySetting>",
+	"TArray<ZString>",
+	"TArray<STargetableBoneConfiguration>",
+	"TArray<ZSecuritySystemCameraConfiguration.SHitmanVisibleEscalationRule>",
+	"TArray<ZSecuritySystemCameraConfiguration.SDeadBodyVisibleEscalationRule>",
+	"S25DProjectionSettings",
+	"SVector4",
+	"TArray<SClothVertex>",
+	"TArray<SFontLibraryDefinition>",
+	"TArray<SCamBone>",
+	"TArray<SVector3>",
+	"TArray<ZHUDOccluderTriggerEntity.SBoneTestSetup>",
+	"uint16",
+	"SWorldSpaceSettings",
+	"SCCEffectSet",
+	"TArray<AI.SFirePattern01>",
+	"TArray<AI.SFirePattern02>",
+	"SSCCuriousConfiguration",
+	"TArray<SColorRGB>"
+];
 
 #[try_fn]
 #[context("Couldn't handle update content event")]
@@ -42,7 +88,13 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 	match from_str(&content) {
 		Ok(sub_entity) => match check_local_references_exist(&sub_entity, entity) {
 			Ok(EditorValidity::Valid) => {
-				if sub_entity != *entity.entities.get(&entity_id).context("No such sub-entity")? {
+				let previous = entity
+					.entities
+					.get(&entity_id)
+					.context("No such sub-entity")?
+					.to_owned();
+
+				if sub_entity != previous {
 					if let Some(hash_list) = app_state.hash_list.load().as_ref() {
 						if let Some(entry) = hash_list.entries.get(&normalise_to_hash(sub_entity.factory.to_owned())) {
 							if !is_valid_entity_factory(&entry.resource_type) {
@@ -116,7 +168,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						)))
 					)?;
 
-					entity.entities.insert(entity_id.to_owned(), sub_entity);
+					entity.entities.insert(entity_id.to_owned(), sub_entity.to_owned());
 
 					send_request(
 						app,
@@ -177,6 +229,37 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						)?;
 
 						finish_task(app, task)?;
+					}
+
+					if app_state.editor_connection.is_connected().await {
+						let prev_props = previous.properties.unwrap_or_default();
+
+						for (property, val) in sub_entity.properties.unwrap_or_default() {
+							let mut should_sync = false;
+
+							if let Some(previous_val) = prev_props.get(&property)
+								&& *previous_val != val
+							{
+								should_sync = true;
+							} else if !prev_props.contains_key(&property) {
+								should_sync = true;
+							}
+
+							if should_sync && SAFE_TO_SYNC.iter().any(|&x| val.property_type == x) {
+								app_state
+									.editor_connection
+									.set_property(
+										&entity_id,
+										&entity.blueprint_hash,
+										&property,
+										PropertyValue {
+											property_type: val.property_type,
+											data: val.value
+										}
+									)
+									.await?;
+							}
+						}
 					}
 				} else {
 					send_request(

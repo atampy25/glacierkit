@@ -61,6 +61,8 @@ export type DependencyWithFlag = { resource: string; flag: string }
 
 export type Dynamics = { announcements: Announcement[] }
 
+export type EditorConnectionEvent = { type: "entitySelected"; data: [string, string] } | { type: "entityTransformUpdated"; data: [string, string, QNTransform] } | { type: "entityPropertyChanged"; data: [string, string, string, string, JsonValue] }
+
 export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorEvent } | { type: "contentSearchResults"; data: ContentSearchResultsEvent }
 
 export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorRequest } | { type: "contentSearchResults"; data: ContentSearchResultsRequest }
@@ -158,7 +160,7 @@ export type EntityOverridesEvent = { type: "initialise"; data: { editor_id: stri
 
 export type EntityOverridesRequest = { type: "initialise"; data: { editor_id: string; property_overrides: string; override_deletes: string; pin_connection_overrides: string; pin_connection_override_deletes: string } } | { type: "updateDecorations"; data: { editor_id: string; decorations: ([string, string])[] } }
 
-export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } } | { type: "useTemplate"; data: { editor_id: string; parent_id: string; template: CopiedEntityData } } | { type: "addGameBrowserItem"; data: { editor_id: string; parent_id: string; file: string } } | { type: "moveEntityToPlayer"; data: { editor_id: string; entity_id: string } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } } | { type: "useTemplate"; data: { editor_id: string; parent_id: string; template: CopiedEntityData } } | { type: "addGameBrowserItem"; data: { editor_id: string; parent_id: string; file: string } } | { type: "selectEntityInEditor"; data: { editor_id: string; entity_id: string } } | { type: "moveEntityToPlayer"; data: { editor_id: string; entity_id: string } } | { type: "rotateEntityAsPlayer"; data: { editor_id: string; entity_id: string } } | { type: "moveEntityToCamera"; data: { editor_id: string; entity_id: string } } | { type: "rotateEntityAsCamera"; data: { editor_id: string; entity_id: string } }
 
 export type EntityTreeRequest = 
 /**
@@ -185,7 +187,7 @@ results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; facto
 
 export type EphemeralQNSettings = { showReverseParentRefs: boolean }
 
-export type Event = { type: "tool"; data: ToolEvent } | { type: "editor"; data: EditorEvent } | { type: "global"; data: GlobalEvent }
+export type Event = { type: "tool"; data: ToolEvent } | { type: "editor"; data: EditorEvent } | { type: "global"; data: GlobalEvent } | { type: "editorConnection"; data: EditorConnectionEvent }
 
 /**
  * An exposed entity.
@@ -237,9 +239,9 @@ export type GameInstall = { version: GameVersion; platform: string; path: string
 
 export type GameVersion = "h1" | "h2" | "h3"
 
-export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string } | { type: "startEditorConnection" }
+export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string }
 
-export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } } | { type: "setEditorConnectionActive"; data: { editor_connection_active: boolean } }
+export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } }
 
 export type JsonPatchType = "MergePatch" | "JsonPatch"
 
@@ -400,6 +402,8 @@ propertyName: string;
  */
 propertyOverride: OverriddenProperty }
 
+export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
+
 /**
  * A reference to an entity.
  */
@@ -449,6 +453,8 @@ reverse_dependencies: ([string, string, string | null])[]; data: ResourceOvervie
 export type ReverseReference = { from: string; data: ReverseReferenceData }
 
 export type ReverseReferenceData = { type: "parent" } | { type: "property"; data: { property_name: string } } | { type: "platformSpecificProperty"; data: { property_name: string; platform: string } } | { type: "event"; data: { event: string; trigger: string } } | { type: "inputCopy"; data: { trigger: string; propagate: string } } | { type: "outputCopy"; data: { event: string; propagate: string } } | { type: "propertyAlias"; data: { aliased_name: string; original_property: string } } | { type: "exposedEntity"; data: { exposed_name: string } } | { type: "exposedInterface"; data: { interface: string } } | { type: "subset"; data: { subset: string } }
+
+export type Rotation = { yaw: number; pitch: number; roll: number }
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
@@ -553,9 +559,13 @@ export type ToolEvent = { type: "fileBrowser"; data: FileBrowserEvent } | { type
 
 export type ToolRequest = { type: "fileBrowser"; data: FileBrowserRequest } | { type: "gameBrowser"; data: GameBrowserRequest } | { type: "settings"; data: SettingsRequest } | { type: "contentSearch"; data: ContentSearchRequest }
 
+export type Transform = { position: Vec3; rotation: Rotation; scale: Vec3 }
+
 export type UnlockableInformation = { type: "Access"; data: { id: string | null } } | { type: "EvergreenMastery"; data: { id: string | null } } | { type: "Disguise"; data: { id: string | null } } | { type: "AgencyPickup"; data: { id: string | null } } | { type: "Weapon"; data: { id: string | null } } | { type: "Gear"; data: { id: string | null } } | { type: "Location"; data: { id: string | null } } | { type: "Package"; data: { id: string | null } } | { type: "LoadoutUnlock"; data: { id: string | null } } | { type: "Unknown"; data: { id: string | null } }
 
 export type UnlockablesPatchEditorEvent = { type: "initialise"; data: { id: string } } | { type: "createUnlockable"; data: { id: string } } | { type: "resetModifications"; data: { id: string; unlockable: string } } | { type: "modifyUnlockable"; data: { id: string; unlockable: string; data: string } } | { type: "selectUnlockable"; data: { id: string; unlockable: string } }
 
 export type UnlockablesPatchEditorRequest = { type: "setUnlockables"; data: { id: string; unlockables: ([string, UnlockableInformation])[] } } | { type: "setModifiedUnlockables"; data: { id: string; modified: string[] } } | { type: "addNewUnlockable"; data: { id: string; new_unlockable: [string, UnlockableInformation] } } | { type: "removeUnlockable"; data: { id: string; unlockable: string } } | { type: "setMonacoContent"; data: { id: string; unlockable: string; orig_data: string; data: string } } | { type: "deselectMonaco"; data: { id: string } } | { type: "modifyUnlockableInformation"; data: { id: string; unlockable: string; info: UnlockableInformation } }
+
+export type Vec3 = { x: number; y: number; z: number }
 

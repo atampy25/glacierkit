@@ -47,7 +47,9 @@ use event_handling::{
 	entity_monaco::{handle_openfactory, handle_updatecontent},
 	entity_overrides::handle_entity_overrides_event,
 	entity_tree::{
-		handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_moveentitytocamera, handle_moveentitytoplayer, handle_paste, handle_rotateentityascamera, handle_rotateentityasplayer, handle_select, handle_selectentityineditor
+		handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_moveentitytocamera, handle_moveentitytoplayer,
+		handle_paste, handle_rotateentityascamera, handle_rotateentityasplayer, handle_select,
+		handle_selectentityineditor
 	},
 	repository_patch::handle_repository_patch_event,
 	resource_overview::{handle_resource_overview_event, initialise_resource_overview},
@@ -63,12 +65,12 @@ use itertools::Itertools;
 use measure_time::print_time;
 use model::{
 	AppSettings, AppState, ContentSearchEvent, ContentSearchRequest, ContentSearchResultsEvent,
-	ContentSearchResultsRequest, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent,
-	EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest, EntityMonacoEvent,
-	EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent, FileBrowserRequest,
-	GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project,
-	ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent, TextEditorRequest,
-	TextFileType, ToolEvent, ToolRequest
+	ContentSearchResultsRequest, EditorConnectionEvent, EditorData, EditorEvent, EditorRequest, EditorState,
+	EditorType, EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest,
+	EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent,
+	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest,
+	JsonPatchType, Project, ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent,
+	TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use ores::{parse_json_ores, UnlockableItem};
@@ -213,6 +215,10 @@ fn main() {
 				handler.flush_events_blocking();
 			}
 		});
+}
+
+pub fn handle_event(app: &AppHandle, evt: Event) {
+	event(app.clone(), evt);
 }
 
 #[tauri::command]
@@ -3044,11 +3050,30 @@ fn event(app: AppHandle, event: Event) {
 												editor_id,
 												results: entity
 													.entities
-													.iter()
+													.par_iter()
 													.filter(|(id, ent)| {
-														let mut s = format!("{}{}", id, to_string(ent).unwrap());
+														let mut parent_names = vec![];
+
+														// Get all parent names
+														let mut parent_ent = *ent;
+
+														while let Ref::Short(Some(ref x)) = &parent_ent.parent {
+															if let Some(next) = entity.entities.get(x) {
+																parent_names.push(next.name.to_owned());
+																parent_ent = next;
+															} else {
+																break;
+															}
+														}
+
+														let mut s = format!(
+															"{}{}{}",
+															parent_names.join("/"),
+															id,
+															to_string(ent).unwrap()
+														);
 														s.make_ascii_lowercase();
-														s.contains(&query)
+														query.split(' ').all(|q| s.contains(q))
 													})
 													.map(|(id, _)| id.to_owned())
 													.collect()
@@ -3319,83 +3344,48 @@ fn event(app: AppHandle, event: Event) {
 
 							app_state.fs_watcher.store(Some(
 								{
-									let mut watcher = notify::recommended_watcher(
-										move |evt: Result<notify::Event, notify::Error>| {
+									let mut watcher = notify_debouncer_full::new_debouncer(
+										Duration::from_secs(2),
+										None,
+										move |evts: notify_debouncer_full::DebounceEventResult| {
 											if let Err::<_, Error>(e) = try {
-												if let Ok(evt) = evt {
-													if evt.need_rescan() {
-														// Refresh the whole tree
+												if let Ok(evts) = evts {
+													for evt in evts {
+														if evt.need_rescan() {
+															// Refresh the whole tree
 
-														let mut files = vec![];
+															let mut files = vec![];
 
-														for entry in WalkDir::new(&notify_path)
-															.sort_by_file_name()
-															.into_iter()
-															.filter_map(|x| x.ok())
-														{
-															files.push((
-																entry.path().into(),
-																entry
-																	.metadata()
-																	.context("Couldn't get file metadata")?
-																	.is_dir()
-															));
+															for entry in WalkDir::new(&notify_path)
+																.sort_by_file_name()
+																.into_iter()
+																.filter_map(|x| x.ok())
+															{
+																files.push((
+																	entry.path().into(),
+																	entry
+																		.metadata()
+																		.context("Couldn't get file metadata")?
+																		.is_dir()
+																));
+															}
+
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::NewTree {
+																		base_path: notify_path.to_owned(),
+																		files
+																	}
+																))
+															)?;
+
+															return;
 														}
 
-														send_request(
-															&notify_app,
-															Request::Tool(ToolRequest::FileBrowser(
-																FileBrowserRequest::NewTree {
-																	base_path: notify_path.to_owned(),
-																	files
-																}
-															))
-														)?;
-
-														return;
-													}
-
-													match evt.kind {
-														notify::EventKind::Create(kind) => match kind {
-															notify::event::CreateKind::File => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::Create {
-																			path: evt
-																				.paths
-																				.first()
-																				.context("Create event had no paths")?
-																				.to_owned(),
-																			is_folder: false
-																		}
-																	))
-																)?;
-															}
-
-															notify::event::CreateKind::Folder => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::Create {
-																			path: evt
-																				.paths
-																				.first()
-																				.context("Create event had no path")?
-																				.to_owned(),
-																			is_folder: true
-																		}
-																	))
-																)?;
-															}
-
-															notify::event::CreateKind::Any
-															| notify::event::CreateKind::Other => {
-																if let Ok(metadata) = fs::metadata(
-																	evt.paths
-																		.first()
-																		.context("Create event had no paths")?
-																) {
+														match evt.kind {
+															notify::EventKind::Create(kind) => match kind {
+																notify::event::CreateKind::File => {
 																	send_request(
 																		&notify_app,
 																		Request::Tool(ToolRequest::FileBrowser(
@@ -3407,89 +3397,144 @@ fn event(app: AppHandle, event: Event) {
 																						"Create event had no paths"
 																					)?
 																					.to_owned(),
-																				is_folder: metadata.is_dir()
+																				is_folder: false
 																			}
 																		))
 																	)?;
 																}
-															}
-														},
 
-														notify::EventKind::Modify(notify::event::ModifyKind::Name(
-															notify::event::RenameMode::Both
-														)) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::Rename {
-																		old_path: evt
-																			.paths
-																			.first()
-																			.context(
-																				"Rename-both event had no first path"
-																			)?
-																			.to_owned(),
-																		new_path: evt
-																			.paths
-																			.get(1)
-																			.context(
-																				"Rename-both event had no second path"
-																			)?
-																			.to_owned()
-																	}
-																))
-															)?;
-														}
+																notify::event::CreateKind::Folder => {
+																	send_request(
+																		&notify_app,
+																		Request::Tool(ToolRequest::FileBrowser(
+																			FileBrowserRequest::Create {
+																				path: evt
+																					.paths
+																					.first()
+																					.context(
+																						"Create event had no path"
+																					)?
+																					.to_owned(),
+																				is_folder: true
+																			}
+																		))
+																	)?;
+																}
 
-														notify::EventKind::Modify(notify::event::ModifyKind::Name(
-															notify::event::RenameMode::From
-														)) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::BeginRename {
-																		old_path: evt
-																			.paths
-																			.first()
-																			.context("Rename-from event had no path")?
-																			.to_owned()
-																	}
-																))
-															)?;
-														}
-
-														notify::EventKind::Modify(notify::event::ModifyKind::Name(
-															notify::event::RenameMode::To
-														)) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::FinishRename {
-																		new_path: evt
-																			.paths
-																			.first()
-																			.context("Rename-to event had no paths")?
-																			.to_owned()
-																	}
-																))
-															)?;
-														}
-
-														notify::EventKind::Remove(_) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::Delete(
+																notify::event::CreateKind::Any
+																| notify::event::CreateKind::Other => {
+																	if let Ok(metadata) = fs::metadata(
 																		evt.paths
 																			.first()
-																			.context("Remove event had no path")?
-																			.to_owned()
-																	)
-																))
-															)?;
-														}
+																			.context("Create event had no paths")?
+																	) {
+																		send_request(
+																			&notify_app,
+																			Request::Tool(ToolRequest::FileBrowser(
+																				FileBrowserRequest::Create {
+																					path: evt
+																						.paths
+																						.first()
+																						.context(
+																							"Create event had no paths"
+																						)?
+																						.to_owned(),
+																					is_folder: metadata.is_dir()
+																				}
+																			))
+																		)?;
+																	}
+																}
+															},
 
-														_ => {}
+															notify::EventKind::Modify(
+																notify::event::ModifyKind::Name(
+																	notify::event::RenameMode::Both
+																)
+															) => {
+																send_request(
+																	&notify_app,
+																	Request::Tool(ToolRequest::FileBrowser(
+																		FileBrowserRequest::Rename {
+																			old_path: evt
+																				.paths
+																				.first()
+																				.context(
+																					"Rename-both event had no first \
+																					 path"
+																				)?
+																				.to_owned(),
+																			new_path: evt
+																				.paths
+																				.get(1)
+																				.context(
+																					"Rename-both event had no second \
+																					 path"
+																				)?
+																				.to_owned()
+																		}
+																	))
+																)?;
+															}
+
+															notify::EventKind::Modify(
+																notify::event::ModifyKind::Name(
+																	notify::event::RenameMode::From
+																)
+															) => {
+																send_request(
+																	&notify_app,
+																	Request::Tool(ToolRequest::FileBrowser(
+																		FileBrowserRequest::BeginRename {
+																			old_path: evt
+																				.paths
+																				.first()
+																				.context(
+																					"Rename-from event had no path"
+																				)?
+																				.to_owned()
+																		}
+																	))
+																)?;
+															}
+
+															notify::EventKind::Modify(
+																notify::event::ModifyKind::Name(
+																	notify::event::RenameMode::To
+																)
+															) => {
+																send_request(
+																	&notify_app,
+																	Request::Tool(ToolRequest::FileBrowser(
+																		FileBrowserRequest::FinishRename {
+																			new_path: evt
+																				.paths
+																				.first()
+																				.context(
+																					"Rename-to event had no path"
+																				)?
+																				.to_owned()
+																		}
+																	))
+																)?;
+															}
+
+															notify::EventKind::Remove(_) => {
+																send_request(
+																	&notify_app,
+																	Request::Tool(ToolRequest::FileBrowser(
+																		FileBrowserRequest::Delete(
+																			evt.paths
+																				.first()
+																				.context("Remove event had no path")?
+																				.to_owned()
+																		)
+																	))
+																)?;
+															}
+
+															_ => {}
+														}
 													}
 												}
 											} {
@@ -3504,7 +3549,8 @@ fn event(app: AppHandle, event: Event) {
 										}
 									)?;
 
-									watcher.watch(&path, notify::RecursiveMode::Recursive)?;
+									watcher.watcher().watch(&path, notify::RecursiveMode::Recursive)?;
+									watcher.cache().add_root(&path, notify::RecursiveMode::Recursive);
 
 									watcher
 								}
@@ -4471,6 +4517,194 @@ fn event(app: AppHandle, event: Event) {
 											id: tab,
 											unsaved: false
 										})
+									)?;
+								}
+							}
+						}
+					},
+
+					Event::EditorConnection(event) => match event {
+						EditorConnectionEvent::EntitySelected(id, tblu) => {
+							for editor in app.state::<AppState>().editor_states.iter() {
+								let entity = match editor.data {
+									EditorData::QNEntity { ref entity, .. } => entity,
+									EditorData::QNPatch { ref current, .. } => current,
+
+									_ => continue
+								};
+
+								if entity.blueprint_hash == tblu {
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+											EntityTreeRequest::Select {
+												editor_id: editor.key().to_owned(),
+												id: entity.entities.contains_key(&id).then_some(id.to_owned())
+											}
+										)))
+									)?;
+								}
+							}
+						}
+
+						EditorConnectionEvent::EntityTransformUpdated(id, tblu, transform) => {
+							let mut qn_editors = vec![];
+							for editor in app_state.editor_states.iter() {
+								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+									qn_editors.push(editor.key().to_owned());
+								}
+							}
+
+							for editor_id in qn_editors {
+								let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => continue
+								};
+
+								if entity.blueprint_hash == tblu
+									&& let Some(sub_entity) = entity.entities.get_mut(&id)
+								{
+									sub_entity.properties.get_or_insert_default().insert(
+										"m_mTransform".into(),
+										Property {
+											property_type: "SMatrix43".into(),
+											value: to_value(&transform)?,
+											post_init: None
+										}
+									);
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id.to_owned(),
+											unsaved: true
+										})
+									)?;
+
+									let mut buf = Vec::new();
+									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+									entity
+										.entities
+										.get(&id)
+										.context("No such entity")?
+										.serialize(&mut ser)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::ReplaceContentIfSameEntityID {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												content: String::from_utf8(buf)?
+											}
+										)))
+									)?;
+								}
+							}
+						}
+
+						EditorConnectionEvent::EntityPropertyChanged(
+							id,
+							tblu,
+							property_name,
+							property_type,
+							property_value
+						) => {
+							let mut qn_editors = vec![];
+							for editor in app_state.editor_states.iter() {
+								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+									qn_editors.push(editor.key().to_owned());
+								}
+							}
+
+							for editor_id in qn_editors {
+								let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => continue
+								};
+
+								if entity.blueprint_hash == tblu && entity.entities.contains_key(&id) {
+									let post_init = if let Some(intellisense) = app_state.intellisense.load().as_ref()
+										&& let Some(game_files) = app_state.game_files.load().as_ref()
+										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+										&& let Some(install) = app_settings.load().game_install.as_ref()
+									{
+										let game_version = app_state
+											.game_installs
+											.iter()
+											.try_find(|x| anyhow::Ok(x.path == *install))?
+											.context("No such game install")?
+											.version;
+
+										if let Some((_, _, _, post_init)) = intellisense
+											.get_properties(
+												game_files,
+												&app_state.cached_entities,
+												hash_list,
+												game_version,
+												&entity,
+												&id,
+												true
+											)?
+											.into_iter()
+											.find(|(name, _, _, _)| *name == property_name)
+										{
+											post_init.then_some(true)
+										} else {
+											None
+										}
+									} else {
+										None
+									};
+
+									let Some(sub_entity) = entity.entities.get_mut(&id) else {
+										unreachable!();
+									};
+
+									sub_entity.properties.get_or_insert_default().insert(
+										property_name.to_owned(),
+										Property {
+											property_type: property_type.to_owned(),
+											value: property_value.to_owned(),
+											post_init
+										}
+									);
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id.to_owned(),
+											unsaved: true
+										})
+									)?;
+
+									let mut buf = Vec::new();
+									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+									entity
+										.entities
+										.get(&id)
+										.context("No such entity")?
+										.serialize(&mut ser)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::ReplaceContentIfSameEntityID {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												content: String::from_utf8(buf)?
+											}
+										)))
 									)?;
 								}
 							}

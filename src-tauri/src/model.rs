@@ -5,6 +5,7 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use notify::RecommendedWatcher;
+use notify_debouncer_full::FileIdMap;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
 use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ use structstruck::strike;
 use uuid::Uuid;
 
 use crate::{
-	editor_connection::EditorConnection,
+	editor_connection::{EditorConnection, QNTransform},
 	entity::{CopiedEntityData, ReverseReference},
 	game_detection::GameInstall,
 	hash_list::HashList,
@@ -45,7 +46,7 @@ pub struct AppState {
 	pub game_installs: Vec<GameInstall>,
 	pub project: ArcSwapOption<Project>,
 	pub hash_list: ArcSwapOption<HashList>,
-	pub fs_watcher: ArcSwapOption<RecommendedWatcher>,
+	pub fs_watcher: ArcSwapOption<notify_debouncer_full::Debouncer<RecommendedWatcher, FileIdMap>>,
 	pub editor_states: Arc<DashMap<Uuid, EditorState>>,
 	pub game_files: ArcSwapOption<PartitionManager>,
 
@@ -651,6 +652,17 @@ strike! {
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid)
+		}),
+
+		EditorConnection(pub enum EditorConnectionEvent {
+			// Entity ID, TBLU hash
+			EntitySelected(String, String),
+
+			// Entity ID, TBLU hash, transform
+			EntityTransformUpdated(String, String, QNTransform),
+
+			// Entity ID, TBLU hash, property name, property type, new value
+			EntityPropertyChanged(String, String, String, String, Value)
 		})
 	}
 }

@@ -21,6 +21,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	editor_connection::PropertyValue,
 	entity::{
 		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local, get_decorations,
 		get_local_reference, get_recursive_children, is_valid_entity_factory, random_entity_id, CopiedEntityData,
@@ -225,6 +226,13 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		)?;
 
 		finish_task(app, task)?;
+	}
+
+	if app_state.editor_connection.is_connected().await {
+		app_state
+			.editor_connection
+			.select_entity(&id, &entity.blueprint_hash)
+			.await?;
 	}
 }
 
@@ -1892,7 +1900,8 @@ pub async fn handle_selectentityineditor(app: &AppHandle, editor_id: Uuid, entit
 
 	app_state
 		.editor_connection
-		.select_entity(&entity_id, &entity.blueprint_hash);
+		.select_entity(&entity_id, &entity.blueprint_hash)
+		.await?;
 
 	finish_task(app, task)?;
 }
@@ -1952,6 +1961,19 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 		})
 	);
 
+	app_state
+		.editor_connection
+		.set_property(
+			&entity_id,
+			&entity.blueprint_hash,
+			"m_mTransform",
+			PropertyValue {
+				property_type: "SMatrix43".into(),
+				data: property.value.to_owned()
+			}
+		)
+		.await?;
+
 	let _ = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2001,6 +2023,19 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 						post_init: None
 					}
 				);
+
+			app_state
+				.editor_connection
+				.set_property(
+					&entity_id,
+					&entity.blueprint_hash,
+					"m_eRoomBehaviour",
+					PropertyValue {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						data: Value::String("ROOM_DYNAMIC".into())
+					}
+				)
+				.await?;
 		}
 	}
 
@@ -2091,6 +2126,19 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 		})
 	);
 
+	app_state
+		.editor_connection
+		.set_property(
+			&entity_id,
+			&entity.blueprint_hash,
+			"m_mTransform",
+			PropertyValue {
+				property_type: "SMatrix43".into(),
+				data: property.value.to_owned()
+			}
+		)
+		.await?;
+
 	let _ = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2140,6 +2188,19 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 						post_init: None
 					}
 				);
+
+			app_state
+				.editor_connection
+				.set_property(
+					&entity_id,
+					&entity.blueprint_hash,
+					"m_eRoomBehaviour",
+					PropertyValue {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						data: Value::String("ROOM_DYNAMIC".into())
+					}
+				)
+				.await?;
 		}
 	}
 
@@ -2230,6 +2291,19 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 		})
 	);
 
+	app_state
+		.editor_connection
+		.set_property(
+			&entity_id,
+			&entity.blueprint_hash,
+			"m_mTransform",
+			PropertyValue {
+				property_type: "SMatrix43".into(),
+				data: property.value.to_owned()
+			}
+		)
+		.await?;
+
 	let _ = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2279,6 +2353,19 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 						post_init: None
 					}
 				);
+
+			app_state
+				.editor_connection
+				.set_property(
+					&entity_id,
+					&entity.blueprint_hash,
+					"m_eRoomBehaviour",
+					PropertyValue {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						data: Value::String("ROOM_DYNAMIC".into())
+					}
+				)
+				.await?;
 		}
 	}
 
@@ -2369,6 +2456,19 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 		})
 	);
 
+	app_state
+		.editor_connection
+		.set_property(
+			&entity_id,
+			&entity.blueprint_hash,
+			"m_mTransform",
+			PropertyValue {
+				property_type: "SMatrix43".into(),
+				data: property.value.to_owned()
+			}
+		)
+		.await?;
+
 	let _ = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2418,6 +2518,19 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 						post_init: None
 					}
 				);
+
+			app_state
+				.editor_connection
+				.set_property(
+					&entity_id,
+					&entity.blueprint_hash,
+					"m_eRoomBehaviour",
+					PropertyValue {
+						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+						data: Value::String("ROOM_DYNAMIC".into())
+					}
+				)
+				.await?;
 		}
 	}
 
