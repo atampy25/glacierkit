@@ -12,7 +12,10 @@ use uuid::Uuid;
 
 use crate::{
 	editor_connection::PropertyValue,
-	entity::{check_local_references_exist, get_decorations, is_valid_entity_blueprint, is_valid_entity_factory},
+	entity::{
+		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
+		is_valid_entity_factory
+	},
 	finish_task,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, EditorValidity, EntityEditorRequest,
@@ -22,7 +25,7 @@ use crate::{
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
-const SAFE_TO_SYNC: [&str; 42] = [
+pub const SAFE_TO_SYNC: [&str; 42] = [
 	"SMatrix43",
 	"float32",
 	"bool",
@@ -136,6 +139,8 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						}
 					}
 
+					entity.entities.insert(entity_id.to_owned(), sub_entity.to_owned());
+
 					let mut reverse_parent_refs: HashSet<String> = HashSet::new();
 
 					for entity_data in entity.entities.values() {
@@ -167,8 +172,6 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							}
 						)))
 					)?;
-
-					entity.entities.insert(entity_id.to_owned(), sub_entity.to_owned());
 
 					send_request(
 						app,
@@ -260,6 +263,21 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 									.await?;
 							}
 						}
+					}
+
+					if let EditorData::QNPatch {
+						ref base, ref current, ..
+					} = editor_state.data
+					{
+						send_request(
+							app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+								EntityTreeRequest::SetDiffInfo {
+									editor_id,
+									diff_info: get_diff_info(base, current)
+								}
+							)))
+						)?;
 					}
 				} else {
 					send_request(

@@ -29,6 +29,7 @@ use crate::{
 pub struct AppSettings {
 	pub extract_modded_files: bool,
 	pub game_install: Option<PathBuf>,
+	pub colourblind_mode: bool,
 	pub seen_announcements: Vec<String>
 }
 
@@ -37,6 +38,7 @@ impl Default for AppSettings {
 		Self {
 			extract_modded_files: false,
 			game_install: None,
+			colourblind_mode: false,
 			seen_announcements: vec![]
 		}
 	}
@@ -103,13 +105,15 @@ pub enum EditorData {
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EphemeralQNSettings {
-	pub show_reverse_parent_refs: bool
+	pub show_reverse_parent_refs: bool,
+	pub show_changes_from_original: bool
 }
 
 impl Default for EphemeralQNSettings {
 	fn default() -> Self {
 		Self {
-			show_reverse_parent_refs: false
+			show_reverse_parent_refs: false,
+			show_changes_from_original: false
 		}
 	}
 }
@@ -309,7 +313,8 @@ strike! {
 			Settings(pub enum SettingsEvent {
 				Initialise,
 				ChangeGameInstall(Option<PathBuf>),
-				ChangeExtractModdedFiles(bool)
+				ChangeExtractModdedFiles(bool),
+				ChangeColourblind(bool)
 			}),
 
 			ContentSearch(pub enum ContentSearchEvent {
@@ -334,6 +339,11 @@ strike! {
 					SetShowReverseParentRefs {
 						editor_id: Uuid,
 						show_reverse_parent_refs: bool
+					},
+
+					SetShowChangesFromOriginal {
+						editor_id: Uuid,
+						show_changes_from_original: bool
 					}
 				}),
 
@@ -423,6 +433,11 @@ strike! {
 					},
 
 					RotateEntityAsCamera {
+						editor_id: Uuid,
+						entity_id: String
+					},
+
+					RestoreToOriginal {
 						editor_id: Uuid,
 						entity_id: String
 					}
@@ -739,6 +754,13 @@ strike! {
 			}),
 
 			Entity(pub enum EntityEditorRequest {
+				General(pub enum EntityGeneralRequest {
+					SetIsPatchEditor {
+						editor_id: Uuid,
+						is_patch_editor: bool
+					}
+				}),
+
 				Tree(pub enum EntityTreeRequest {
 					/// Will trigger a Select event from the tree - ensure this doesn't end up in a loop
 					Select {
@@ -785,6 +807,16 @@ strike! {
 					SetEditorConnectionAvailable {
 						editor_id: Uuid,
 						editor_connection_available: bool
+					},
+
+					SetShowDiff {
+						editor_id: Uuid,
+						show_diff: bool
+					},
+
+					SetDiffInfo {
+						editor_id: Uuid,
+						diff_info: (Vec<String>, Vec<String>, Vec<(String, String, Ref, String, bool)>)
 					}
 				}),
 

@@ -12,6 +12,7 @@
 			case "initialise":
 				gameInstalls = request.data.game_installs
 				extractModdedFiles = request.data.settings.extractModdedFiles
+				colourblind = request.data.settings.colourblindMode
 				selectedGameInstall = request.data.settings.gameInstall || null
 				break
 
@@ -55,12 +56,37 @@
 		}
 	}
 
+	async function changeColourblind({ target }: { target: EventTarget | null }) {
+		if (target) {
+			const _target = target as HTMLInputElement
+
+			colourblind = _target.checked
+			await event({
+				type: "tool",
+				data: {
+					type: "settings",
+					data: {
+						type: "changeColourblind",
+						data: _target.checked
+					}
+				}
+			})
+		}
+	}
+
 	let extractModdedFiles = false
+	let colourblind = false
 
 	let projectLoaded = false
 
 	let gameInstalls: GameInstall[] = []
 	let selectedGameInstall: string | null = null
+
+	$: if (colourblind) {
+		document.body.classList.add("colourblind-mode")
+	} else {
+		document.body.classList.remove("colourblind-mode")
+	}
 </script>
 
 <div class="w-full h-full p-6 overflow-x-hidden overflow-y-auto">
@@ -72,6 +98,16 @@
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
 				GlacierKit usually ignores modded copies of files (files past chunk0patch9) when reading game files.
+			</span>
+		</TooltipIcon>
+	</div>
+	<div class="flex items-center gap-2">
+		<div class="flex-shrink">
+			<Checkbox checked={colourblind} on:change={changeColourblind} labelText="Use non-colour contrast" />
+		</div>
+		<TooltipIcon icon={Information}>
+			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
+				Will use text features like italics and strikethrough in addition to colour to mark contrast.
 			</span>
 		</TooltipIcon>
 	</div>

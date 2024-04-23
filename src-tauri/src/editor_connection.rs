@@ -34,7 +34,7 @@ use crate::{
 		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, Event,
 		GlobalRequest, Request
 	},
-	send_request
+	send_notification, send_request, Notification, NotificationKind
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -177,18 +177,16 @@ pub struct PropertyValue {
 pub enum EntityBaseDetails {
 	Game {
 		id: String,
-		tblu: String
-		// name: Option<String>,
+		tblu: String // name: Option<String>,
 
-		// #[serde(rename = "type")]
-		// ty: String
+		             // #[serde(rename = "type")]
+		             // ty: String
 	},
 	Editor {
-		id: String
-		// name: Option<String>,
+		id: String // name: Option<String>,
 
-		// #[serde(rename = "type")]
-		// ty: String
+		           // #[serde(rename = "type")]
+		           // ty: String
 	}
 }
 
@@ -526,6 +524,16 @@ impl EditorConnection {
 									.expect("Couldn't queue debounced event");
 							}
 
+							SDKEditorEvent::Error { message, .. } => {
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::ErrorReport {
+										error: format!("SDK editor error: {:?}", message)
+									})
+								)
+								.expect("Couldn't send error report to frontend");
+							}
+
 							_ => {}
 						}
 					}
@@ -556,6 +564,17 @@ impl EditorConnection {
 					)?;
 				}
 			}
+
+			send_notification(
+				&self.app,
+				Notification {
+					kind: NotificationKind::Info,
+					title: "Connected to ZHMModSDK editor".into(),
+					subtitle: "Selection and property changes will be synced automatically, and the entity context \
+					           menu now has additional options."
+						.into()
+				}
+			)?;
 		}
 	}
 

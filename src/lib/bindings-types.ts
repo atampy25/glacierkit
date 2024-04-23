@@ -4,7 +4,7 @@ export type Announcement = { id: string; kind: AnnouncementKind; title: string; 
 
 export type AnnouncementKind = "info" | "success" | "warning" | "error"
 
-export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; seenAnnouncements: string[] }
+export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; colourblindMode: boolean; seenAnnouncements: string[] }
 
 export type ArrayPatchOperation = { RemoveItemByValue: JsonValue } | { AddItemAfter: [JsonValue, JsonValue] } | { AddItemBefore: [JsonValue, JsonValue] } | { AddItem: JsonValue }
 
@@ -140,9 +140,11 @@ comments: CommentEntity[] }
 
 export type EntityEditorEvent = { type: "general"; data: EntityGeneralEvent } | { type: "tree"; data: EntityTreeEvent } | { type: "monaco"; data: EntityMonacoEvent } | { type: "metaPane"; data: EntityMetaPaneEvent } | { type: "metadata"; data: EntityMetadataEvent } | { type: "overrides"; data: EntityOverridesEvent }
 
-export type EntityEditorRequest = { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest } | { type: "metadata"; data: EntityMetadataRequest } | { type: "overrides"; data: EntityOverridesRequest }
+export type EntityEditorRequest = { type: "general"; data: EntityGeneralRequest } | { type: "tree"; data: EntityTreeRequest } | { type: "monaco"; data: EntityMonacoRequest } | { type: "metaPane"; data: EntityMetaPaneRequest } | { type: "metadata"; data: EntityMetadataRequest } | { type: "overrides"; data: EntityOverridesRequest }
 
-export type EntityGeneralEvent = { type: "setShowReverseParentRefs"; data: { editor_id: string; show_reverse_parent_refs: boolean } }
+export type EntityGeneralEvent = { type: "setShowReverseParentRefs"; data: { editor_id: string; show_reverse_parent_refs: boolean } } | { type: "setShowChangesFromOriginal"; data: { editor_id: string; show_changes_from_original: boolean } }
+
+export type EntityGeneralRequest = { type: "setIsPatchEditor"; data: { editor_id: string; is_patch_editor: boolean } }
 
 export type EntityMetaPaneEvent = { type: "jumpToReference"; data: { editor_id: string; reference: string } } | { type: "setNotes"; data: { editor_id: string; entity_id: string; notes: string } }
 
@@ -160,7 +162,7 @@ export type EntityOverridesEvent = { type: "initialise"; data: { editor_id: stri
 
 export type EntityOverridesRequest = { type: "initialise"; data: { editor_id: string; property_overrides: string; override_deletes: string; pin_connection_overrides: string; pin_connection_override_deletes: string } } | { type: "updateDecorations"; data: { editor_id: string; decorations: ([string, string])[] } }
 
-export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } } | { type: "useTemplate"; data: { editor_id: string; parent_id: string; template: CopiedEntityData } } | { type: "addGameBrowserItem"; data: { editor_id: string; parent_id: string; file: string } } | { type: "selectEntityInEditor"; data: { editor_id: string; entity_id: string } } | { type: "moveEntityToPlayer"; data: { editor_id: string; entity_id: string } } | { type: "rotateEntityAsPlayer"; data: { editor_id: string; entity_id: string } } | { type: "moveEntityToCamera"; data: { editor_id: string; entity_id: string } } | { type: "rotateEntityAsCamera"; data: { editor_id: string; entity_id: string } }
+export type EntityTreeEvent = { type: "initialise"; data: { editor_id: string } } | { type: "select"; data: { editor_id: string; id: string } } | { type: "create"; data: { editor_id: string; id: string; content: SubEntity } } | { type: "delete"; data: { editor_id: string; id: string } } | { type: "rename"; data: { editor_id: string; id: string; new_name: string } } | { type: "reparent"; data: { editor_id: string; id: string; new_parent: Ref } } | { type: "copy"; data: { editor_id: string; id: string } } | { type: "paste"; data: { editor_id: string; parent_id: string } } | { type: "search"; data: { editor_id: string; query: string } } | { type: "showHelpMenu"; data: { editor_id: string; entity_id: string } } | { type: "useTemplate"; data: { editor_id: string; parent_id: string; template: CopiedEntityData } } | { type: "addGameBrowserItem"; data: { editor_id: string; parent_id: string; file: string } } | { type: "selectEntityInEditor"; data: { editor_id: string; entity_id: string } } | { type: "moveEntityToPlayer"; data: { editor_id: string; entity_id: string } } | { type: "rotateEntityAsPlayer"; data: { editor_id: string; entity_id: string } } | { type: "moveEntityToCamera"; data: { editor_id: string; entity_id: string } } | { type: "rotateEntityAsCamera"; data: { editor_id: string; entity_id: string } } | { type: "restoreToOriginal"; data: { editor_id: string; entity_id: string } }
 
 export type EntityTreeRequest = 
 /**
@@ -183,9 +185,9 @@ new_entities: ([string, Ref, string, string, boolean])[] } } | { type: "searchRe
 /**
  * The IDs of the entities matching the query
  */
-results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } } | { type: "setTemplates"; data: { editor_id: string; templates: PastableTemplateCategory[] } } | { type: "setEditorConnectionAvailable"; data: { editor_id: string; editor_connection_available: boolean } }
+results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } } | { type: "setTemplates"; data: { editor_id: string; templates: PastableTemplateCategory[] } } | { type: "setEditorConnectionAvailable"; data: { editor_id: string; editor_connection_available: boolean } } | { type: "setShowDiff"; data: { editor_id: string; show_diff: boolean } } | { type: "setDiffInfo"; data: { editor_id: string; diff_info: [string[], string[], ([string, string, Ref, string, boolean])[]] } }
 
-export type EphemeralQNSettings = { showReverseParentRefs: boolean }
+export type EphemeralQNSettings = { showReverseParentRefs: boolean; showChangesFromOriginal: boolean }
 
 export type Event = { type: "tool"; data: ToolEvent } | { type: "editor"; data: EditorEvent } | { type: "global"; data: GlobalEvent } | { type: "editorConnection"; data: EditorConnectionEvent }
 
@@ -458,7 +460,7 @@ export type Rotation = { yaw: number; pitch: number; roll: number }
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
-export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean }
+export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeColourblind"; data: boolean }
 
 export type SettingsRequest = { type: "initialise"; data: { game_installs: GameInstall[]; settings: AppSettings } } | { type: "changeProjectSettings"; data: ProjectSettings }
 

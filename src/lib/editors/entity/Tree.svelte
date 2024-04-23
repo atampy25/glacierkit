@@ -49,6 +49,12 @@
 
 	let editorConnectionAvailable = false
 
+	let addedEntities: string[] = []
+	let removedEntities: [string, string, Ref, string, boolean][] = []
+	let changedEntities: string[] = []
+
+	let showDiff = false
+
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
 			core: {
@@ -59,7 +65,14 @@
 					dots: true,
 					icons: true
 				},
-				check_callback: true,
+				check_callback: function (operation: any, node: { id: string }, _node_parent: any, _node_position: any, _more: any) {
+					// Disallow drag and drop
+					if (removedEntities.some((a) => a[0] === node.id) && operation === "move_node") {
+						return false
+					}
+
+					return true
+				},
 				force_text: true,
 				keyboard: {
 					f2: () => {}
@@ -77,197 +90,15 @@
 			contextmenu: {
 				select_node: false,
 				items: (b: { id: string }, c: any) => {
-					return {
-						create: {
-							separator_before: false,
-							separator_after: true,
-							_disabled: false,
-							label: "Create Entity",
-							icon: "fa fa-plus",
-							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
-
-								const newEntityID = "cafe" + genRandHex(12)
-
-								tree.create_node(
-									selected_node,
-									{
-										id: newEntityID,
-										parent: selected_node.id,
-										icon: "fa fa-project-diagram",
-										text: "",
-										folder: false,
-										factory: "[modules:/zentity.class].pc_entitytype",
-										hasReverseParentRefs: false,
-										parentRef: selected_node.id
-									},
-									getPositionOfNode(selected_node.id, "", false),
-									function (a: any) {
-										tree.edit(a, undefined, async (node, status, _c) => {
-											if (!status || !node.text) {
-												tree.delete_node(newEntityID)
-												return
-											}
-
-											// Ensure parent gets reclassified as a folder if necessary
-											selected_node.original.hasReverseParentRefs = true
-											selected_node.original.folder = selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
-
-											tree.set_icon(
-												selected_node.id,
-												selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
-													? "fa-regular fa-folder"
-													: icons.find((a) => selected_node.original.factory.includes(a[0]))
-														? icons.find((a) => selected_node.original.factory.includes(a[0]))![1]
-														: "fa-regular fa-file"
-											)
-
-											// If it's a folder it might move to the top
-											tree.move_node(selected_node.id, selected_node.parent, getPositionOfNode(selected_node.parent, selected_node.text, selected_node.original.folder))
-
-											await event({
-												type: "editor",
-												data: {
-													type: "entity",
-													data: {
-														type: "tree",
-														data: {
-															type: "create",
-															data: {
-																editor_id: editorID,
-																id: newEntityID,
-																content: {
-																	parent: selected_node.id,
-																	name: node.text,
-																	factory: "[modules:/zentity.class].pc_entitytype",
-																	blueprint: "[modules:/zentity.class].pc_entityblueprint"
-																}
-															}
-														}
-													}
-												}
-											})
-
-											// Add the entity ID to the displayed name
-											tree.rename_node(node, `${node.text} (${node.id})`)
-										})
-									}
-								)
-							}
-						},
-						rename: {
-							separator_before: false,
-							separator_after: false,
-							_disabled: false,
-							label: "Rename",
-							icon: "fa-regular fa-pen-to-square",
-							action: function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
-
-								// don't include entity ID in editing input
-								tree.rename_node(selected_node, selected_node.text.split(" ").slice(0, -1).join(" "))
-
-								tree.edit(selected_node, undefined, async (node, status, _cancelled) => {
-									if (status) {
-										tree.move_node(node, node.parent, getPositionOfNode(node.parent, node.text, node.original.folder))
-
-										await event({
-											type: "editor",
-											data: {
-												type: "entity",
-												data: {
-													type: "tree",
-													data: {
-														type: "rename",
-														data: {
-															editor_id: editorID,
-															id: node.id,
-															new_name: node.text
-														}
-													}
-												}
-											}
-										})
-
-										// re-add the entity ID
-										tree.rename_node(node, `${node.text} (${node.id})`)
-									} else {
-										// re-add the entity ID
-										tree.rename_node(node, `${node.text} (${node.id})`)
-									}
-								})
-							}
-						},
-						delete: {
-							separator_before: false,
-							separator_after: false,
-							_disabled: false,
-							label: "Delete",
-							icon: "fa-regular fa-trash-can",
-							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
-
-								tree.is_selected(selected_node) ? tree.delete_node(tree.get_selected()) : tree.delete_node(selected_node)
-
-								if (selected_node.parent !== "#") {
-									tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some((a: any) => a.parent == tree.get_node(selected_node.parent).id)
-									tree.get_node(selected_node.parent).original.folder =
-										tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
-										tree.get_node(selected_node.parent).original.hasReverseParentRefs
-
-									// Reclassify parent as not folder if necessary
-									tree.set_icon(
-										selected_node.parent,
-										tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
-											tree.get_node(selected_node.parent).original.hasReverseParentRefs
-											? "fa-regular fa-folder"
-											: icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))
-												? icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))![1]
-												: "fa-regular fa-file"
-									)
-
-									// If it's no longer a folder it might move down
-									tree.move_node(
-										selected_node.parent,
-										tree.get_node(selected_node.parent).parent,
-										getPositionOfNode(tree.get_node(selected_node.parent).parent, tree.get_node(selected_node.parent).text, tree.get_node(selected_node.parent).original.folder)
-									)
-								}
-
-								await event({
-									type: "editor",
-									data: {
-										type: "entity",
-										data: {
-											type: "tree",
-											data: {
-												type: "delete",
-												data: {
-													editor_id: editorID,
-													id: selected_node.id
-												}
-											}
-										}
-									}
-								})
-							}
-						},
-						ccp: {
-							separator_before: true,
-							separator_after: false,
-							label: "Clipboard",
-							icon: "far fa-clipboard",
-							action: false,
-							submenu: {
-								copy: {
+					return removedEntities.some((a) => a[0] === b.id)
+						? {
+								restore: {
 									separator_before: false,
-									separator_after: false,
-									label: "Copy",
-									icon: "far fa-copy",
-									action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+									separator_after: true,
+									_disabled: false,
+									label: "Restore to Original",
+									icon: "fa fa-undo",
+									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
 										const tree = jQuery.jstree!.reference(b.reference)
 										const selected_node = tree.get_node(b.reference)
 
@@ -278,7 +109,193 @@
 												data: {
 													type: "tree",
 													data: {
-														type: "copy",
+														type: "restoreToOriginal",
+														data: {
+															editor_id: editorID,
+															entity_id: selected_node.id
+														}
+													}
+												}
+											}
+										})
+									}
+								}
+							}
+						: {
+								create: {
+									separator_before: false,
+									separator_after: true,
+									_disabled: false,
+									label: "Create Entity",
+									icon: "fa fa-plus",
+									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
+
+										const newEntityID = "cafe" + genRandHex(12)
+
+										tree.create_node(
+											selected_node,
+											{
+												id: newEntityID,
+												parent: selected_node.id,
+												icon: "fa fa-project-diagram",
+												text: "",
+												folder: false,
+												factory: "[modules:/zentity.class].pc_entitytype",
+												hasReverseParentRefs: false,
+												parentRef: selected_node.id
+											},
+											getPositionOfNode(selected_node.id, "", false),
+											function (a: any) {
+												tree.edit(a, undefined, async (node, status, _c) => {
+													if (!status || !node.text) {
+														tree.delete_node(newEntityID)
+														return
+													}
+
+													// Ensure parent gets reclassified as a folder if necessary
+													selected_node.original.hasReverseParentRefs = true
+													selected_node.original.folder =
+														selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+
+													tree.set_icon(
+														selected_node.id,
+														selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+															? "fa-regular fa-folder"
+															: icons.find((a) => selected_node.original.factory.includes(a[0]))
+																? icons.find((a) => selected_node.original.factory.includes(a[0]))![1]
+																: "fa-regular fa-file"
+													)
+
+													// If it's a folder it might move to the top
+													tree.move_node(selected_node.id, selected_node.parent, getPositionOfNode(selected_node.parent, selected_node.text, selected_node.original.folder))
+
+													await event({
+														type: "editor",
+														data: {
+															type: "entity",
+															data: {
+																type: "tree",
+																data: {
+																	type: "create",
+																	data: {
+																		editor_id: editorID,
+																		id: newEntityID,
+																		content: {
+																			parent: selected_node.id,
+																			name: node.text,
+																			factory: "[modules:/zentity.class].pc_entitytype",
+																			blueprint: "[modules:/zentity.class].pc_entityblueprint"
+																		}
+																	}
+																}
+															}
+														}
+													})
+
+													// Add the entity ID to the displayed name
+													tree.rename_node(node, `${node.text} (${node.id})`)
+												})
+											}
+										)
+									}
+								},
+								rename: {
+									separator_before: false,
+									separator_after: false,
+									_disabled: false,
+									label: "Rename",
+									icon: "fa-regular fa-pen-to-square",
+									action: function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
+
+										// don't include entity ID in editing input
+										tree.rename_node(selected_node, selected_node.text.split(" ").slice(0, -1).join(" "))
+
+										tree.edit(selected_node, undefined, async (node, status, _cancelled) => {
+											if (status) {
+												tree.move_node(node, node.parent, getPositionOfNode(node.parent, node.text, node.original.folder))
+
+												await event({
+													type: "editor",
+													data: {
+														type: "entity",
+														data: {
+															type: "tree",
+															data: {
+																type: "rename",
+																data: {
+																	editor_id: editorID,
+																	id: node.id,
+																	new_name: node.text
+																}
+															}
+														}
+													}
+												})
+
+												// re-add the entity ID
+												tree.rename_node(node, `${node.text} (${node.id})`)
+											} else {
+												// re-add the entity ID
+												tree.rename_node(node, `${node.text} (${node.id})`)
+											}
+										})
+									}
+								},
+								delete: {
+									separator_before: false,
+									separator_after: false,
+									_disabled: false,
+									label: "Delete",
+									icon: "fa-regular fa-trash-can",
+									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
+
+										tree.is_selected(selected_node) ? tree.delete_node(tree.get_selected()) : tree.delete_node(selected_node)
+
+										if (selected_node.parent !== "#") {
+											tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some(
+												(a: any) => a.parent == tree.get_node(selected_node.parent).id
+											)
+											tree.get_node(selected_node.parent).original.folder =
+												tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+												tree.get_node(selected_node.parent).original.hasReverseParentRefs
+
+											// Reclassify parent as not folder if necessary
+											tree.set_icon(
+												selected_node.parent,
+												tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+													tree.get_node(selected_node.parent).original.hasReverseParentRefs
+													? "fa-regular fa-folder"
+													: icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))
+														? icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))![1]
+														: "fa-regular fa-file"
+											)
+
+											// If it's no longer a folder it might move down
+											tree.move_node(
+												selected_node.parent,
+												tree.get_node(selected_node.parent).parent,
+												getPositionOfNode(
+													tree.get_node(selected_node.parent).parent,
+													tree.get_node(selected_node.parent).text,
+													tree.get_node(selected_node.parent).original.folder
+												)
+											)
+										}
+
+										await event({
+											type: "editor",
+											data: {
+												type: "entity",
+												data: {
+													type: "tree",
+													data: {
+														type: "delete",
 														data: {
 															editor_id: editorID,
 															id: selected_node.id
@@ -289,13 +306,322 @@
 										})
 									}
 								},
-								paste: {
-									separator_before: false,
-									_disabled: false,
+								ccp: {
+									separator_before: true,
 									separator_after: false,
-									label: "Paste",
-									icon: "far fa-paste",
-									action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+									label: "Clipboard",
+									icon: "far fa-clipboard",
+									action: false,
+									submenu: {
+										copy: {
+											separator_before: false,
+											separator_after: false,
+											label: "Copy",
+											icon: "far fa-copy",
+											action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+												const tree = jQuery.jstree!.reference(b.reference)
+												const selected_node = tree.get_node(b.reference)
+
+												await event({
+													type: "editor",
+													data: {
+														type: "entity",
+														data: {
+															type: "tree",
+															data: {
+																type: "copy",
+																data: {
+																	editor_id: editorID,
+																	id: selected_node.id
+																}
+															}
+														}
+													}
+												})
+											}
+										},
+										paste: {
+											separator_before: false,
+											_disabled: false,
+											separator_after: false,
+											label: "Paste",
+											icon: "far fa-paste",
+											action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+												const tree = jQuery.jstree!.reference(b.reference)
+												const selected_node = tree.get_node(b.reference)
+
+												await event({
+													type: "editor",
+													data: {
+														type: "entity",
+														data: {
+															type: "tree",
+															data: {
+																type: "paste",
+																data: {
+																	editor_id: editorID,
+																	parent_id: selected_node.id
+																}
+															}
+														}
+													}
+												})
+											}
+										}
+									}
+								},
+								templates: {
+									separator_before: true,
+									separator_after: false,
+									label: "Templates",
+									icon: "fa-solid fa-shapes",
+									action: false,
+									submenu: Object.fromEntries(
+										templates.map((category) => [
+											`templateCategory${category.name.replace(" ", "")}`,
+											{
+												separator_before: true,
+												separator_after: false,
+												label: category.name,
+												icon: category.icon,
+												action: false,
+												submenu: Object.fromEntries(
+													category.templates.map((template) => [
+														`template${template.name.replace(" ", "")}`,
+														{
+															separator_before: false,
+															_disabled: false,
+															separator_after: false,
+															label: template.name,
+															icon: template.icon,
+															action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+																trackEvent("Insert template", { template: template.name })
+
+																const tree = jQuery.jstree!.reference(b.reference)
+																const selected_node = tree.get_node(b.reference)
+
+																await event({
+																	type: "editor",
+																	data: {
+																		type: "entity",
+																		data: {
+																			type: "tree",
+																			data: {
+																				type: "useTemplate",
+																				data: {
+																					editor_id: editorID,
+																					parent_id: selected_node.id,
+																					template: template.pasteData
+																				}
+																			}
+																		}
+																	}
+																})
+															}
+														}
+													])
+												)
+											}
+										])
+									)
+								},
+								...(editorConnectionAvailable
+									? {
+											editorConnection: {
+												separator_before: true,
+												separator_after: false,
+												label: "Editor",
+												icon: "fa-solid fa-right-left",
+												action: false,
+												submenu: {
+													selectInEditor: {
+														separator_before: false,
+														separator_after: false,
+														label: "Select in Editor",
+														icon: "fas fa-highlighter",
+														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+															let d = tree.get_node(b.reference)
+
+															await event({
+																type: "editor",
+																data: {
+																	type: "entity",
+																	data: {
+																		type: "tree",
+																		data: {
+																			type: "selectEntityInEditor",
+																			data: {
+																				editor_id: editorID,
+																				entity_id: d.id
+																			}
+																		}
+																	}
+																}
+															})
+														}
+													},
+													moveToPlayerPosition: {
+														separator_before: false,
+														separator_after: false,
+														label: "Move to Player Position",
+														icon: "fa-solid fa-location-dot",
+														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+															let d = tree.get_node(b.reference)
+
+															await event({
+																type: "editor",
+																data: {
+																	type: "entity",
+																	data: {
+																		type: "tree",
+																		data: {
+																			type: "moveEntityToPlayer",
+																			data: {
+																				editor_id: editorID,
+																				entity_id: d.id
+																			}
+																		}
+																	}
+																}
+															})
+														}
+													},
+													rotateAsPlayer: {
+														separator_before: false,
+														separator_after: false,
+														label: "Adjust Rotation to Player",
+														icon: "fa-solid fa-location-dot",
+														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+															let d = tree.get_node(b.reference)
+
+															await event({
+																type: "editor",
+																data: {
+																	type: "entity",
+																	data: {
+																		type: "tree",
+																		data: {
+																			type: "rotateEntityAsPlayer",
+																			data: {
+																				editor_id: editorID,
+																				entity_id: d.id
+																			}
+																		}
+																	}
+																}
+															})
+														}
+													},
+													moveToCameraPosition: {
+														separator_before: false,
+														separator_after: false,
+														label: "Move to Camera Position",
+														icon: "fa-solid fa-location-dot",
+														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+															let d = tree.get_node(b.reference)
+
+															await event({
+																type: "editor",
+																data: {
+																	type: "entity",
+																	data: {
+																		type: "tree",
+																		data: {
+																			type: "moveEntityToCamera",
+																			data: {
+																				editor_id: editorID,
+																				entity_id: d.id
+																			}
+																		}
+																	}
+																}
+															})
+														}
+													},
+													rotateAsCamera: {
+														separator_before: false,
+														separator_after: false,
+														label: "Adjust Rotation to Camera",
+														icon: "fa-solid fa-location-dot",
+														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
+															let d = tree.get_node(b.reference)
+
+															await event({
+																type: "editor",
+																data: {
+																	type: "entity",
+																	data: {
+																		type: "tree",
+																		data: {
+																			type: "rotateEntityAsCamera",
+																			data: {
+																				editor_id: editorID,
+																				entity_id: d.id
+																			}
+																		}
+																	}
+																}
+															})
+														}
+													}
+												}
+											}
+										}
+									: {}),
+								...(changedEntities.includes(b.id)
+									? {
+											revert: {
+												separator_before: false,
+												separator_after: true,
+												_disabled: false,
+												label: "Revert to Original",
+												icon: "fa fa-undo",
+												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+													const tree = jQuery.jstree!.reference(b.reference)
+													const selected_node = tree.get_node(b.reference)
+
+													await event({
+														type: "editor",
+														data: {
+															type: "entity",
+															data: {
+																type: "tree",
+																data: {
+																	type: "restoreToOriginal",
+																	data: {
+																		editor_id: editorID,
+																		entity_id: selected_node.id
+																	}
+																}
+															}
+														}
+													})
+												}
+											}
+										}
+									: {}),
+								copyID: {
+									separator_before: false,
+									separator_after: false,
+									_disabled: false,
+									label: "Copy ID",
+									icon: "far fa-copy",
+									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										const tree = jQuery.jstree!.reference(b.reference)
+										const selected_node = tree.get_node(b.reference)
+
+										await clipboard.writeText(selected_node.id)
+									}
+								},
+								help: {
+									separator_before: false,
+									separator_after: false,
+									_disabled: false,
+									label: "Help",
+									icon: "far fa-circle-question",
+									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+										trackEvent("Show help menu")
+
 										const tree = jQuery.jstree!.reference(b.reference)
 										const selected_node = tree.get_node(b.reference)
 
@@ -306,10 +632,10 @@
 												data: {
 													type: "tree",
 													data: {
-														type: "paste",
+														type: "showHelpMenu",
 														data: {
 															editor_id: editorID,
-															parent_id: selected_node.id
+															entity_id: selected_node.id
 														}
 													}
 												}
@@ -318,249 +644,6 @@
 									}
 								}
 							}
-						},
-						templates: {
-							separator_before: true,
-							separator_after: false,
-							label: "Templates",
-							icon: "fa-solid fa-shapes",
-							action: false,
-							submenu: Object.fromEntries(
-								templates.map((category) => [
-									`templateCategory${category.name.replace(" ", "")}`,
-									{
-										separator_before: true,
-										separator_after: false,
-										label: category.name,
-										icon: category.icon,
-										action: false,
-										submenu: Object.fromEntries(
-											category.templates.map((template) => [
-												`template${template.name.replace(" ", "")}`,
-												{
-													separator_before: false,
-													_disabled: false,
-													separator_after: false,
-													label: template.name,
-													icon: template.icon,
-													action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
-														trackEvent("Insert template", { template: template.name })
-
-														const tree = jQuery.jstree!.reference(b.reference)
-														const selected_node = tree.get_node(b.reference)
-
-														await event({
-															type: "editor",
-															data: {
-																type: "entity",
-																data: {
-																	type: "tree",
-																	data: {
-																		type: "useTemplate",
-																		data: {
-																			editor_id: editorID,
-																			parent_id: selected_node.id,
-																			template: template.pasteData
-																		}
-																	}
-																}
-															}
-														})
-													}
-												}
-											])
-										)
-									}
-								])
-							)
-						},
-						...(editorConnectionAvailable
-							? {
-									editorConnection: {
-										separator_before: true,
-										separator_after: false,
-										label: "Editor",
-										icon: "fa-solid fa-right-left",
-										action: false,
-										submenu: {
-											selectInEditor: {
-												separator_before: false,
-												separator_after: false,
-												label: "Select in Editor",
-												icon: "fas fa-highlighter",
-												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
-													let d = tree.get_node(b.reference)
-
-													await event({
-														type: "editor",
-														data: {
-															type: "entity",
-															data: {
-																type: "tree",
-																data: {
-																	type: "selectEntityInEditor",
-																	data: {
-																		editor_id: editorID,
-																		entity_id: d.id
-																	}
-																}
-															}
-														}
-													})
-												}
-											},
-											moveToPlayerPosition: {
-												separator_before: false,
-												separator_after: false,
-												label: "Move to Player Position",
-												icon: "fa-solid fa-location-dot",
-												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
-													let d = tree.get_node(b.reference)
-
-													await event({
-														type: "editor",
-														data: {
-															type: "entity",
-															data: {
-																type: "tree",
-																data: {
-																	type: "moveEntityToPlayer",
-																	data: {
-																		editor_id: editorID,
-																		entity_id: d.id
-																	}
-																}
-															}
-														}
-													})
-												}
-											},
-											rotateAsPlayer: {
-												separator_before: false,
-												separator_after: false,
-												label: "Adjust Rotation to Player",
-												icon: "fa-solid fa-location-dot",
-												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
-													let d = tree.get_node(b.reference)
-
-													await event({
-														type: "editor",
-														data: {
-															type: "entity",
-															data: {
-																type: "tree",
-																data: {
-																	type: "rotateEntityAsPlayer",
-																	data: {
-																		editor_id: editorID,
-																		entity_id: d.id
-																	}
-																}
-															}
-														}
-													})
-												}
-											},
-											moveToCameraPosition: {
-												separator_before: false,
-												separator_after: false,
-												label: "Move to Camera Position",
-												icon: "fa-solid fa-location-dot",
-												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
-													let d = tree.get_node(b.reference)
-
-													await event({
-														type: "editor",
-														data: {
-															type: "entity",
-															data: {
-																type: "tree",
-																data: {
-																	type: "moveEntityToCamera",
-																	data: {
-																		editor_id: editorID,
-																		entity_id: d.id
-																	}
-																}
-															}
-														}
-													})
-												}
-											},
-											rotateAsCamera: {
-												separator_before: false,
-												separator_after: false,
-												label: "Adjust Rotation to Camera",
-												icon: "fa-solid fa-location-dot",
-												action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
-													let d = tree.get_node(b.reference)
-
-													await event({
-														type: "editor",
-														data: {
-															type: "entity",
-															data: {
-																type: "tree",
-																data: {
-																	type: "rotateEntityAsCamera",
-																	data: {
-																		editor_id: editorID,
-																		entity_id: d.id
-																	}
-																}
-															}
-														}
-													})
-												}
-											}
-										}
-									}
-								}
-							: {}),
-						copyID: {
-							separator_before: false,
-							separator_after: false,
-							_disabled: false,
-							label: "Copy ID",
-							icon: "far fa-copy",
-							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
-
-								await clipboard.writeText(selected_node.id)
-							}
-						},
-						help: {
-							separator_before: false,
-							separator_after: false,
-							_disabled: false,
-							label: "Help",
-							icon: "far fa-circle-question",
-							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-								trackEvent("Show help menu")
-
-								const tree = jQuery.jstree!.reference(b.reference)
-								const selected_node = tree.get_node(b.reference)
-
-								await event({
-									type: "editor",
-									data: {
-										type: "entity",
-										data: {
-											type: "tree",
-											data: {
-												type: "showHelpMenu",
-												data: {
-													editor_id: editorID,
-													entity_id: selected_node.id
-												}
-											}
-										}
-									}
-								})
-							}
-						}
-					}
 				}
 			},
 			dnd: {
@@ -574,7 +657,7 @@
 		jQuery("#" + elemID).on("changed.jstree", async (_, { selected }: { selected: string[] }) => {
 			if (selected.length) {
 				const selected_node = tree.get_node(selected[0])
-				if (selected_node) {
+				if (selected_node && !removedEntities.some((a) => a[0] === selected_node.id)) {
 					selectedNode = selected[0]
 
 					await event({
@@ -643,6 +726,10 @@
 			})
 		})
 
+		jQuery("#" + elemID).on("load.jstree", () => {
+			updateDiffing()
+		})
+
 		await event({
 			type: "editor",
 			data: {
@@ -674,11 +761,11 @@
 				break
 
 			case "newTree":
-				await replaceTree(request.data.entities)
+				replaceTree(request.data.entities)
 				break
 
 			case "newItems":
-				await newItems(request.data.new_entities)
+				newItems(request.data.new_entities)
 				break
 
 			case "searchResults":
@@ -700,6 +787,23 @@
 
 			case "setEditorConnectionAvailable":
 				editorConnectionAvailable = request.data.editor_connection_available
+				break
+
+			case "setDiffInfo":
+				const old_diff: [string[], string[], typeof removedEntities] = [addedEntities, changedEntities, removedEntities]
+				;[addedEntities, changedEntities, removedEntities] = request.data.diff_info
+
+				// May be called before tree is loaded
+				try {
+					updateDiffing(old_diff)
+				} catch (e) {
+					console.log(e)
+				}
+				break
+
+			case "setShowDiff":
+				showDiff = request.data.show_diff
+				updateDiffing()
 				break
 
 			default:
@@ -744,7 +848,7 @@
 		"modules:/": "fa fa-project-diagram" // Paths
 	})
 
-	async function replaceTree(nodes: [string, Ref, string, string, boolean][]) {
+	function replaceTree(nodes: [string, Ref, string, string, boolean][]) {
 		tree.settings!.core.data = []
 
 		for (const [entityID, parent, name, factory, hasReverseParentRefs] of nodes) {
@@ -766,9 +870,11 @@
 		}
 
 		tree.refresh()
+
+		updateDiffing()
 	}
 
-	async function newItems(nodes: [string, Ref, string, string, boolean][]) {
+	function newItems(nodes: [string, Ref, string, string, boolean][]) {
 		let added = 0
 		while (added < nodes.length) {
 			for (const [entityID, parent, name, factory, hasReverseParentRefs] of nodes) {
@@ -878,6 +984,127 @@
 				}
 			}
 		}
+
+		updateDiffing()
+	}
+
+	function updateDiffing(old_diff?: [string[], string[], [string, string, Ref, string, boolean][]]) {
+		if (old_diff) {
+			for (const entityID of old_diff[0]) {
+				if (tree.get_node(entityID)) {
+					tree.get_node(entityID).li_attr.class = ""
+					tree.get_node(entityID, true)[0]?.classList?.remove?.("item-new")
+				}
+			}
+
+			for (const entityID of old_diff[1]) {
+				if (tree.get_node(entityID)) {
+					tree.get_node(entityID).li_attr.class = ""
+					tree.get_node(entityID, true)[0]?.classList?.remove?.("item-modified")
+				}
+			}
+
+			for (const entityID of old_diff[2].map((a) => a[0])) {
+				if (tree.get_node(entityID)) {
+					if (removedEntities.some((a) => a[0] === entityID)) {
+						tree.delete_node(entityID)
+					} else {
+						tree.get_node(entityID).li_attr.class = ""
+						tree.get_node(entityID, true)[0]?.classList?.remove?.("item-removed")
+					}
+				}
+			}
+		}
+
+		for (const entityID of addedEntities) {
+			tree.get_node(entityID).li_attr.class = ""
+			tree.get_node(entityID, true)[0]?.classList?.remove?.("item-new")
+		}
+
+		for (const entityID of changedEntities) {
+			tree.get_node(entityID).li_attr.class = ""
+			tree.get_node(entityID, true)[0]?.classList?.remove?.("item-modified")
+		}
+
+		for (const entityID of removedEntities.map((a) => a[0])) {
+			if (tree.get_node(entityID)) {
+				tree.delete_node(entityID)
+			}
+		}
+
+		removedEntities = removedEntities.filter((a) => !tree.get_node(a[0]))
+
+		if (showDiff) {
+			for (const entityID of addedEntities) {
+				tree.get_node(entityID).li_attr.class = "item-new"
+				tree.get_node(entityID, true)[0]?.classList?.add?.("item-new")
+			}
+
+			for (const entityID of changedEntities) {
+				tree.get_node(entityID).li_attr.class = "item-modified"
+				tree.get_node(entityID, true)[0]?.classList?.add?.("item-modified")
+			}
+
+			let added = 0
+			while (added < removedEntities.length) {
+				for (const [entityID, name, parent, factory, hasReverseParentRefs] of removedEntities) {
+					// We have to add the top-level entities first to ensure the tree responds appropriately
+					if (!getReferencedLocalEntity(parent) || tree.get_node(getReferencedLocalEntity(parent) || "#")) {
+						tree.create_node(
+							getReferencedLocalEntity(parent) || "#",
+							{
+								id: entityID,
+								parent: getReferencedLocalEntity(parent) || "#",
+								icon:
+									factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+										? "fa-regular fa-folder"
+										: icons.find((a) => factory.includes(a[0]))
+											? icons.find((a) => factory.includes(a[0]))![1]
+											: "fa-regular fa-file",
+								text: `${name} (${entityID})`,
+								folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+								factory,
+								hasReverseParentRefs,
+								parentRef: parent,
+								li_attr: {
+									class: "item-removed"
+								}
+							},
+							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+						)
+
+						if (getReferencedLocalEntity(parent)) {
+							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
+							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+
+							tree.set_icon(
+								getReferencedLocalEntity(parent),
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+									? "fa-regular fa-folder"
+									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
+										? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
+										: "fa-regular fa-file"
+							)
+
+							tree.move_node(
+								getReferencedLocalEntity(parent),
+								tree.get_node(getReferencedLocalEntity(parent)).parent,
+								getPositionOfNode(
+									tree.get_node(getReferencedLocalEntity(parent)).parent,
+									tree.get_node(getReferencedLocalEntity(parent)).text,
+									tree.get_node(getReferencedLocalEntity(parent)).original.folder
+								)
+							)
+						}
+
+						added += 1
+					}
+				}
+			}
+		}
 	}
 
 	async function searchInput(evt: any) {
@@ -907,6 +1134,10 @@
 
 	function fixSelection() {
 		tree.deselect_all(true)
+
+		if (!tree.get_node(selectedNode) || removedEntities.some((a) => a[0] === selectedNode)) {
+			selectedNode = null
+		}
 
 		if (selectedNode) {
 			tree.select_node(selectedNode, true)

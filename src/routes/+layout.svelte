@@ -444,7 +444,35 @@
 	:global(.jstree-default .jstree-search) {
 		font-style: normal;
 		font-weight: normal;
-		@apply text-emerald-200;
+		@apply text-yellow-200;
+	}
+
+	:global(.colourblind-mode .jstree-default .jstree-search) {
+		@apply font-bold;
+	}
+
+	:global(.jstree-default .item-new > a) {
+		@apply text-emerald-200 !important;
+	}
+
+	:global(.colourblind-mode .jstree-default .item-new > a) {
+		@apply font-bold !important;
+	}
+
+	:global(.jstree-default .item-modified > a) {
+		@apply text-purple-200 !important;
+	}
+
+	:global(.colourblind-mode .jstree-default .item-modified > a) {
+		@apply italic !important;
+	}
+
+	:global(.jstree-default .item-removed > a) {
+		@apply text-red-200 !important;
+	}
+
+	:global(.colourblind-mode .jstree-default .item-removed > a) {
+		@apply line-through !important;
 	}
 
 	:global(.jstree-default .jstree-hovered) {

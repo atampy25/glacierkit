@@ -24,8 +24,8 @@ use crate::{
 	editor_connection::PropertyValue,
 	entity::{
 		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local, get_decorations,
-		get_local_reference, get_recursive_children, is_valid_entity_factory, random_entity_id, CopiedEntityData,
-		ReverseReferenceData
+		get_diff_info, get_local_reference, get_recursive_children, is_valid_entity_factory, random_entity_id,
+		CopiedEntityData, ReverseReferenceData
 	},
 	finish_task,
 	game_detection::GameVersion,
@@ -40,6 +40,8 @@ use crate::{
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash},
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
+
+use super::entity_monaco::SAFE_TO_SYNC;
 
 #[try_fn]
 #[context("Couldn't handle select event")]
@@ -573,6 +575,21 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 			}
 		)))
 	)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
 }
 
 #[try_fn]
@@ -1117,6 +1134,21 @@ pub async fn handle_paste(
 			unsaved: true
 		})
 	)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
 }
 
 #[try_fn]
@@ -1877,6 +1909,21 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 	}
 
 	finish_task(app, task)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
 }
 
 #[try_fn]
@@ -2069,6 +2116,21 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 	)?;
 
 	finish_task(app, task)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
 }
 
 #[try_fn]
@@ -2234,6 +2296,21 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 	)?;
 
 	finish_task(app, task)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
 }
 
 #[try_fn]
@@ -2399,6 +2476,21 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 	)?;
 
 	finish_task(app, task)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			&app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
 }
 
 #[try_fn]
@@ -2562,6 +2654,200 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 			}
 		)))
 	)?;
+
+	finish_task(app, task)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
+}
+
+#[try_fn]
+#[context("Couldn't handle restore to original event")]
+pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Reverting {} to original state", entity_id))?;
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let EditorData::QNPatch {
+		ref base,
+		ref mut current,
+		..
+	} = editor_state.data
+	else {
+		Err(anyhow!("Editor {} is not a QN patch editor", editor_id))?;
+		panic!();
+	};
+
+	if let Some(previous) = current.entities.get(&entity_id).cloned() {
+		current.entities.insert(
+			entity_id.to_owned(),
+			base.entities
+				.get(&entity_id)
+				.context("Entity didn't exist in base")?
+				.to_owned()
+		);
+
+		let sub_entity = current.entities.get(&entity_id).context("No such entity")?.to_owned();
+
+		let mut reverse_parent_refs: HashSet<String> = HashSet::new();
+
+		for entity_data in current.entities.values() {
+			match entity_data.parent {
+				Ref::Full(ref reference) if reference.external_scene.is_none() => {
+					reverse_parent_refs.insert(reference.entity_ref.to_owned());
+				}
+
+				Ref::Short(Some(ref reference)) => {
+					reverse_parent_refs.insert(reference.to_owned());
+				}
+
+				_ => {}
+			}
+		}
+
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::NewItems {
+					editor_id,
+					new_entities: vec![(
+						entity_id.to_owned(),
+						sub_entity.parent.to_owned(),
+						sub_entity.name.to_owned(),
+						sub_entity.factory.to_owned(),
+						reverse_parent_refs.contains(&entity_id)
+					)]
+				}
+			)))
+		)?;
+
+		let mut buf = Vec::new();
+		let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+		let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+		sub_entity.serialize(&mut ser)?;
+
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::ReplaceContentIfSameEntityID {
+					editor_id: editor_id.to_owned(),
+					entity_id: entity_id.to_owned(),
+					content: String::from_utf8(buf)?
+				}
+			)))
+		)?;
+
+		if app_state.editor_connection.is_connected().await {
+			let prev_props = previous.properties.unwrap_or_default();
+
+			for (property, val) in sub_entity.properties.unwrap_or_default() {
+				let mut should_sync = false;
+
+				if let Some(previous_val) = prev_props.get(&property)
+					&& *previous_val != val
+				{
+					should_sync = true;
+				} else if !prev_props.contains_key(&property) {
+					should_sync = true;
+				}
+
+				if should_sync && SAFE_TO_SYNC.iter().any(|&x| val.property_type == x) {
+					app_state
+						.editor_connection
+						.set_property(
+							&entity_id,
+							&current.blueprint_hash,
+							&property,
+							PropertyValue {
+								property_type: val.property_type,
+								data: val.value
+							}
+						)
+						.await?;
+				}
+			}
+		}
+	} else {
+		current.entities.insert(
+			entity_id.to_owned(),
+			base.entities
+				.get(&entity_id)
+				.context("Entity didn't exist in base")?
+				.to_owned()
+		);
+
+		let sub_entity = current.entities.get(&entity_id).context("No such entity")?.to_owned();
+
+		let mut reverse_parent_refs: HashSet<String> = HashSet::new();
+
+		for entity_data in current.entities.values() {
+			match entity_data.parent {
+				Ref::Full(ref reference) if reference.external_scene.is_none() => {
+					reverse_parent_refs.insert(reference.entity_ref.to_owned());
+				}
+
+				Ref::Short(Some(ref reference)) => {
+					reverse_parent_refs.insert(reference.to_owned());
+				}
+
+				_ => {}
+			}
+		}
+
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::NewItems {
+					editor_id,
+					new_entities: vec![(
+						entity_id.to_owned(),
+						sub_entity.parent.to_owned(),
+						sub_entity.name.to_owned(),
+						sub_entity.factory.to_owned(),
+						reverse_parent_refs.contains(&entity_id)
+					)]
+				}
+			)))
+		)?;
+	}
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
 
 	finish_task(app, task)?;
 }

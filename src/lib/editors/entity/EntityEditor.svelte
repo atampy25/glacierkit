@@ -41,6 +41,10 @@
 				overrides.handleRequest(request.data)
 				break
 
+			case "general":
+				isPatchEditor = request.data.data.is_patch_editor
+				break
+
 			default:
 				request satisfies never
 				break
@@ -51,6 +55,9 @@
 	let activeMode: (typeof modes)[number] = "Tree"
 
 	let showReverseParentRefs = false
+	let showChangesFromOriginal = false
+
+	let isPatchEditor = false
 
 	async function showReverseParentRefsChanged(evt: any) {
 		const _event = evt as { target: HTMLInputElement }
@@ -72,6 +79,27 @@
 			}
 		})
 	}
+
+	async function showChangesFromOriginalChanged(evt: any) {
+		const _event = evt as { target: HTMLInputElement }
+
+		await event({
+			type: "editor",
+			data: {
+				type: "entity",
+				data: {
+					type: "general",
+					data: {
+						type: "setShowChangesFromOriginal",
+						data: {
+							editor_id: id,
+							show_changes_from_original: _event.target.checked
+						}
+					}
+				}
+			}
+		})
+	}
 </script>
 
 <div class="w-full h-full">
@@ -87,7 +115,14 @@
 				>
 			{/each}
 		</div>
-		<Checkbox checked={showReverseParentRefs} on:change={showReverseParentRefsChanged} labelText="Show reverse parent references" />
+		<div>
+			<Checkbox checked={showReverseParentRefs} on:change={showReverseParentRefsChanged} labelText="Show reverse parent references" />
+		</div>
+		{#if isPatchEditor}
+			<div>
+				<Checkbox checked={showChangesFromOriginal} on:change={showChangesFromOriginalChanged} labelText="Highlight changes from original entity" />
+			</div>
+		{/if}
 	</div>
 	<div style="height: calc(100vh - 11rem)" class:hidden={activeMode !== "Metadata"}>
 		<Metadata editorID={id} bind:this={metadata} />

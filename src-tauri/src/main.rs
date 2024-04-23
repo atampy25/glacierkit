@@ -40,7 +40,9 @@ use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use editor_connection::EditorConnection;
-use entity::{calculate_reverse_references, get_local_reference, get_recursive_children, CopiedEntityData};
+use entity::{
+	calculate_reverse_references, get_diff_info, get_local_reference, get_recursive_children, CopiedEntityData
+};
 use event_handling::{
 	content_search::start_content_search,
 	entity_metadata::handle_entity_metadata_event,
@@ -48,8 +50,8 @@ use event_handling::{
 	entity_overrides::handle_entity_overrides_event,
 	entity_tree::{
 		handle_delete, handle_gamebrowseradd, handle_helpmenu, handle_moveentitytocamera, handle_moveentitytoplayer,
-		handle_paste, handle_rotateentityascamera, handle_rotateentityasplayer, handle_select,
-		handle_selectentityineditor
+		handle_paste, handle_restoretooriginal, handle_rotateentityascamera, handle_rotateentityasplayer,
+		handle_select, handle_selectentityineditor
 	},
 	repository_patch::handle_repository_patch_event,
 	resource_overview::{handle_resource_overview_event, initialise_resource_overview},
@@ -66,11 +68,11 @@ use measure_time::print_time;
 use model::{
 	AppSettings, AppState, ContentSearchEvent, ContentSearchRequest, ContentSearchResultsEvent,
 	ContentSearchResultsRequest, EditorConnectionEvent, EditorData, EditorEvent, EditorRequest, EditorState,
-	EditorType, EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityMetaPaneEvent, EntityMetadataRequest,
-	EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event, FileBrowserEvent,
-	FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent, GlobalRequest,
-	JsonPatchType, Project, ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest, TextEditorEvent,
-	TextEditorRequest, TextFileType, ToolEvent, ToolRequest
+	EditorType, EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent, EntityGeneralRequest, EntityMetaPaneEvent,
+	EntityMetadataRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Event,
+	FileBrowserEvent, FileBrowserRequest, GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalEvent,
+	GlobalRequest, JsonPatchType, Project, ProjectSettings, Request, SearchFilter, SettingsEvent, SettingsRequest,
+	TextEditorEvent, TextEditorRequest, TextFileType, ToolEvent, ToolRequest
 };
 use notify::Watcher;
 use ores::{parse_json_ores, UnlockableItem};
@@ -2681,6 +2683,20 @@ fn event(app: AppHandle, event: Event) {
 								.unwrap();
 								app_settings.store(settings.into());
 							}
+
+							SettingsEvent::ChangeColourblind(value) => {
+								let mut settings = (*app_settings.load_full()).to_owned();
+								settings.colourblind_mode = value;
+								fs::write(
+									app.path_resolver()
+										.app_data_dir()
+										.context("Couldn't get app data dir")?
+										.join("settings.json"),
+									to_vec(&settings).unwrap()
+								)
+								.unwrap();
+								app_settings.store(settings.into());
+							}
 						},
 
 						ToolEvent::ContentSearch(event) => match event {
@@ -2762,6 +2778,36 @@ fn event(app: AppHandle, event: Event) {
 
 									settings.show_reverse_parent_refs = show_reverse_parent_refs;
 								}
+
+								EntityGeneralEvent::SetShowChangesFromOriginal {
+									editor_id,
+									show_changes_from_original
+								} => {
+									let mut editor_state =
+										app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+									let settings = match editor_state.data {
+										EditorData::QNEntity { ref mut settings, .. } => settings,
+										EditorData::QNPatch { ref mut settings, .. } => settings,
+
+										_ => {
+											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+											panic!();
+										}
+									};
+
+									settings.show_changes_from_original = show_changes_from_original;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+											EntityTreeRequest::SetShowDiff {
+												editor_id,
+												show_diff: show_changes_from_original
+											}
+										)))
+									)?;
+								}
 							},
 
 							EntityEditorEvent::Tree(event) => match event {
@@ -2814,6 +2860,19 @@ fn event(app: AppHandle, event: Event) {
 
 									send_request(
 										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::General(
+											EntityGeneralRequest::SetIsPatchEditor {
+												editor_id: editor_id.to_owned(),
+												is_patch_editor: matches!(
+													editor_state.data,
+													EditorData::QNPatch { .. }
+												)
+											}
+										)))
+									)?;
+
+									send_request(
+										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 											EntityTreeRequest::NewTree {
 												editor_id: editor_id.to_owned(),
@@ -2845,6 +2904,21 @@ fn event(app: AppHandle, event: Event) {
 											}
 										)))
 									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
 								}
 
 								EntityTreeEvent::Select { editor_id, id } => {
@@ -2870,10 +2944,25 @@ fn event(app: AppHandle, event: Event) {
 									send_request(
 										&app,
 										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id,
+											id: editor_id.to_owned(),
 											unsaved: true
 										})
 									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
 								}
 
 								EntityTreeEvent::Delete { editor_id, id } => {
@@ -2928,6 +3017,21 @@ fn event(app: AppHandle, event: Event) {
 											}
 										)))
 									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
 								}
 
 								EntityTreeEvent::Reparent {
@@ -2978,6 +3082,21 @@ fn event(app: AppHandle, event: Event) {
 											}
 										)))
 									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
 								}
 
 								EntityTreeEvent::Copy { editor_id, id } => {
@@ -3015,6 +3134,21 @@ fn event(app: AppHandle, event: Event) {
 									Clipboard::new()?.set_text(to_string(&data_to_copy)?)?;
 
 									finish_task(&app, task)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
 								}
 
 								EntityTreeEvent::Paste { editor_id, parent_id } => {
@@ -3122,6 +3256,10 @@ fn event(app: AppHandle, event: Event) {
 
 								EntityTreeEvent::RotateEntityAsCamera { editor_id, entity_id } => {
 									handle_rotateentityascamera(&app, editor_id, entity_id).await?;
+								}
+
+								EntityTreeEvent::RestoreToOriginal { editor_id, entity_id } => {
+									handle_restoretooriginal(&app, editor_id, entity_id).await?;
 								}
 							},
 
@@ -3510,9 +3648,7 @@ fn event(app: AppHandle, event: Event) {
 																			new_path: evt
 																				.paths
 																				.first()
-																				.context(
-																					"Rename-to event had no path"
-																				)?
+																				.context("Rename-to event had no path")?
 																				.to_owned()
 																		}
 																	))
@@ -4604,6 +4740,21 @@ fn event(app: AppHandle, event: Event) {
 											}
 										)))
 									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
 								}
 							}
 						}
@@ -4706,6 +4857,21 @@ fn event(app: AppHandle, event: Event) {
 											}
 										)))
 									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
 								}
 							}
 						}

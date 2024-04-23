@@ -6,6 +6,8 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};
 use rand::{seq::SliceRandom, thread_rng};
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value};
@@ -1073,4 +1075,62 @@ pub fn is_valid_entity_blueprint(resource_type: &str) -> bool {
 		|| resource_type == "ECPB"
 		|| resource_type == "AIBB"
 		|| resource_type == "WSGB"
+}
+
+/// New, modified, removed (ID, name, parent, factory, has reverse parent refs)
+pub fn get_diff_info(
+	original: &Entity,
+	modified: &Entity
+) -> (Vec<String>, Vec<String>, Vec<(String, String, Ref, String, bool)>) {
+	let mut old_reverse_parent_refs: HashMap<String, Vec<String>> = HashMap::new();
+
+	for (entity_id, entity_data) in original.entities.iter() {
+		match entity_data.parent {
+			Ref::Full(ref reference) if reference.external_scene.is_none() => {
+				old_reverse_parent_refs
+					.entry(reference.entity_ref.to_owned())
+					.and_modify(|x| x.push(entity_id.to_owned()))
+					.or_insert(vec![entity_id.to_owned()]);
+			}
+
+			Ref::Short(Some(ref reference)) => {
+				old_reverse_parent_refs
+					.entry(reference.to_owned())
+					.and_modify(|x| x.push(entity_id.to_owned()))
+					.or_insert(vec![entity_id.to_owned()]);
+			}
+
+			_ => {}
+		}
+	}
+
+	let mut new = vec![];
+	let mut changed = vec![];
+
+	let removed = original
+		.entities
+		.par_iter()
+		.filter(|&(id, _)| !modified.entities.contains_key(id))
+		.map(|(id, orig)| {
+			(
+				id.to_owned(),
+				orig.name.to_owned(),
+				orig.parent.to_owned(),
+				orig.factory.to_owned(),
+				old_reverse_parent_refs.contains_key(id)
+			)
+		})
+		.collect();
+
+	for (id, modif) in modified.entities.iter() {
+		if let Some(orig) = original.entities.get(id) {
+			if modif != orig {
+				changed.push(id.to_owned());
+			}
+		} else {
+			new.push(id.to_owned());
+		}
+	}
+
+	(new, changed, removed)
 }
