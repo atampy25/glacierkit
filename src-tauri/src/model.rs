@@ -468,6 +468,13 @@ strike! {
 					OpenFactory {
 						editor_id: Uuid,
 						factory: String
+					},
+
+					SignalPin {
+						editor_id: Uuid,
+						entity_id: String,
+						pin: String,
+						output: bool
 					}
 				}),
 
@@ -865,6 +872,11 @@ strike! {
 					UpdateValidity {
 						editor_id: Uuid,
 						validity: EditorValidity
+					},
+
+					SetEditorConnected {
+						editor_id: Uuid,
+						connected: bool
 					}
 				}),
 

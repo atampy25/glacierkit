@@ -52,7 +52,7 @@
 		"Convert between repository.json/unlockables.json files and JSON.patch.json files easily by right-clicking them in the Files panel.",
 		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
 		"Separate search terms with spaces to find only files which match all search terms.",
-		"Installing the ZHMModSDK and Editor mod will allow you to modify entity positions and properties visually and in real time."
+		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit."
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]

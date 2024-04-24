@@ -31,8 +31,8 @@ use tryvial::try_fn;
 use crate::{
 	handle_event,
 	model::{
-		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityTreeRequest, Event,
-		GlobalRequest, Request
+		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest,
+		EntityTreeRequest, Event, GlobalRequest, Request
 	},
 	send_notification, send_request, Notification, NotificationKind
 };
@@ -442,6 +442,16 @@ impl EditorConnection {
 													}
 												)))
 											)?;
+
+											send_request(
+												&app,
+												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+													EntityMonacoRequest::SetEditorConnected {
+														editor_id: editor.key().to_owned(),
+														connected: false
+													}
+												)))
+											)?;
 										}
 									}
 								}
@@ -476,6 +486,17 @@ impl EditorConnection {
 										EntityTreeRequest::SetEditorConnectionAvailable {
 											editor_id: editor.key().to_owned(),
 											editor_connection_available: false
+										}
+									)))
+								)
+								.expect("Couldn't send data to frontend");
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+										EntityMonacoRequest::SetEditorConnected {
+											editor_id: editor.key().to_owned(),
+											connected: false
 										}
 									)))
 								)
@@ -559,6 +580,16 @@ impl EditorConnection {
 							EntityTreeRequest::SetEditorConnectionAvailable {
 								editor_id: editor.key().to_owned(),
 								editor_connection_available: true
+							}
+						)))
+					)?;
+
+					send_request(
+						&self.app,
+						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+							EntityMonacoRequest::SetEditorConnected {
+								editor_id: editor.key().to_owned(),
+								connected: true
 							}
 						)))
 					)?;
@@ -749,6 +780,23 @@ impl EditorConnection {
 				&Default::default()
 			)
 			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+		})
+		.await?;
+	}
+
+	#[try_fn]
+	#[context("Couldn't signal pin {pin} on {entity_id}")]
+	pub async fn signal_pin(&self, entity_id: &str, tblu: &str, pin: &str, output: bool) -> Result<()> {
+		self.send_request(SDKEditorRequest::SignalEntityPin {
+			entity: EntitySelector::Game {
+				id: entity_id.to_owned(),
+				tblu: tblu.to_owned()
+			},
+			pin: pin
+				.parse()
+				.map(PropertyID::Unknown)
+				.unwrap_or(PropertyID::Known(pin.to_owned())),
+			output
 		})
 		.await?;
 	}

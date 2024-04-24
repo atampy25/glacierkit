@@ -32,6 +32,8 @@
 	let showCurvePreview = false
 	let curveToPreview: [number, number, number, number, number, number, number, number][] | null = null
 
+	let editorConnected = false
+
 	const baseIntellisenseSchema = merge(cloneDeep(baseSchema), {
 		$ref: "#/definitions/SubEntity",
 		definitions: {
@@ -224,6 +226,7 @@
 		const showPreviewCurveCondition = editor.createContextKey<boolean>("showPreviewCurveCondition", false)
 		const showFollowReferenceCondition = editor.createContextKey<boolean>("showFollowReferenceCondition", false)
 		const showOpenFactoryCondition = editor.createContextKey<boolean>("showOpenFactoryCondition", false)
+		const showSignalPinCondition = editor.createContextKey<boolean>("showSignalPinCondition", false)
 
 		editor.onDidChangeCursorPosition((e) => {
 			let entData
@@ -253,6 +256,12 @@
 			}
 
 			showOpenFactoryCondition.set(editor.getModel()!.getLineContent(e.position.lineNumber).includes(`"factory":`))
+
+			if (!word || !editorConnected) {
+				showSignalPinCondition.set(false)
+			} else {
+				showSignalPinCondition.set([...Object.keys(entData.inputCopying), ...Object.keys(entData.outputCopying), ...Object.keys(entData.events)].includes(word))
+			}
 		})
 
 		editor.addAction({
@@ -270,6 +279,40 @@
 				curveToPreview = JSON.parse(editor.getValue()).properties[propertyName].value.data
 
 				showCurvePreview = true
+			}
+		})
+
+		editor.addAction({
+			id: "signal-pin",
+			label: "Signal pin in-game",
+			contextMenuGroupId: "navigation",
+			contextMenuOrder: 0,
+			keybindings: [],
+			precondition: "showSignalPinCondition",
+			run: async (ed) => {
+				try {
+					const pin = editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
+					const output = !JSON.parse(editor.getValue()).inputCopying[pin]
+
+					await event({
+						type: "editor",
+						data: {
+							type: "entity",
+							data: {
+								type: "monaco",
+								data: {
+									type: "signalPin",
+									data: {
+										editor_id: editorID,
+										entity_id: entityID!,
+										pin,
+										output
+									}
+								}
+							}
+						}
+					})
+				} catch {}
 			}
 		})
 
@@ -542,6 +585,10 @@
 					localRefEntityIDs = request.data.local_ref_entity_ids
 					updateDecorations()
 				}
+				break
+
+			case "setEditorConnected":
+				editorConnected = request.data.connected
 				break
 
 			default:

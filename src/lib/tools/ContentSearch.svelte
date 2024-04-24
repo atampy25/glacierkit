@@ -52,8 +52,7 @@
 
 					if (searchEntities) searchTypes.push("TEMP")
 
-					// Support for CBLUs in RT is broken so they are not included in search
-					if (searchRL) searchTypes.push("AIRG", "RTLV", "ATMD", "VIDB", "UICB", "CPPT", "CRMD", "DSWB", "WSWB", "GFXF", "GIDX", "WSGB", "ECPB", "ENUM")
+					if (searchRL) searchTypes.push("AIRG", "RTLV", "ATMD", "VIDB", "UICB", "CPPT", "CBLU", "CRMD", "DSWB", "WSWB", "GFXF", "GIDX", "WSGB", "ECPB", "ENUM")
 
 					if (searchText) searchTypes.push("JSON", "REPO", "ORES")
 

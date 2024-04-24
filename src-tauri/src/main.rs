@@ -2699,11 +2699,7 @@ fn event(app: AppHandle, event: Event) {
 								if let Some(project) = app_state.project.load().as_ref() {
 									let mut settings = (*project.settings.load_full()).to_owned();
 									settings.custom_paths = value;
-									fs::write(
-										project.path.join("project.json"),
-										to_vec(&settings)?
-									)
-									?;
+									fs::write(project.path.join("project.json"), to_vec(&settings)?)?;
 									project.settings.store(settings.into());
 								}
 							}
@@ -2902,15 +2898,24 @@ fn event(app: AppHandle, event: Event) {
 										)))
 									)?;
 
+									let editor_connected = app_state.editor_connection.is_connected().await;
+
 									send_request(
 										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 											EntityTreeRequest::SetEditorConnectionAvailable {
-												editor_id,
-												editor_connection_available: app_state
-													.editor_connection
-													.is_connected()
-													.await
+												editor_id: editor_id.to_owned(),
+												editor_connection_available: editor_connected
+											}
+										)))
+									)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::SetEditorConnected {
+												editor_id: editor_id.to_owned(),
+												connected: editor_connected
 											}
 										)))
 									)?;
@@ -3297,6 +3302,31 @@ fn event(app: AppHandle, event: Event) {
 								EntityMonacoEvent::OpenFactory { factory, .. } => {
 									handle_openfactory(&app, factory).await?;
 								}
+
+								EntityMonacoEvent::SignalPin {
+									editor_id,
+									entity_id,
+									pin,
+									output
+								} => {
+									let editor_state =
+										app_state.editor_states.get(&editor_id).context("No such editor")?;
+
+									let entity = match editor_state.data {
+										EditorData::QNEntity { ref entity, .. } => entity,
+										EditorData::QNPatch { ref current, .. } => current,
+
+										_ => {
+											Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+											panic!();
+										}
+									};
+
+									app_state
+										.editor_connection
+										.signal_pin(&entity_id, &entity.blueprint_hash, &pin, output)
+										.await?;
+								}
 							},
 
 							EntityEditorEvent::MetaPane(event) => match event {
@@ -3456,10 +3486,9 @@ fn event(app: AppHandle, event: Event) {
 								settings = ProjectSettings::default();
 								fs::write(path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
 							}
-							
+
 							for editor in app.state::<AppState>().editor_states.iter() {
 								if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
-
 									send_request(
 										&app,
 										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
