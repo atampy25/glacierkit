@@ -4,6 +4,7 @@
 	import { TextInput, Dropdown } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
+	import md5 from "md5"
 
 	export let editorID: string
 
@@ -13,6 +14,7 @@
 	let subType: SubType = "scene"
 	let externalScenes: string[] = []
 	let hashModificationAllowed = true
+	let customPaths: string[] = []
 
 	export async function handleRequest(request: EntityMetadataRequest) {
 		console.log(`Metadata editor for editor ${editorID} handling request`, request)
@@ -36,6 +38,10 @@
 
 			case "setHashModificationAllowed":
 				hashModificationAllowed = request.data.hash_modification_allowed
+				break
+
+			case "updateCustomPaths":
+				customPaths = request.data.custom_paths
 				break
 
 			default:
@@ -127,25 +133,29 @@
 </script>
 
 <div class="h-full w-full overflow-y-auto">
-	<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-		<TextInput
-			value={factoryHash}
-			placeholder="You can use the Text Tools panel to generate this"
-			labelText="Factory hash"
-			on:change={factoryHashInput}
-			disabled={!hashModificationAllowed}
-			class="code-font"
-		/>
+	<TextInput
+		bind:value={factoryHash}
+		placeholder="You can use the Text Tools panel to generate this"
+		labelText="Factory hash"
+		helperText={customPaths.find((a) => ("00" + md5(a.toLowerCase()).slice(2, 16)).toUpperCase() === factoryHash)}
+		on:change={factoryHashInput}
+		disabled={!hashModificationAllowed}
+		class="code-font"
+	/>
 
+	<div class="my-4">
 		<TextInput
-			value={blueprintHash}
+			bind:value={blueprintHash}
 			placeholder="You can use the Text Tools panel to generate this"
 			labelText="Blueprint hash"
+			helperText={customPaths.find((a) => ("00" + md5(a.toLowerCase()).slice(2, 16)).toUpperCase() === blueprintHash)}
 			on:change={blueprintHashInput}
 			disabled={!hashModificationAllowed}
 			class="code-font"
 		/>
+	</div>
 
+	<div class="grid grid-cols-2 gap-2">
 		<TextInput value={rootEntity} placeholder="The root sub-entity of this entity" labelText="Root entity" on:change={rootEntityInput} class="code-font" />
 
 		<Dropdown

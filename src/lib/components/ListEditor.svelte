@@ -12,55 +12,50 @@
 
 	let newValueInputModalOpen = false
 	let newValue = ""
+
+	let entryToAddInput: HTMLInputElement
 </script>
 
-<table class="table-auto border-collapse bg-[#393939]">
-	<tbody>
-		{#each data as value, index (value)}
-			<tr class:border-b={index != data.length - 1} class="border-solid border-b-white">
-				<td class="py-2 px-4 text-[#f4f4f4]">
-					<div class="flex flex-row gap-4 items-center">
-						<code class="flex-grow break-all">{value}</code>
-						<Button
-							kind="ghost"
-							size="small"
-							icon={CloseOutline}
-							iconDescription="Remove value"
-							on:click={() => {
-								data = data.filter((a) => a !== value)
-								dispatch("updated", data)
-							}}
-						/>
-					</div>
-				</td>
-			</tr>
-		{/each}
-		{#if data.length == 0}
-			<tr class="border-solid border-b-white">
-				<td class="py-2 px-4 text-[#f4f4f4]">
-					<div class="flex flex-row gap-4 items-center">
-						<code class="flex-grow">No entries</code>
-					</div>
-				</td>
-			</tr>
-		{/if}
-	</tbody>
-</table>
-<br />
-<div class="text-white">
-	<Button
-		kind="primary"
-		icon={AddAlt}
-		on:click={() => {
-			newValueInputModalOpen = true
-		}}
-	>
-		Add an entry
-	</Button>
+<div class="flex flex-col gap-1 mb-2">
+	{#each data as value}
+		<div class="flex items-center gap-2">
+			<div class="p-2 bg-[#393939] text-[#f4f4f4] flex-grow">
+				<code style="font-size: 0.95em" class="break-all">{value}</code>
+			</div>
+			<Button
+				kind="ghost"
+				size="small"
+				icon={CloseOutline}
+				iconDescription="Remove value"
+				on:click={() => {
+					data = data.filter((a) => a !== value)
+					dispatch("updated", data)
+				}}
+			/>
+		</div>
+	{/each}
+	{#if data.length == 0}
+		<div class="p-2 bg-[#393939] text-[#f4f4f4] flex items-center gap-2">
+			<code style="font-size: 0.95em">No entries</code>
+		</div>
+	{/if}
 </div>
+<Button
+	size="small"
+	kind="primary"
+	icon={AddAlt}
+	on:click={() => {
+		newValueInputModalOpen = true
+	}}
+>
+	Add an entry
+</Button>
 
 <ComposedModal
 	open={newValueInputModalOpen}
+	on:close={() => {
+		newValueInputModalOpen = false
+	}}
 	on:submit={() => {
 		newValueInputModalOpen = false
 		data = [...data, newValue]
@@ -71,7 +66,24 @@
 >
 	<ModalHeader title="Add an entry" />
 	<ModalBody>
-		<TextInput labelText="Entry to add" bind:value={newValue} />
+		<TextInput
+			labelText="Entry to add"
+			data-modal-primary-focus
+			bind:value={newValue}
+			bind:ref={entryToAddInput}
+			on:keydown={({ key }) => {
+				if (key === "Enter") {
+					if (newValue.length > 0) {
+						newValueInputModalOpen = false
+						data = [...data, newValue]
+						newValue = ""
+
+						dispatch("updated", data)
+						entryToAddInput.value = ""
+					}
+				}
+			}}
+		/>
 	</ModalBody>
 	<ModalFooter primaryButtonText="Continue" />
 </ComposedModal>

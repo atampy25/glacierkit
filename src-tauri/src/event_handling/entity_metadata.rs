@@ -1,15 +1,18 @@
+use std::fs;
+
 use anyhow::{anyhow, Context, Result};
 use fn_error_context::context;
+use serde_json::to_vec;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 
 use crate::{
 	model::{
 		AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
-		EntityMetadataRequest, GlobalRequest, Request
+		EntityMetadataRequest, GlobalRequest, Request, SettingsRequest, ToolRequest
 	},
 	rpkg::normalise_to_hash,
-	send_request
+	send_notification, send_request, Notification, NotificationKind
 };
 
 #[try_fn]
@@ -45,6 +48,18 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 				)))
 			)?;
 
+			if let Some(project) = app_state.project.load().as_ref() {
+				send_request(
+					app,
+					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+						EntityMetadataRequest::UpdateCustomPaths {
+							editor_id: editor_id.to_owned(),
+							custom_paths: project.settings.load().custom_paths.to_owned()
+						}
+					)))
+				)?;
+			}
+
 			// allow user to modify hash if there is no defined file we're writing to; will automatically convert editor state into entity editor rather than patch editor
 			// also allow user to modify hash if it's already an entity
 			send_request(
@@ -66,6 +81,40 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 			let mut is_patch_editor = false;
 
 			if factory_hash != normalise_to_hash(factory_hash.to_owned()) {
+				if let Some(project) = app_state.project.load().as_ref() {
+					let mut settings = (*project.settings.load_full()).to_owned();
+					settings.custom_paths.push(factory_hash.to_owned());
+
+					send_request(
+						app,
+						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+							EntityMetadataRequest::UpdateCustomPaths {
+								editor_id: editor_id.to_owned(),
+								custom_paths: settings.custom_paths.to_owned()
+							}
+						)))
+					)?;
+
+					send_request(
+						app,
+						Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings(
+							settings.to_owned()
+						)))
+					)?;
+
+					fs::write(project.path.join("project.json"), to_vec(&settings)?)?;
+					project.settings.store(settings.into());
+
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Info,
+							title: "Custom path saved".into(),
+							subtitle: "The entered path has been saved in your custom paths list.".into()
+						}
+					)?;
+				}
+
 				factory_hash = normalise_to_hash(factory_hash);
 
 				send_request(
@@ -139,6 +188,40 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 			let mut is_patch_editor = false;
 
 			if blueprint_hash != normalise_to_hash(blueprint_hash.to_owned()) {
+				if let Some(project) = app_state.project.load().as_ref() {
+					let mut settings = (*project.settings.load_full()).to_owned();
+					settings.custom_paths.push(blueprint_hash.to_owned());
+
+					send_request(
+						app,
+						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+							EntityMetadataRequest::UpdateCustomPaths {
+								editor_id: editor_id.to_owned(),
+								custom_paths: settings.custom_paths.to_owned()
+							}
+						)))
+					)?;
+
+					send_request(
+						app,
+						Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings(
+							settings.to_owned()
+						)))
+					)?;
+
+					fs::write(project.path.join("project.json"), to_vec(&settings)?)?;
+					project.settings.store(settings.into());
+
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Info,
+							title: "Custom path saved".into(),
+							subtitle: "The entered path has been saved in your custom paths list.".into()
+						}
+					)?;
+				}
+
 				blueprint_hash = normalise_to_hash(blueprint_hash);
 
 				send_request(

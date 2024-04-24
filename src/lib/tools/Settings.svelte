@@ -4,6 +4,7 @@
 	import { Checkbox, TooltipIcon } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
+	import ListEditor from "$lib/components/ListEditor.svelte"
 
 	export async function handleRequest(request: SettingsRequest) {
 		console.log("Settings tool handling request", request)
@@ -18,6 +19,7 @@
 
 			case "changeProjectSettings":
 				projectLoaded = true
+				customPaths = request.data.customPaths
 				break
 
 			default:
@@ -87,6 +89,8 @@
 	} else {
 		document.body.classList.remove("colourblind-mode")
 	}
+
+	let customPaths: string[] = []
 </script>
 
 <div class="w-full h-full p-6 overflow-x-hidden overflow-y-auto">
@@ -163,7 +167,22 @@
 
 	<h4 class="mt-4">Project settings</h4>
 	{#if projectLoaded}
-		<p>There are no project settings (yet)</p>
+		<p class="mt-1 mb-1">Custom paths</p>
+		<ListEditor
+			bind:data={customPaths}
+			on:updated={async ({ detail }) => {
+				await event({
+					type: "tool",
+					data: {
+						type: "settings",
+						data: {
+							type: "changeCustomPaths",
+							data: detail
+						}
+					}
+				})
+			}}
+		/>
 	{:else}
 		<p>No project loaded</p>
 	{/if}

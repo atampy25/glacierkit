@@ -2661,9 +2661,8 @@ fn event(app: AppHandle, event: Event) {
 											.app_data_dir()
 											.context("Couldn't get app data dir")?
 											.join("settings.json"),
-										to_vec(&settings).unwrap()
-									)
-									.unwrap();
+										to_vec(&settings)?
+									)?;
 									app_settings.store(settings.into());
 
 									load_game_files(&app).await?;
@@ -2678,9 +2677,8 @@ fn event(app: AppHandle, event: Event) {
 										.app_data_dir()
 										.context("Couldn't get app data dir")?
 										.join("settings.json"),
-									to_vec(&settings).unwrap()
-								)
-								.unwrap();
+									to_vec(&settings)?
+								)?;
 								app_settings.store(settings.into());
 							}
 
@@ -2692,10 +2690,22 @@ fn event(app: AppHandle, event: Event) {
 										.app_data_dir()
 										.context("Couldn't get app data dir")?
 										.join("settings.json"),
-									to_vec(&settings).unwrap()
-								)
-								.unwrap();
+									to_vec(&settings)?
+								)?;
 								app_settings.store(settings.into());
+							}
+
+							SettingsEvent::ChangeCustomPaths(value) => {
+								if let Some(project) = app_state.project.load().as_ref() {
+									let mut settings = (*project.settings.load_full()).to_owned();
+									settings.custom_paths = value;
+									fs::write(
+										project.path.join("project.json"),
+										to_vec(&settings)?
+									)
+									?;
+									project.settings.store(settings.into());
+								}
 							}
 						},
 
@@ -3445,6 +3455,21 @@ fn event(app: AppHandle, event: Event) {
 							} else {
 								settings = ProjectSettings::default();
 								fs::write(path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
+							}
+							
+							for editor in app.state::<AppState>().editor_states.iter() {
+								if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+											EntityMetadataRequest::UpdateCustomPaths {
+												editor_id: editor.key().to_owned(),
+												custom_paths: settings.custom_paths.to_owned()
+											}
+										)))
+									)?;
+								}
 							}
 
 							app_state.project.store(Some(

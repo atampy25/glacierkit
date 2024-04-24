@@ -127,11 +127,13 @@ pub struct Project {
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ProjectSettings {}
+pub struct ProjectSettings {
+	pub custom_paths: Vec<String>
+}
 
 impl Default for ProjectSettings {
 	fn default() -> Self {
-		Self {}
+		Self { custom_paths: vec![] }
 	}
 }
 
@@ -312,9 +314,12 @@ strike! {
 
 			Settings(pub enum SettingsEvent {
 				Initialise,
+
 				ChangeGameInstall(Option<PathBuf>),
 				ChangeExtractModdedFiles(bool),
-				ChangeColourblind(bool)
+				ChangeColourblind(bool),
+
+				ChangeCustomPaths(Vec<String>)
 			}),
 
 			ContentSearch(pub enum ContentSearchEvent {
@@ -895,6 +900,11 @@ strike! {
 					SetBlueprintHash {
 						editor_id: Uuid,
 						blueprint_hash: String
+					},
+
+					UpdateCustomPaths {
+						editor_id: Uuid,
+						custom_paths: Vec<String>
 					}
 				}),
 

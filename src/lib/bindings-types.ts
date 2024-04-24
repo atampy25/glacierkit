@@ -152,7 +152,7 @@ export type EntityMetaPaneRequest = { type: "setReverseRefs"; data: { editor_id:
 
 export type EntityMetadataEvent = { type: "initialise"; data: { editor_id: string } } | { type: "setFactoryHash"; data: { editor_id: string; factory_hash: string } } | { type: "setBlueprintHash"; data: { editor_id: string; blueprint_hash: string } } | { type: "setRootEntity"; data: { editor_id: string; root_entity: string } } | { type: "setSubType"; data: { editor_id: string; sub_type: SubType } } | { type: "setExternalScenes"; data: { editor_id: string; external_scenes: string[] } }
 
-export type EntityMetadataRequest = { type: "initialise"; data: { editor_id: string; factory_hash: string; blueprint_hash: string; root_entity: string; sub_type: SubType; external_scenes: string[] } } | { type: "setHashModificationAllowed"; data: { editor_id: string; hash_modification_allowed: boolean } } | { type: "setFactoryHash"; data: { editor_id: string; factory_hash: string } } | { type: "setBlueprintHash"; data: { editor_id: string; blueprint_hash: string } }
+export type EntityMetadataRequest = { type: "initialise"; data: { editor_id: string; factory_hash: string; blueprint_hash: string; root_entity: string; sub_type: SubType; external_scenes: string[] } } | { type: "setHashModificationAllowed"; data: { editor_id: string; hash_modification_allowed: boolean } } | { type: "setFactoryHash"; data: { editor_id: string; factory_hash: string } } | { type: "setBlueprintHash"; data: { editor_id: string; blueprint_hash: string } } | { type: "updateCustomPaths"; data: { editor_id: string; custom_paths: string[] } }
 
 export type EntityMonacoEvent = { type: "updateContent"; data: { editor_id: string; entity_id: string; content: string } } | { type: "followReference"; data: { editor_id: string; reference: string } } | { type: "openFactory"; data: { editor_id: string; factory: string } }
 
@@ -340,7 +340,7 @@ toPin: string;
  */
 value?: SimpleProperty | null }
 
-export type ProjectSettings = Record<string, never>
+export type ProjectSettings = { customPaths: string[] }
 
 /**
  * A property with a type and a value. Can be marked as post-init.
@@ -460,7 +460,7 @@ export type Rotation = { yaw: number; pitch: number; roll: number }
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
-export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeColourblind"; data: boolean }
+export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeColourblind"; data: boolean } | { type: "changeCustomPaths"; data: string[] }
 
 export type SettingsRequest = { type: "initialise"; data: { game_installs: GameInstall[]; settings: AppSettings } } | { type: "changeProjectSettings"; data: ProjectSettings }
 
