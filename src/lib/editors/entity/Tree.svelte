@@ -65,14 +65,7 @@
 					dots: true,
 					icons: true
 				},
-				check_callback: function (operation: any, node: { id: string }, _node_parent: any, _node_position: any, _more: any) {
-					// Disallow drag and drop
-					if (removedEntities.some((a) => a[0] === node.id) && operation === "move_node") {
-						return false
-					}
-
-					return true
-				},
+				check_callback: true,
 				force_text: true,
 				keyboard: {
 					f2: () => {}
@@ -96,28 +89,30 @@
 									separator_before: false,
 									separator_after: true,
 									_disabled: false,
-									label: "Restore to Original",
-									icon: "fa fa-undo",
+									label: !removedEntities.some((a) => a[0] === tree.get_node(b.id).parent) ? "Restore to Original" : "Restore Parent First",
+									icon: !removedEntities.some((a) => a[0] === tree.get_node(b.id).parent) ? "fa fa-undo" : "fa fa-close",
 									action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
 										const tree = jQuery.jstree!.reference(b.reference)
 										const selected_node = tree.get_node(b.reference)
 
-										await event({
-											type: "editor",
-											data: {
-												type: "entity",
+										if (!removedEntities.some((a) => a[0] === tree.get_node(selected_node.id).parent)) {
+											await event({
+												type: "editor",
 												data: {
-													type: "tree",
+													type: "entity",
 													data: {
-														type: "restoreToOriginal",
+														type: "tree",
 														data: {
-															editor_id: editorID,
-															entity_id: selected_node.id
+															type: "restoreToOriginal",
+															data: {
+																editor_id: editorID,
+																entity_id: selected_node.id
+															}
 														}
 													}
 												}
-											}
-										})
+											})
+										}
 									}
 								}
 							}
@@ -679,7 +674,20 @@
 			}
 		})
 
+		let currentlyCorrectingRemovedMovement = false
+
 		jQuery("#" + elemID).on("move_node.jstree", async (_, { node, parent, old_parent }: { node: any; parent: string; old_parent: string }) => {
+			if (removedEntities.some((a) => a[0] === node.id) || removedEntities.some((a) => a[0] === parent)) {
+				if (currentlyCorrectingRemovedMovement) {
+					currentlyCorrectingRemovedMovement = false
+					return
+				} else {
+					currentlyCorrectingRemovedMovement = true
+					tree.move_node(node, old_parent, getPositionOfNode(old_parent, node.text, node.original.folder))
+					return
+				}
+			}
+
 			if (parent !== old_parent) {
 				tree.move_node(node, parent, getPositionOfNode(parent, node.text, node.original.folder))
 
@@ -726,7 +734,7 @@
 			})
 		})
 
-		jQuery("#" + elemID).on("load.jstree", () => {
+		jQuery("#" + elemID).on("ready.jstree", () => {
 			updateDiffing()
 		})
 
@@ -790,12 +798,11 @@
 				break
 
 			case "setDiffInfo":
-				const old_diff: [string[], string[], typeof removedEntities] = [addedEntities, changedEntities, removedEntities]
 				;[addedEntities, changedEntities, removedEntities] = request.data.diff_info
 
 				// May be called before tree is loaded
 				try {
-					updateDiffing(old_diff)
+					updateDiffing()
 				} catch (e) {
 					console.log(e)
 				}
@@ -988,42 +995,12 @@
 		updateDiffing()
 	}
 
-	function updateDiffing(old_diff?: [string[], string[], [string, string, Ref, string, boolean][]]) {
-		if (old_diff) {
-			for (const entityID of old_diff[0]) {
-				if (tree.get_node(entityID)) {
-					tree.get_node(entityID).li_attr.class = ""
-					tree.get_node(entityID, true)[0]?.classList?.remove?.("item-new")
-				}
-			}
-
-			for (const entityID of old_diff[1]) {
-				if (tree.get_node(entityID)) {
-					tree.get_node(entityID).li_attr.class = ""
-					tree.get_node(entityID, true)[0]?.classList?.remove?.("item-modified")
-				}
-			}
-
-			for (const entityID of old_diff[2].map((a) => a[0])) {
-				if (tree.get_node(entityID)) {
-					if (removedEntities.some((a) => a[0] === entityID)) {
-						tree.delete_node(entityID)
-					} else {
-						tree.get_node(entityID).li_attr.class = ""
-						tree.get_node(entityID, true)[0]?.classList?.remove?.("item-removed")
-					}
-				}
-			}
-		}
-
-		for (const entityID of addedEntities) {
-			tree.get_node(entityID).li_attr.class = ""
-			tree.get_node(entityID, true)[0]?.classList?.remove?.("item-new")
-		}
-
-		for (const entityID of changedEntities) {
-			tree.get_node(entityID).li_attr.class = ""
-			tree.get_node(entityID, true)[0]?.classList?.remove?.("item-modified")
+	function updateDiffing() {
+		for (const { id } of tree.get_json(undefined, { flat: true })) {
+			tree.get_node(id).li_attr.class = ""
+			tree.get_node(id, true)[0]?.classList?.remove?.("item-new")
+			tree.get_node(id, true)[0]?.classList?.remove?.("item-modified")
+			tree.get_node(id, true)[0]?.classList?.remove?.("item-removed")
 		}
 
 		for (const entityID of removedEntities.map((a) => a[0])) {
@@ -1031,8 +1008,6 @@
 				tree.delete_node(entityID)
 			}
 		}
-
-		removedEntities = removedEntities.filter((a) => !tree.get_node(a[0]))
 
 		if (showDiff) {
 			for (const entityID of addedEntities) {
@@ -1049,58 +1024,60 @@
 			while (added < removedEntities.length) {
 				for (const [entityID, name, parent, factory, hasReverseParentRefs] of removedEntities) {
 					// We have to add the top-level entities first to ensure the tree responds appropriately
-					if (!getReferencedLocalEntity(parent) || tree.get_node(getReferencedLocalEntity(parent) || "#")) {
-						tree.create_node(
-							getReferencedLocalEntity(parent) || "#",
-							{
-								id: entityID,
-								parent: getReferencedLocalEntity(parent) || "#",
-								icon:
-									factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
-										? "fa-regular fa-folder"
-										: icons.find((a) => factory.includes(a[0]))
-											? icons.find((a) => factory.includes(a[0]))![1]
-											: "fa-regular fa-file",
-								text: `${name} (${entityID})`,
-								folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
-								factory,
-								hasReverseParentRefs,
-								parentRef: parent,
-								li_attr: {
-									class: "item-removed"
-								}
-							},
-							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
-						)
+					if (!tree.get_node(entityID)) {
+						if (!getReferencedLocalEntity(parent) || tree.get_node(getReferencedLocalEntity(parent) || "#")) {
+							tree.create_node(
+								getReferencedLocalEntity(parent) || "#",
+								{
+									id: entityID,
+									parent: getReferencedLocalEntity(parent) || "#",
+									icon:
+										factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+											? "fa-regular fa-folder"
+											: icons.find((a) => factory.includes(a[0]))
+												? icons.find((a) => factory.includes(a[0]))![1]
+												: "fa-regular fa-file",
+									text: `${name} (${entityID})`,
+									folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+									factory,
+									hasReverseParentRefs,
+									parentRef: parent,
+									li_attr: {
+										class: "item-removed"
+									}
+								},
+								getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+							)
 
-						if (getReferencedLocalEntity(parent)) {
-							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
-							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
-								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
-
-							tree.set_icon(
-								getReferencedLocalEntity(parent),
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+							if (getReferencedLocalEntity(parent)) {
+								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
+								tree.get_node(getReferencedLocalEntity(parent)).original.folder =
+									tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
 									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
-									? "fa-regular fa-folder"
-									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
-										? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
-										: "fa-regular fa-file"
-							)
 
-							tree.move_node(
-								getReferencedLocalEntity(parent),
-								tree.get_node(getReferencedLocalEntity(parent)).parent,
-								getPositionOfNode(
-									tree.get_node(getReferencedLocalEntity(parent)).parent,
-									tree.get_node(getReferencedLocalEntity(parent)).text,
-									tree.get_node(getReferencedLocalEntity(parent)).original.folder
+								tree.set_icon(
+									getReferencedLocalEntity(parent),
+									tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+										tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+										? "fa-regular fa-folder"
+										: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
+											? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
+											: "fa-regular fa-file"
 								)
-							)
-						}
 
-						added += 1
+								tree.move_node(
+									getReferencedLocalEntity(parent),
+									tree.get_node(getReferencedLocalEntity(parent)).parent,
+									getPositionOfNode(
+										tree.get_node(getReferencedLocalEntity(parent)).parent,
+										tree.get_node(getReferencedLocalEntity(parent)).text,
+										tree.get_node(getReferencedLocalEntity(parent)).original.folder
+									)
+								)
+							}
+
+							added += 1
+						}
 					}
 				}
 			}
