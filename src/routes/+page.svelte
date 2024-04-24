@@ -29,6 +29,7 @@
 	import Search from "carbon-icons-svelte/lib/Search.svelte"
 	import ContentSearch from "$lib/tools/ContentSearch.svelte"
 	import ContentSearchResultsEditor from "$lib/editors/contentsearchresults/ContentSearchResultsEditor.svelte"
+	import { open } from "@tauri-apps/api/dialog"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -52,7 +53,8 @@
 		"Convert between repository.json/unlockables.json files and JSON.patch.json files easily by right-clicking them in the Files panel.",
 		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
 		"Separate search terms with spaces to find only files which match all search terms.",
-		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit."
+		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit.",
+		"You can open a file from outside of your current project by pressing CTRL-O."
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]
@@ -413,6 +415,37 @@
 						data: activeTab
 					}
 				})
+			}
+		}
+	}}
+	use:shortcut={{
+		key: "o",
+		control: true,
+		callback: async () => {
+			trackEvent("Open file using CTRL-O")
+
+			await event({
+				type: "global",
+				data: {
+					type: "selectAndOpenFile"
+				}
+			})
+		}
+	}}
+	use:shortcut={{
+		key: "O",
+		control: true,
+		shift: true,
+		callback: async () => {
+			trackEvent("Load workspace using CTRL-SHIFT-O")
+
+			const path = await open({
+				title: "Select the project folder",
+				directory: true
+			})
+
+			if (typeof path === "string") {
+				await event({ type: "global", data: { type: "loadWorkspace", data: path } })
 			}
 		}
 	}}

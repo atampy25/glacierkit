@@ -681,6 +681,7 @@ strike! {
 		Global(pub enum GlobalEvent {
 			SetSeenAnnouncements(Vec<String>),
 			LoadWorkspace(PathBuf),
+			SelectAndOpenFile,
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid)

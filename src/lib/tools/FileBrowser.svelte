@@ -766,6 +766,8 @@
 			<p class="mb-4">You don't have a project loaded. Select a folder to get started!</p>
 			<Button
 				on:click={async () => {
+					trackEvent("Load workspace using button")
+
 					const path = await open({
 						title: "Select the project folder",
 						directory: true
@@ -786,6 +788,8 @@
 			<span
 				class="text-neutral-400 cursor-pointer"
 				on:click={async () => {
+					trackEvent("Load workspace using text link")
+
 					const path = await open({
 						title: "Select the project folder",
 						directory: true
