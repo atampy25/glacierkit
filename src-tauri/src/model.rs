@@ -204,7 +204,12 @@ pub enum ResourceOverviewData {
 		blueprint_hash: String,
 		blueprint_path_or_hint: Option<String>
 	},
-	GenericRL,
+	GenericRL {
+		json: String
+	},
+	Json {
+		json: String
+	},
 	Ores,
 	Image {
 		image_path: PathBuf,

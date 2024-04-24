@@ -8,7 +8,8 @@ use image::{io::Reader as ImageReader, ImageFormat};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
 use rpkg_rs::{runtime::resource::partition_manager::PartitionManager, GlacierResource};
-use serde_json::{from_slice, from_value, json, to_vec, Value};
+use serde::Serialize;
+use serde_json::{from_slice, from_value, json, to_string, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tauri_plugin_aptabase::EventTracker;
 use tex_rs::texture_map::TextureMap;
@@ -137,7 +138,22 @@ pub fn initialise_resource_overview(
 				}
 
 				"AIRG" | "TBLU" | "RTLV" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "DSWB" | "GFXF" | "GIDX"
-				| "WSGB" | "ECPB" | "UICB" | "ENUM" => ResourceOverviewData::GenericRL,
+				| "WSGB" | "ECPB" | "UICB" | "ENUM" => {
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+
+					ResourceOverviewData::GenericRL {
+						json: {
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							convert_generic::<Value>(&res_data, game_version, &res_meta.hash_resource_type)?
+								.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						}
+					}
+				}
 
 				"ORES" if hash == "0057C2C3941115CA" => ResourceOverviewData::Unlockables,
 
@@ -338,6 +354,19 @@ pub fn initialise_resource_overview(
 				}
 
 				"REPO" => ResourceOverviewData::Repository,
+
+				"JSON" => ResourceOverviewData::Json {
+					json: {
+						let mut buf = Vec::new();
+						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+						from_slice::<Value>(&extract_latest_resource(game_files, hash_list, hash)?.1)?
+							.serialize(&mut ser)?;
+
+						String::from_utf8(buf)?
+					}
+				},
 
 				_ => ResourceOverviewData::Generic
 			}

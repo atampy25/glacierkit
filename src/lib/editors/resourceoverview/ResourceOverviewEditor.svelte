@@ -9,6 +9,8 @@
 	import { convertFileSrc } from "@tauri-apps/api/tauri"
 	import WaveformPlayer from "$lib/components/WaveformPlayer.svelte"
 	import MultiWaveformPlayer from "$lib/components/MultiWaveformPlayer.svelte"
+	import Monaco from "./Monaco.svelte"
+	import { v4 } from "uuid"
 
 	export let id: string
 
@@ -443,6 +445,10 @@
 					<div class="text-xl">{chunk}</div>
 				</div>
 			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4 h-[30vh]">
+				<Monaco id={v4()} content={data.data.json}></Monaco>
+			</div>
 			<h4 class="mb-1">Actions</h4>
 			<div class="flex flex-wrap gap-2 mb-4">
 				<Button
@@ -664,6 +670,50 @@
 					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract unlockables as binary")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+		{:else if data.type === "Json"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4 h-[30vh]">
+				<Monaco id={v4()} content={data.data.json}></Monaco>
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract generic file", { hash, filetype })
 
 						await event({
 							type: "editor",

@@ -14,7 +14,7 @@ edition = "2021"
 tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
-serde_json = { version = "1.0.110" }
+serde_json = { version = "1.0.110", features = ["preserve_order"] }
 serde = { version = "1.0.194", features = ["derive"] }
 tauri = { version = "1.5.4", features = ["api-all", "devtools"] }
 structstruck = "0.4.1"
