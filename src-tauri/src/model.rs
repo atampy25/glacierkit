@@ -806,7 +806,7 @@ strike! {
 						factory: String,
 						input_pins: Vec<String>,
 						output_pins: Vec<String>,
-						default_properties_html: String
+						default_properties_json: String
 					},
 
 					SetTemplates {

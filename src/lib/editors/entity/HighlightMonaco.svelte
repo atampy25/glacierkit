@@ -22,15 +22,17 @@
 			roundedSelection: false,
 			theme: "theme",
 			minimap: {
-				enabled: true
+				enabled: false
 			},
+			lineNumbers: "off",
+			folding: false,
 			automaticLayout: true,
 			fontFamily: "Fira Code",
 			fontLigatures: true,
 			colorDecorators: true,
 			readOnly: true,
 			readOnlyMessage: {
-				value: "Preview is read-only."
+				value: "This can't be edited."
 			}
 		})
 

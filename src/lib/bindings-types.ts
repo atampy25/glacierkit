@@ -185,7 +185,7 @@ new_entities: ([string, Ref, string, string, boolean])[] } } | { type: "searchRe
 /**
  * The IDs of the entities matching the query
  */
-results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_html: string } } | { type: "setTemplates"; data: { editor_id: string; templates: PastableTemplateCategory[] } } | { type: "setEditorConnectionAvailable"; data: { editor_id: string; editor_connection_available: boolean } } | { type: "setShowDiff"; data: { editor_id: string; show_diff: boolean } } | { type: "setDiffInfo"; data: { editor_id: string; diff_info: [string[], string[], ([string, string, Ref, string, boolean])[]] } }
+results: string[] } } | { type: "showHelpMenu"; data: { editor_id: string; factory: string; input_pins: string[]; output_pins: string[]; default_properties_json: string } } | { type: "setTemplates"; data: { editor_id: string; templates: PastableTemplateCategory[] } } | { type: "setEditorConnectionAvailable"; data: { editor_id: string; editor_connection_available: boolean } } | { type: "setShowDiff"; data: { editor_id: string; show_diff: boolean } } | { type: "setDiffInfo"; data: { editor_id: string; diff_info: [string[], string[], ([string, string, Ref, string, boolean])[]] } }
 
 export type EphemeralQNSettings = { showReverseParentRefs: boolean; showChangesFromOriginal: boolean }
 

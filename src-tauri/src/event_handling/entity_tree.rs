@@ -15,7 +15,6 @@ use quickentity_rs::{
 };
 use serde::Serialize;
 use serde_json::{from_value, json, to_value, Value};
-use syntect::{highlighting::ThemeSet, html::highlighted_html_for_string, parsing::SyntaxSet};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -1277,8 +1276,6 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 			String::from_utf8(buf)?
 		};
 
-		let ss = SyntaxSet::load_defaults_newlines();
-
 		send_request(
 			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
@@ -1287,14 +1284,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 					factory: sub_entity.factory.to_owned(),
 					input_pins: pins.0,
 					output_pins: pins.1,
-					default_properties_html: highlighted_html_for_string(
-						&properties_data_str,
-						&ss,
-						ss.find_syntax_by_extension("json").unwrap(),
-						&ThemeSet::load_from_reader(&mut BufReader::new(Cursor::new(include_bytes!(
-							"../../assets/vs-dark.tmTheme"
-						))))?
-					)?
+					default_properties_json: properties_data_str
 				}
 			)))
 		)?;

@@ -9,6 +9,8 @@
 	import { changeReferenceToLocalEntity, genRandHex, getReferencedLocalEntity } from "./utils"
 	import { clipboard } from "@tauri-apps/api"
 	import { trackEvent } from "@aptabase/tauri"
+	import HighlightMonaco from "./HighlightMonaco.svelte"
+	import { v4 } from "uuid"
 
 	export let editorID: string
 
@@ -43,7 +45,7 @@
 	let helpMenuFactory = ""
 	let helpMenuInputs: string[] = []
 	let helpMenuOutputs: string[] = []
-	let helpMenuDefaultPropertiesHTML = ""
+	let helpMenuDefaultPropertiesJSON = ""
 
 	let templates: PastableTemplateCategory[] = []
 
@@ -785,7 +787,7 @@
 				helpMenuFactory = request.data.factory
 				helpMenuInputs = request.data.input_pins
 				helpMenuOutputs = request.data.output_pins
-				helpMenuDefaultPropertiesHTML = request.data.default_properties_html
+				helpMenuDefaultPropertiesJSON = request.data.default_properties_json
 				helpMenuOpen = true
 				break
 
@@ -1140,11 +1142,11 @@
 <div id={elemID} class="flex-grow overflow-auto" />
 
 <Modal bind:open={helpMenuOpen} modalHeading="Help for {helpMenuFactory}" passiveModal>
-	<div class="grid grid-cols-2 gap-4">
-		<div>
+	<div class="grid grid-cols-2 gap-4 h-[70vh]">
+		<div class="flex flex-col gap-1">
 			<h2>Default properties</h2>
-			<div class="w-full overflow-x-auto rounded-sm bg-[#1e1e1e] p-2">
-				<code>{@html helpMenuDefaultPropertiesHTML}</code>
+			<div class="w-full flex-grow">
+				<HighlightMonaco id={v4()} content={helpMenuDefaultPropertiesJSON} />
 			</div>
 		</div>
 		<div>
