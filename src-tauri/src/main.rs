@@ -2996,6 +2996,19 @@ fn event(app: AppHandle, event: Event) {
 						GlobalEvent::SaveTab(tab) => {
 							let mut editor = app_state.editor_states.get_mut(&tab).context("No such editor")?;
 
+							let task = start_task(
+								&app,
+								format!(
+									"Saving {}",
+									editor
+										.file
+										.as_ref()
+										.and_then(|x| x.file_name())
+										.map(|x| x.to_string_lossy().to_string())
+										.unwrap_or("tab".into())
+								)
+							)?;
+
 							let data_to_save = match &editor.data {
 								EditorData::Nil => {
 									Err(anyhow!("Editor is a nil editor"))?;
@@ -3382,6 +3395,8 @@ fn event(app: AppHandle, event: Event) {
 													)?;
 												}
 											}
+
+											finish_task(&app, task)?;
 
 											return;
 										}
@@ -3784,6 +3799,8 @@ fn event(app: AppHandle, event: Event) {
 												}
 											}
 
+											finish_task(&app, task)?;
+
 											return;
 										}
 									}
@@ -3916,6 +3933,8 @@ fn event(app: AppHandle, event: Event) {
 									)?;
 								}
 							}
+
+							finish_task(&app, task)?;
 						}
 					},
 
