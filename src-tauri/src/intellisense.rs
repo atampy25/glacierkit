@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use itertools::Itertools;
 use quickentity_rs::{
 	qn_structs::{Entity, Ref, RefMaybeConstantValue, RefWithConstantValue},

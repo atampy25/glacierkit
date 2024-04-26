@@ -1,7 +1,4 @@
-use std::{
-	io::{BufReader, Cursor},
-	ops::Deref
-};
+use std::ops::Deref;
 
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
@@ -582,7 +579,7 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 	} = editor_state.data
 	{
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 				EntityTreeRequest::SetDiffInfo {
 					editor_id,
@@ -1141,7 +1138,7 @@ pub async fn handle_paste(
 	} = editor_state.data
 	{
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 				EntityTreeRequest::SetDiffInfo {
 					editor_id,
@@ -1907,7 +1904,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 	} = editor_state.data
 	{
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 				EntityTreeRequest::SetDiffInfo {
 					editor_id,
@@ -2114,7 +2111,7 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 	} = editor_state.data
 	{
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 				EntityTreeRequest::SetDiffInfo {
 					editor_id,
@@ -2294,7 +2291,7 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 	} = editor_state.data
 	{
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 				EntityTreeRequest::SetDiffInfo {
 					editor_id,
@@ -2474,7 +2471,7 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 	} = editor_state.data
 	{
 		send_request(
-			&app,
+			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
 				EntityTreeRequest::SetDiffInfo {
 					editor_id,

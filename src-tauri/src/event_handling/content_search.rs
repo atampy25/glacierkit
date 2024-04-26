@@ -10,7 +10,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend,
 use regex::bytes::Regex;
 use rpkg_rs::runtime::resource::runtime_resource_id::RuntimeResourceID;
 use serde::Serialize;
-use serde_json::{to_string, to_value, to_vec};
+use serde_json::{to_string, to_vec};
 use tauri::{AppHandle, Manager};
 use tonytools::hmlanguages;
 use tryvial::try_fn;
