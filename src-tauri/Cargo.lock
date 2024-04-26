@@ -210,6 +210,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
+ "tonytools",
  "trash",
  "tryvial",
  "uuid",
@@ -546,6 +547,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
+name = "bimap"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
+
+[[package]]
 name = "binrw"
 version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -570,10 +577,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-set"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0700ddab506f33b20a03b13996eccd309a48e5ff77d0d95926aa0210fb4e95f1"
+dependencies = [
+ "bit-vec",
+]
+
+[[package]]
+name = "bit-vec"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+
+[[package]]
 name = "bit_field"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc827186963e592360843fb5ba4b973e145841266c1357f7180c43526f2e5b61"
+
+[[package]]
+name = "bitchomp"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c59efba252574008d3d896b77ca6d1e880df54cda00029e055569e79e72c78af"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "bitfield-struct"
@@ -1746,6 +1777,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fancy-regex"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "531e46835a22af56d1e3b66f04844bed63158bc094a628bec1d321d9b4c44bf2"
+dependencies = [
+ "bit-set",
+ "regex-automata 0.4.6",
+ "regex-syntax 0.8.3",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2864,6 +2906,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "intel_tex_2"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "410e8e64fd296f11254dba8fccdc2ed35d8df41592fa96785ffc9877b6a9aaa5"
+dependencies = [
+ "ispc_rt",
+]
+
+[[package]]
 name = "interpolate_name"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2889,6 +2940,16 @@ dependencies = [
  "hermit-abi",
  "libc",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "ispc_rt"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8d30e08ddfd6fe26c3ee2e856dff022420cd0514ed16f5ccf2dc3e1d5cae578"
+dependencies = [
+ "libc",
+ "num_cpus",
 ]
 
 [[package]]
@@ -3207,6 +3268,15 @@ checksum = "57d27b317e207b10f69f5e75494119e391a96f48861ae870d1da6edac98ca900"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "lz4_flex"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75761162ae2b0e580d7e7c390558127e5f01b4194debd6221fd8c207fc80e3f5"
+dependencies = [
+ "twox-hash",
 ]
 
 [[package]]
@@ -3675,6 +3745,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "num"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3135b08af27d103b0a51f2ae0f8632117b7b185ccf931445affa8df530576a41"
+dependencies = [
+ "num-bigint",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3682,6 +3766,15 @@ checksum = "608e7659b5c3d7cba262d894801b9ec9d00de989e8a82bd4bef91d08da45cdc0"
 dependencies = [
  "autocfg",
  "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23c6602fda94a57c990fe0df199a035d83576b496aa29f4e634a8ac6004e68a6"
+dependencies = [
  "num-traits",
 ]
 
@@ -3708,6 +3801,17 @@ version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f"
 dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-iter"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d869c01cc0c455284163fd0092f1f93835385ccab5a98a0dcc497b2f8bf055a9"
+dependencies = [
+ "autocfg",
+ "num-integer",
  "num-traits",
 ]
 
@@ -4741,7 +4845,7 @@ dependencies = [
 
 [[package]]
 name = "rpkg-rs"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "binrw",
  "byteorder",
@@ -5878,6 +5982,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "texture2ddecoder"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54f0e5ca5dceb9b44d0f376de51782277c25fb42ffe1dad08d847f3a156d26d9"
+dependencies = [
+ "paste",
+]
+
+[[package]]
 name = "thin-slice"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6138,6 +6251,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonytools"
+version = "0.2.1"
+dependencies = [
+ "bimap",
+ "bitchomp",
+ "byteorder",
+ "crc32fast",
+ "extended-tea",
+ "fancy-regex",
+ "indexmap 2.2.6",
+ "intel_tex_2",
+ "lz4_flex",
+ "md5",
+ "num",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "texture2ddecoder",
+]
+
+[[package]]
 name = "tower-service"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6292,6 +6426,16 @@ dependencies = [
  "thiserror",
  "url",
  "utf-8",
+]
+
+[[package]]
+name = "twox-hash"
+version = "1.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
+dependencies = [
+ "cfg-if",
+ "static_assertions",
 ]
 
 [[package]]

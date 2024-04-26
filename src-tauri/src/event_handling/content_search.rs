@@ -1,19 +1,18 @@
-use std::{fs, time::Instant};
+use std::{ops::Deref, time::Instant};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
 use itertools::Itertools;
 use quickentity_rs::{convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn};
-use rayon::{
-	iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend, ParallelIterator},
-	ThreadPoolBuilder
-};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend, ParallelIterator};
 use regex::bytes::Regex;
 use rpkg_rs::runtime::resource::runtime_resource_id::RuntimeResourceID;
-use serde_json::{to_string, to_vec};
-use tauri::{api::path::app_data_dir, AppHandle, Manager};
+use serde::Serialize;
+use serde_json::{to_string, to_value, to_vec};
+use tauri::{AppHandle, Manager};
+use tonytools::hmlanguages;
 use tryvial::try_fn;
 use uuid::Uuid;
 
@@ -27,7 +26,7 @@ use crate::{
 		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
 		h3_convert_binary_to_factory
 	},
-	rpkg::convert_resource_info_to_rpkg_meta_no_hl,
+	rpkg::{convert_resource_info_to_rpkg_meta_no_hl, extract_latest_resource_no_hl},
 	send_request, start_task
 };
 
@@ -126,7 +125,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											};
 
 											let entity =
-												convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, true)
+												convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
 													.ok()?;
 
 											to_vec(&entity).ok()?
@@ -172,8 +171,8 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									}
 								}
 
-								"AIRG" | "RTLV" | "ATMD" | "VIDB" | "UICB" | "CPPT" | "CRMD" | "DSWB" | "WSWB"
-								| "GFXF" | "GIDX" | "WSGB" | "ECPB" | "ENUM" => {
+								"AIRG" | "ATMD" | "VIDB" | "UICB" | "CPPT" | "CRMD" | "DSWB" | "WSWB" | "GFXF"
+								| "GIDX" | "WSGB" | "ECPB" | "ENUM" => {
 									let s: Option<_> = try {
 										convert_generic_str(
 											&partition.get_resource(resource_id).ok()?,
@@ -213,6 +212,291 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 
 									if let Some(s) = s {
 										query.is_match(&s)
+									} else {
+										false
+									}
+								}
+
+								"CLNG" => {
+									let s: Option<_> = try {
+										let (res_meta, res_data) = (
+											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											partition.get_resource(resource_id).ok()?
+										);
+
+										let clng = hmlanguages::clng::CLNG::new(
+											match game_version {
+												GameVersion::H1 => tonytools::Version::H2016,
+												GameVersion::H2 => tonytools::Version::H2,
+												GameVersion::H3 => tonytools::Version::H3
+											},
+											match game_version {
+												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
+												GameVersion::H2 => {
+													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+												}
+												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+											}
+										)
+										.ok()?;
+
+										let mut buf = Vec::new();
+										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+										clng.convert(&res_data, to_string(&res_meta).ok()?)
+											.ok()?
+											.serialize(&mut ser)
+											.ok()?;
+
+										buf
+									};
+
+									if let Some(s) = s {
+										query.is_match(&s)
+									} else {
+										false
+									}
+								}
+
+								"DITL" => {
+									let s: Option<_> = try {
+										let (res_meta, res_data) = (
+											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											partition.get_resource(resource_id).ok()?
+										);
+
+										let ditl = hmlanguages::ditl::DITL::new(
+											app_state.tonytools_hash_list.load().as_ref()?.deref().to_owned()
+										)
+										.ok()?;
+
+										let mut buf = Vec::new();
+										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+										ditl.convert(&res_data, to_string(&res_meta).ok()?)
+											.ok()?
+											.serialize(&mut ser)
+											.ok()?;
+
+										buf
+									};
+
+									if let Some(s) = s {
+										query.is_match(&s)
+									} else {
+										false
+									}
+								}
+
+								"DLGE" => {
+									let s: Option<_> = try {
+										let (res_meta, res_data) = (
+											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											partition.get_resource(resource_id).ok()?
+										);
+
+										let dlge = hmlanguages::dlge::DLGE::new(
+											app_state.tonytools_hash_list.load().as_ref()?.deref().to_owned(),
+											match game_version {
+												GameVersion::H1 => tonytools::Version::H2016,
+												GameVersion::H2 => tonytools::Version::H2,
+												GameVersion::H3 => tonytools::Version::H3
+											},
+											match game_version {
+												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
+												GameVersion::H2 => {
+													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+												}
+												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+											},
+											None,
+											false
+										)
+										.ok()?;
+
+										let mut buf = Vec::new();
+										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+										dlge.convert(&res_data, to_string(&res_meta).ok()?)
+											.ok()?
+											.serialize(&mut ser)
+											.ok()?;
+
+										buf
+									};
+
+									if let Some(s) = s {
+										query.is_match(&s)
+									} else {
+										false
+									}
+								}
+
+								"LOCR" => {
+									let s: Option<_> = try {
+										let (res_meta, res_data) = (
+											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											partition.get_resource(resource_id).ok()?
+										);
+
+										let locr = hmlanguages::locr::LOCR::new(
+											app_state.tonytools_hash_list.load().as_ref()?.deref().to_owned(),
+											match game_version {
+												GameVersion::H1 => tonytools::Version::H2016,
+												GameVersion::H2 => tonytools::Version::H2,
+												GameVersion::H3 => tonytools::Version::H3
+											},
+											match game_version {
+												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
+												GameVersion::H2 => {
+													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+												}
+												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+											},
+											false
+										)
+										.ok()?;
+
+										let mut buf = Vec::new();
+										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+										locr.convert(&res_data, to_string(&res_meta).ok()?)
+											.ok()?
+											.serialize(&mut ser)
+											.ok()?;
+
+										buf
+									};
+
+									if let Some(s) = s {
+										query.is_match(&s)
+									} else {
+										false
+									}
+								}
+
+								"RTLV" => {
+									let s: Option<_> = try {
+										let (res_meta, res_data) = (
+											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											partition.get_resource(resource_id).ok()?
+										);
+
+										let rtlv = hmlanguages::rtlv::RTLV::new(
+											match game_version {
+												GameVersion::H1 => tonytools::Version::H2016,
+												GameVersion::H2 => tonytools::Version::H2,
+												GameVersion::H3 => tonytools::Version::H3
+											},
+											match game_version {
+												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
+												GameVersion::H2 => {
+													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+												}
+												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+											}
+										)
+										.ok()?;
+
+										let mut buf = Vec::new();
+										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+										rtlv.convert(&res_data, to_string(&res_meta).ok()?)
+											.ok()?
+											.serialize(&mut ser)
+											.ok()?;
+
+										buf
+									};
+
+									if let Some(s) = s {
+										query.is_match(&s)
+									} else {
+										false
+									}
+								}
+
+								"LINE" => {
+									let s: Option<_> = try {
+										let (res_meta, res_data) = (
+											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											partition.get_resource(resource_id).ok()?
+										);
+
+										let (locr_meta, locr_data) = extract_latest_resource_no_hl(
+											game_files,
+											&res_meta.hash_reference_data.first()?.hash
+										)
+										.ok()?;
+
+										let locr = hmlanguages::locr::LOCR::new(
+											app_state.tonytools_hash_list.load().as_ref()?.deref().to_owned(),
+											match game_version {
+												GameVersion::H1 => tonytools::Version::H2016,
+												GameVersion::H2 => tonytools::Version::H2,
+												GameVersion::H3 => tonytools::Version::H3
+											},
+											match game_version {
+												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
+												GameVersion::H2 => {
+													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+												}
+												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+											},
+											false
+										)
+										.ok()?;
+
+										let locr = locr.convert(&locr_data, to_string(&locr_meta).ok()?).ok()?;
+
+										let res_data: [u8; 5] = res_data.try_into().ok()?;
+
+										let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
+
+										let line_hash = format!("{:0>8X}", line_id);
+
+										let line_str = app_state
+											.tonytools_hash_list
+											.load()
+											.as_ref()?
+											.lines
+											.get_by_left(&line_id)
+											.cloned();
+
+										if let Some(line_str) = line_str {
+											locr.languages
+												.into_iter()
+												.filter_map(|(_, keys)| {
+													if let serde_json::Value::String(val) = keys.get(&line_str)? {
+														Some(val.to_owned())
+													} else {
+														None
+													}
+												})
+												.collect::<Vec<_>>()
+												.join("\n")
+										} else {
+											locr.languages
+												.into_iter()
+												.filter_map(|(_, keys)| {
+													if let serde_json::Value::String(val) = keys.get(&line_hash)? {
+														Some(val.to_owned())
+													} else {
+														None
+													}
+												})
+												.collect::<Vec<_>>()
+												.join("\n")
+										}
+									};
+
+									if let Some(s) = s {
+										query.is_match(s.as_bytes())
 									} else {
 										false
 									}

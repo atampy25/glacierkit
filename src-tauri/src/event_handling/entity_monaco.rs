@@ -195,6 +195,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 						&& let Some(install) = app_settings.load().game_install.as_ref()
 						&& let Some(repository) = app_state.repository.load().as_ref()
+						&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
 					{
 						let game_version = app_state
 							.game_installs
@@ -211,6 +212,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							repository,
 							hash_list,
 							game_version,
+							tonytools_hash_list,
 							entity.entities.get(&entity_id).context("No such entity")?,
 							entity
 						)?;

@@ -7,10 +7,12 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Error, Result};
+use arc_swap::ArcSwap;
 use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use indexmap::IndexMap;
+use itertools::Itertools;
 use quickentity_rs::{
 	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn, qn_structs::Property,
 	rt_structs::SEntityTemplatePropertyValue
@@ -303,6 +305,7 @@ pub struct EditorConnection {
 	events: broadcast::Sender<SDKEditorEvent>,
 	debounced_events: tokio::sync::mpsc::Sender<SDKEditorEvent>,
 	entity_tree_loaded: Arc<AtomicBool>,
+	entities_loaded: Arc<ArcSwap<Vec<(String, Option<String>)>>>,
 	app: AppHandle
 }
 
@@ -398,6 +401,7 @@ impl EditorConnection {
 			events: sender,
 			entity_tree_loaded: AtomicBool::new(false).into(),
 			debounced_events: tx,
+			entities_loaded: Arc::new(Arc::new(vec![]).into()),
 			app
 		}
 	}
@@ -516,12 +520,44 @@ impl EditorConnection {
 
 			let debounced_events = self.debounced_events.clone();
 
+			let sender = self.sender.clone();
+
+			let entities_loaded = self.entities_loaded.clone();
+
 			spawn(async move {
 				loop {
 					if let Ok(evt) = receiver.recv().await {
 						match evt {
 							SDKEditorEvent::EntityTreeRebuilt => {
 								entity_tree_loaded.store(true, Ordering::SeqCst);
+
+								sender
+									.lock()
+									.await
+									.as_mut()
+									.expect("Not connected")
+									.send(Message::Text(
+										serde_json::to_string(&SDKEditorRequest::ListEntities {
+											editorOnly: false,
+											msgId: None
+										})
+										.expect("Couldn't serialise")
+									))
+									.await
+									.expect("Couldn't send ListEntities request");
+							}
+
+							SDKEditorEvent::EntityList { entities, .. } => {
+								entities_loaded.store(
+									entities
+										.into_iter()
+										.map(|x| match x {
+											EntityBaseDetails::Game { id, tblu } => (id, Some(tblu)),
+											EntityBaseDetails::Editor { id } => (id, None)
+										})
+										.collect_vec()
+										.into()
+								);
 							}
 
 							SDKEditorEvent::SceneClearing { .. } | SDKEditorEvent::SceneLoading { .. } => {
@@ -669,13 +705,20 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't select entity {:?}", entity_id)]
 	pub async fn select_entity(&self, entity_id: &str, tblu: &str) -> Result<()> {
-		self.send_request(SDKEditorRequest::SelectEntity {
-			entity: EntitySelector::Game {
-				id: entity_id.to_owned(),
-				tblu: tblu.to_owned()
-			}
-		})
-		.await?;
+		if self
+			.entities_loaded
+			.load()
+			.iter()
+			.any(|(x, y)| x == entity_id && y.as_deref() == Some(tblu))
+		{
+			self.send_request(SDKEditorRequest::SelectEntity {
+				entity: EntitySelector::Game {
+					id: entity_id.to_owned(),
+					tblu: tblu.to_owned()
+				}
+			})
+			.await?;
+		}
 	}
 
 	#[try_fn]
@@ -759,45 +802,59 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't set property {property} on {entity_id}")]
 	pub async fn set_property(&self, entity_id: &str, tblu: &str, property: &str, value: PropertyValue) -> Result<()> {
-		self.send_request(SDKEditorRequest::SetEntityProperty {
-			entity: EntitySelector::Game {
-				id: entity_id.to_owned(),
-				tblu: tblu.to_owned()
-			},
-			property: property
-				.parse()
-				.map(PropertyID::Unknown)
-				.unwrap_or(PropertyID::Known(property.to_owned())),
-			value: convert_qn_property_value_to_rt(
-				&Property {
-					property_type: value.property_type,
-					value: value.data,
-					post_init: None
+		if self
+			.entities_loaded
+			.load()
+			.iter()
+			.any(|(x, y)| x == entity_id && y.as_deref() == Some(tblu))
+		{
+			self.send_request(SDKEditorRequest::SetEntityProperty {
+				entity: EntitySelector::Game {
+					id: entity_id.to_owned(),
+					tblu: tblu.to_owned()
 				},
-				&Default::default(),
-				&Default::default(),
-				&Default::default(),
-				&Default::default()
-			)
-			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-		})
-		.await?;
+				property: property
+					.parse()
+					.map(PropertyID::Unknown)
+					.unwrap_or(PropertyID::Known(property.to_owned())),
+				value: convert_qn_property_value_to_rt(
+					&Property {
+						property_type: value.property_type,
+						value: value.data,
+						post_init: None
+					},
+					&Default::default(),
+					&Default::default(),
+					&Default::default(),
+					&Default::default()
+				)
+				.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+			})
+			.await?;
+		}
 	}
 
 	#[try_fn]
 	#[context("Couldn't signal pin {pin} on {entity_id}")]
 	pub async fn signal_pin(&self, entity_id: &str, tblu: &str, pin: &str, output: bool) -> Result<()> {
-		self.send_request(SDKEditorRequest::SignalEntityPin {
-			entity: EntitySelector::Game {
-				id: entity_id.to_owned(),
-				tblu: tblu.to_owned()
-			},
-			pin: pin
-				.parse()
-				.map(PropertyID::Unknown)
-				.unwrap_or(PropertyID::Known(pin.to_owned())),
-			output
-		})
-		.await?;
+		if self
+			.entities_loaded
+			.load()
+			.iter()
+			.any(|(x, y)| x == entity_id && y.as_deref() == Some(tblu))
+		{
+			self.send_request(SDKEditorRequest::SignalEntityPin {
+				entity: EntitySelector::Game {
+					id: entity_id.to_owned(),
+					tblu: tblu.to_owned()
+				},
+				pin: pin
+					.parse()
+					.map(PropertyID::Unknown)
+					.unwrap_or(PropertyID::Known(pin.to_owned())),
+				output
+			})
+			.await?;
+		}
 	}
 }

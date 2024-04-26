@@ -73,6 +73,7 @@ serde_path_to_error = "0.1.16"
 debounced = "0.1.0"
 notify-debouncer-full = "0.3.1"
 tokio-stream = "0.1.15"
+tonytools = { path = "../../tonytools-rs" }
 
 [target.'cfg(linux)'.dependencies]
 fork = "0.1.22"

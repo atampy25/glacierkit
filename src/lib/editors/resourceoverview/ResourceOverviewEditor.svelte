@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ResourceOverviewData, ResourceOverviewRequest } from "$lib/bindings-types"
 	import { event } from "$lib/utils"
-	import { Button } from "carbon-components-svelte"
+	import { Button, DataTable } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
@@ -18,7 +18,7 @@
 	let filetype = ""
 	let chunk = ""
 	let pathOrHint: string | null = null
-	let dependencies: [string, string, string | null, string][] = []
+	let dependencies: [string, string, string | null, string, boolean][] = []
 	let reverseDependencies: [string, string, string | null][] = []
 	let data: ResourceOverviewData | null = null
 
@@ -730,6 +730,119 @@
 					}}>Extract file</Button
 				>
 			</div>
+		{:else if data.type === "HMLanguages"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4 h-[30vh]">
+				<Monaco id={v4()} content={data.data.json} />
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract HMLanguages file as JSON", { filetype })
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsHMLanguages",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract as JSON</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract HMLanguages file as binary", { filetype })
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+		{:else if data.type === "LocalisedLine"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4 w-[30rem] max-h-[30vh] overflow-y-auto">
+				<DataTable
+					headers={[
+						{ key: "lang", value: "Language", width: "8rem" },
+						{ key: "val", value: "String" }
+					]}
+					rows={data.data.languages.map(([lang, val], ind) => ({ id: ind, lang, val }))}
+				/>
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract generic file", { hash, filetype })
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
 		{:else}
 			<div class="text-2xl mb-2 font-bold break-all">
 				{pathOrHint || "No path"}
@@ -776,7 +889,7 @@
 			<div class="flex flex-col">
 				<h4 class="mb-1">Dependencies</h4>
 				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
-					{#each dependencies as [hash, type, path, flag]}
+					{#each dependencies as [hash, type, path, flag, inGame]}
 						{#if type}
 							<div
 								class="bg-[#303030] p-3 cursor-pointer"
@@ -821,6 +934,9 @@
 									{flag}</div
 								>
 								<div class="break-all">{path || "No path"}</div>
+								{#if !inGame}
+									<div class="text-base">Not present in game files</div>
+								{/if}
 							</div>
 						{:else}
 							<div class="bg-[#303030] p-3">
@@ -829,6 +945,9 @@
 									{flag}</div
 								>
 								<div class="break-all">Unknown resource</div>
+								{#if !inGame}
+									<div class="text-base">Not present in game files</div>
+								{/if}
 							</div>
 						{/if}
 					{/each}

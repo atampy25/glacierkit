@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::{Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
@@ -10,8 +11,9 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Value};
+use serde_json::{from_value, to_string, Value};
 use specta::Type;
+use tonytools::hmlanguages;
 use tryvial::try_fn;
 use velcro::vec;
 
@@ -632,6 +634,88 @@ pub fn get_ref_decoration(
 }
 
 #[try_fn]
+#[context("Couldn't get decoration for LINE {}", line)]
+pub fn get_line_decoration(
+	game_files: &PartitionManager,
+	hash_list: &HashList,
+	game_version: GameVersion,
+	tonytools_hash_list: &tonytools::hashlist::HashList,
+	line: &str
+) -> Result<String> {
+	let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, line)?;
+
+	let (locr_meta, locr_data) = extract_latest_resource(
+		game_files,
+		hash_list,
+		&res_meta
+			.hash_reference_data
+			.first()
+			.context("No LOCR dependency on LINE")?
+			.hash
+	)?;
+
+	let locr = hmlanguages::locr::LOCR::new(
+		tonytools_hash_list.to_owned(),
+		match game_version {
+			GameVersion::H1 => tonytools::Version::H2016,
+			GameVersion::H2 => tonytools::Version::H2,
+			GameVersion::H3 => tonytools::Version::H3
+		},
+		match game_version {
+			GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
+			GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
+			GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+		},
+		false
+	)
+	.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+	let locr = locr
+		.convert(&locr_data, to_string(&locr_meta)?)
+		.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+	let res_data: [u8; 5] = res_data.try_into().ok().context("Couldn't read LINE data as u32")?;
+
+	let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
+
+	let line_hash = format!("{:0>8X}", line_id);
+
+	let line_str = tonytools_hash_list.lines.get_by_left(&line_id).cloned();
+
+	if let Some(line_str) = line_str {
+		locr.languages
+			.get("en")
+			.context("No en key in LOCR")?
+			.get(&line_str)
+			.unwrap_or(
+				locr.languages
+					.get("xx")
+					.context("No xx key in LOCR")?
+					.get(&line_str)
+					.context("No value in xx for key")?
+			)
+			.as_str()
+			.context("LOCR key was not string")?
+			.to_owned()
+	} else {
+		locr.languages
+			.get("en")
+			.context("No en key in LOCR")?
+			.get(&line_hash)
+			.unwrap_or(
+				locr.languages
+					.get("xx")
+					.context("No xx key in LOCR")?
+					.get(&line_hash)
+					.context("No value in xx for key")?
+			)
+			.as_str()
+			.context("LOCR key was not string")?
+			.to_owned()
+	}
+}
+
+#[try_fn]
 #[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
 pub fn get_decorations(
 	game_files: &PartitionManager,
@@ -639,6 +723,7 @@ pub fn get_decorations(
 	repository: &[RepositoryItem],
 	hash_list: &HashList,
 	game_version: GameVersion,
+	tonytools_hash_list: &tonytools::hashlist::HashList,
 	sub_entity: &SubEntity,
 	entity: &Entity
 ) -> Result<Vec<(String, String)>> {
@@ -730,7 +815,14 @@ pub fn get_decorations(
 				""
 			};
 
-			if res.starts_with('0') {
+			if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+				&& entry.resource_type == "LINE"
+			{
+				decorations.push((
+					res.to_owned(),
+					get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+				));
+			} else if res.starts_with('0') {
 				if let Some(entry) = hash_list.entries.get(res) {
 					if let Some(hint) = entry.hint.as_ref() {
 						decorations.push((res.to_owned(), hint.to_owned()));
@@ -752,7 +844,14 @@ pub fn get_decorations(
 					""
 				};
 
-				if res.starts_with('0') {
+				if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+					&& entry.resource_type == "LINE"
+				{
+					decorations.push((
+						res.to_owned(),
+						get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+					));
+				} else if res.starts_with('0') {
 					if let Some(entry) = hash_list.entries.get(res) {
 						if let Some(hint) = entry.hint.as_ref() {
 							decorations.push((res.to_owned(), hint.to_owned()));
@@ -827,7 +926,14 @@ pub fn get_decorations(
 					""
 				};
 
-				if res.starts_with('0') {
+				if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+					&& entry.resource_type == "LINE"
+				{
+					decorations.push((
+						res.to_owned(),
+						get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+					));
+				} else if res.starts_with('0') {
 					if let Some(entry) = hash_list.entries.get(res) {
 						if let Some(hint) = entry.hint.as_ref() {
 							decorations.push((res.to_owned(), hint.to_owned()));
@@ -849,7 +955,14 @@ pub fn get_decorations(
 						""
 					};
 
-					if res.starts_with('0') {
+					if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+						&& entry.resource_type == "LINE"
+					{
+						decorations.push((
+							res.to_owned(),
+							get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+						));
+					} else if res.starts_with('0') {
 						if let Some(entry) = hash_list.entries.get(res) {
 							if let Some(hint) = entry.hint.as_ref() {
 								decorations.push((res.to_owned(), hint.to_owned()));

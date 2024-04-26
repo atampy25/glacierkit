@@ -26,6 +26,7 @@
 	let searchRL = false
 	let searchText = false
 	let searchQN = false
+	let searchLocalisation = false
 </script>
 
 <div class="w-full h-full p-2">
@@ -39,9 +40,10 @@
 			<div class="mb-3"><Search placeholder="Search query (supports regex)" size="lg" bind:value={searchQuery} /></div>
 			<div class="mb-4">
 				<Checkbox labelText="Search entities" bind:checked={searchEntities} />
+				<Checkbox labelText="Use QuickEntity format" bind:checked={searchQN} />
 				<Checkbox labelText="Search ResourceLib types" bind:checked={searchRL} />
 				<Checkbox labelText="Search textual files (JSON, REPO, ORES)" bind:checked={searchText} />
-				<Checkbox labelText="Use QuickEntity format" bind:checked={searchQN} />
+				<Checkbox labelText="Search localisation" bind:checked={searchLocalisation} />
 			</div>
 			<Button
 				icon={SearchIcon}
@@ -55,6 +57,8 @@
 					if (searchRL) searchTypes.push("AIRG", "RTLV", "ATMD", "VIDB", "UICB", "CPPT", "CBLU", "CRMD", "DSWB", "WSWB", "GFXF", "GIDX", "WSGB", "ECPB", "ENUM")
 
 					if (searchText) searchTypes.push("JSON", "REPO", "ORES")
+
+					if (searchLocalisation) searchTypes.push("CLNG", "DITL", "DLGE", "LOCR", "RTLV", "LINE")
 
 					await event({
 						type: "tool",

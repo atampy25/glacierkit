@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
@@ -58,14 +58,7 @@ pub struct Intellisense {
 
 	pub matt_properties: Arc<DashMap<String, Vec<MaterialProperty>>>,
 
-	pub all_cppts: HashSet<String>,
-	pub all_asets: HashSet<String>,
-	pub all_uicts: HashSet<String>,
-	pub all_matts: HashSet<String>,
-	pub all_wswts: HashSet<String>,
-	pub all_ecpts: HashSet<String>,
-	pub all_aibxs: HashSet<String>,
-	pub all_wsgts: HashSet<String>
+	pub file_types: HashMap<String, String>
 }
 
 impl Intellisense {
@@ -448,7 +441,9 @@ impl Intellisense {
 
 				found.extend(
 					{
-						if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
+						if let Some(ty) = self.file_types.get(&normalise_to_hash(targeted.factory.to_owned()))
+							&& ty == "ASET"
+						{
 							extract_latest_metadata(
 								game_files,
 								hash_list,
@@ -470,312 +465,346 @@ impl Intellisense {
 						Ok({
 							let mut found = vec![];
 
-							if self.all_cppts.contains(&factory) {
-								for (prop_name, (prop_type, default_val)) in
-									self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
-								{
-									found.push((prop_name, prop_type, default_val, false));
-								}
-							} else if self.all_uicts.contains(&factory) {
-								// All UI controls have the properties of ZUIControlEntity
-								for (prop_name, (prop_type, default_val)) in
-									self.get_cppt_properties(game_files, hash_list, game_version, "002C4526CC9753E6")?
-								{
-									found.push((prop_name, prop_type, default_val, false));
-								}
-
-								for entry in convert_uicb(
-									&extract_latest_resource(
-										game_files,
-										hash_list,
-										&extract_latest_metadata(game_files, hash_list, &factory)?
-											.hash_reference_data
-											.into_iter()
-											.find(|x| {
-												hash_list
-													.entries
-													.get(&normalise_to_hash(x.hash.to_owned()))
-													.map(|entry| entry.resource_type == "UICB")
-													.unwrap_or(false)
-											})
-											.context("No blueprint dependency on UICT")?
-											.hash
-									)?
-									.1
-								)?
-								.m_aAttributes
-								{
-									// Property
-									if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
-										let prop_type = self
-											.uicb_prop_types
-											.get(to_value(entry.m_eType)?.as_str().unwrap())
-											.context("Unknown UICB property type")?;
-
-										// We can't get the actual default values, if there are any, so we just use sensible defaults
-										found.push((
-											entry.m_sName,
-											prop_type.into(),
-											match prop_type.as_ref() {
-												"int32" => to_value(0)?,
-												"float32" => to_value(0)?,
-												"ZString" => to_value("")?,
-												"bool" => to_value(false)?,
-												_ => Value::Null
-											},
-											false
-										));
+							if let Some(ty) = self.file_types.get(&factory) {
+								match ty.as_ref() {
+									"CPPT" => {
+										for (prop_name, (prop_type, default_val)) in
+											self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
+										{
+											found.push((prop_name, prop_type, default_val, false));
+										}
 									}
-								}
-							} else if self.all_matts.contains(&factory) {
-								// All materials have the properties of ZRenderMaterialEntity
-								for (prop_name, (prop_type, default_val)) in
-									self.get_cppt_properties(game_files, hash_list, game_version, "00B4B11DA327CAD0")?
-								{
-									found.push((prop_name, prop_type, default_val, false));
-								}
 
-								for property in self.get_matt_properties(game_files, hash_list, &factory)? {
-									match property.data {
-										MaterialPropertyData::Texture(texture) => {
-											found.push((
-												property.name.to_owned(),
-												"ZRuntimeResourceID".into(),
-												texture
-													.map(|texture| {
-														json!({
-															"resource": texture,
-															"flag": "5F"
-														})
+									"UICT" => {
+										// All UI controls have the properties of ZUIControlEntity
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											"002C4526CC9753E6"
+										)? {
+											found.push((prop_name, prop_type, default_val, false));
+										}
+
+										for entry in convert_uicb(
+											&extract_latest_resource(
+												game_files,
+												hash_list,
+												&extract_latest_metadata(game_files, hash_list, &factory)?
+													.hash_reference_data
+													.into_iter()
+													.find(|x| {
+														hash_list
+															.entries
+															.get(&normalise_to_hash(x.hash.to_owned()))
+															.map(|entry| entry.resource_type == "UICB")
+															.unwrap_or(false)
 													})
-													.unwrap_or(Value::Null),
-												false
-											));
+													.context("No blueprint dependency on UICT")?
+													.hash
+											)?
+											.1
+										)?
+										.m_aAttributes
+										{
+											// Property
+											if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
+												let prop_type = self
+													.uicb_prop_types
+													.get(to_value(entry.m_eType)?.as_str().unwrap())
+													.context("Unknown UICB property type")?;
 
-											found.push((
-												format!("{}_enab", property.name),
-												"bool".into(),
-												json!(false),
-												false
-											));
+												// We can't get the actual default values, if there are any, so we just use sensible defaults
+												found.push((
+													entry.m_sName,
+													prop_type.into(),
+													match prop_type.as_ref() {
+														"int32" => to_value(0)?,
+														"float32" => to_value(0)?,
+														"ZString" => to_value("")?,
+														"bool" => to_value(false)?,
+														_ => Value::Null
+													},
+													false
+												));
+											}
+										}
+									}
 
-											found.push((
-												format!("{}_dest", property.name),
-												"SEntityTemplateReference".into(),
-												Value::Null,
-												false
-											));
+									"MATT" => {
+										// All materials have the properties of ZRenderMaterialEntity
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											"00B4B11DA327CAD0"
+										)? {
+											found.push((prop_name, prop_type, default_val, false));
 										}
 
-										MaterialPropertyData::ColorRGB(r, g, b) => {
-											found.push((
-												property.name.to_owned(),
-												"SColorRGB".into(),
-												to_value(format!(
-													"#{:0>2x}{:0>2x}{:0>2x}",
-													(r * 255.0).round() as u8,
-													(g * 255.0).round() as u8,
-													(b * 255.0).round() as u8
-												))?,
-												false
-											));
+										for property in self.get_matt_properties(game_files, hash_list, &factory)? {
+											match property.data {
+												MaterialPropertyData::Texture(texture) => {
+													found.push((
+														property.name.to_owned(),
+														"ZRuntimeResourceID".into(),
+														texture
+															.map(|texture| {
+																json!({
+																	"resource": texture,
+																	"flag": "5F"
+																})
+															})
+															.unwrap_or(Value::Null),
+														false
+													));
 
-											found.push((
-												format!("{}_op", property.name),
-												"IRenderMaterialEntity.EModifierOperation".into(),
-												to_value("eLeave")?,
-												false
-											));
+													found.push((
+														format!("{}_enab", property.name),
+														"bool".into(),
+														json!(false),
+														false
+													));
+
+													found.push((
+														format!("{}_dest", property.name),
+														"SEntityTemplateReference".into(),
+														Value::Null,
+														false
+													));
+												}
+
+												MaterialPropertyData::ColorRGB(r, g, b) => {
+													found.push((
+														property.name.to_owned(),
+														"SColorRGB".into(),
+														to_value(format!(
+															"#{:0>2x}{:0>2x}{:0>2x}",
+															(r * 255.0).round() as u8,
+															(g * 255.0).round() as u8,
+															(b * 255.0).round() as u8
+														))?,
+														false
+													));
+
+													found.push((
+														format!("{}_op", property.name),
+														"IRenderMaterialEntity.EModifierOperation".into(),
+														to_value("eLeave")?,
+														false
+													));
+												}
+
+												MaterialPropertyData::ColorRGBA(r, g, b, a) => {
+													found.push((
+														property.name.to_owned(),
+														"SColorRGBA".into(),
+														to_value(format!(
+															"#{:0>2x}{:0>2x}{:0>2x}{:0>2x}",
+															(r * 255.0).round() as u8,
+															(g * 255.0).round() as u8,
+															(b * 255.0).round() as u8,
+															(a * 255.0).round() as u8
+														))?,
+														false
+													));
+
+													found.push((
+														format!("{}_op", property.name),
+														"IRenderMaterialEntity.EModifierOperation".into(),
+														to_value("eLeave")?,
+														false
+													));
+												}
+
+												MaterialPropertyData::Float(val) => {
+													found.push((
+														property.name.to_owned(),
+														"float32".into(),
+														to_value(val)?,
+														false
+													));
+
+													found.push((
+														format!("{}_op", property.name),
+														"IRenderMaterialEntity.EModifierOperation".into(),
+														to_value("eLeave")?,
+														false
+													));
+												}
+
+												MaterialPropertyData::Vector2(x, y) => {
+													found.push((
+														property.name.to_owned(),
+														"SVector2".into(),
+														json!({
+															"x": x,
+															"y": y
+														}),
+														false
+													));
+
+													found.push((
+														format!("{}_op", property.name),
+														"IRenderMaterialEntity.EModifierOperation".into(),
+														to_value("eLeave")?,
+														false
+													));
+												}
+
+												MaterialPropertyData::Vector3(x, y, z) => {
+													found.push((
+														property.name.to_owned(),
+														"SVector3".into(),
+														json!({
+															"x": x,
+															"y": y,
+															"z": z
+														}),
+														false
+													));
+
+													found.push((
+														format!("{}_op", property.name),
+														"IRenderMaterialEntity.EModifierOperation".into(),
+														to_value("eLeave")?,
+														false
+													));
+												}
+
+												MaterialPropertyData::Vector4(x, y, z, w) => {
+													found.push((
+														property.name.to_owned(),
+														"SVector4".into(),
+														json!({
+															"x": x,
+															"y": y,
+															"z": z,
+															"w": w
+														}),
+														false
+													));
+
+													found.push((
+														format!("{}_op", property.name),
+														"IRenderMaterialEntity.EModifierOperation".into(),
+														to_value("eLeave")?,
+														false
+													));
+												}
+											}
+										}
+									}
+
+									"WSWT" => {
+										// All switch groups have the properties of ZAudioSwitchEntity
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											"00797DC916520C4D"
+										)? {
+											found.push((prop_name, prop_type, default_val, false));
+										}
+									}
+
+									"ECPT" => {
+										// All extended CPP entities have the properties of ZMaterialOverwriteAspect
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											"00D3003AAA7B3817"
+										)? {
+											found.push((prop_name, prop_type, default_val, false));
 										}
 
-										MaterialPropertyData::ColorRGBA(r, g, b, a) => {
-											found.push((
-												property.name.to_owned(),
-												"SColorRGBA".into(),
-												to_value(format!(
-													"#{:0>2x}{:0>2x}{:0>2x}{:0>2x}",
-													(r * 255.0).round() as u8,
-													(g * 255.0).round() as u8,
-													(b * 255.0).round() as u8,
-													(a * 255.0).round() as u8
-												))?,
-												false
-											));
+										let ecpb_data = extract_latest_resource(
+											game_files,
+											hash_list,
+											&extract_latest_metadata(game_files, hash_list, &factory)?
+												.hash_reference_data
+												.into_iter()
+												.find(|x| {
+													hash_list
+														.entries
+														.get(&normalise_to_hash(x.hash.to_owned()))
+														.map(|entry| entry.resource_type == "ECPB")
+														.unwrap_or(false)
+												})
+												.context("No blueprint dependency on ECPT")?
+												.hash
+										)?
+										.1;
 
-											found.push((
-												format!("{}_op", property.name),
-												"IRenderMaterialEntity.EModifierOperation".into(),
-												to_value("eLeave")?,
-												false
-											));
-										}
+										let ecpb_data = match game_version {
+											GameVersion::H1 => h2016_convert_ecpb(&ecpb_data)?,
+											GameVersion::H2 => h2_convert_ecpb(&ecpb_data)?,
+											GameVersion::H3 => h3_convert_ecpb(&ecpb_data)?
+										};
 
-										MaterialPropertyData::Float(val) => {
+										for entry in ecpb_data.properties {
 											found.push((
-												property.name.to_owned(),
-												"float32".into(),
-												to_value(val)?,
-												false
-											));
-
-											found.push((
-												format!("{}_op", property.name),
-												"IRenderMaterialEntity.EModifierOperation".into(),
-												to_value("eLeave")?,
-												false
-											));
-										}
-
-										MaterialPropertyData::Vector2(x, y) => {
-											found.push((
-												property.name.to_owned(),
-												"SVector2".into(),
-												json!({
-													"x": x,
-													"y": y
-												}),
-												false
-											));
-
-											found.push((
-												format!("{}_op", property.name),
-												"IRenderMaterialEntity.EModifierOperation".into(),
-												to_value("eLeave")?,
-												false
-											));
-										}
-
-										MaterialPropertyData::Vector3(x, y, z) => {
-											found.push((
-												property.name.to_owned(),
-												"SVector3".into(),
-												json!({
-													"x": x,
-													"y": y,
-													"z": z
-												}),
-												false
-											));
-
-											found.push((
-												format!("{}_op", property.name),
-												"IRenderMaterialEntity.EModifierOperation".into(),
-												to_value("eLeave")?,
-												false
-											));
-										}
-
-										MaterialPropertyData::Vector4(x, y, z, w) => {
-											found.push((
-												property.name.to_owned(),
-												"SVector4".into(),
-												json!({
-													"x": x,
-													"y": y,
-													"z": z,
-													"w": w
-												}),
-												false
-											));
-
-											found.push((
-												format!("{}_op", property.name),
-												"IRenderMaterialEntity.EModifierOperation".into(),
-												to_value("eLeave")?,
+												entry.property_name,
+												match entry.property_type {
+													EExtendedPropertyType::TYPE_RESOURCEPTR => "ZRuntimeResourceID",
+													EExtendedPropertyType::TYPE_INT32 => "int32",
+													EExtendedPropertyType::TYPE_UINT32 => "uint32",
+													EExtendedPropertyType::TYPE_FLOAT => "float32",
+													EExtendedPropertyType::TYPE_STRING => "ZString",
+													EExtendedPropertyType::TYPE_BOOL => "bool",
+													EExtendedPropertyType::TYPE_ENTITYREF => "SEntityTemplateReference",
+													EExtendedPropertyType::TYPE_VARIANT => "ZVariant"
+												}
+												.into(),
+												match entry.property_type {
+													EExtendedPropertyType::TYPE_RESOURCEPTR => Value::Null,
+													EExtendedPropertyType::TYPE_INT32 => to_value(0)?,
+													EExtendedPropertyType::TYPE_UINT32 => to_value(0)?,
+													EExtendedPropertyType::TYPE_FLOAT => to_value(0)?,
+													EExtendedPropertyType::TYPE_STRING => Value::String("".into()),
+													EExtendedPropertyType::TYPE_BOOL => Value::Bool(false),
+													EExtendedPropertyType::TYPE_ENTITYREF => Value::Null,
+													EExtendedPropertyType::TYPE_VARIANT => Value::Null
+												},
 												false
 											));
 										}
 									}
-								}
-							} else if self.all_wswts.contains(&factory) {
-								// All switch groups have the properties of ZAudioSwitchEntity
-								for (prop_name, (prop_type, default_val)) in
-									self.get_cppt_properties(game_files, hash_list, game_version, "00797DC916520C4D")?
-								{
-									found.push((prop_name, prop_type, default_val, false));
-								}
-							} else if self.all_ecpts.contains(&factory) {
-								// All extended CPP entities have the properties of ZMaterialOverwriteAspect
-								for (prop_name, (prop_type, default_val)) in
-									self.get_cppt_properties(game_files, hash_list, game_version, "00D3003AAA7B3817")?
-								{
-									found.push((prop_name, prop_type, default_val, false));
-								}
 
-								let ecpb_data = extract_latest_resource(
-									game_files,
-									hash_list,
-									&extract_latest_metadata(game_files, hash_list, &factory)?
-										.hash_reference_data
-										.into_iter()
-										.find(|x| {
-											hash_list
-												.entries
-												.get(&normalise_to_hash(x.hash.to_owned()))
-												.map(|entry| entry.resource_type == "ECPB")
-												.unwrap_or(false)
-										})
-										.context("No blueprint dependency on ECPT")?
-										.hash
-								)?
-								.1;
-
-								let ecpb_data = match game_version {
-									GameVersion::H1 => h2016_convert_ecpb(&ecpb_data)?,
-									GameVersion::H2 => h2_convert_ecpb(&ecpb_data)?,
-									GameVersion::H3 => h3_convert_ecpb(&ecpb_data)?
-								};
-
-								for entry in ecpb_data.properties {
-									found.push((
-										entry.property_name,
-										match entry.property_type {
-											EExtendedPropertyType::TYPE_RESOURCEPTR => "ZRuntimeResourceID",
-											EExtendedPropertyType::TYPE_INT32 => "int32",
-											EExtendedPropertyType::TYPE_UINT32 => "uint32",
-											EExtendedPropertyType::TYPE_FLOAT => "float32",
-											EExtendedPropertyType::TYPE_STRING => "ZString",
-											EExtendedPropertyType::TYPE_BOOL => "bool",
-											EExtendedPropertyType::TYPE_ENTITYREF => "SEntityTemplateReference",
-											EExtendedPropertyType::TYPE_VARIANT => "ZVariant"
+									"AIBX" => {
+										// All behaviour trees have the properties of ZBehaviorTreeEntity
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											"0028607138892D70"
+										)? {
+											found.push((prop_name, prop_type, default_val, false));
 										}
-										.into(),
-										match entry.property_type {
-											EExtendedPropertyType::TYPE_RESOURCEPTR => Value::Null,
-											EExtendedPropertyType::TYPE_INT32 => to_value(0)?,
-											EExtendedPropertyType::TYPE_UINT32 => to_value(0)?,
-											EExtendedPropertyType::TYPE_FLOAT => to_value(0)?,
-											EExtendedPropertyType::TYPE_STRING => Value::String("".into()),
-											EExtendedPropertyType::TYPE_BOOL => Value::Bool(false),
-											EExtendedPropertyType::TYPE_ENTITYREF => Value::Null,
-											EExtendedPropertyType::TYPE_VARIANT => Value::Null
-										},
-										false
-									));
-								}
-							} else if self.all_aibxs.contains(&factory) {
-								// All behaviour trees have the properties of ZBehaviorTreeEntity
-								for (prop_name, (prop_type, default_val)) in
-									self.get_cppt_properties(game_files, hash_list, game_version, "0028607138892D70")?
-								{
-									found.push((prop_name, prop_type, default_val, false));
-								}
-							} else if self.all_wsgts.contains(&factory) {
-								// All state groups have the properties of ZAudioStateEntity
-								for (prop_name, (prop_type, default_val)) in
-									self.get_cppt_properties(game_files, hash_list, game_version, "000D409686293996")?
-								{
-									found.push((prop_name, prop_type, default_val, false));
-								}
-							} else {
-								match ensure_entity_in_cache(
-									game_files,
-									cached_entities,
-									game_version,
-									hash_list,
-									&normalise_to_hash(factory.to_owned())
-								) {
-									Ok(_) => {
+									}
+
+									"WSGT" => {
+										// All state groups have the properties of ZAudioStateEntity
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											"000D409686293996"
+										)? {
+											found.push((prop_name, prop_type, default_val, false));
+										}
+									}
+
+									"TEMP" => {
+										ensure_entity_in_cache(
+											game_files,
+											cached_entities,
+											game_version,
+											hash_list,
+											&normalise_to_hash(factory.to_owned())
+										)?;
+
 										let extracted = cached_entities
 											.get(&normalise_to_hash(factory.to_owned()))
 											.expect("Ensured");
@@ -791,13 +820,7 @@ impl Intellisense {
 										)?);
 									}
 
-									Err(e)
-										if format!("{:?}", e)
-											.contains("Couldn't find the resource in any partition") => {}
-
-									x => {
-										x?;
-									}
+									_ => bail!("Unknown factory type")
 								}
 							}
 
@@ -875,7 +898,9 @@ impl Intellisense {
 			)));
 		}
 
-		for factory in if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
+		for factory in if let Some(ty) = self.file_types.get(&normalise_to_hash(targeted.factory.to_owned()))
+			&& ty == "ASET"
+		{
 			extract_latest_metadata(game_files, hash_list, &normalise_to_hash(targeted.factory.to_owned()))?
 				.hash_reference_data
 				.into_iter()
@@ -887,329 +912,344 @@ impl Intellisense {
 		} else {
 			vec![normalise_to_hash(targeted.factory.to_owned())]
 		} {
-			if self.all_cppts.contains(&factory) {
-				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
-				{
-					if prop_name == property_to_find {
-						return Ok(Some((prop_type, default_val, false)));
+			if let Some(ty) = self.file_types.get(&factory) {
+				match ty.as_ref() {
+					"CPPT" => {
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
+						{
+							if prop_name == property_to_find {
+								return Ok(Some((prop_type, default_val, false)));
+							}
+						}
 					}
-				}
-			} else if self.all_uicts.contains(&factory) {
-				// All UI controls have the properties of ZUIControlEntity
-				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(game_files, hash_list, game_version, "002C4526CC9753E6")?
-				{
-					if prop_name == property_to_find {
-						return Ok(Some((prop_type, default_val, false)));
-					}
-				}
 
-				for entry in convert_uicb(
-					&extract_latest_resource(
-						game_files,
-						hash_list,
-						&extract_latest_metadata(game_files, hash_list, &factory)?
-							.hash_reference_data
-							.into_iter()
-							.find(|x| {
-								hash_list
-									.entries
-									.get(&normalise_to_hash(x.hash.to_owned()))
-									.map(|entry| entry.resource_type == "UICB")
-									.unwrap_or(false)
-							})
-							.context("No blueprint dependency on UICT")?
-							.hash
-					)?
-					.1
-				)?
-				.m_aAttributes
-				{
-					// Property
-					if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
-						let prop_type = self
-							.uicb_prop_types
-							.get(to_value(entry.m_eType)?.as_str().unwrap())
-							.context("Unknown UICB property type")?;
+					"UICT" => {
+						// All UI controls have the properties of ZUIControlEntity
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(game_files, hash_list, game_version, "002C4526CC9753E6")?
+						{
+							if prop_name == property_to_find {
+								return Ok(Some((prop_type, default_val, false)));
+							}
+						}
 
-						// We can't get the actual default values, if there are any, so we just use sensible defaults
-						return Ok(Some((
-							prop_type.into(),
-							match prop_type.as_ref() {
-								"int32" => to_value(0)?,
-								"float32" => to_value(0)?,
-								"ZString" => to_value("")?,
-								"bool" => to_value(false)?,
-								_ => Value::Null
-							},
-							false
-						)));
-					}
-				}
-			} else if self.all_matts.contains(&factory) {
-				// All materials have the properties of ZRenderMaterialEntity
-				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(game_files, hash_list, game_version, "00B4B11DA327CAD0")?
-				{
-					if prop_name == property_to_find {
-						return Ok(Some((prop_type, default_val, false)));
-					}
-				}
+						for entry in convert_uicb(
+							&extract_latest_resource(
+								game_files,
+								hash_list,
+								&extract_latest_metadata(game_files, hash_list, &factory)?
+									.hash_reference_data
+									.into_iter()
+									.find(|x| {
+										hash_list
+											.entries
+											.get(&normalise_to_hash(x.hash.to_owned()))
+											.map(|entry| entry.resource_type == "UICB")
+											.unwrap_or(false)
+									})
+									.context("No blueprint dependency on UICT")?
+									.hash
+							)?
+							.1
+						)?
+						.m_aAttributes
+						{
+							// Property
+							if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_PROPERTY {
+								let prop_type = self
+									.uicb_prop_types
+									.get(to_value(entry.m_eType)?.as_str().unwrap())
+									.context("Unknown UICB property type")?;
 
-				for property in self.get_matt_properties(game_files, hash_list, &factory)? {
-					match property.data {
-						MaterialPropertyData::Texture(texture) => {
-							if property.name == property_to_find {
+								// We can't get the actual default values, if there are any, so we just use sensible defaults
 								return Ok(Some((
-									"ZRuntimeResourceID".into(),
-									texture
-										.map(|texture| {
+									prop_type.into(),
+									match prop_type.as_ref() {
+										"int32" => to_value(0)?,
+										"float32" => to_value(0)?,
+										"ZString" => to_value("")?,
+										"bool" => to_value(false)?,
+										_ => Value::Null
+									},
+									false
+								)));
+							}
+						}
+					}
+
+					"MATT" => {
+						// All materials have the properties of ZRenderMaterialEntity
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(game_files, hash_list, game_version, "00B4B11DA327CAD0")?
+						{
+							if prop_name == property_to_find {
+								return Ok(Some((prop_type, default_val, false)));
+							}
+						}
+
+						for property in self.get_matt_properties(game_files, hash_list, &factory)? {
+							match property.data {
+								MaterialPropertyData::Texture(texture) => {
+									if property.name == property_to_find {
+										return Ok(Some((
+											"ZRuntimeResourceID".into(),
+											texture
+												.map(|texture| {
+													json!({
+														"resource": texture,
+														"flag": "5F"
+													})
+												})
+												.unwrap_or(Value::Null),
+											false
+										)));
+									}
+
+									if format!("{}_enab", property.name) == property_to_find {
+										return Ok(Some(("bool".into(), json!(false), false)));
+									}
+
+									if format!("{}_dest", property.name) == property_to_find {
+										return Ok(Some(("SEntityTemplateReference".into(), Value::Null, false)));
+									}
+								}
+
+								MaterialPropertyData::ColorRGB(r, g, b) => {
+									if property.name == property_to_find {
+										return Ok(Some((
+											"SColorRGB".into(),
+											to_value(format!(
+												"#{:0>2x}{:0>2x}{:0>2x}",
+												(r * 255.0).round() as u8,
+												(g * 255.0).round() as u8,
+												(b * 255.0).round() as u8
+											))?,
+											false
+										)));
+									}
+
+									if format!("{}_op", property.name) == property_to_find {
+										return Ok(Some((
+											"IRenderMaterialEntity.EModifierOperation".into(),
+											to_value("eLeave")?,
+											false
+										)));
+									}
+								}
+
+								MaterialPropertyData::ColorRGBA(r, g, b, a) => {
+									if property.name == property_to_find {
+										return Ok(Some((
+											"SColorRGBA".into(),
+											to_value(format!(
+												"#{:0>2x}{:0>2x}{:0>2x}{:0>2x}",
+												(r * 255.0).round() as u8,
+												(g * 255.0).round() as u8,
+												(b * 255.0).round() as u8,
+												(a * 255.0).round() as u8
+											))?,
+											false
+										)));
+									}
+
+									if format!("{}_op", property.name) == property_to_find {
+										return Ok(Some((
+											"IRenderMaterialEntity.EModifierOperation".into(),
+											to_value("eLeave")?,
+											false
+										)));
+									}
+								}
+
+								MaterialPropertyData::Float(val) => {
+									if property.name == property_to_find {
+										return Ok(Some(("float32".into(), to_value(val)?, false)));
+									}
+
+									if format!("{}_op", property.name) == property_to_find {
+										return Ok(Some((
+											"IRenderMaterialEntity.EModifierOperation".into(),
+											to_value("eLeave")?,
+											false
+										)));
+									}
+								}
+
+								MaterialPropertyData::Vector2(x, y) => {
+									if property.name == property_to_find {
+										return Ok(Some((
+											"SVector2".into(),
 											json!({
-												"resource": texture,
-												"flag": "5F"
-											})
-										})
-										.unwrap_or(Value::Null),
-									false
-								)));
-							}
+												"x": x,
+												"y": y
+											}),
+											false
+										)));
+									}
 
-							if format!("{}_enab", property.name) == property_to_find {
-								return Ok(Some(("bool".into(), json!(false), false)));
-							}
+									if format!("{}_op", property.name) == property_to_find {
+										return Ok(Some((
+											"IRenderMaterialEntity.EModifierOperation".into(),
+											to_value("eLeave")?,
+											false
+										)));
+									}
+								}
 
-							if format!("{}_dest", property.name) == property_to_find {
-								return Ok(Some(("SEntityTemplateReference".into(), Value::Null, false)));
+								MaterialPropertyData::Vector3(x, y, z) => {
+									if property.name == property_to_find {
+										return Ok(Some((
+											"SVector3".into(),
+											json!({
+												"x": x,
+												"y": y,
+												"z": z
+											}),
+											false
+										)));
+									}
+
+									if format!("{}_op", property.name) == property_to_find {
+										return Ok(Some((
+											"IRenderMaterialEntity.EModifierOperation".into(),
+											to_value("eLeave")?,
+											false
+										)));
+									}
+								}
+
+								MaterialPropertyData::Vector4(x, y, z, w) => {
+									if property.name == property_to_find {
+										return Ok(Some((
+											"SVector4".into(),
+											json!({
+												"x": x,
+												"y": y,
+												"z": z,
+												"w": w
+											}),
+											false
+										)));
+									}
+
+									if format!("{}_op", property.name) == property_to_find {
+										return Ok(Some((
+											"IRenderMaterialEntity.EModifierOperation".into(),
+											to_value("eLeave")?,
+											false
+										)));
+									}
+								}
+							}
+						}
+					}
+
+					"WSWT" => {
+						// All switch groups have the properties of ZAudioSwitchEntity
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(game_files, hash_list, game_version, "00797DC916520C4D")?
+						{
+							if prop_name == property_to_find {
+								return Ok(Some((prop_type, default_val, false)));
+							}
+						}
+					}
+					"ECPT" => {
+						// All extended CPP entities have the properties of ZMaterialOverwriteAspect
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(game_files, hash_list, game_version, "00D3003AAA7B3817")?
+						{
+							if prop_name == property_to_find {
+								return Ok(Some((prop_type, default_val, false)));
 							}
 						}
 
-						MaterialPropertyData::ColorRGB(r, g, b) => {
-							if property.name == property_to_find {
-								return Ok(Some((
-									"SColorRGB".into(),
-									to_value(format!(
-										"#{:0>2x}{:0>2x}{:0>2x}",
-										(r * 255.0).round() as u8,
-										(g * 255.0).round() as u8,
-										(b * 255.0).round() as u8
-									))?,
-									false
-								)));
-							}
+						let ecpb_data = extract_latest_resource(
+							game_files,
+							hash_list,
+							&extract_latest_metadata(game_files, hash_list, &factory)?
+								.hash_reference_data
+								.into_iter()
+								.find(|x| {
+									hash_list
+										.entries
+										.get(&normalise_to_hash(x.hash.to_owned()))
+										.map(|entry| entry.resource_type == "ECPB")
+										.unwrap_or(false)
+								})
+								.context("No blueprint dependency on ECPT")?
+								.hash
+						)?
+						.1;
 
-							if format!("{}_op", property.name) == property_to_find {
-								return Ok(Some((
-									"IRenderMaterialEntity.EModifierOperation".into(),
-									to_value("eLeave")?,
-									false
-								)));
-							}
-						}
+						let ecpb_data = match game_version {
+							GameVersion::H1 => h2016_convert_ecpb(&ecpb_data)?,
+							GameVersion::H2 => h2_convert_ecpb(&ecpb_data)?,
+							GameVersion::H3 => h3_convert_ecpb(&ecpb_data)?
+						};
 
-						MaterialPropertyData::ColorRGBA(r, g, b, a) => {
-							if property.name == property_to_find {
+						for entry in ecpb_data.properties {
+							if entry.property_name == property_to_find {
 								return Ok(Some((
-									"SColorRGBA".into(),
-									to_value(format!(
-										"#{:0>2x}{:0>2x}{:0>2x}{:0>2x}",
-										(r * 255.0).round() as u8,
-										(g * 255.0).round() as u8,
-										(b * 255.0).round() as u8,
-										(a * 255.0).round() as u8
-									))?,
-									false
-								)));
-							}
-
-							if format!("{}_op", property.name) == property_to_find {
-								return Ok(Some((
-									"IRenderMaterialEntity.EModifierOperation".into(),
-									to_value("eLeave")?,
-									false
-								)));
-							}
-						}
-
-						MaterialPropertyData::Float(val) => {
-							if property.name == property_to_find {
-								return Ok(Some(("float32".into(), to_value(val)?, false)));
-							}
-
-							if format!("{}_op", property.name) == property_to_find {
-								return Ok(Some((
-									"IRenderMaterialEntity.EModifierOperation".into(),
-									to_value("eLeave")?,
-									false
-								)));
-							}
-						}
-
-						MaterialPropertyData::Vector2(x, y) => {
-							if property.name == property_to_find {
-								return Ok(Some((
-									"SVector2".into(),
-									json!({
-										"x": x,
-										"y": y
-									}),
-									false
-								)));
-							}
-
-							if format!("{}_op", property.name) == property_to_find {
-								return Ok(Some((
-									"IRenderMaterialEntity.EModifierOperation".into(),
-									to_value("eLeave")?,
-									false
-								)));
-							}
-						}
-
-						MaterialPropertyData::Vector3(x, y, z) => {
-							if property.name == property_to_find {
-								return Ok(Some((
-									"SVector3".into(),
-									json!({
-										"x": x,
-										"y": y,
-										"z": z
-									}),
-									false
-								)));
-							}
-
-							if format!("{}_op", property.name) == property_to_find {
-								return Ok(Some((
-									"IRenderMaterialEntity.EModifierOperation".into(),
-									to_value("eLeave")?,
-									false
-								)));
-							}
-						}
-
-						MaterialPropertyData::Vector4(x, y, z, w) => {
-							if property.name == property_to_find {
-								return Ok(Some((
-									"SVector4".into(),
-									json!({
-										"x": x,
-										"y": y,
-										"z": z,
-										"w": w
-									}),
-									false
-								)));
-							}
-
-							if format!("{}_op", property.name) == property_to_find {
-								return Ok(Some((
-									"IRenderMaterialEntity.EModifierOperation".into(),
-									to_value("eLeave")?,
+									match entry.property_type {
+										EExtendedPropertyType::TYPE_RESOURCEPTR => "ZRuntimeResourceID",
+										EExtendedPropertyType::TYPE_INT32 => "int32",
+										EExtendedPropertyType::TYPE_UINT32 => "uint32",
+										EExtendedPropertyType::TYPE_FLOAT => "float32",
+										EExtendedPropertyType::TYPE_STRING => "ZString",
+										EExtendedPropertyType::TYPE_BOOL => "bool",
+										EExtendedPropertyType::TYPE_ENTITYREF => "SEntityTemplateReference",
+										EExtendedPropertyType::TYPE_VARIANT => "ZVariant"
+									}
+									.into(),
+									match entry.property_type {
+										EExtendedPropertyType::TYPE_RESOURCEPTR => Value::Null,
+										EExtendedPropertyType::TYPE_INT32 => to_value(0)?,
+										EExtendedPropertyType::TYPE_UINT32 => to_value(0)?,
+										EExtendedPropertyType::TYPE_FLOAT => to_value(0)?,
+										EExtendedPropertyType::TYPE_STRING => Value::String("".into()),
+										EExtendedPropertyType::TYPE_BOOL => Value::Bool(false),
+										EExtendedPropertyType::TYPE_ENTITYREF => Value::Null,
+										EExtendedPropertyType::TYPE_VARIANT => Value::Null
+									},
 									false
 								)));
 							}
 						}
 					}
-				}
-			} else if self.all_wswts.contains(&factory) {
-				// All switch groups have the properties of ZAudioSwitchEntity
-				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(game_files, hash_list, game_version, "00797DC916520C4D")?
-				{
-					if prop_name == property_to_find {
-						return Ok(Some((prop_type, default_val, false)));
-					}
-				}
-			} else if self.all_ecpts.contains(&factory) {
-				// All extended CPP entities have the properties of ZMaterialOverwriteAspect
-				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(game_files, hash_list, game_version, "00D3003AAA7B3817")?
-				{
-					if prop_name == property_to_find {
-						return Ok(Some((prop_type, default_val, false)));
-					}
-				}
 
-				let ecpb_data = extract_latest_resource(
-					game_files,
-					hash_list,
-					&extract_latest_metadata(game_files, hash_list, &factory)?
-						.hash_reference_data
-						.into_iter()
-						.find(|x| {
-							hash_list
-								.entries
-								.get(&normalise_to_hash(x.hash.to_owned()))
-								.map(|entry| entry.resource_type == "ECPB")
-								.unwrap_or(false)
-						})
-						.context("No blueprint dependency on ECPT")?
-						.hash
-				)?
-				.1;
-
-				let ecpb_data = match game_version {
-					GameVersion::H1 => h2016_convert_ecpb(&ecpb_data)?,
-					GameVersion::H2 => h2_convert_ecpb(&ecpb_data)?,
-					GameVersion::H3 => h3_convert_ecpb(&ecpb_data)?
-				};
-
-				for entry in ecpb_data.properties {
-					if entry.property_name == property_to_find {
-						return Ok(Some((
-							match entry.property_type {
-								EExtendedPropertyType::TYPE_RESOURCEPTR => "ZRuntimeResourceID",
-								EExtendedPropertyType::TYPE_INT32 => "int32",
-								EExtendedPropertyType::TYPE_UINT32 => "uint32",
-								EExtendedPropertyType::TYPE_FLOAT => "float32",
-								EExtendedPropertyType::TYPE_STRING => "ZString",
-								EExtendedPropertyType::TYPE_BOOL => "bool",
-								EExtendedPropertyType::TYPE_ENTITYREF => "SEntityTemplateReference",
-								EExtendedPropertyType::TYPE_VARIANT => "ZVariant"
+					"AIBX" => {
+						// All behaviour trees have the properties of ZBehaviorTreeEntity
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(game_files, hash_list, game_version, "0028607138892D70")?
+						{
+							if prop_name == property_to_find {
+								return Ok(Some((prop_type, default_val, false)));
 							}
-							.into(),
-							match entry.property_type {
-								EExtendedPropertyType::TYPE_RESOURCEPTR => Value::Null,
-								EExtendedPropertyType::TYPE_INT32 => to_value(0)?,
-								EExtendedPropertyType::TYPE_UINT32 => to_value(0)?,
-								EExtendedPropertyType::TYPE_FLOAT => to_value(0)?,
-								EExtendedPropertyType::TYPE_STRING => Value::String("".into()),
-								EExtendedPropertyType::TYPE_BOOL => Value::Bool(false),
-								EExtendedPropertyType::TYPE_ENTITYREF => Value::Null,
-								EExtendedPropertyType::TYPE_VARIANT => Value::Null
-							},
-							false
-						)));
+						}
 					}
-				}
-			} else if self.all_aibxs.contains(&factory) {
-				// All behaviour trees have the properties of ZBehaviorTreeEntity
-				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(game_files, hash_list, game_version, "0028607138892D70")?
-				{
-					if prop_name == property_to_find {
-						return Ok(Some((prop_type, default_val, false)));
+
+					"WSGT" => {
+						// All state groups have the properties of ZAudioStateEntity
+						for (prop_name, (prop_type, default_val)) in
+							self.get_cppt_properties(game_files, hash_list, game_version, "000D409686293996")?
+						{
+							if prop_name == property_to_find {
+								return Ok(Some((prop_type, default_val, false)));
+							}
+						}
 					}
-				}
-			} else if self.all_wsgts.contains(&factory) {
-				// All state groups have the properties of ZAudioStateEntity
-				for (prop_name, (prop_type, default_val)) in
-					self.get_cppt_properties(game_files, hash_list, game_version, "000D409686293996")?
-				{
-					if prop_name == property_to_find {
-						return Ok(Some((prop_type, default_val, false)));
-					}
-				}
-			} else {
-				match ensure_entity_in_cache(
-					game_files,
-					cached_entities,
-					game_version,
-					hash_list,
-					&normalise_to_hash(factory.to_owned())
-				) {
-					Ok(_) => {
+
+					"TEMP" => {
+						ensure_entity_in_cache(
+							game_files,
+							cached_entities,
+							game_version,
+							hash_list,
+							&normalise_to_hash(factory.to_owned())
+						)?;
+
 						let extracted = cached_entities
 							.get(&normalise_to_hash(factory.to_owned()))
 							.expect("Ensured");
@@ -1227,11 +1267,7 @@ impl Intellisense {
 						}
 					}
 
-					Err(e) if format!("{:?}", e).contains("Couldn't find the resource in any partition") => {}
-
-					x => {
-						x?;
-					}
+					_ => bail!("Unknown factory type")
 				}
 			}
 		}
@@ -1336,7 +1372,9 @@ impl Intellisense {
 		}
 
 		let (fac_input, fac_output): (Vec<_>, Vec<_>) = {
-			if self.all_asets.contains(&normalise_to_hash(targeted.factory.to_owned())) {
+			if let Some(ty) = self.file_types.get(&normalise_to_hash(targeted.factory.to_owned()))
+				&& ty == "ASET"
+			{
 				extract_latest_metadata(game_files, hash_list, &normalise_to_hash(targeted.factory.to_owned()))?
 					.hash_reference_data
 					.into_iter()
@@ -1355,143 +1393,159 @@ impl Intellisense {
 				let mut input = vec![];
 				let mut output = vec![];
 
-				if self.all_cppts.contains(&factory) {
-					let cppt_data = self.cppt_pins.get(&factory).context("No such CPPT in pins")?;
-					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
-				} else if self.all_uicts.contains(&factory) {
-					// All UI controls have the pins of ZUIControlEntity
-					let cppt_data = self.cppt_pins.get("002C4526CC9753E6").context("No such CPPT in pins")?;
-					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+				if let Some(ty) = self.file_types.get(&factory) {
+					match ty.as_ref() {
+						"CPPT" => {
+							let cppt_data = self.cppt_pins.get(&factory).context("No such CPPT in pins")?;
+							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+						}
 
-					for entry in convert_uicb(
-						&extract_latest_resource(
-							game_files,
-							hash_list,
-							&extract_latest_metadata(game_files, hash_list, &factory)?
+						"UICT" => {
+							// All UI controls have the pins of ZUIControlEntity
+							let cppt_data = self.cppt_pins.get("002C4526CC9753E6").context("No such CPPT in pins")?;
+							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+
+							for entry in convert_uicb(
+								&extract_latest_resource(
+									game_files,
+									hash_list,
+									&extract_latest_metadata(game_files, hash_list, &factory)?
+										.hash_reference_data
+										.into_iter()
+										.find(|x| {
+											hash_list
+												.entries
+												.get(&normalise_to_hash(x.hash.to_owned()))
+												.map(|entry| entry.resource_type == "UICB")
+												.unwrap_or(false)
+										})
+										.context("No blueprint dependency on UICT")?
+										.hash
+								)?
+								.1
+							)?
+							.m_aAttributes
+							{
+								if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_INPUT_PIN {
+									// Input pin
+									input.push(entry.m_sName);
+								} else if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_OUTPUT_PIN {
+									// Output pin
+									output.push(entry.m_sName);
+								}
+							}
+						}
+
+						"MATT" => {
+							// All materials have the pins of ZRenderMaterialEntity
+							let cppt_data = self.cppt_pins.get("00B4B11DA327CAD0").context("No such CPPT in pins")?;
+							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+
+							for property in self.get_matt_properties(game_files, hash_list, &factory)? {
+								if !matches!(property.data, MaterialPropertyData::Texture(_)) {
+									input.push(property.name);
+								}
+							}
+						}
+
+						"WSWT" => {
+							// All switch groups have the pins of ZAudioSwitchEntity
+							let cppt_data = self.cppt_pins.get("00797DC916520C4D").context("No such CPPT in pins")?;
+							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+
+							let wswt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
+
+							let dswb_hash = &wswt_meta
 								.hash_reference_data
-								.into_iter()
+								.iter()
 								.find(|x| {
 									hash_list
 										.entries
 										.get(&normalise_to_hash(x.hash.to_owned()))
-										.map(|entry| entry.resource_type == "UICB")
+										.map(|entry| entry.resource_type == "DSWB" || entry.resource_type == "WSWB")
 										.unwrap_or(false)
 								})
-								.context("No blueprint dependency on UICT")?
-								.hash
-						)?
-						.1
-					)?
-					.m_aAttributes
-					{
-						if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_INPUT_PIN {
-							// Input pin
-							input.push(entry.m_sName);
-						} else if entry.m_eKind == EAttributeKind::E_ATTRIBUTE_KIND_OUTPUT_PIN {
-							// Output pin
-							output.push(entry.m_sName);
+								.context("No blueprint dependency on WSWT")?
+								.hash;
+
+							let dswb_data = match game_version {
+								GameVersion::H1 => {
+									h2016_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
+								}
+								GameVersion::H2 => {
+									h2_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
+								}
+								GameVersion::H3 => {
+									h3_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
+								}
+							};
+
+							input.extend(dswb_data.m_aSwitches);
 						}
-					}
-				} else if self.all_matts.contains(&factory) {
-					// All materials have the pins of ZRenderMaterialEntity
-					let cppt_data = self.cppt_pins.get("00B4B11DA327CAD0").context("No such CPPT in pins")?;
-					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-					for property in self.get_matt_properties(game_files, hash_list, &factory)? {
-						if !matches!(property.data, MaterialPropertyData::Texture(_)) {
-							input.push(property.name);
+						"ECPT" => {
+							// All extended CPP entities have the pins of ZMaterialOverwriteAspect
+							let cppt_data = self.cppt_pins.get("00D3003AAA7B3817").context("No such CPPT in pins")?;
+							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 						}
-					}
-				} else if self.all_wswts.contains(&factory) {
-					// All switch groups have the pins of ZAudioSwitchEntity
-					let cppt_data = self.cppt_pins.get("00797DC916520C4D").context("No such CPPT in pins")?;
-					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-					let wswt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
-
-					let dswb_hash = &wswt_meta
-						.hash_reference_data
-						.iter()
-						.find(|x| {
-							hash_list
-								.entries
-								.get(&normalise_to_hash(x.hash.to_owned()))
-								.map(|entry| entry.resource_type == "DSWB" || entry.resource_type == "WSWB")
-								.unwrap_or(false)
-						})
-						.context("No blueprint dependency on WSWT")?
-						.hash;
-
-					let dswb_data = match game_version {
-						GameVersion::H1 => {
-							h2016_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
+						"AIBX" => {
+							// All behaviour trees have the pins of ZBehaviorTreeEntity
+							let cppt_data = self.cppt_pins.get("0028607138892D70").context("No such CPPT in pins")?;
+							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 						}
-						GameVersion::H2 => {
-							h2_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
-						}
-						GameVersion::H3 => {
-							h3_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
-						}
-					};
 
-					input.extend(dswb_data.m_aSwitches);
-				} else if self.all_ecpts.contains(&factory) {
-					// All extended CPP entities have the pins of ZMaterialOverwriteAspect
-					let cppt_data = self.cppt_pins.get("00D3003AAA7B3817").context("No such CPPT in pins")?;
-					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
-				} else if self.all_aibxs.contains(&factory) {
-					// All behaviour trees have the pins of ZBehaviorTreeEntity
-					let cppt_data = self.cppt_pins.get("0028607138892D70").context("No such CPPT in pins")?;
-					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
-				} else if self.all_wsgts.contains(&factory) {
-					// All state groups have the pins of ZAudioStateEntity
-					let cppt_data = self.cppt_pins.get("000D409686293996").context("No such CPPT in pins")?;
-					input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-					output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+						"WSGT" => {
+							// All state groups have the pins of ZAudioStateEntity
+							let cppt_data = self.cppt_pins.get("000D409686293996").context("No such CPPT in pins")?;
+							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-					let wsgt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
+							let wsgt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
 
-					let wsgb_hash = &wsgt_meta
-						.hash_reference_data
-						.iter()
-						.find(|x| {
-							hash_list
-								.entries
-								.get(&normalise_to_hash(x.hash.to_owned()))
-								.map(|entry| entry.resource_type == "WSGB")
-								.unwrap_or(false)
-						})
-						.context("No blueprint dependency on WSWT")?
-						.hash;
+							let wsgb_hash = &wsgt_meta
+								.hash_reference_data
+								.iter()
+								.find(|x| {
+									hash_list
+										.entries
+										.get(&normalise_to_hash(x.hash.to_owned()))
+										.map(|entry| entry.resource_type == "WSGB")
+										.unwrap_or(false)
+								})
+								.context("No blueprint dependency on WSWT")?
+								.hash;
 
-					let wsgb_data = match game_version {
-						GameVersion::H1 => {
-							h2016_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
+							let wsgb_data = match game_version {
+								GameVersion::H1 => {
+									h2016_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
+								}
+								GameVersion::H2 => {
+									h2_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
+								}
+								GameVersion::H3 => {
+									h3_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
+								}
+							};
+
+							input.extend(wsgb_data.m_aSwitches);
 						}
-						GameVersion::H2 => {
-							h2_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
-						}
-						GameVersion::H3 => {
-							h3_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
-						}
-					};
 
-					input.extend(wsgb_data.m_aSwitches);
-				} else {
-					match ensure_entity_in_cache(
-						game_files,
-						cached_entities,
-						game_version,
-						hash_list,
-						&normalise_to_hash(factory.to_owned())
-					) {
-						Ok(_) => {
+						"TEMP" => {
+							ensure_entity_in_cache(
+								game_files,
+								cached_entities,
+								game_version,
+								hash_list,
+								&normalise_to_hash(factory.to_owned())
+							)?;
+
 							let extracted = cached_entities
 								.get(&normalise_to_hash(factory.to_owned()))
 								.expect("Ensured");
@@ -1510,11 +1564,7 @@ impl Intellisense {
 							output.extend(found.1);
 						}
 
-						Err(e) if format!("{:?}", e).contains("Couldn't find the resource in any partition") => {}
-
-						x => {
-							x?;
-						}
+						_ => bail!("Unknown factory type")
 					}
 				}
 

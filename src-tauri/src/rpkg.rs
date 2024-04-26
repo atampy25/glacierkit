@@ -7,8 +7,8 @@ use quickentity_rs::{
 	rpkg_structs::{ResourceDependency, ResourceMeta}
 };
 use rpkg_rs::runtime::resource::{
-	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_partition::PatchId,
-	runtime_resource_id::RuntimeResourceID
+	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_package::ResourceReferenceFlags,
+	resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
 };
 use tryvial::try_fn;
 
@@ -35,7 +35,13 @@ pub fn convert_resource_info_to_rpkg_meta_no_hl(info: &ResourceInfo) -> Resource
 			.get_all_references()
 			.iter()
 			.map(|(hash, flag)| ResourceDependency {
-				flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
+				flag: format!(
+					"{:02X}",
+					match flag {
+						ResourceReferenceFlags::Legacy(x) => x,
+						ResourceReferenceFlags::Standard(x) => x
+					}
+				),
 				hash: hash.to_hex_string()
 			})
 			.collect(),
@@ -58,7 +64,13 @@ pub fn convert_resource_info_to_rpkg_meta(hash_list: &HashList, info: &ResourceI
 			.get_all_references()
 			.iter()
 			.map(|(hash, flag)| ResourceDependency {
-				flag: format!("{:02X}", flag.to_owned().into_bytes()[0]),
+				flag: format!(
+					"{:02X}",
+					match flag {
+						ResourceReferenceFlags::Legacy(x) => x,
+						ResourceReferenceFlags::Standard(x) => x
+					}
+				),
 				hash: hash_list
 					.entries
 					.get(&hash.to_hex_string())
@@ -96,6 +108,31 @@ pub fn extract_latest_resource(
 		{
 			return Ok((
 				convert_resource_info_to_rpkg_meta(hash_list, info),
+				partition
+					.get_resource(&resource_id)
+					.context("Couldn't extract resource using rpkg-rs")?
+			));
+		}
+	}
+
+	bail!("Couldn't find the resource in any partition");
+}
+
+/// Extract the latest copy of a resource by its hash or path, without using the hash list.
+#[context("Couldn't extract resource {}", resource)]
+pub fn extract_latest_resource_no_hl(game_files: &PartitionManager, resource: &str) -> Result<(ResourceMeta, Vec<u8>)> {
+	let resource = normalise_to_hash(resource.into());
+
+	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
+
+	for partition in game_files.get_all_partitions() {
+		if let Some((info, _)) = partition
+			.get_latest_resources()
+			.into_iter()
+			.find(|(x, _)| *x.get_rrid() == resource_id)
+		{
+			return Ok((
+				convert_resource_info_to_rpkg_meta_no_hl(info),
 				partition
 					.get_resource(&resource_id)
 					.context("Couldn't extract resource using rpkg-rs")?
@@ -155,7 +192,13 @@ pub fn extract_latest_overview_info(
 					.map(|(res_id, flag)| {
 						(
 							res_id.to_hex_string(),
-							format!("{:02X}", flag.to_owned().into_bytes()[0])
+							format!(
+								"{:02X}",
+								match flag {
+									ResourceReferenceFlags::Legacy(x) => x,
+									ResourceReferenceFlags::Standard(x) => x
+								}
+							)
 						)
 					})
 					.collect()
@@ -225,7 +268,7 @@ pub fn ensure_entity_in_cache(
 			.context("Couldn't convert binary data to ResourceLib blueprint")?
 	};
 
-	let entity = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, true)
+	let entity = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
 		.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 	cached_entities.insert(factory_hash.to_owned(), entity.to_owned());

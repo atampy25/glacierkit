@@ -48,6 +48,7 @@ pub struct AppState {
 	pub game_installs: Vec<GameInstall>,
 	pub project: ArcSwapOption<Project>,
 	pub hash_list: ArcSwapOption<HashList>,
+	pub tonytools_hash_list: ArcSwapOption<tonytools::hashlist::HashList>,
 	pub fs_watcher: ArcSwapOption<notify_debouncer_full::Debouncer<RecommendedWatcher, FileIdMap>>,
 	pub editor_states: Arc<DashMap<Uuid, EditorState>>,
 	pub game_files: ArcSwapOption<PartitionManager>,
@@ -223,7 +224,13 @@ pub enum ResourceOverviewData {
 		wav_paths: Vec<(String, PathBuf)>
 	},
 	Repository,
-	Unlockables
+	Unlockables,
+	HMLanguages {
+		json: String
+	},
+	LocalisedLine {
+		languages: Vec<(String, String)>
+	}
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -611,6 +618,10 @@ strike! {
 
 				ExtractORESAsJson {
 					id: Uuid
+				},
+
+				ExtractAsHMLanguages {
+					id: Uuid
 				}
 			}),
 
@@ -950,8 +961,8 @@ strike! {
 					chunk_patch: String,
 					path_or_hint: Option<String>,
 
-					/// Hash, type, path/hint, flag
-					dependencies: Vec<(String, String, Option<String>, String)>,
+					/// Hash, type, path/hint, flag, is actually in current game version
+					dependencies: Vec<(String, String, Option<String>, String, bool)>,
 
 					/// Hash, type, path/hint
 					reverse_dependencies: Vec<(String, String, Option<String>)>,

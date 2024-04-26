@@ -113,6 +113,11 @@ const HASH_LIST_VERSION_ENDPOINT: &str =
 const HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/hash_list.sml";
 
+const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
+	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/version.json";
+
+const TONYTOOLS_HASH_LIST_ENDPOINT: &str =
+	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/hash_list.hmla";
 pub trait RunCommandExt {
 	/// Run the command, returning its stdout. If the command fails (status code non-zero), an error is returned with the stderr output.
 	fn run(self) -> Result<String>;
@@ -196,6 +201,10 @@ fn main() {
 				hash_list: fs::read(app_data_path.join("hash_list.sml"))
 					.ok()
 					.and_then(|x| serde_smile::from_slice(&x).ok())
+					.into(),
+				tonytools_hash_list: fs::read(app_data_path.join("tonytools_hash_list.hlma"))
+					.ok()
+					.and_then(|x| tonytools::hashlist::HashList::load(&x).ok().map(|x| x.into()))
 					.into(),
 				fs_watcher: None.into(),
 				editor_states: DashMap::new().into(),
@@ -388,7 +397,7 @@ fn event(app: AppHandle, event: Event) {
 										let (fac, fac_meta, blu, blu_meta) = convert_to_rt(&entity)
 											.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-										let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, true)
+										let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
 											.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 										reconverted.comments = comments;
@@ -458,7 +467,7 @@ fn event(app: AppHandle, event: Event) {
 											let (fac, fac_meta, blu, blu_meta) = convert_to_rt(&entity)
 												.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-											let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, true)
+											let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
 												.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 											reconverted.comments = comments;
@@ -4200,7 +4209,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 	let path = path.as_ref();
 
 	let task = start_task(
-		&app,
+		app,
 		format!(
 			"Opening {}",
 			path.file_name().context("No file name")?.to_string_lossy()
@@ -4216,7 +4225,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 	};
 
 	if let Some(existing) = existing {
-		send_request(&app, Request::Global(GlobalRequest::SelectTab(existing)))?;
+		send_request(app, Request::Global(GlobalRequest::SelectTab(existing)))?;
 	} else {
 		let extension = path
 			.file_name()
@@ -4261,7 +4270,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4331,7 +4340,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					);
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::CreateTab {
 							id,
 							name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4340,12 +4349,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					)?;
 				} else {
 					send_request(
-						&app,
+						app,
 						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
 					)?;
 
 					send_notification(
-						&app,
+						app,
 						Notification {
 							kind: NotificationKind::Error,
 							title: "No game selected".into(),
@@ -4376,7 +4385,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4400,7 +4409,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4426,7 +4435,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4474,7 +4483,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					);
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::CreateTab {
 							id,
 							name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4485,12 +4494,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					)?;
 				} else {
 					send_request(
-						&app,
+						app,
 						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
 					)?;
 
 					send_notification(
-						&app,
+						app,
 						Notification {
 							kind: NotificationKind::Error,
 							title: "No game selected".into(),
@@ -4569,7 +4578,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					);
 
 					send_request(
-						&app,
+						app,
 						Request::Global(GlobalRequest::CreateTab {
 							id,
 							name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4580,12 +4589,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					)?;
 				} else {
 					send_request(
-						&app,
+						app,
 						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
 					)?;
 
 					send_notification(
-						&app,
+						app,
 						Notification {
 							kind: NotificationKind::Error,
 							title: "No game selected".into(),
@@ -4648,7 +4657,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							);
 
 							send_request(
-								&app,
+								app,
 								Request::Global(GlobalRequest::CreateTab {
 									id,
 									name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4659,12 +4668,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							)?;
 						} else {
 							send_request(
-								&app,
+								app,
 								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
 							)?;
 
 							send_notification(
-								&app,
+								app,
 								Notification {
 									kind: NotificationKind::Error,
 									title: "No game selected".into(),
@@ -4758,7 +4767,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							);
 
 							send_request(
-								&app,
+								app,
 								Request::Global(GlobalRequest::CreateTab {
 									id,
 									name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4769,12 +4778,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							)?;
 						} else {
 							send_request(
-								&app,
+								app,
 								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
 							)?;
 
 							send_notification(
-								&app,
+								app,
 								Notification {
 									kind: NotificationKind::Error,
 									title: "No game selected".into(),
@@ -4797,7 +4806,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						);
 
 						send_request(
-							&app,
+							app,
 							Request::Global(GlobalRequest::CreateTab {
 								id,
 								name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4825,7 +4834,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4850,7 +4859,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				);
 
 				send_request(
-					&app,
+					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
 						name: path.file_name().context("No file name")?.to_string_lossy().into(),
@@ -4861,7 +4870,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 		}
 	}
 
-	finish_task(&app, task)?;
+	finish_task(app, task)?;
 }
 
 #[try_fn]
@@ -5032,7 +5041,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		if let Ok(data) = data.text().await {
 			let new_version = data
 				.trim()
-				.parse::<u16>()
+				.parse::<u32>()
 				.context("Online hash list version wasn't a number")?;
 
 			if current_version < new_version {
@@ -5049,6 +5058,43 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 						)?;
 
 						app_state.hash_list.store(Some(hash_list.into()));
+					}
+				}
+			}
+		}
+	}
+
+	let current_version = app_state
+		.tonytools_hash_list
+		.load()
+		.as_ref()
+		.map(|x| x.version)
+		.unwrap_or(0);
+
+	if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_VERSION_ENDPOINT).await {
+		if let Ok(data) = data.text().await {
+			let new_version = from_str::<Value>(&data)
+				.context("Couldn't parse online version data as JSON")?
+				.get("version")
+				.context("No version key in online version data")?
+				.as_u64()
+				.context("Online hash list version wasn't a number")? as u32;
+
+			if current_version < new_version {
+				if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_ENDPOINT).await {
+					if let Ok(data) = data.bytes().await {
+						let tonytools_hash_list = tonytools::hashlist::HashList::load(&data)
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+						fs::write(
+							app.path_resolver()
+								.app_data_dir()
+								.context("Couldn't get app data dir")?
+								.join("tonytools_hash_list.hlma"),
+							data
+						)?;
+
+						app_state.tonytools_hash_list.store(Some(tonytools_hash_list.into()));
 					}
 				}
 			}
@@ -5082,62 +5128,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 				cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
 				uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json")).unwrap(),
 				matt_properties: DashMap::new().into(),
-				all_cppts: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "CPPT")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect(),
-				all_asets: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "ASET")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect(),
-				all_uicts: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "UICT")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect(),
-				all_matts: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "MATT")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect(),
-				all_wswts: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "WSWT")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect(),
-				all_ecpts: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "ECPT")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect(),
-				all_aibxs: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "AIBX")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect(),
-				all_wsgts: hash_list
-					.entries
-					.iter()
-					.filter(|(_, entry)| entry.resource_type == "WSGT")
-					.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-					.map(|(hash, _)| hash.to_owned())
-					.collect()
+				file_types: resource_reverse_dependencies.par_iter().filter_map(|(x, _)| Some((x.to_owned(), hash_list.entries.get(x)?.resource_type.to_owned()))).collect()
 			}
 			.into()
 		));

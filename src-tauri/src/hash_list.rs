@@ -9,7 +9,7 @@ use tryvial::try_fn;
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DeserialisedHashList {
-	pub version: u16,
+	pub version: u32,
 	pub entries: Vec<DeserialisedEntry>
 }
 
@@ -26,7 +26,7 @@ pub struct DeserialisedEntry {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HashList {
-	pub version: u16,
+	pub version: u32,
 	pub entries: HashMap<String, HashData>
 }
 
