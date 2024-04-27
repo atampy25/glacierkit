@@ -1217,9 +1217,6 @@ pub fn get_diff_info(
 		}
 	}
 
-	let mut new = vec![];
-	let mut changed = vec![];
-
 	let removed = original
 		.entities
 		.par_iter()
@@ -1235,15 +1232,31 @@ pub fn get_diff_info(
 		})
 		.collect();
 
-	for (id, modif) in modified.entities.iter() {
-		if let Some(orig) = original.entities.get(id) {
-			if modif != orig {
-				changed.push(id.to_owned());
+	let mut diff = modified
+		.entities
+		.par_iter()
+		.filter_map(|(id, modif)| {
+			if let Some(orig) = original.entities.get(id) {
+				if modif != orig {
+					Some(("changed", id))
+				} else {
+					None
+				}
+			} else {
+				Some(("new", id))
 			}
-		} else {
-			new.push(id.to_owned());
-		}
-	}
+		})
+		.collect::<Vec<_>>()
+		.into_iter()
+		.into_group_map();
 
-	(new, changed, removed)
+	(
+		diff.remove("new")
+			.map(|x| x.into_iter().cloned().collect())
+			.unwrap_or_default(),
+		diff.remove("changed")
+			.map(|x| x.into_iter().cloned().collect())
+			.unwrap_or_default(),
+		removed
+	)
 }

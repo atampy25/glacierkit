@@ -236,6 +236,8 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						finish_task(app, task)?;
 					}
 
+					let task = start_task(app, "Syncing properties")?;
+
 					if app_state.editor_connection.is_connected().await {
 						let prev_props = previous.properties.unwrap_or_default();
 
@@ -267,6 +269,10 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						}
 					}
 
+					finish_task(app, task)?;
+
+					let task = start_task(app, "Updating change information")?;
+
 					if let EditorData::QNPatch {
 						ref base, ref current, ..
 					} = editor_state.data
@@ -281,6 +287,8 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							)))
 						)?;
 					}
+
+					finish_task(app, task)?;
 				} else {
 					send_request(
 						app,

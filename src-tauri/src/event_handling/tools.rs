@@ -16,6 +16,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use serde_json::{from_slice, from_value, json, to_string, to_value, to_vec, Value};
 use tauri::{async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
+use tokio::net::TcpStream;
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
@@ -1530,8 +1531,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					loop {
 						interval.tick().await;
 
-						// Attempt to connect every 10 seconds; it doesn't matter if it fails or is already connected
-						let _ = app.state::<AppState>().editor_connection.connect().await;
+						// Attempt to connect every 10 seconds
+						if TcpStream::connect("localhost:46735").await.is_ok() {
+							let _ = app.state::<AppState>().editor_connection.connect().await;
+						}
 					}
 				});
 			}
