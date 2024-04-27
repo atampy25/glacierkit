@@ -260,7 +260,7 @@
 			if (!word || !editorConnected) {
 				showSignalPinCondition.set(false)
 			} else {
-				showSignalPinCondition.set([...Object.keys(entData.inputCopying), ...Object.keys(entData.outputCopying), ...Object.keys(entData.events)].includes(word))
+				showSignalPinCondition.set([...Object.keys(entData.inputCopying || {}), ...Object.keys(entData.outputCopying || {}), ...Object.keys(entData.events || {})].includes(word))
 			}
 		})
 
