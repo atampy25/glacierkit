@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+	fs,
+	path::{Path, PathBuf}
+};
 
 use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
@@ -19,13 +22,13 @@ use rpkg_rs::{
 	misc::ini_file_system::IniFileSystem,
 	runtime::resource::{package_defs::PackageDefinitionSource, partition_manager::PartitionManager}
 };
+use serde::Serialize;
 use serde_json::{from_slice, from_str, from_value, to_value, Value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::event_handling::resource_overview::initialise_resource_overview;
 use crate::game_detection::GameVersion;
 use crate::hash_list::HashList;
 use crate::intellisense::Intellisense;
@@ -36,6 +39,7 @@ use crate::model::{
 use crate::ores::{parse_json_ores, UnlockableItem};
 use crate::repository::RepositoryItem;
 use crate::rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
+use crate::{event_handling::resource_overview::initialise_resource_overview, resourcelib::convert_generic};
 use crate::{
 	finish_task, send_notification, send_request, start_task, Notification, NotificationKind, HASH_LIST_ENDPOINT,
 	HASH_LIST_VERSION_ENDPOINT, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT
@@ -1028,5 +1032,172 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		}
 
 		finish_task(app, task)?;
+	}
+}
+
+/// Only available for entities, the repository and unlockables currently
+#[try_fn]
+#[context("Couldn't open {hash} in editor")]
+pub async fn open_in_editor(
+	app: &AppHandle,
+	game_files: &PartitionManager,
+	install: &PathBuf,
+	hash_list: &HashList,
+	hash: String
+) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	match hash_list
+		.entries
+		.get(&hash)
+		.context("Not in hash list")?
+		.resource_type
+		.as_ref()
+	{
+		"TEMP" => {
+			let task = start_task(app, format!("Loading entity {}", hash))?;
+
+			let game_install_data = app_state
+				.game_installs
+				.iter()
+				.try_find(|x| anyhow::Ok(x.path == *install))?
+				.context("No such game install")?;
+
+			ensure_entity_in_cache(
+				game_files,
+				&app_state.cached_entities,
+				game_install_data.version,
+				hash_list,
+				&hash
+			)?;
+
+			let entity = app_state.cached_entities.get(&hash).unwrap().to_owned();
+
+			let default_tab_name = format!(
+				"{} ({})",
+				entity
+					.entities
+					.get(&entity.root_entity)
+					.context("Root entity doesn't exist")?
+					.name,
+				hash
+			);
+
+			let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
+				if let Some(path) = entry.path.as_ref() {
+					path.replace("].pc_entitytype", "")
+						.replace("].pc_entitytemplate", "")
+						.split('/')
+						.last()
+						.map(|x| x.to_owned())
+						.unwrap_or(default_tab_name)
+				} else if let Some(hint) = entry.hint.as_ref() {
+					format!("{} ({})", hint, hash)
+				} else {
+					default_tab_name
+				}
+			} else {
+				default_tab_name
+			};
+
+			let id = Uuid::new_v4();
+
+			app_state.editor_states.insert(
+				id.to_owned(),
+				EditorState {
+					file: None,
+					data: EditorData::QNPatch {
+						base: Box::new(entity.to_owned()),
+						current: Box::new(entity),
+						settings: Default::default()
+					}
+				}
+			);
+
+			send_request(
+				app,
+				Request::Global(GlobalRequest::CreateTab {
+					id,
+					name: tab_name,
+					editor_type: EditorType::QNPatch
+				})
+			)?;
+
+			finish_task(app, task)?;
+		}
+
+		"REPO" => {
+			let task = start_task(app, "Loading repository")?;
+
+			let id = Uuid::new_v4();
+
+			let repository: Vec<RepositoryItem> = if let Some(x) = app_state.repository.load().as_ref() {
+				x.par_iter().cloned().collect()
+			} else {
+				from_slice(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?
+			};
+
+			app_state.editor_states.insert(
+				id.to_owned(),
+				EditorState {
+					file: None,
+					data: EditorData::RepositoryPatch {
+						base: repository.to_owned(),
+						current: repository,
+						patch_type: JsonPatchType::MergePatch
+					}
+				}
+			);
+
+			send_request(
+				app,
+				Request::Global(GlobalRequest::CreateTab {
+					id,
+					name: "pro.repo".into(),
+					editor_type: EditorType::RepositoryPatch {
+						patch_type: JsonPatchType::MergePatch
+					}
+				})
+			)?;
+
+			finish_task(app, task)?;
+		}
+
+		"ORES" if hash == "0057C2C3941115CA" => {
+			let task = start_task(app, "Loading unlockables")?;
+
+			let id = Uuid::new_v4();
+
+			let unlockables: Vec<UnlockableItem> = from_value(parse_json_ores(
+				&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
+			)?)?;
+
+			app_state.editor_states.insert(
+				id.to_owned(),
+				EditorState {
+					file: None,
+					data: EditorData::UnlockablesPatch {
+						base: unlockables.to_owned(),
+						current: unlockables,
+						patch_type: JsonPatchType::MergePatch
+					}
+				}
+			);
+
+			send_request(
+				app,
+				Request::Global(GlobalRequest::CreateTab {
+					id,
+					name: "config.unlockables".into(),
+					editor_type: EditorType::UnlockablesPatch {
+						patch_type: JsonPatchType::MergePatch
+					}
+				})
+			)?;
+
+			finish_task(app, task)?;
+		}
+
+		x => panic!("Opening {x} files in editor is not supported")
 	}
 }

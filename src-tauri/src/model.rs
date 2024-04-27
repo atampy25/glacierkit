@@ -211,7 +211,9 @@ pub enum ResourceOverviewData {
 	Json {
 		json: String
 	},
-	Ores,
+	Ores {
+		json: String
+	},
 	Image {
 		image_path: PathBuf,
 		dds_data: Option<(String, String)>

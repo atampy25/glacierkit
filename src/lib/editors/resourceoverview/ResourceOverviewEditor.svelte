@@ -508,6 +508,10 @@
 					<div class="text-xl">{chunk}</div>
 				</div>
 			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4 h-[30vh]">
+				<Monaco id={v4()} content={data.data.json} />
+			</div>
 			<h4 class="mb-1">Actions</h4>
 			<div class="flex flex-wrap gap-2 mb-4">
 				<Button

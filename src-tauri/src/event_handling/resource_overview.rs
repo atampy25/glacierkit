@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::{
 	finish_task,
 	game_detection::GameVersion,
+	general::open_in_editor,
 	hash_list::HashList,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, JsonPatchType,
@@ -159,7 +160,20 @@ pub fn initialise_resource_overview(
 
 				"ORES" if hash == "0057C2C3941115CA" => ResourceOverviewData::Unlockables,
 
-				"ORES" => ResourceOverviewData::Ores,
+				"ORES" => ResourceOverviewData::Ores {
+					json: {
+						let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let res_data = parse_hashes_ores(&res_data)?;
+
+						let mut buf = Vec::new();
+						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+						res_data.serialize(&mut ser)?;
+
+						String::from_utf8(buf)?
+					}
+				},
 
 				"GFXI" => {
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
@@ -758,165 +772,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				.to_owned()
 			};
 
-			// Only available for entities, the repository and unlockables currently
-
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				match hash_list
-					.entries
-					.get(&hash)
-					.context("Not in hash list")?
-					.resource_type
-					.as_ref()
-				{
-					"TEMP" => {
-						let task = start_task(app, format!("Loading entity {}", hash))?;
-
-						let game_install_data = app_state
-							.game_installs
-							.iter()
-							.try_find(|x| anyhow::Ok(x.path == *install))?
-							.context("No such game install")?;
-
-						ensure_entity_in_cache(
-							game_files,
-							&app_state.cached_entities,
-							game_install_data.version,
-							hash_list,
-							&hash
-						)?;
-
-						let entity = app_state.cached_entities.get(&hash).unwrap().to_owned();
-
-						let default_tab_name = format!(
-							"{} ({})",
-							entity
-								.entities
-								.get(&entity.root_entity)
-								.context("Root entity doesn't exist")?
-								.name,
-							hash
-						);
-
-						let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
-							if let Some(path) = entry.path.as_ref() {
-								path.replace("].pc_entitytype", "")
-									.replace("].pc_entitytemplate", "")
-									.split('/')
-									.last()
-									.map(|x| x.to_owned())
-									.unwrap_or(default_tab_name)
-							} else if let Some(hint) = entry.hint.as_ref() {
-								format!("{} ({})", hint, hash)
-							} else {
-								default_tab_name
-							}
-						} else {
-							default_tab_name
-						};
-
-						let id = Uuid::new_v4();
-
-						app_state.editor_states.insert(
-							id.to_owned(),
-							EditorState {
-								file: None,
-								data: EditorData::QNPatch {
-									base: Box::new(entity.to_owned()),
-									current: Box::new(entity),
-									settings: Default::default()
-								}
-							}
-						);
-
-						send_request(
-							app,
-							Request::Global(GlobalRequest::CreateTab {
-								id,
-								name: tab_name,
-								editor_type: EditorType::QNPatch
-							})
-						)?;
-
-						finish_task(app, task)?;
-					}
-
-					"REPO" => {
-						let task = start_task(app, "Loading repository")?;
-
-						let id = Uuid::new_v4();
-
-						let repository: Vec<RepositoryItem> = if let Some(x) = app_state.repository.load().as_ref() {
-							x.par_iter().cloned().collect()
-						} else {
-							from_slice(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?
-						};
-
-						app_state.editor_states.insert(
-							id.to_owned(),
-							EditorState {
-								file: None,
-								data: EditorData::RepositoryPatch {
-									base: repository.to_owned(),
-									current: repository,
-									patch_type: JsonPatchType::MergePatch
-								}
-							}
-						);
-
-						send_request(
-							app,
-							Request::Global(GlobalRequest::CreateTab {
-								id,
-								name: "pro.repo".into(),
-								editor_type: EditorType::RepositoryPatch {
-									patch_type: JsonPatchType::MergePatch
-								}
-							})
-						)?;
-
-						finish_task(app, task)?;
-					}
-
-					"ORES" if hash == "0057C2C3941115CA" => {
-						let task = start_task(app, "Loading unlockables")?;
-
-						let id = Uuid::new_v4();
-
-						let unlockables: Vec<UnlockableItem> = from_value(parse_json_ores(
-							&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
-						)?)?;
-
-						app_state.editor_states.insert(
-							id.to_owned(),
-							EditorState {
-								file: None,
-								data: EditorData::UnlockablesPatch {
-									base: unlockables.to_owned(),
-									current: unlockables,
-									patch_type: JsonPatchType::MergePatch
-								}
-							}
-						);
-
-						send_request(
-							app,
-							Request::Global(GlobalRequest::CreateTab {
-								id,
-								name: "config.unlockables".into(),
-								editor_type: EditorType::UnlockablesPatch {
-									patch_type: JsonPatchType::MergePatch
-								}
-							})
-						)?;
-
-						finish_task(app, task)?;
-					}
-
-					x => panic!("Opening {x} files in editor is not supported")
-				}
+				open_in_editor(app, game_files, install, hash_list, hash).await?;
 			}
 		}
 
@@ -1285,6 +1145,25 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
+				if hash == "0057C2C3941115CA"{
+					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+	
+					let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+	
+					if let Some(project) = app_state.project.load().as_ref() {
+						dialog = dialog.set_directory(&project.path);
+					}
+	
+					let res_data = parse_json_ores(&res_data)?;
+	
+					if let Some(save_handle) = dialog
+						.set_file_name(&format!("{}.json", hash))
+						.add_filter("JSON file", &["json"])
+						.save_file()
+						.await
+					{
+						fs::write(save_handle.path(), to_vec(&res_data)?)?;
+					}}else{
 				let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
@@ -1302,7 +1181,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.await
 				{
 					fs::write(save_handle.path(), to_vec(&res_data)?)?;
-				}
+				}}
 			}
 		}
 
