@@ -27,7 +27,11 @@ use tokio::{
 	sync::{broadcast, Mutex}
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{
+	connect_async,
+	tungstenite::{protocol::WebSocketConfig, Message},
+	MaybeTlsStream, WebSocketStream
+};
 use tryvial::try_fn;
 
 use crate::{
@@ -305,7 +309,6 @@ pub struct EditorConnection {
 	events: broadcast::Sender<SDKEditorEvent>,
 	debounced_events: tokio::sync::mpsc::Sender<SDKEditorEvent>,
 	entity_tree_loaded: Arc<AtomicBool>,
-	entities_loaded: Arc<ArcSwap<Vec<(String, Option<String>)>>>,
 	app: AppHandle
 }
 
@@ -401,7 +404,6 @@ impl EditorConnection {
 			events: sender,
 			entity_tree_loaded: AtomicBool::new(false).into(),
 			debounced_events: tx,
-			entities_loaded: Arc::new(Arc::new(vec![]).into()),
 			app
 		}
 	}
@@ -426,85 +428,94 @@ impl EditorConnection {
 
 			spawn(async move {
 				read.for_each(|msg| async {
-					if let Ok(msg) = msg {
-						if let Err::<_, Error>(e) = try {
-							match msg {
-								Message::Ping(_) => {}
-								Message::Pong(_) => {}
+					match msg {
+						Ok(msg) => {
+							if let Err::<_, Error>(e) = try {
+								match msg {
+									Message::Ping(_) => {}
+									Message::Pong(_) => {}
 
-								Message::Close(_) => {
-									sender.lock().await.take();
+									Message::Close(_) => {
+										sender.lock().await.take();
 
-									for editor in app.state::<AppState>().editor_states.iter() {
-										if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-											send_request(
-												&app,
-												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-													EntityTreeRequest::SetEditorConnectionAvailable {
-														editor_id: editor.key().to_owned(),
-														editor_connection_available: false
-													}
-												)))
-											)?;
+										for editor in app.state::<AppState>().editor_states.iter() {
+											if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } =
+												editor.data
+											{
+												send_request(
+													&app,
+													Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+														EntityTreeRequest::SetEditorConnectionAvailable {
+															editor_id: editor.key().to_owned(),
+															editor_connection_available: false
+														}
+													)))
+												)?;
 
-											send_request(
-												&app,
-												Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-													EntityMonacoRequest::SetEditorConnected {
-														editor_id: editor.key().to_owned(),
-														connected: false
-													}
-												)))
-											)?;
+												send_request(
+													&app,
+													Request::Editor(EditorRequest::Entity(
+														EntityEditorRequest::Monaco(
+															EntityMonacoRequest::SetEditorConnected {
+																editor_id: editor.key().to_owned(),
+																connected: false
+															}
+														)
+													))
+												)?;
+											}
 										}
 									}
+
+									_ => {
+										let msg = msg.to_text().context("Couldn't convert message to text")?;
+
+										let msg: SDKEditorEvent = serde_json::from_str(msg).with_context(|| {
+											format!("Couldn't parse message {msg:?} as SDKEditorEvent")
+										})?;
+
+										// It's ok if there are no listeners
+										let _ = events.send(msg);
+									}
 								}
-
-								_ => {
-									let msg = msg.to_text().context("Couldn't convert message to text")?;
-
-									let msg: SDKEditorEvent = serde_json::from_str(msg)
-										.with_context(|| format!("Couldn't parse message {msg:?} as SDKEditorEvent"))?;
-
-									// It's ok if there are no listeners
-									let _ = events.send(msg);
-								}
+							} {
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::ErrorReport {
+										error: format!("{:?}", e.context("Editor connection message handling error"))
+									})
+								)
+								.expect("Couldn't send error report to frontend");
 							}
-						} {
-							send_request(
-								&app,
-								Request::Global(GlobalRequest::ErrorReport {
-									error: format!("{:?}", e.context("Editor connection message handling error"))
-								})
-							)
-							.expect("Couldn't send error report to frontend");
 						}
-					} else {
-						sender.lock().await.take();
 
-						for editor in app.state::<AppState>().editor_states.iter() {
-							if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-								send_request(
-									&app,
-									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-										EntityTreeRequest::SetEditorConnectionAvailable {
-											editor_id: editor.key().to_owned(),
-											editor_connection_available: false
-										}
-									)))
-								)
-								.expect("Couldn't send data to frontend");
+						Err(e) => {
+							sender.lock().await.take();
 
-								send_request(
-									&app,
-									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-										EntityMonacoRequest::SetEditorConnected {
-											editor_id: editor.key().to_owned(),
-											connected: false
-										}
-									)))
-								)
-								.expect("Couldn't send data to frontend");
+							for editor in app.state::<AppState>().editor_states.iter() {
+								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+											EntityTreeRequest::SetEditorConnectionAvailable {
+												editor_id: editor.key().to_owned(),
+												editor_connection_available: false
+											}
+										)))
+									)
+									.expect("Couldn't send data to frontend");
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::SetEditorConnected {
+												editor_id: editor.key().to_owned(),
+												connected: false
+											}
+										)))
+									)
+									.expect("Couldn't send data to frontend");
+								}
 							}
 						}
 					}
@@ -520,44 +531,12 @@ impl EditorConnection {
 
 			let debounced_events = self.debounced_events.clone();
 
-			let sender = self.sender.clone();
-
-			let entities_loaded = self.entities_loaded.clone();
-
 			spawn(async move {
 				loop {
 					if let Ok(evt) = receiver.recv().await {
 						match evt {
 							SDKEditorEvent::EntityTreeRebuilt => {
 								entity_tree_loaded.store(true, Ordering::SeqCst);
-
-								sender
-									.lock()
-									.await
-									.as_mut()
-									.expect("Not connected")
-									.send(Message::Text(
-										serde_json::to_string(&SDKEditorRequest::ListEntities {
-											editorOnly: false,
-											msgId: None
-										})
-										.expect("Couldn't serialise")
-									))
-									.await
-									.expect("Couldn't send ListEntities request");
-							}
-
-							SDKEditorEvent::EntityList { entities, .. } => {
-								entities_loaded.store(
-									entities
-										.into_iter()
-										.map(|x| match x {
-											EntityBaseDetails::Game { id, tblu } => (id, Some(tblu)),
-											EntityBaseDetails::Editor { id } => (id, None)
-										})
-										.collect_vec()
-										.into()
-								);
 							}
 
 							SDKEditorEvent::SceneClearing { .. } | SDKEditorEvent::SceneLoading { .. } => {
@@ -582,13 +561,15 @@ impl EditorConnection {
 							}
 
 							SDKEditorEvent::Error { message, .. } => {
-								send_request(
-									&app,
-									Request::Global(GlobalRequest::ErrorReport {
-										error: format!("SDK editor error: {:?}", message)
-									})
-								)
-								.expect("Couldn't send error report to frontend");
+								if !message.contains("Could not find entity for the given selector") {
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::ErrorReport {
+											error: format!("SDK editor error: {:?}", message)
+										})
+									)
+									.expect("Couldn't send error report to frontend");
+								}
 							}
 
 							_ => {}
@@ -705,20 +686,13 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't select entity {:?}", entity_id)]
 	pub async fn select_entity(&self, entity_id: &str, tblu: &str) -> Result<()> {
-		if self
-			.entities_loaded
-			.load()
-			.iter()
-			.any(|(x, y)| x == entity_id && y.as_deref() == Some(tblu))
-		{
-			self.send_request(SDKEditorRequest::SelectEntity {
-				entity: EntitySelector::Game {
-					id: entity_id.to_owned(),
-					tblu: tblu.to_owned()
-				}
-			})
-			.await?;
-		}
+		self.send_request(SDKEditorRequest::SelectEntity {
+			entity: EntitySelector::Game {
+				id: entity_id.to_owned(),
+				tblu: tblu.to_owned()
+			}
+		})
+		.await?;
 	}
 
 	#[try_fn]
@@ -802,59 +776,45 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't set property {property} on {entity_id}")]
 	pub async fn set_property(&self, entity_id: &str, tblu: &str, property: &str, value: PropertyValue) -> Result<()> {
-		if self
-			.entities_loaded
-			.load()
-			.iter()
-			.any(|(x, y)| x == entity_id && y.as_deref() == Some(tblu))
-		{
-			self.send_request(SDKEditorRequest::SetEntityProperty {
-				entity: EntitySelector::Game {
-					id: entity_id.to_owned(),
-					tblu: tblu.to_owned()
+		self.send_request(SDKEditorRequest::SetEntityProperty {
+			entity: EntitySelector::Game {
+				id: entity_id.to_owned(),
+				tblu: tblu.to_owned()
+			},
+			property: property
+				.parse()
+				.map(PropertyID::Unknown)
+				.unwrap_or(PropertyID::Known(property.to_owned())),
+			value: convert_qn_property_value_to_rt(
+				&Property {
+					property_type: value.property_type,
+					value: value.data,
+					post_init: None
 				},
-				property: property
-					.parse()
-					.map(PropertyID::Unknown)
-					.unwrap_or(PropertyID::Known(property.to_owned())),
-				value: convert_qn_property_value_to_rt(
-					&Property {
-						property_type: value.property_type,
-						value: value.data,
-						post_init: None
-					},
-					&Default::default(),
-					&Default::default(),
-					&Default::default(),
-					&Default::default()
-				)
-				.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-			})
-			.await?;
-		}
+				&Default::default(),
+				&Default::default(),
+				&Default::default(),
+				&Default::default()
+			)
+			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+		})
+		.await?;
 	}
 
 	#[try_fn]
 	#[context("Couldn't signal pin {pin} on {entity_id}")]
 	pub async fn signal_pin(&self, entity_id: &str, tblu: &str, pin: &str, output: bool) -> Result<()> {
-		if self
-			.entities_loaded
-			.load()
-			.iter()
-			.any(|(x, y)| x == entity_id && y.as_deref() == Some(tblu))
-		{
-			self.send_request(SDKEditorRequest::SignalEntityPin {
-				entity: EntitySelector::Game {
-					id: entity_id.to_owned(),
-					tblu: tblu.to_owned()
-				},
-				pin: pin
-					.parse()
-					.map(PropertyID::Unknown)
-					.unwrap_or(PropertyID::Known(pin.to_owned())),
-				output
-			})
-			.await?;
-		}
+		self.send_request(SDKEditorRequest::SignalEntityPin {
+			entity: EntitySelector::Game {
+				id: entity_id.to_owned(),
+				tblu: tblu.to_owned()
+			},
+			pin: pin
+				.parse()
+				.map(PropertyID::Unknown)
+				.unwrap_or(PropertyID::Known(pin.to_owned())),
+			output
+		})
+		.await?;
 	}
 }

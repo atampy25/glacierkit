@@ -710,23 +710,8 @@ fn event(app: AppHandle, event: Event) {
 													.entities
 													.par_iter()
 													.filter(|(id, ent)| {
-														let mut parent_names = vec![];
-
-														// Get all parent names
-														let mut parent_ent = *ent;
-
-														while let Ref::Short(Some(ref x)) = &parent_ent.parent {
-															if let Some(next) = entity.entities.get(x) {
-																parent_names.push(next.name.to_owned());
-																parent_ent = next;
-															} else {
-																break;
-															}
-														}
-
 														let mut s = format!(
-															"{}{}{}",
-															parent_names.join("/"),
+															"{}{}",
 															id,
 															to_string(ent).unwrap()
 														);

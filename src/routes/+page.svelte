@@ -612,7 +612,7 @@
 								{/if}
 								<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 								<div
-									class="mt-8 mx-16 flex gap-2 items-center text-neutral-300 cursor-pointer"
+									class="mt-8 mx-16 flex gap-2 items-center text-neutral-300 cursor-pointer leading-snug"
 									on:click={() => {
 										hint = hints[(hints.indexOf(hint) + 1) % hints.length]
 									}}><Idea size={20} />{hint}</div

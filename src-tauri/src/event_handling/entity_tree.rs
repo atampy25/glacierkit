@@ -228,12 +228,16 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		finish_task(app, task)?;
 	}
 
+	let task = start_task(app, format!("Selecting {} in editor", id))?;
+
 	if app_state.editor_connection.is_connected().await {
 		app_state
 			.editor_connection
 			.select_entity(&id, &entity.blueprint_hash)
 			.await?;
 	}
+
+	finish_task(app, task)?;
 }
 
 #[try_fn]

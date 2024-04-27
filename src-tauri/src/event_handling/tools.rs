@@ -1377,8 +1377,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						interval.tick().await;
 
 						// Attempt to connect every 10 seconds
-						if TcpStream::connect("localhost:46735").await.is_ok() {
-							let _ = app.state::<AppState>().editor_connection.connect().await;
+						if !app.state::<AppState>().editor_connection.is_connected().await {
+							if TcpStream::connect("localhost:46735").await.is_ok() {
+								let _ = app.state::<AppState>().editor_connection.connect().await;
+							}
 						}
 					}
 				});
