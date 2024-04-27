@@ -223,7 +223,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					EditorState {
 						file: Some(path.to_owned()),
 						data: EditorData::Text {
-							content: fs::read_to_string(path).context("Couldn't read file")?,
+							content: fs::read_to_string(path)
+								.context("Couldn't read file")?
+								.replace("\r\n", "\n"),
 							file_type: file_type.to_owned()
 						}
 					}
@@ -247,7 +249,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					EditorState {
 						file: Some(path.to_owned()),
 						data: EditorData::Text {
-							content: fs::read_to_string(path).context("Couldn't read file")?,
+							content: fs::read_to_string(path)
+								.context("Couldn't read file")?
+								.replace("\r\n", "\n"),
 							file_type: TextFileType::PlainText
 						}
 					}
@@ -273,7 +277,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					EditorState {
 						file: Some(path.to_owned()),
 						data: EditorData::Text {
-							content: fs::read_to_string(path).context("Couldn't read file")?,
+							content: fs::read_to_string(path)
+								.context("Couldn't read file")?
+								.replace("\r\n", "\n"),
 							file_type: TextFileType::Markdown
 						}
 					}
@@ -644,7 +650,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							EditorState {
 								file: Some(path.to_owned()),
 								data: EditorData::Text {
-									content: fs::read_to_string(path).context("Couldn't read file")?,
+									content: fs::read_to_string(path)
+										.context("Couldn't read file")?
+										.replace("\r\n", "\n"),
 									file_type: TextFileType::Json
 								}
 							}
@@ -672,7 +680,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					EditorState {
 						file: Some(path.to_owned()),
 						data: EditorData::Text {
-							content: fs::read_to_string(path).context("Couldn't read file")?,
+							content: fs::read_to_string(path)
+								.context("Couldn't read file")?
+								.replace("\r\n", "\n"),
 							file_type: TextFileType::Json
 						}
 					}
