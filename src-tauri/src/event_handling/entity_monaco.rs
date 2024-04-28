@@ -25,7 +25,7 @@ use crate::{
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
-pub const SAFE_TO_SYNC: [&str; 42] = [
+pub const SAFE_TO_SYNC: [&str; 43] = [
 	"SMatrix43",
 	"float32",
 	"bool",
@@ -67,7 +67,8 @@ pub const SAFE_TO_SYNC: [&str; 42] = [
 	"TArray<AI.SFirePattern01>",
 	"TArray<AI.SFirePattern02>",
 	"SSCCuriousConfiguration",
-	"TArray<SColorRGB>"
+	"TArray<SColorRGB>",
+	"SEntityTemplateReference"
 ];
 
 #[try_fn]

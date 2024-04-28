@@ -14,12 +14,13 @@ use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
-	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn, qn_structs::Property,
+	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn,
+	qn_structs::{FullRef, Property, Ref},
 	rt_structs::SEntityTemplatePropertyValue
 };
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Value};
+use serde_json::{from_value, json, Value};
 use specta::Type;
 use tauri::{async_runtime::spawn, AppHandle, Manager};
 use tokio::{
@@ -40,6 +41,7 @@ use crate::{
 		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest,
 		EntityTreeRequest, Event, GlobalRequest, Request
 	},
+	rpkg::normalise_to_hash,
 	send_notification, send_request, Notification, NotificationKind
 };
 
@@ -465,6 +467,16 @@ impl EditorConnection {
 												)?;
 											}
 										}
+
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Info,
+												title: "Disconnected from ZHMModSDK editor".into(),
+												subtitle: "Editor integration features will no longer be available."
+													.into()
+											}
+										)?;
 									}
 
 									_ => {
@@ -517,6 +529,16 @@ impl EditorConnection {
 									.expect("Couldn't send data to frontend");
 								}
 							}
+
+							send_notification(
+								&app,
+								Notification {
+									kind: NotificationKind::Info,
+									title: "Disconnected from ZHMModSDK editor".into(),
+									subtitle: "Editor integration features will no longer be available.".into()
+								}
+							)
+							.expect("Couldn't send data to frontend");
 						}
 					}
 				})
@@ -776,29 +798,64 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't set property {property} on {entity_id}")]
 	pub async fn set_property(&self, entity_id: &str, tblu: &str, property: &str, value: PropertyValue) -> Result<()> {
-		self.send_request(SDKEditorRequest::SetEntityProperty {
-			entity: EntitySelector::Game {
-				id: entity_id.to_owned(),
-				tblu: tblu.to_owned()
-			},
-			property: property
-				.parse()
-				.map(PropertyID::Unknown)
-				.unwrap_or(PropertyID::Known(property.to_owned())),
-			value: convert_qn_property_value_to_rt(
-				&Property {
-					property_type: value.property_type,
-					value: value.data,
-					post_init: None
+		if value.property_type == "SEntityTemplateReference" {
+			self.send_request(SDKEditorRequest::SetEntityProperty {
+				entity: EntitySelector::Game {
+					id: entity_id.to_owned(),
+					tblu: tblu.to_owned()
 				},
-				&Default::default(),
-				&Default::default(),
-				&Default::default(),
-				&Default::default()
-			)
-			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-		})
-		.await?;
+				property: property
+					.parse()
+					.map(PropertyID::Unknown)
+					.unwrap_or(PropertyID::Known(property.to_owned())),
+				value: match from_value::<Ref>(value.data)? {
+					Ref::Full(FullRef {
+						entity_ref,
+						external_scene: Some(scene),
+						exposed_entity: None
+					}) => json!({
+						"id": entity_ref,
+						"source": "game",
+						"tblu": normalise_to_hash(scene)
+					}),
+
+					Ref::Short(Some(entity_id)) => json!({
+						"id": entity_id,
+						"source": "game",
+						"tblu": tblu.to_owned()
+					}),
+
+					Ref::Short(None) => Value::Null,
+
+					_ => return Ok(()) // Can't set exposed entities
+				}
+			})
+			.await?;
+		} else {
+			self.send_request(SDKEditorRequest::SetEntityProperty {
+				entity: EntitySelector::Game {
+					id: entity_id.to_owned(),
+					tblu: tblu.to_owned()
+				},
+				property: property
+					.parse()
+					.map(PropertyID::Unknown)
+					.unwrap_or(PropertyID::Known(property.to_owned())),
+				value: convert_qn_property_value_to_rt(
+					&Property {
+						property_type: value.property_type,
+						value: value.data,
+						post_init: None
+					},
+					&Default::default(),
+					&Default::default(),
+					&Default::default(),
+					&Default::default()
+				)
+				.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+			})
+			.await?;
+		}
 	}
 
 	#[try_fn]

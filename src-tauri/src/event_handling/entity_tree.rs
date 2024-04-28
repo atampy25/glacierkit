@@ -1968,6 +1968,30 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 
 	let player_transform = app_state.editor_connection.get_player_transform().await?;
 
+	if entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"))
+		.is_some()
+	{
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eidParent",
+				PropertyValue {
+					property_type: "SEntityTemplateReference".into(),
+					data: Value::Null
+				}
+			)
+			.await?;
+	}
+
 	let property = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2013,15 +2037,6 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 			}
 		)
 		.await?;
-
-	let _ = entity
-		.entities
-		.get_mut(&entity_id)
-		.context("No such entity")?
-		.properties
-		.as_mut()
-		.unwrap()
-		.shift_remove(&String::from("m_eidParent"));
 
 	if let Some(intellisense) = app_state.intellisense.load().as_ref()
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
@@ -2148,6 +2163,30 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 
 	let player_transform = app_state.editor_connection.get_player_transform().await?;
 
+	if entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"))
+		.is_some()
+	{
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eidParent",
+				PropertyValue {
+					property_type: "SEntityTemplateReference".into(),
+					data: Value::Null
+				}
+			)
+			.await?;
+	}
+
 	let property = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2193,15 +2232,6 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 			}
 		)
 		.await?;
-
-	let _ = entity
-		.entities
-		.get_mut(&entity_id)
-		.context("No such entity")?
-		.properties
-		.as_mut()
-		.unwrap()
-		.shift_remove(&String::from("m_eidParent"));
 
 	if let Some(intellisense) = app_state.intellisense.load().as_ref()
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
@@ -2328,6 +2358,30 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 
 	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
 
+	if entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"))
+		.is_some()
+	{
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eidParent",
+				PropertyValue {
+					property_type: "SEntityTemplateReference".into(),
+					data: Value::Null
+				}
+			)
+			.await?;
+	}
+
 	let property = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2373,15 +2427,6 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 			}
 		)
 		.await?;
-
-	let _ = entity
-		.entities
-		.get_mut(&entity_id)
-		.context("No such entity")?
-		.properties
-		.as_mut()
-		.unwrap()
-		.shift_remove(&String::from("m_eidParent"));
 
 	if let Some(intellisense) = app_state.intellisense.load().as_ref()
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
@@ -2508,6 +2553,30 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 
 	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
 
+	if entity
+		.entities
+		.get_mut(&entity_id)
+		.context("No such entity")?
+		.properties
+		.as_mut()
+		.unwrap()
+		.shift_remove(&String::from("m_eidParent"))
+		.is_some()
+	{
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eidParent",
+				PropertyValue {
+					property_type: "SEntityTemplateReference".into(),
+					data: Value::Null
+				}
+			)
+			.await?;
+	}
+
 	let property = entity
 		.entities
 		.get_mut(&entity_id)
@@ -2553,15 +2622,6 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 			}
 		)
 		.await?;
-
-	let _ = entity
-		.entities
-		.get_mut(&entity_id)
-		.context("No such entity")?
-		.properties
-		.as_mut()
-		.unwrap()
-		.shift_remove(&String::from("m_eidParent"));
 
 	if let Some(intellisense) = app_state.intellisense.load().as_ref()
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
