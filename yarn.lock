@@ -564,7 +564,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/api@npm:^1.0.0, @tauri-apps/api@npm:^1.5.3":
+"@tauri-apps/api@npm:1.5.3, @tauri-apps/api@npm:^1.0.0, @tauri-apps/api@npm:^1.5.3":
   version: 1.5.3
   resolution: "@tauri-apps/api@npm:1.5.3"
   checksum: 7709c368603881d1f615eb334261339b55f479e44af112702ce42e65a7bf1cfd48e95a7ad3efec9d275d78c09af43fe0b7c3acffc7cef6a14a470a457b807272
@@ -2624,6 +2624,7 @@ __metadata:
     svelte-check: "npm:^3.6.0"
     svelte-splitpanes: "npm:^0.8.0"
     tailwindcss: "npm:^3.4.0"
+    tauri-plugin-log: "https://github.com/tauri-apps/tauri-plugin-log#v1"
     tslib: "npm:^2.4.1"
     typescript: "npm:^5.0.0"
     uuid: "npm:^9.0.1"
@@ -3651,6 +3652,15 @@ __metadata:
     mkdirp: "npm:^1.0.3"
     yallist: "npm:^4.0.0"
   checksum: 02ca064a1a6b4521fef88c07d389ac0936730091f8c02d30ea60d472e0378768e870769ab9e986d87807bfee5654359cf29ff4372746cc65e30cbddc352660d8
+  languageName: node
+  linkType: hard
+
+"tauri-plugin-log@https://github.com/tauri-apps/tauri-plugin-log#v1":
+  version: 0.0.0
+  resolution: "tauri-plugin-log@https://github.com/tauri-apps/tauri-plugin-log.git#commit=752531f21f626c9f9f1716a28c4a37054c679657"
+  dependencies:
+    "@tauri-apps/api": "npm:1.5.3"
+  checksum: 9a23af3f489633faca6b8a8be339920d7154b18ba32dcb4ca0c635944039b80c0e436a88ac622592e6603d36054a4ac3156f4fcb5e4d85e06d8eb3b9329a66ea
   languageName: node
   linkType: hard
 

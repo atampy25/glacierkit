@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::HashSet;
+use log::debug;
 use quickentity_rs::qn_structs::Ref;
 
 use serde_json::from_str;
@@ -254,6 +255,8 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							}
 
 							if should_sync && SAFE_TO_SYNC.iter().any(|&x| val.property_type == x) {
+								debug!("Syncing property {} for entity {}", property, entity_id);
+
 								app_state
 									.editor_connection
 									.set_property(

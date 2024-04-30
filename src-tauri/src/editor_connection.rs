@@ -7,12 +7,10 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Error, Result};
-use arc_swap::ArcSwap;
 use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use indexmap::IndexMap;
-use itertools::Itertools;
 use quickentity_rs::{
 	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn,
 	qn_structs::{FullRef, Property, Ref},
@@ -25,14 +23,10 @@ use specta::Type;
 use tauri::{async_runtime::spawn, AppHandle, Manager};
 use tokio::{
 	net::TcpStream,
-	sync::{broadcast, Mutex}
+	sync::{broadcast, RwLock}
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tokio_tungstenite::{
-	connect_async,
-	tungstenite::{protocol::WebSocketConfig, Message},
-	MaybeTlsStream, WebSocketStream
-};
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tryvial::try_fn;
 
 use crate::{
@@ -307,7 +301,7 @@ pub enum SDKEditorEvent {
 }
 
 pub struct EditorConnection {
-	sender: Arc<Mutex<Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>>>,
+	sender: Arc<RwLock<Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>>>,
 	events: broadcast::Sender<SDKEditorEvent>,
 	debounced_events: tokio::sync::mpsc::Sender<SDKEditorEvent>,
 	entity_tree_loaded: Arc<AtomicBool>,
@@ -402,7 +396,7 @@ impl EditorConnection {
 		});
 
 		Self {
-			sender: Mutex::new(None).into(),
+			sender: RwLock::new(None).into(),
 			events: sender,
 			entity_tree_loaded: AtomicBool::new(false).into(),
 			debounced_events: tx,
@@ -413,7 +407,7 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't connect to editor server")]
 	pub async fn connect(&self) -> Result<()> {
-		let mut sender_guard = self.sender.lock().await;
+		let mut sender_guard = self.sender.write().await;
 
 		if sender_guard.is_none() {
 			let (ws_stream, _) = connect_async("ws://localhost:46735")
@@ -438,7 +432,7 @@ impl EditorConnection {
 									Message::Pong(_) => {}
 
 									Message::Close(_) => {
-										sender.lock().await.take();
+										sender.write().await.take();
 
 										for editor in app.state::<AppState>().editor_states.iter() {
 											if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } =
@@ -502,7 +496,7 @@ impl EditorConnection {
 						}
 
 						Err(e) => {
-							sender.lock().await.take();
+							sender.write().await.take();
 
 							for editor in app.state::<AppState>().editor_states.iter() {
 								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
@@ -650,7 +644,7 @@ impl EditorConnection {
 
 	#[try_fn]
 	pub async fn disconnect(&self) -> Result<()> {
-		let mut sender_guard = self.sender.lock().await;
+		let mut sender_guard = self.sender.write().await;
 
 		if sender_guard.is_some() {
 			self.entity_tree_loaded.store(false, Ordering::SeqCst);
@@ -664,14 +658,14 @@ impl EditorConnection {
 	}
 
 	pub async fn is_connected(&self) -> bool {
-		self.sender.lock().await.is_some()
+		self.sender.read().await.is_some()
 	}
 
 	#[try_fn]
 	async fn send_request(&self, request: SDKEditorRequest) -> Result<()> {
 		if !self.entity_tree_loaded.load(Ordering::SeqCst) {
 			self.sender
-				.lock()
+				.write()
 				.await
 				.as_mut()
 				.context("Not connected")?
@@ -685,7 +679,7 @@ impl EditorConnection {
 		}
 
 		self.sender
-			.lock()
+			.write()
 			.await
 			.as_mut()
 			.context("Not connected")?

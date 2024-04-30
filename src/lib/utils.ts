@@ -1,4 +1,5 @@
 import { type Event, commands } from "$lib/bindings"
+import { trace } from "tauri-plugin-log"
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type ObjectEntry<T extends {}> = T extends object
@@ -17,7 +18,7 @@ export function typedEntries<T extends {}>(object: T): ReadonlyArray<ObjectEntry
 }
 
 export async function event(event: Event) {
-	console.log("Sending event", event)
+	trace(`Sending event ${JSON.stringify(event, undefined, "\t")}`)
 	await commands.event(event)
 }
 

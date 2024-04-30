@@ -18,6 +18,7 @@
 	import * as monaco from "monaco-editor"
 	import { createPatch } from "rfc6902"
 	import { writeTextFile } from "@tauri-apps/api/fs"
+	import { attachConsole } from "tauri-plugin-log"
 
 	let tasks: [string, string][] = []
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
@@ -40,6 +41,8 @@
 	beforeUpdate(async () => {
 		if (!hasListened) {
 			hasListened = true
+
+			const detachConsole = await attachConsole()
 
 			const unlistenStartTask = await listen("start-task", ({ payload: task }: { payload: [string, string] }) => {
 				tasks = [...tasks, task]
@@ -94,6 +97,7 @@
 				unlistenFinishTask()
 				unlistedNotification()
 				unlistenRequest()
+				detachConsole()
 			}
 
 			self.MonacoEnvironment = {

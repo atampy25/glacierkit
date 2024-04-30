@@ -439,6 +439,8 @@
 														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
 															let d = tree.get_node(b.reference)
 
+															trackEvent("Select in editor")
+
 															await event({
 																type: "editor",
 																data: {
@@ -464,6 +466,8 @@
 														icon: "fa-solid fa-location-dot",
 														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
 															let d = tree.get_node(b.reference)
+
+															trackEvent("Move to player position")
 
 															await event({
 																type: "editor",
@@ -491,6 +495,8 @@
 														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
 															let d = tree.get_node(b.reference)
 
+															trackEvent("Adjust rotation to player")
+
 															await event({
 																type: "editor",
 																data: {
@@ -517,6 +523,8 @@
 														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
 															let d = tree.get_node(b.reference)
 
+															trackEvent("Move to camera position")
+
 															await event({
 																type: "editor",
 																data: {
@@ -542,6 +550,8 @@
 														icon: "fa-solid fa-location-dot",
 														action: async (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) => {
 															let d = tree.get_node(b.reference)
+
+															trackEvent("Adjust rotation to camera")
 
 															await event({
 																type: "editor",
@@ -576,6 +586,8 @@
 												action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
 													const tree = jQuery.jstree!.reference(b.reference)
 													const selected_node = tree.get_node(b.reference)
+
+													trackEvent("Revert changed entity to original")
 
 													await event({
 														type: "editor",

@@ -294,6 +294,8 @@
 					const pin = editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
 					const output = !JSON.parse(editor.getValue()).inputCopying[pin]
 
+					trackEvent("Signal pin in-game")
+
 					await event({
 						type: "editor",
 						data: {

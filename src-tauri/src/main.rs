@@ -56,6 +56,7 @@ use game_detection::detect_installs;
 use general::open_file;
 use hashbrown::{HashMap, HashSet};
 use indexmap::IndexMap;
+use log::{info, trace, LevelFilter};
 use model::{
 	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
 	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorEvent, EntityEditorRequest, EntityGeneralEvent,
@@ -75,6 +76,7 @@ use serde_json::{from_slice, from_str, json, to_string, to_value, to_vec, Value}
 use show_in_folder::show_in_folder;
 use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
+use tauri_plugin_log::LogTarget;
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
@@ -139,9 +141,17 @@ fn main() {
 				})
 				.build()
 		)
+		.plugin(
+			tauri_plugin_log::Builder::default()
+				.targets([LogTarget::LogDir, LogTarget::Stdout, LogTarget::Webview])
+				.level_for("tauri_plugin_aptabase", LevelFilter::Off)
+				.build()
+		)
 		.plugin(specta)
 		.setup(|app| {
 			app.track_event("App started", None);
+
+			info!("Starting app");
 
 			let app_data_path = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
@@ -164,9 +174,13 @@ fn main() {
 				app.manage(ArcSwap::new(settings.into()));
 			}
 
+			info!("Loaded settings");
+
 			if app_data_path.join("temp").exists() {
 				fs::remove_dir_all(app_data_path.join("temp"))?;
 			}
+
+			info!("Removed temp folder");
 
 			app.manage(AppState {
 				game_installs: detect_installs().expect("Couldn't detect game installs"),
@@ -189,6 +203,8 @@ fn main() {
 				editor_connection: EditorConnection::new(app.handle())
 			});
 
+			info!("Managed state");
+
 			Ok(())
 		})
 		.build(tauri::generate_context!())
@@ -209,6 +225,8 @@ pub fn handle_event(app: &AppHandle, evt: Event) {
 #[specta::specta]
 fn event(app: AppHandle, event: Event) {
 	async_runtime::spawn(async move {
+		trace!("Handling event: {:?}", event);
+
 		let cloned_app = app.clone();
 
 		if let Err(e) = async_runtime::spawn(async move {
@@ -710,11 +728,7 @@ fn event(app: AppHandle, event: Event) {
 													.entities
 													.par_iter()
 													.filter(|(id, ent)| {
-														let mut s = format!(
-															"{}{}",
-															id,
-															to_string(ent).unwrap()
-														);
+														let mut s = format!("{}{}", id, to_string(ent).unwrap());
 														s.make_ascii_lowercase();
 														query.split(' ').all(|q| s.contains(q))
 													})
@@ -1596,9 +1610,6 @@ fn event(app: AppHandle, event: Event) {
 															*view = current
 																.pointer(
 																	&path
-																		.chars()
-																		.skip(1)
-																		.collect::<String>()
 																		.split('/')
 																		.collect::<Vec<_>>()
 																		.into_iter()
@@ -1959,9 +1970,6 @@ fn event(app: AppHandle, event: Event) {
 															*view = current
 																.pointer(
 																	&path
-																		.chars()
-																		.skip(1)
-																		.collect::<String>()
 																		.split('/')
 																		.collect::<Vec<_>>()
 																		.into_iter()
