@@ -495,7 +495,7 @@ impl EditorConnection {
 							}
 						}
 
-						Err(e) => {
+						Err(_) => {
 							sender.write().await.take();
 
 							for editor in app.state::<AppState>().editor_states.iter() {

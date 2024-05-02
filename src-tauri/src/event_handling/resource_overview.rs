@@ -7,9 +7,9 @@ use hashbrown::HashMap;
 use image::{io::Reader as ImageReader, ImageFormat};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
-use rpkg_rs::{runtime::resource::partition_manager::PartitionManager, GlacierResource};
+use rpkg_rs::{resource::partition_manager::PartitionManager, GlacierResource};
 use serde::Serialize;
-use serde_json::{from_slice, from_value, json, to_string, to_vec, Value};
+use serde_json::{from_slice, json, to_string, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tauri_plugin_aptabase::EventTracker;
 use tex_rs::texture_map::TextureMap;
@@ -23,11 +23,10 @@ use crate::{
 	general::open_in_editor,
 	hash_list::HashList,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, JsonPatchType,
-		Request, ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
+		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Request,
+		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
 	},
-	ores::{parse_hashes_ores, parse_json_ores, UnlockableItem},
-	repository::RepositoryItem,
+	ores::{parse_hashes_ores, parse_json_ores},
 	resourcelib::{
 		convert_generic, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
 		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
@@ -1145,17 +1144,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				if hash == "0057C2C3941115CA"{
+				if hash == "0057C2C3941115CA" {
 					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
-	
+
 					let mut dialog = AsyncFileDialog::new().set_title("Extract file");
-	
+
 					if let Some(project) = app_state.project.load().as_ref() {
 						dialog = dialog.set_directory(&project.path);
 					}
-	
+
 					let res_data = parse_json_ores(&res_data)?;
-	
+
 					if let Some(save_handle) = dialog
 						.set_file_name(&format!("{}.json", hash))
 						.add_filter("JSON file", &["json"])
@@ -1163,25 +1162,27 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						.await
 					{
 						fs::write(save_handle.path(), to_vec(&res_data)?)?;
-					}}else{
-				let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					}
+				} else {
+					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+					let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
+					if let Some(project) = app_state.project.load().as_ref() {
+						dialog = dialog.set_directory(&project.path);
+					}
+
+					let res_data = parse_hashes_ores(&res_data)?;
+
+					if let Some(save_handle) = dialog
+						.set_file_name(&format!("{}.json", hash))
+						.add_filter("JSON file", &["json"])
+						.save_file()
+						.await
+					{
+						fs::write(save_handle.path(), to_vec(&res_data)?)?;
+					}
 				}
-
-				let res_data = parse_hashes_ores(&res_data)?;
-
-				if let Some(save_handle) = dialog
-					.set_file_name(&format!("{}.json", hash))
-					.add_filter("JSON file", &["json"])
-					.save_file()
-					.await
-				{
-					fs::write(save_handle.path(), to_vec(&res_data)?)?;
-				}}
 			}
 		}
 

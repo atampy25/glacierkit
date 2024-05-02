@@ -6,7 +6,7 @@ use quickentity_rs::{
 	qn_structs::Entity,
 	rpkg_structs::{ResourceDependency, ResourceMeta}
 };
-use rpkg_rs::runtime::resource::{
+use rpkg_rs::resource::{
 	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_package::ResourceReferenceFlags,
 	resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
 };
@@ -23,16 +23,15 @@ use crate::{
 
 pub fn convert_resource_info_to_rpkg_meta_no_hl(info: &ResourceInfo) -> ResourceMeta {
 	ResourceMeta {
-		hash_offset: info.get_data_offset(),
-		hash_size: (info.get_compressed_size().unwrap_or(0) | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
-			as u32,
-		hash_size_final: info.get_size(),
-		hash_value: info.get_rrid().to_hex_string(),
-		hash_size_in_memory: info.get_system_memory_requirement(),
-		hash_size_in_video_memory: info.get_video_memory_requirement(),
-		hash_resource_type: info.get_type(),
+		hash_offset: info.data_offset(),
+		hash_size: (info.compressed_size().unwrap_or(0) | (if info.is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
+		hash_size_final: info.size(),
+		hash_value: info.rrid().to_hex_string(),
+		hash_size_in_memory: info.system_memory_requirement(),
+		hash_size_in_video_memory: info.video_memory_requirement(),
+		hash_resource_type: info.data_type(),
 		hash_reference_data: info
-			.get_all_references()
+			.references()
 			.iter()
 			.map(|(hash, flag)| ResourceDependency {
 				flag: format!(
@@ -45,23 +44,22 @@ pub fn convert_resource_info_to_rpkg_meta_no_hl(info: &ResourceInfo) -> Resource
 				hash: hash.to_hex_string()
 			})
 			.collect(),
-		hash_reference_table_size: info.get_reference_chunk_size() as u32,
-		hash_reference_table_dummy: info.get_states_chunk_size() as u32
+		hash_reference_table_size: info.reference_chunk_size() as u32,
+		hash_reference_table_dummy: info.states_chunk_size() as u32
 	}
 }
 
 pub fn convert_resource_info_to_rpkg_meta(hash_list: &HashList, info: &ResourceInfo) -> ResourceMeta {
 	ResourceMeta {
-		hash_offset: info.get_data_offset(),
-		hash_size: (info.get_compressed_size().unwrap_or(0) | (if info.get_is_scrambled() { 0x80000000 } else { 0x0 }))
-			as u32,
-		hash_size_final: info.get_size(),
-		hash_value: info.get_rrid().to_hex_string(),
-		hash_size_in_memory: info.get_system_memory_requirement(),
-		hash_size_in_video_memory: info.get_video_memory_requirement(),
-		hash_resource_type: info.get_type(),
+		hash_offset: info.data_offset(),
+		hash_size: (info.compressed_size().unwrap_or(0) | (if info.is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
+		hash_size_final: info.size(),
+		hash_value: info.rrid().to_hex_string(),
+		hash_size_in_memory: info.system_memory_requirement(),
+		hash_size_in_video_memory: info.video_memory_requirement(),
+		hash_resource_type: info.data_type(),
 		hash_reference_data: info
-			.get_all_references()
+			.references()
 			.iter()
 			.map(|(hash, flag)| ResourceDependency {
 				flag: format!(
@@ -84,8 +82,8 @@ pub fn convert_resource_info_to_rpkg_meta(hash_list: &HashList, info: &ResourceI
 					.unwrap_or_else(|| hash.to_hex_string())
 			})
 			.collect(),
-		hash_reference_table_size: info.get_reference_chunk_size() as u32,
-		hash_reference_table_dummy: info.get_states_chunk_size() as u32
+		hash_reference_table_size: info.reference_chunk_size() as u32,
+		hash_reference_table_dummy: info.states_chunk_size() as u32
 	}
 }
 
@@ -100,16 +98,16 @@ pub fn extract_latest_resource(
 
 	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
 
-	for partition in game_files.get_all_partitions() {
+	for partition in game_files.partitions() {
 		if let Some((info, _)) = partition
-			.get_latest_resources()
+			.latest_resources()
 			.into_iter()
-			.find(|(x, _)| *x.get_rrid() == resource_id)
+			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			return Ok((
 				convert_resource_info_to_rpkg_meta(hash_list, info),
 				partition
-					.get_resource(&resource_id)
+					.read_resource(&resource_id)
 					.context("Couldn't extract resource using rpkg-rs")?
 			));
 		}
@@ -125,16 +123,16 @@ pub fn extract_latest_resource_no_hl(game_files: &PartitionManager, resource: &s
 
 	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
 
-	for partition in game_files.get_all_partitions() {
+	for partition in game_files.partitions() {
 		if let Some((info, _)) = partition
-			.get_latest_resources()
+			.latest_resources()
 			.into_iter()
-			.find(|(x, _)| *x.get_rrid() == resource_id)
+			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			return Ok((
 				convert_resource_info_to_rpkg_meta_no_hl(info),
 				partition
-					.get_resource(&resource_id)
+					.read_resource(&resource_id)
 					.context("Couldn't extract resource using rpkg-rs")?
 			));
 		}
@@ -154,11 +152,11 @@ pub fn extract_latest_metadata(
 
 	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
 
-	for partition in game_files.get_all_partitions() {
+	for partition in game_files.partitions() {
 		if let Some((info, _)) = partition
-			.get_latest_resources()
+			.latest_resources()
 			.into_iter()
-			.find(|(x, _)| *x.get_rrid() == resource_id)
+			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			return Ok(convert_resource_info_to_rpkg_meta(hash_list, info));
 		}
@@ -175,19 +173,19 @@ pub fn extract_latest_overview_info(
 ) -> Result<(String, String, Vec<(String, String)>)> {
 	let resource_id = RuntimeResourceID::from_hex_string(hash)?;
 
-	for partition in game_files.get_all_partitions() {
+	for partition in game_files.partitions() {
 		if let Some((info, patchlevel)) = partition
-			.get_latest_resources()
+			.latest_resources()
 			.into_iter()
-			.find(|(x, _)| *x.get_rrid() == resource_id)
+			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			return Ok((
-				info.get_type(),
+				info.data_type(),
 				match patchlevel {
-					PatchId::Base => partition.get_partition_info().id.to_string(),
-					PatchId::Patch(level) => format!("{}patch{}", partition.get_partition_info().id, level)
+					PatchId::Base => partition.partition_info().id().to_string(),
+					PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
 				},
-				info.get_all_references()
+				info.references()
 					.iter()
 					.map(|(res_id, flag)| {
 						(

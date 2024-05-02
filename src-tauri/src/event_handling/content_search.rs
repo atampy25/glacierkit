@@ -8,7 +8,7 @@ use itertools::Itertools;
 use quickentity_rs::{convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend, ParallelIterator};
 use regex::bytes::Regex;
-use rpkg_rs::runtime::resource::runtime_resource_id::RuntimeResourceID;
+use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use serde::Serialize;
 use serde_json::{to_string, to_vec};
 use tauri::{AppHandle, Manager};
@@ -52,14 +52,14 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 			.version;
 
 		let resources = game_files
-			.get_all_partitions()
+			.partitions()
 			.into_par_iter()
 			.rev()
 			.flat_map(|partition| {
 				partition
-					.get_latest_resources()
+					.latest_resources()
 					.into_par_iter()
-					.map(move |(resource, _)| (resource.get_rrid(), (partition, resource)))
+					.map(move |(resource, _)| (resource.rrid(), (partition, resource)))
 			})
 			.collect::<HashMap<_, _>>();
 
@@ -78,7 +78,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 					.collect_vec()
 					.into_par_iter()
 					.filter(|(resource_id, (partition, resource_info))| {
-						let filetype = resource_info.get_type();
+						let filetype = resource_info.data_type();
 
 						if filetypes.contains(&filetype) {
 							match filetype.as_ref() {
@@ -86,7 +86,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									let s: Option<Vec<u8>> = try {
 										if use_qn_format {
 											let (temp_data, temp_meta) = (
-												partition.get_resource(resource_id).ok()?,
+												partition.read_resource(resource_id).ok()?,
 												convert_resource_info_to_rpkg_meta_no_hl(resource_info)
 											);
 
@@ -108,7 +108,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											let tblu_rrid = RuntimeResourceID::from_hex_string(blueprint_hash).ok()?;
 
 											let (tblu_data, tblu_meta) = (
-												partition.get_resource(&tblu_rrid).ok()?,
+												partition.read_resource(&tblu_rrid).ok()?,
 												convert_resource_info_to_rpkg_meta_no_hl(
 													partition.get_resource_info(&tblu_rrid).ok()?
 												)
@@ -130,7 +130,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 
 											to_vec(&entity).ok()?
 										} else {
-											let temp_data = partition.get_resource(resource_id).ok()?;
+											let temp_data = partition.read_resource(resource_id).ok()?;
 
 											let factory = match game_version {
 												GameVersion::H1 => convert_2016_factory_to_modern(
@@ -143,9 +143,10 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											};
 
 											let (tblu_rrid, _) = &resource_info
-												.get_reference(factory.blueprint_index_in_resource_header as usize)?;
+												.references()
+												.get(factory.blueprint_index_in_resource_header as usize)?;
 
-											let tblu_data = partition.get_resource(tblu_rrid).ok()?;
+											let tblu_data = partition.read_resource(tblu_rrid).ok()?;
 
 											let blueprint = match game_version {
 												GameVersion::H1 => convert_2016_blueprint_to_modern(
@@ -175,7 +176,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 								| "GIDX" | "WSGB" | "ECPB" | "ENUM" => {
 									let s: Option<_> = try {
 										convert_generic_str(
-											&partition.get_resource(resource_id).ok()?,
+											&partition.read_resource(resource_id).ok()?,
 											game_version,
 											&filetype
 										)
@@ -190,7 +191,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 								}
 
 								"JSON" | "REPO" => {
-									let s: Option<_> = try { partition.get_resource(resource_id).ok()? };
+									let s: Option<_> = try { partition.read_resource(resource_id).ok()? };
 
 									if let Some(s) = s {
 										query.is_match(&s)
@@ -201,7 +202,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 
 								"ORES" => {
 									let s: Option<_> = try {
-										let data = partition.get_resource(resource_id).ok()?;
+										let data = partition.read_resource(resource_id).ok()?;
 
 										if resource_id.to_hex_string() == "0057C2C3941115CA" {
 											to_vec(&parse_json_ores(&data).ok()?).ok()?
@@ -221,7 +222,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
 											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
-											partition.get_resource(resource_id).ok()?
+											partition.read_resource(resource_id).ok()?
 										);
 
 										let clng = hmlanguages::clng::CLNG::new(
@@ -263,7 +264,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
 											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
-											partition.get_resource(resource_id).ok()?
+											partition.read_resource(resource_id).ok()?
 										);
 
 										let ditl = hmlanguages::ditl::DITL::new(
@@ -294,7 +295,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
 											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
-											partition.get_resource(resource_id).ok()?
+											partition.read_resource(resource_id).ok()?
 										);
 
 										let dlge = hmlanguages::dlge::DLGE::new(
@@ -339,7 +340,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
 											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
-											partition.get_resource(resource_id).ok()?
+											partition.read_resource(resource_id).ok()?
 										);
 
 										let locr = hmlanguages::locr::LOCR::new(
@@ -383,7 +384,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
 											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
-											partition.get_resource(resource_id).ok()?
+											partition.read_resource(resource_id).ok()?
 										);
 
 										let rtlv = hmlanguages::rtlv::RTLV::new(
@@ -425,7 +426,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
 											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
-											partition.get_resource(resource_id).ok()?
+											partition.read_resource(resource_id).ok()?
 										);
 
 										let (locr_meta, locr_data) = extract_latest_resource_no_hl(

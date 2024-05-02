@@ -9,7 +9,7 @@ use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, Re
 use rand::{seq::SliceRandom, thread_rng};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
-use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
+use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_string, Value};
 use specta::Type;

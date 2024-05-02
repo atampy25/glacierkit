@@ -19,16 +19,16 @@ use rayon::iter::{
 	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator
 };
 use rpkg_rs::{
-	misc::ini_file_system::IniFileSystem,
-	runtime::resource::{package_defs::PackageDefinitionSource, partition_manager::PartitionManager}
+	misc::ini_file_system::IniFileSystem, resource::partition_manager::PartitionManager,
+	resource::pdefs::PackageDefinitionSource
 };
-use serde::Serialize;
 use serde_json::{from_slice, from_str, from_value, to_value, Value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
+use crate::event_handling::resource_overview::initialise_resource_overview;
 use crate::game_detection::GameVersion;
 use crate::hash_list::HashList;
 use crate::intellisense::Intellisense;
@@ -39,7 +39,6 @@ use crate::model::{
 use crate::ores::{parse_json_ores, UnlockableItem};
 use crate::repository::RepositoryItem;
 use crate::rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
-use crate::{event_handling::resource_overview::initialise_resource_overview, resourcelib::convert_generic};
 use crate::{
 	finish_task, send_notification, send_request, start_task, Notification, NotificationKind, HASH_LIST_ENDPOINT,
 	HASH_LIST_VERSION_ENDPOINT, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT
@@ -753,13 +752,15 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		let thumbs = IniFileSystem::from(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
 
 		let thumbs = thumbs
-			.get_root()
-			.get_section("application")
+			.root()
+			.sections()
+			.get("application")
 			.context("Couldn't get application section")?;
 
-		let (Some(proj_path), Some(relative_runtime_path)) =
-			(thumbs.get_option("PROJECT_PATH"), thumbs.get_option("RUNTIME_PATH"))
-		else {
+		let (Some(proj_path), Some(relative_runtime_path)) = (
+			thumbs.options().get("PROJECT_PATH"),
+			thumbs.options().get("RUNTIME_PATH")
+		) else {
 			bail!("thumbs.dat was missing required properties");
 		};
 
@@ -793,13 +794,13 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		if !app_settings.load().extract_modded_files {
 			for partition in &mut partitions {
-				partition.patch_level = 9;
+				partition.set_max_patch_level(9);
 			}
 		}
 
 		finish_task(app, task)?;
 
-		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
+		let partition_names = partitions.iter().map(|x| x.id().to_string()).collect_vec();
 
 		let mut last_index = 0;
 		let mut last_progress = 0;
@@ -839,14 +840,14 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
 		let resources = partition_manager
-			.get_all_partitions()
+			.partitions()
 			.into_par_iter()
 			.rev()
 			.flat_map(|partition| {
 				partition
-					.get_latest_resources()
+					.latest_resources()
 					.into_par_iter()
-					.map(|(resource, _)| (resource.get_rrid(), resource.get_all_references()))
+					.map(|(resource, _)| (resource.rrid(), resource.references()))
 			})
 			.collect::<HashMap<_, _>>();
 

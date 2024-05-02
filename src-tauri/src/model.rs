@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use notify::RecommendedWatcher;
 use notify_debouncer_full::FileIdMap;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
-use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
+use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;

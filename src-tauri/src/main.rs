@@ -1744,9 +1744,9 @@ fn event(app: AppHandle, event: Event) {
 																y.insert("Guid".into(), to_value(x.id).unwrap());
 																y.extend(
 																	x.data
-																		.to_owned()
-																		.into_iter()
-																		.filter(|(key, _)| key != "Id")
+																		.iter()
+																		.filter(|(key, _)| *key != "Id")
+																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
 																);
 																y
 															}
@@ -1771,9 +1771,9 @@ fn event(app: AppHandle, event: Event) {
 																y.insert("Guid".into(), to_value(x.id).unwrap());
 																y.extend(
 																	x.data
-																		.to_owned()
-																		.into_iter()
-																		.filter(|(key, _)| key != "Id")
+																		.iter()
+																		.filter(|(key, _)| *key != "Id")
+																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
 																);
 																y
 															}
@@ -2017,9 +2017,9 @@ fn event(app: AppHandle, event: Event) {
 																y.insert("Guid".into(), to_value(x.id).unwrap());
 																y.extend(
 																	x.data
-																		.to_owned()
-																		.into_iter()
-																		.filter(|(key, _)| key != "Id")
+																		.iter()
+																		.filter(|(key, _)| *key != "Id")
+																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
 																);
 																y
 															}
@@ -2044,9 +2044,9 @@ fn event(app: AppHandle, event: Event) {
 																y.insert("Guid".into(), to_value(x.id).unwrap());
 																y.extend(
 																	x.data
-																		.to_owned()
-																		.into_iter()
-																		.filter(|(key, _)| key != "Id")
+																		.iter()
+																		.filter(|(key, _)| *key != "Id")
+																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
 																);
 																y
 															}

@@ -12,7 +12,7 @@ use quickentity_rs::{
 	RAD2DEG
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rpkg_rs::runtime::resource::partition_manager::PartitionManager;
+use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, json, to_value, Value};
 use tryvial::try_fn;

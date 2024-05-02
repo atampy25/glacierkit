@@ -5,14 +5,13 @@ use arc_swap::ArcSwap;
 use fn_error_context::context;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use notify::Watcher;
 use quickentity_rs::{
 	apply_patch, convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn, convert_to_rt,
 	generate_patch,
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::{from_slice, from_value, json, to_string, to_value, to_vec, Value};
 use tauri::{async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
@@ -24,11 +23,10 @@ use velcro::vec;
 use crate::general::{load_game_files, open_file};
 use crate::model::{
 	AppSettings, AppState, ContentSearchEvent, EditorData, EditorState, EditorType, FileBrowserEvent, GameBrowserEntry,
-	GameBrowserEvent, GameBrowserRequest, GlobalRequest, JsonPatchType, Request, SearchFilter, SettingsEvent,
-	SettingsRequest, ToolEvent, ToolRequest
+	GameBrowserEvent, GameBrowserRequest, GlobalRequest, Request, SearchFilter, SettingsEvent, SettingsRequest,
+	ToolEvent, ToolRequest
 };
 use crate::ores::{parse_json_ores, UnlockableItem};
-use crate::repository::RepositoryItem;
 use crate::resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
 	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory

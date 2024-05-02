@@ -5619,6 +5619,54 @@
 			{
 				"pin": "Pacified",
 				"description": ""
+			},
+			{
+				"pin": "ItemFound",
+				"description": ""
+			},
+			{
+				"pin": "ItemStashed",
+				"description": ""
+			},
+			{
+				"pin": "BodyBagPlaced",
+				"description": ""
+			},
+			{
+				"pin": "ProjectileBodyShot",
+				"description": ""
+			},
+			{
+				"pin": "ProjectileCrowdBodyShot",
+				"description": ""
+			},
+			{
+				"pin": "EliminateUsed",
+				"description": ""
+			},
+			{
+				"pin": "EliminateSilentUsed",
+				"description": ""
+			},
+			{
+				"pin": "CaughtArmed",
+				"description": ""
+			},
+			{
+				"pin": "InvestigateCurious",
+				"description": ""
+			},
+			{
+				"pin": "HaveUnhiddenBodies",
+				"description": ""
+			},
+			{
+				"pin": "AllBodiesHidden",
+				"description": ""
+			},
+			{
+				"pin": "AllPacifiedHidden",
+				"description": ""
 			}
 		]
 	},
@@ -5782,6 +5830,62 @@
 			},
 			{
 				"pin": "BodyFoundEvent",
+				"description": ""
+			},
+			{
+				"pin": "ChangedDisguiseEvent",
+				"description": ""
+			},
+			{
+				"pin": "TrespassingEvent",
+				"description": ""
+			},
+			{
+				"pin": "DisguiseBlownEvent",
+				"description": ""
+			},
+			{
+				"pin": "DisguiseSuspiciousEvent",
+				"description": ""
+			},
+			{
+				"pin": "BeingFriskedEvent",
+				"description": ""
+			},
+			{
+				"pin": "HoldingIllegalWeaponEvent",
+				"description": ""
+			},
+			{
+				"pin": "ExitInventory",
+				"description": ""
+			},
+			{
+				"pin": "ItemDropped",
+				"description": ""
+			},
+			{
+				"pin": "AccidentBodyFoundEvent",
+				"description": ""
+			},
+			{
+				"pin": "DisguiseClearedEvent",
+				"description": ""
+			},
+			{
+				"pin": "ItemThrown",
+				"description": ""
+			},
+			{
+				"pin": "ItemRemovedFromInventory",
+				"description": ""
+			},
+			{
+				"pin": "DeadBodySeenEvent",
+				"description": ""
+			},
+			{
+				"pin": "BodyHiddenEvent",
 				"description": ""
 			}
 		]

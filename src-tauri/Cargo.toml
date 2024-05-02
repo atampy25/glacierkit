@@ -42,13 +42,13 @@ trash = "3.1.2"
 notify = { version = "6.1.1", default-features = false, features = [
     "macos_fsevent",
 ] }
-quickentity-rs = { path = "../../quickentity-rs" }
+quickentity-rs = { git = "https://github.com/atampy25/quickentity-rs" }
 lazy_static = "1.4.0"
 velcro = "0.5.4"
 indexmap = "2.1.0"
 arboard = "3.3.0"
 rand = "0.8.5"
-rpkg-rs = { path = "../../rpkg-rs" }
+rpkg-rs = { git = "https://github.com/dafitius/rpkg-rs" }
 rfd = "0.10.0"
 async-recursion = "1.0.5"
 parking_lot = "0.12.1"
