@@ -61,7 +61,7 @@
 		"type": "string",
 		"description": "A UUID in standard text format.",
 		"default": "00000000-0000-0000-0000-000000000000",
-		"format": "uuid"
+		"pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 	},
 	"ZGameTime": {
 		"type": "object",
