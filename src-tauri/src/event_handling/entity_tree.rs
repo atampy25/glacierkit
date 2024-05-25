@@ -701,8 +701,10 @@ pub async fn handle_paste(
 								..
 							}) = entity_ref
 							{
-								entity.external_scenes.push(scene.to_owned());
-								added_external_scenes += 1;
+								if !entity.external_scenes.contains(scene) {
+									entity.external_scenes.push(scene.to_owned());
+									added_external_scenes += 1;
+								}
 							}
 
 							alter_ref_according_to_changelist(&entity_ref, &changed_entity_ids)
@@ -762,8 +764,10 @@ pub async fn handle_paste(
 									..
 								}) = entity_ref
 								{
-									entity.external_scenes.push(scene.to_owned());
-									added_external_scenes += 1;
+									if !entity.external_scenes.contains(scene) {
+										entity.external_scenes.push(scene.to_owned());
+										added_external_scenes += 1;
+									}
 								}
 
 								alter_ref_according_to_changelist(&entity_ref, &changed_entity_ids)

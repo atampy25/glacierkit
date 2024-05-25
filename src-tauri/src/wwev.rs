@@ -64,11 +64,13 @@ pub fn parse_wwev(wwev_data: &[u8]) -> Result<WwiseEvent> {
 		x
 	});
 
-	let non_streamed_count = u32::from_le_bytes({
+	let non_streamed_count = i32::from_le_bytes({
 		let mut x = [0u8; 4];
 		wwev.read_exact(&mut x)?;
 		x
 	});
+
+	// TODO: There is apparently another i32 here in 2016 WWEVs
 
 	if non_streamed_count == 0 {
 		// This is a streamed WWEV or it is simply empty
