@@ -12,6 +12,8 @@
 	let uuid = v4()
 	let pathToCalculateHash = ""
 	let stringToCalculateLocHash = ""
+	let hexToDecimal = ""
+	let decimalToHex = ""
 </script>
 
 <div class="w-full h-full p-6 overflow-y-auto">
@@ -58,5 +60,35 @@
 		<br />
 		<div class="bx--label">Decimal</div>
 		<CodeSnippet code={window.crc.crc32(stringToCalculateLocHash.toUpperCase()).toString()} />
+	</div>
+
+	<h4 class="mt-4 mb-2">Hex to decimal</h4>
+	<TextInput
+		bind:value={hexToDecimal}
+		on:change={() => {
+			if (hexToDecimal) {
+				trackEvent("Convert hex to decimal")
+			}
+		}}
+		placeholder="0123456789ABCDEF"
+	/>
+	<div class="mt-4">
+		<div class="bx--label">Decimal</div>
+		<CodeSnippet code={new Decimal("0x" + (hexToDecimal || "0").toLowerCase()).toString()} />
+	</div>
+
+	<h4 class="mt-4 mb-2">Decimal to hex</h4>
+	<TextInput
+		bind:value={decimalToHex}
+		on:change={() => {
+			if (decimalToHex) {
+				trackEvent("Calculate decimal to hex")
+			}
+		}}
+		placeholder="81985529216486895"
+	/>
+	<div class="mt-4">
+		<div class="bx--label">Hex</div>
+		<CodeSnippet code={new Decimal(decimalToHex || "0").toHex().slice(2).toUpperCase()} />
 	</div>
 </div>
