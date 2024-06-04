@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use itertools::Itertools;
 use quickentity_rs::qn_structs::{Entity, Ref};
 use serde::Serialize;
 use serde_json::{from_str, from_value};
@@ -174,7 +175,10 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 		send_request(
 			app,
 			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Overrides(
-				EntityOverridesRequest::UpdateDecorations { editor_id, decorations }
+				EntityOverridesRequest::UpdateDecorations {
+					editor_id,
+					decorations: decorations.into_iter().unique().collect()
+				}
 			)))
 		)?;
 

@@ -855,11 +855,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			.try_reserve(resources.len())
 			.map_err(|e| anyhow!("Reserve error: {e:?}"))?;
 
-		reverse_dependencies.par_extend(
-			resources
-				.par_iter()
-				.map(|(x, _)| (x.to_hex_string(), Default::default()))
-		);
+		reverse_dependencies.par_extend(resources.par_keys().map(|x| (x.to_hex_string(), Default::default())));
 
 		resources
 			.into_par_iter()
@@ -881,7 +877,12 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		app_state.resource_reverse_dependencies.store(Some(
 			reverse_dependencies
 				.into_par_iter()
-				.map(|(x, y)| (x, y.into_iter().dedup().collect()))
+				.map(|(x, mut y)| {
+					(x, {
+						y.sort_unstable();
+						y.into_iter().dedup().collect()
+					})
+				})
 				.collect::<HashMap<_, _>>()
 				.into()
 		));

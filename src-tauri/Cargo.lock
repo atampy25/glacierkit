@@ -6567,11 +6567,12 @@ dependencies = [
 
 [[package]]
 name = "tonytools"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bimap",
  "bitchomp",
  "byteorder",
+ "clap",
  "crc32fast",
  "extended-tea",
  "fancy-regex",
