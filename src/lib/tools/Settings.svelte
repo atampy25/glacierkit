@@ -5,6 +5,7 @@
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
+	import { help } from "$lib/helpray"
 
 	export async function handleRequest(request: SettingsRequest) {
 		console.log("Settings tool handling request", request)
@@ -93,7 +94,10 @@
 	let customPaths: string[] = []
 </script>
 
-<div class="w-full h-full p-6 overflow-x-hidden overflow-y-auto">
+<div
+	class="w-full h-full p-6 overflow-x-hidden overflow-y-auto"
+	use:help={{ title: "Settings", description: "This panel lets you modify GlacierKit's settings. Some settings are GlacierKit-wide, while others are project-specific." }}
+>
 	<h4>GlacierKit settings</h4>
 	<div class="flex items-center gap-2">
 		<div class="flex-shrink">

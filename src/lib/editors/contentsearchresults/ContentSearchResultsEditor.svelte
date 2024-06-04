@@ -3,6 +3,7 @@
 	import { event } from "$lib/utils"
 	import { onMount } from "svelte"
 	import { trackEvent } from "@aptabase/tauri"
+	import { help } from "$lib/helpray"
 
 	export let id: string
 
@@ -39,7 +40,10 @@
 	}
 </script>
 
-<div class="w-full h-full flex flex-col p-4 overflow-y-auto">
+<div
+	class="w-full h-full flex flex-col p-4 overflow-y-auto"
+	use:help={{ title: "Search results", description: "This page lists all the resources matching a previous search made from the Advanced Search panel." }}
+>
 	{#if results.length}
 		<h4 class="mb-1">Results</h4>
 		<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">

@@ -4,6 +4,7 @@
 	import md5 from "md5"
 	import { Decimal } from "decimal.js"
 	import { trackEvent } from "@aptabase/tauri"
+	import { help } from "$lib/helpray"
 
 	export async function handleRequest(request: any) {
 		// Text transformer is purely frontend
@@ -16,7 +17,7 @@
 	let decimalToHex = ""
 </script>
 
-<div class="w-full h-full p-6 overflow-y-auto">
+<div class="w-full h-full p-6 overflow-y-auto" use:help={{ title: "Text tools", description: "This panel lets you generate UUIDs, calculate hashes and convert between different number formats." }}>
 	<h4 class="mb-2">Random UUID</h4>
 	<CodeSnippet
 		code={uuid}

@@ -5,6 +5,7 @@
 	import { onMount } from "svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
 	import md5 from "md5"
+	import { help } from "$lib/helpray"
 
 	export let editorID: string
 
@@ -132,10 +133,10 @@
 	}
 </script>
 
-<div class="h-full w-full overflow-y-auto">
+<div class="h-full w-full overflow-y-auto" use:help={{ title: "Metadata", description: "This view lets you see and edit the metadata of an entity." }}>
 	<TextInput
 		bind:value={factoryHash}
-		placeholder="You can use the Text Tools panel to generate this"
+		placeholder="A hash, or a path that will be auto-converted into a hash"
 		labelText="Factory hash"
 		helperText={customPaths.find((a) => ("00" + md5(a.toLowerCase()).slice(2, 16)).toUpperCase() === factoryHash)}
 		on:change={factoryHashInput}
@@ -146,7 +147,7 @@
 	<div class="my-4">
 		<TextInput
 			bind:value={blueprintHash}
-			placeholder="You can use the Text Tools panel to generate this"
+			placeholder="A hash, or a path that will be auto-converted into a hash"
 			labelText="Blueprint hash"
 			helperText={customPaths.find((a) => ("00" + md5(a.toLowerCase()).slice(2, 16)).toUpperCase() === blueprintHash)}
 			on:change={blueprintHashInput}

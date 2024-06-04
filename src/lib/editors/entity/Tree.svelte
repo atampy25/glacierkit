@@ -11,6 +11,7 @@
 	import { trackEvent } from "@aptabase/tauri"
 	import HighlightMonaco from "./HighlightMonaco.svelte"
 	import { v4 } from "uuid"
+	import { help } from "$lib/helpray"
 
 	export let editorID: string
 

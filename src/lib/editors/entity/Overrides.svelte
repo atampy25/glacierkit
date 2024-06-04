@@ -3,6 +3,7 @@
 	import { event } from "$lib/utils"
 	import { onMount } from "svelte"
 	import OverrideMonaco from "./OverrideMonaco.svelte"
+	import { help } from "$lib/helpray"
 
 	export let editorID: string
 
@@ -56,7 +57,7 @@
 	let pinConnectionOverrideDeleteEditor: OverrideMonaco
 </script>
 
-<div class="h-full w-full">
+<div class="h-full w-full" use:help={{ title: "Overrides", description: "This view lets you see and edit the overrides defined in an entity." }}>
 	<div class="h-10 bg-[#202020] flex flex-wrap w-fit mb-2">
 		<div
 			class="px-4 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
@@ -87,16 +88,28 @@
 			}}>Pin connection override deletes</div
 		>
 	</div>
-	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "propertyOverrides"}>
+	<div
+		style="height: calc(100vh - 14.5rem)"
+		class:hidden={activeMode !== "propertyOverrides"}
+		use:help={{ title: "Property overrides", description: "Properties on other entities to override when this entity is loaded." }}
+	>
 		<OverrideMonaco {editorID} mode="propertyOverrides" bind:this={propertyOverrideEditor} />
 	</div>
-	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "overrideDeletes"}>
+	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "overrideDeletes"} use:help={{ title: "Override deletes", description: "Entities to delete when this entity is loaded." }}>
 		<OverrideMonaco {editorID} mode="overrideDeletes" bind:this={overrideDeleteEditor} />
 	</div>
-	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "pinConnectionOverrides"}>
+	<div
+		style="height: calc(100vh - 14.5rem)"
+		class:hidden={activeMode !== "pinConnectionOverrides"}
+		use:help={{ title: "Pin connection overrides", description: "Pin connections to create when this entity is loaded." }}
+	>
 		<OverrideMonaco {editorID} mode="pinConnectionOverrides" bind:this={pinConnectionOverrideEditor} />
 	</div>
-	<div style="height: calc(100vh - 14.5rem)" class:hidden={activeMode !== "pinConnectionOverrideDeletes"}>
+	<div
+		style="height: calc(100vh - 14.5rem)"
+		class:hidden={activeMode !== "pinConnectionOverrideDeletes"}
+		use:help={{ title: "Pin connection override deletes", description: "Pin connections to delete when this entity is loaded." }}
+	>
 		<OverrideMonaco {editorID} mode="pinConnectionOverrideDeletes" bind:this={pinConnectionOverrideDeleteEditor} />
 	</div>
 </div>

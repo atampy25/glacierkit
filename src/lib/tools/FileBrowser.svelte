@@ -12,6 +12,7 @@
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { trackEvent } from "@aptabase/tauri"
 	import { readTextFile } from "@tauri-apps/api/fs"
+	import { help } from "$lib/helpray"
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 	let tree: JSTree = null!
@@ -760,7 +761,13 @@
 	}
 </script>
 
-<div class="w-full h-full p-2 flex flex-col">
+<div
+	class="w-full h-full p-2 flex flex-col"
+	use:help={{
+		title: "Files",
+		description: "This panel shows your currently loaded project. You can click a file to open it in the editor, right-click it to see options or drag it around to move it."
+	}}
+>
 	{#if !path}
 		<div class="p-4">
 			<p class="mb-4">You don't have a project loaded. Select a folder to get started!</p>
@@ -787,6 +794,7 @@
 			<div class="mb-4"><Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} /></div>
 			<span
 				class="text-neutral-400 cursor-pointer"
+				use:help={{ title: "Project path", description: "You can click this to change the loaded project." }}
 				on:click={async () => {
 					trackEvent("Load workspace using text link")
 

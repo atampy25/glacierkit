@@ -7,6 +7,7 @@
 	import { event } from "$lib/utils"
 	import { clipboard } from "@tauri-apps/api"
 	import { trackEvent } from "@aptabase/tauri"
+	import { help } from "$lib/helpray"
 
 	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 
@@ -443,7 +444,14 @@
 	let searchQuery = ""
 </script>
 
-<div class="w-full h-full p-2 flex flex-col">
+<div
+	class="w-full h-full p-2 flex flex-col"
+	use:help={{
+		title: "Game content",
+		description:
+			"This panel lets you search the game files by hash, extension or path. Click a game resource to open an overview of it, or right-click to see more options. Some resources can also be dragged directly into an entity's tree."
+	}}
+>
 	{#if !enabled}
 		<div class="p-4">
 			<p>You haven't selected a copy of the game to work with - go to the Settings tool to do that.</p>
@@ -451,7 +459,13 @@
 	{:else}
 		<div class="pt-2 pb-1 px-2 leading-tight text-base">
 			<div class="mb-4">
-				<div class="flex gap-2">
+				<div
+					class="flex gap-2"
+					use:help={{
+						title: "Search query",
+						description: 'You can separate multiple queries with spaces. For example, "agent47 default" matches only files containing both "agent47" and "default" in their path.'
+					}}
+				>
 					<Search
 						placeholder="Search game files..."
 						size="lg"

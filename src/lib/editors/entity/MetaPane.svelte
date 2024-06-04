@@ -4,6 +4,7 @@
 	import { ClickableTile, TextArea } from "carbon-components-svelte"
 	import { debounce } from "lodash"
 	import { trackEvent } from "@aptabase/tauri"
+	import { help } from "$lib/helpray"
 
 	export let editorID: string
 
@@ -65,7 +66,10 @@
 	}
 </script>
 
-<div class="h-full w-full flex flex-col gap-1 overflow-y-auto">
+<div
+	class="h-full w-full flex flex-col gap-1 overflow-y-auto"
+	use:help={{ title: "Meta pane", description: "You can see (and follow) the reverse references of an entity here, and write notes for future reference as well." }}
+>
 	<h3>Reverse references</h3>
 	<div class="flex flex-wrap gap-2">
 		{#each reverseRefs as ref}

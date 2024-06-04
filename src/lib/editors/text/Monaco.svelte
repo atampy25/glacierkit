@@ -3,6 +3,7 @@
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
 	import type { TextFileType } from "$lib/bindings-types"
 	import { debounce } from "lodash"
+	import { help } from "$lib/helpray"
 
 	let el: HTMLDivElement = null!
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
@@ -78,4 +79,4 @@
 	}
 </script>
 
-<div bind:this={el} class="h-full w-full" />
+<div bind:this={el} class="h-full w-full" use:help={{ title: "Text editor", description: "For editing text. Syntax highlighting and intellisense, are available for certain filetypes." }} />

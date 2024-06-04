@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ContentSearchRequest } from "$lib/bindings-types"
+	import { help } from "$lib/helpray"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "@aptabase/tauri"
 	import { Button, Checkbox, Search } from "carbon-components-svelte"
@@ -29,7 +30,7 @@
 	let searchLocalisation = false
 </script>
 
-<div class="w-full h-full p-2">
+<div class="w-full h-full p-2" use:help={{ title: "Advanced search", description: "This panel lets you exhaustively search inside the contents of a variety of game formats with a given query." }}>
 	{#if !enabled}
 		<div class="p-4">
 			<p>You haven't selected a copy of the game to work with - go to the Settings tool to do that.</p>

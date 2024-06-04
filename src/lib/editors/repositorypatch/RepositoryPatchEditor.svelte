@@ -8,6 +8,7 @@
 	import Undo from "carbon-icons-svelte/lib/Undo.svelte"
 	import Add from "carbon-icons-svelte/lib/Add.svelte"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
+	import { help } from "$lib/helpray"
 
 	export let id: string
 
@@ -116,7 +117,7 @@
 
 <div class="grid grid-cols-4 gap-4 w-full h-full">
 	<div class="h-full">
-		<div class="h-1/3 flex flex-col">
+		<div class="h-1/3 flex flex-col" use:help={{ title: "Modified repository items", description: "Items that have been added or modified from their original state by your edits." }}>
 			<h2>Modified</h2>
 			<div class="mt-1">
 				<Button
@@ -350,7 +351,7 @@
 				{/each}
 			</div>
 		</div>
-		<div class="h-2/3 flex flex-col">
+		<div class="h-2/3 flex flex-col" use:help={{ title: "Unmodified repository items", description: "Repository items that have not been touched by your edits." }}>
 			<h2>Unmodified</h2>
 			<div class="mt-1 flex gap-2">
 				<Search
@@ -607,7 +608,10 @@
 	</div>
 	<div class="col-span-3">
 		{#if selectedItem}
-			<div class="mb-2 flex items-center">
+			<div
+				class="mb-2 flex items-center"
+				use:help={{ title: "Editor", description: "You can see and edit the data of the selected repository item here. On the right is your modified version; on the left is the original." }}
+			>
 				<div class="flex-grow">
 					<h2>Editor</h2>
 					<code>{selectedItem}</code>

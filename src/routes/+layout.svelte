@@ -19,6 +19,8 @@
 	import { createPatch } from "rfc6902"
 	import { writeTextFile } from "@tauri-apps/api/fs"
 	import { attachConsole } from "tauri-plugin-log"
+	import { help } from "$lib/helpray"
+	import HelpRay from "$lib/components/HelpRay.svelte"
 
 	let tasks: [string, string][] = []
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
@@ -317,6 +319,8 @@
 
 	let errorModalOpen = false
 	let errorModalError = ""
+
+	let helpRayActive = false
 </script>
 
 <ComposedModal
@@ -337,17 +341,26 @@
 	<SkipToContent />
 
 	<!-- svelte-ignore a11y-missing-attribute -->
-	<a data-tauri-drag-region class:bx--header__name={true}>GlacierKit</a>
+	<a data-tauri-drag-region class:bx--header__name={true} use:help={{ title: "GlacierKit title", description: "This is in fact the app you are using." }}>GlacierKit</a>
 
 	<div data-tauri-drag-region class="pointer-events-none cursor-none w-full text-center text-neutral-400">{windowTitle}</div>
 
 	<div data-tauri-drag-region class="flex flex-row items-center justify-end text-white">
-		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.minimize}>
+		<div class="h-full p-3.5 hover:bg-neutral-700 active:bg-neutral-600" on:click={() => (helpRayActive = !helpRayActive)}>
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z"
+				/>
+			</svg>
+		</div>
+		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.minimize} use:help={{ title: "Minimise", description: "Minimise the application." }}>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.toggleMaximize}>
+		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.toggleMaximize} use:help={{ title: "Maximise", description: "Maximise the application." }}>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path
 					stroke-linecap="round"
@@ -356,7 +369,7 @@
 				/>
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" on:click={appWindow.close}>
+		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" on:click={appWindow.close} use:help={{ title: "Close", description: "Close the application." }}>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 			</svg>
@@ -368,7 +381,7 @@
 	<slot />
 </div>
 
-<div class="h-6 flex items-center gap-4 px-3 bg-neutral-600">
+<div class="h-6 flex items-center gap-4 px-3 bg-neutral-600" use:help={{ title: "Task bar", description: "You can see all currently running background tasks here." }}>
 	{#if tasks.length}
 		{#each tasks as [id, task] (id)}
 			<span transition:fade={{ duration: 100 }} animate:flip={{ duration: 250 }}>{task}</span>
@@ -387,6 +400,8 @@
 		{/each}
 	</div>
 </div>
+
+<HelpRay bind:enabled={helpRayActive} />
 
 <style>
 	:global(.bx--header) {

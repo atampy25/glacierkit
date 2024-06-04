@@ -8,6 +8,7 @@
 	import { event } from "$lib/utils"
 	import Metadata from "./Metadata.svelte"
 	import Overrides from "./Overrides.svelte"
+	import { help } from "$lib/helpray"
 
 	export let id: string
 
@@ -102,9 +103,9 @@
 	}
 </script>
 
-<div class="w-full h-full">
+<div class="w-full h-full" use:help={{ title: "Entity editor", description: "Both entity.json and entity.patch.json files can be edited visually with GlacierKit." }}>
 	<div class="flex-shrink-0 flex flex-wrap gap-4 mb-2 items-center">
-		<div class="h-10 bg-[#202020] flex flex-wrap w-fit">
+		<div class="h-10 bg-[#202020] flex flex-wrap w-fit" use:help={{ title: "Views", description: "You can switch which view of an entity you're looking at here." }}>
 			{#each modes as mode}
 				<div
 					class="px-4 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
@@ -115,11 +116,16 @@
 				>
 			{/each}
 		</div>
-		<div>
+		<div use:help={{ title: "Show reverse parent references", description: "Whether to show parent references in the reverse references list. This is off by default to reduce clutter." }}>
 			<Checkbox checked={showReverseParentRefs} on:change={showReverseParentRefsChanged} labelText="Show reverse parent references" />
 		</div>
 		{#if isPatchEditor}
-			<div>
+			<div
+				use:help={{
+					title: "Highlight changes from original entity",
+					description: "Highlights which entities have been modified, removed or added from the original entity, and lets you revert these changes if necessary."
+				}}
+			>
 				<Checkbox checked={showChangesFromOriginal} on:change={showChangesFromOriginalChanged} labelText="Highlight changes from original entity" />
 			</div>
 		{/if}
@@ -136,7 +142,14 @@
 				<div class="w-full h-full pb-4 pr-2">
 					<Splitpanes horizontal theme="">
 						<Pane size={80}>
-							<div class="h-full w-full flex flex-col gap-1">
+							<div
+								class="h-full w-full flex flex-col gap-1"
+								use:help={{
+									title: "Tree",
+									description:
+										"The hierarchical structure of the entity is displayed here. You can click a sub-entity to select it, drag sub-entities around to reorganise them or right-click to see more options."
+								}}
+							>
 								<h3>Tree</h3>
 								<!-- The `min-h-0 basis-0` here is EXTREMELY necessary as the tree will refuse to apply overflow-auto if it is removed, instead extending the box past its allowance! -->
 								<div class="flex-grow flex flex-col gap-2 min-h-0 basis-0">
@@ -151,7 +164,7 @@
 				</div>
 			</Pane>
 			<Pane class="overflow-visible">
-				<div class="h-full w-full flex flex-col gap-1">
+				<div class="h-full w-full flex flex-col gap-1" use:help={{ title: "Editor", description: "You can see and edit the selected entity's data here." }}>
 					<h3>Editor</h3>
 					<Monaco editorID={id} bind:this={monaco} />
 				</div>

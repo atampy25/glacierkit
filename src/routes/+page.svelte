@@ -30,6 +30,7 @@
 	import ContentSearch from "$lib/tools/ContentSearch.svelte"
 	import ContentSearchResultsEditor from "$lib/editors/contentsearchresults/ContentSearchResultsEditor.svelte"
 	import { open } from "@tauri-apps/api/dialog"
+	import { help } from "$lib/helpray"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -452,7 +453,7 @@
 />
 
 <div class="h-full w-full flex">
-	<div class="w-14 bg-neutral-900 flex flex-col">
+	<div class="w-14 bg-neutral-900 flex flex-col" use:help={{ title: "Tools", description: "The left pane contains tools, which you can select here." }}>
 		{#each typedEntries(tools) as [toolID, tool] (toolID)}
 			<ToolButton
 				icon={tool.icon}
@@ -520,6 +521,7 @@
 											})
 										}
 									}}
+									use:help={{ title: "Tabs", description: "Each file or editor has an associated tab. You can reorder tabs by dragging." }}
 								>
 									{tab.name}
 									<div class="flex">
@@ -582,7 +584,7 @@
 								<h1>Welcome to GlacierKit</h1>
 								<p>You can start by selecting a project on the left.</p>
 								{#if announcements.length}
-									<div class="flex-col items-center -mb-4">
+									<div class="flex-col items-center -mb-4" use:help={{ title: "Announcements", description: "Any important announcements are displayed here." }}>
 										{#each announcements as announcement (announcement.id)}
 											{#if new Date().getTime() < (announcement.until || Number.MAX_VALUE) && !seenAnnouncements.includes(announcement.id)}
 												<div class="text-left -mb-2 flex items-center justify-center -mr-4">
@@ -615,7 +617,8 @@
 									class="mt-8 mx-16 flex gap-2 items-center text-neutral-300 cursor-pointer leading-snug"
 									on:click={() => {
 										hint = hints[(hints.indexOf(hint) + 1) % hints.length]
-									}}><Idea size={20} />{hint}</div
+									}}
+									use:help={{ title: "Hint", description: "A (hopefully) helpful hint." }}><Idea size={20} />{hint}</div
 								>
 							</div>
 						</div>

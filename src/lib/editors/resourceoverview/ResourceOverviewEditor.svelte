@@ -11,6 +11,7 @@
 	import MultiWaveformPlayer from "$lib/components/MultiWaveformPlayer.svelte"
 	import Monaco from "./Monaco.svelte"
 	import { v4 } from "uuid"
+	import { help } from "$lib/helpray"
 
 	export let id: string
 
@@ -61,7 +62,13 @@
 	}
 </script>
 
-<div class="w-full h-full flex flex-col p-4 overflow-y-auto">
+<div
+	class="w-full h-full flex flex-col p-4 overflow-y-auto"
+	use:help={{
+		title: "Resource overview",
+		description: "The resource overview shows basic information about (and potentially previews of) game resources, and lets you perform actions like extracting them in different formats."
+	}}
+>
 	{#if data}
 		{#if data.type === "Entity"}
 			<div class="text-2xl mb-2 font-bold break-all">
@@ -890,7 +897,7 @@
 		{/if}
 
 		<div class="grid grid-cols-2 gap-2 flex-grow basis-0">
-			<div class="flex flex-col">
+			<div class="flex flex-col" use:help={{ title: "Dependencies", description: "Other resources that this resource depends on, listed in the order stored in the game files." }}>
 				<h4 class="mb-1">Dependencies</h4>
 				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
 					{#each dependencies as [hash, type, path, flag, inGame]}
@@ -957,7 +964,7 @@
 					{/each}
 				</div>
 			</div>
-			<div class="flex flex-col">
+			<div class="flex flex-col" use:help={{ title: "Reverse dependencies", description: "Other resources that depend upon this resource, sorted alphabetically." }}>
 				<h4 class="mb-1">Reverse dependencies</h4>
 				<div class="flex-grow basis-0 overflow-y-auto flex flex-col gap-1 pr-2">
 					{#each reverseDependencies as [hash, type, path]}
