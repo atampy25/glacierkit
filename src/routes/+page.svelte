@@ -493,7 +493,7 @@
 						>
 							{#each tabs as tab (tab.id)}
 								<div
-									class="h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
+									class="select-none h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
 									class:border-b={activeTab === tab.id}
 									on:click|self={async () => {
 										if (activeTab !== tab.id) {

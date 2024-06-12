@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use anyhow::{Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
@@ -17,6 +17,7 @@ use tonytools::hmlanguages;
 use tryvial::try_fn;
 use velcro::vec;
 
+use crate::languages::get_language_map;
 use crate::{
 	game_detection::GameVersion,
 	hash_list::HashList,
@@ -654,25 +655,39 @@ pub fn get_line_decoration(
 			.hash
 	)?;
 
-	let locr = hmlanguages::locr::LOCR::new(
-		tonytools_hash_list.to_owned(),
-		match game_version {
-			GameVersion::H1 => tonytools::Version::H2016,
-			GameVersion::H2 => tonytools::Version::H2,
-			GameVersion::H3 => tonytools::Version::H3
-		},
-		match game_version {
-			GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-			GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-			GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-		},
-		false
-	)
-	.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+	let locr = {
+		let mut iteration = 0;
 
-	let locr = locr
-		.convert(&locr_data, to_string(&locr_meta)?)
-		.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+		loop {
+			if let Ok::<_, anyhow::Error>(x) = try {
+				let langmap =
+					get_language_map(game_version, iteration).context("No more alternate language maps available")?;
+
+				let locr = hmlanguages::locr::LOCR::new(
+					tonytools_hash_list.to_owned(),
+					match game_version {
+						GameVersion::H1 => tonytools::Version::H2016,
+						GameVersion::H2 => tonytools::Version::H2,
+						GameVersion::H3 => tonytools::Version::H3
+					},
+					Some(langmap.1.to_owned()),
+					langmap.0
+				)
+				.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+				locr.convert(&locr_data, to_string(&locr_meta)?)
+					.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+			} {
+				break x;
+			} else {
+				iteration += 1;
+
+				if get_language_map(game_version, iteration).is_none() {
+					bail!("No more alternate language maps available");
+				}
+			}
+		}
+	};
 
 	let res_data: [u8; 5] = res_data.try_into().ok().context("Couldn't read LINE data as u32")?;
 

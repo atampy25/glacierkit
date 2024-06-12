@@ -622,9 +622,9 @@ checksum = "dc827186963e592360843fb5ba4b973e145841266c1357f7180c43526f2e5b61"
 
 [[package]]
 name = "bitchomp"
-version = "0.2.2"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c59efba252574008d3d896b77ca6d1e880df54cda00029e055569e79e72c78af"
+checksum = "a974eb7363fab27fba2bc287a7ff47ab455f3656b09d30c85eaa7529d2cc8171"
 dependencies = [
  "num-traits",
 ]
@@ -3017,9 +3017,9 @@ dependencies = [
 
 [[package]]
 name = "intel_tex_2"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "410e8e64fd296f11254dba8fccdc2ed35d8df41592fa96785ffc9877b6a9aaa5"
+checksum = "bd699c0e6adcac28c06db24a220c834c8ec811e0d2d80f0261bb14e01737b4dc"
 dependencies = [
  "ispc_rt",
 ]
@@ -6567,7 +6567,7 @@ dependencies = [
 
 [[package]]
 name = "tonytools"
-version = "0.3.2"
+version = "0.5.0"
 dependencies = [
  "bimap",
  "bitchomp",
@@ -6576,6 +6576,7 @@ dependencies = [
  "crc32fast",
  "extended-tea",
  "fancy-regex",
+ "glob",
  "indexmap 2.2.6",
  "intel_tex_2",
  "lz4_flex",

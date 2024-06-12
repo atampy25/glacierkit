@@ -1,6 +1,6 @@
 use std::{ops::Deref, time::Instant};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
@@ -19,6 +19,7 @@ use uuid::Uuid;
 use crate::{
 	finish_task,
 	game_detection::GameVersion,
+	languages::get_language_map,
 	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
 	ores::{parse_hashes_ores, parse_json_ores},
 	resourcelib::{
@@ -225,30 +226,43 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let clng = hmlanguages::clng::CLNG::new(
-											match game_version {
-												GameVersion::H1 => tonytools::Version::H2016,
-												GameVersion::H2 => tonytools::Version::H2,
-												GameVersion::H3 => tonytools::Version::H3
-											},
-											match game_version {
-												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-												GameVersion::H2 => {
-													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+										let clng = {
+											let mut iteration = 0;
+
+											loop {
+												if let Ok::<_, anyhow::Error>(x) = try {
+													let langmap = get_language_map(game_version, iteration)
+														.context("No more alternate language maps available")?;
+
+													let clng = hmlanguages::clng::CLNG::new(
+														match game_version {
+															GameVersion::H1 => tonytools::Version::H2016,
+															GameVersion::H2 => tonytools::Version::H2,
+															GameVersion::H3 => tonytools::Version::H3
+														},
+														Some(langmap.1.to_owned())
+													)
+													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+													clng.convert(&res_data, to_string(&res_meta)?)
+														.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+												} {
+													break x;
+												} else {
+													iteration += 1;
+
+													if get_language_map(game_version, iteration).is_none() {
+														None?;
+													}
 												}
-												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
 											}
-										)
-										.ok()?;
+										};
 
 										let mut buf = Vec::new();
 										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-										clng.convert(&res_data, to_string(&res_meta).ok()?)
-											.ok()?
-											.serialize(&mut ser)
-											.ok()?;
+										clng.serialize(&mut ser).ok()?;
 
 										buf
 									};
@@ -298,33 +312,52 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let dlge = hmlanguages::dlge::DLGE::new(
-											app_state.tonytools_hash_list.load().as_ref()?.deref().to_owned(),
-											match game_version {
-												GameVersion::H1 => tonytools::Version::H2016,
-												GameVersion::H2 => tonytools::Version::H2,
-												GameVersion::H3 => tonytools::Version::H3
-											},
-											match game_version {
-												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-												GameVersion::H2 => {
-													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+										let dlge = {
+											let mut iteration = 0;
+
+											loop {
+												if let Ok::<_, anyhow::Error>(x) = try {
+													let langmap = get_language_map(game_version, iteration)
+														.context("No more alternate language maps available")?;
+
+													let dlge = hmlanguages::dlge::DLGE::new(
+														app_state
+															.tonytools_hash_list
+															.load()
+															.as_ref()
+															.context("No hash list available")?
+															.deref()
+															.to_owned(),
+														match game_version {
+															GameVersion::H1 => tonytools::Version::H2016,
+															GameVersion::H2 => tonytools::Version::H2,
+															GameVersion::H3 => tonytools::Version::H3
+														},
+														Some(langmap.1.to_owned()),
+														None,
+														false
+													)
+													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+													dlge.convert(&res_data, to_string(&res_meta)?)
+														.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+												} {
+													break x;
+												} else {
+													iteration += 1;
+
+													if get_language_map(game_version, iteration).is_none() {
+														None?;
+													}
 												}
-												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-											},
-											None,
-											false
-										)
-										.ok()?;
+											}
+										};
 
 										let mut buf = Vec::new();
 										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-										dlge.convert(&res_data, to_string(&res_meta).ok()?)
-											.ok()?
-											.serialize(&mut ser)
-											.ok()?;
+										dlge.serialize(&mut ser).ok()?;
 
 										buf
 									};
@@ -343,32 +376,51 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let locr = hmlanguages::locr::LOCR::new(
-											app_state.tonytools_hash_list.load().as_ref()?.deref().to_owned(),
-											match game_version {
-												GameVersion::H1 => tonytools::Version::H2016,
-												GameVersion::H2 => tonytools::Version::H2,
-												GameVersion::H3 => tonytools::Version::H3
-											},
-											match game_version {
-												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-												GameVersion::H2 => {
-													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+										let locr = {
+											let mut iteration = 0;
+
+											loop {
+												if let Ok::<_, anyhow::Error>(x) = try {
+													let langmap = get_language_map(game_version, iteration)
+														.context("No more alternate language maps available")?;
+
+													let locr = hmlanguages::locr::LOCR::new(
+														app_state
+															.tonytools_hash_list
+															.load()
+															.as_ref()
+															.context("No hash list available")?
+															.deref()
+															.to_owned(),
+														match game_version {
+															GameVersion::H1 => tonytools::Version::H2016,
+															GameVersion::H2 => tonytools::Version::H2,
+															GameVersion::H3 => tonytools::Version::H3
+														},
+														Some(langmap.1.to_owned()),
+														langmap.0
+													)
+													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+													locr.convert(&res_data, to_string(&res_meta)?)
+														.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+												} {
+													break x;
+												} else {
+													iteration += 1;
+
+													if get_language_map(game_version, iteration).is_none() {
+														None?;
+													}
 												}
-												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-											},
-											false
-										)
-										.ok()?;
+											}
+										};
 
 										let mut buf = Vec::new();
 										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-										locr.convert(&res_data, to_string(&res_meta).ok()?)
-											.ok()?
-											.serialize(&mut ser)
-											.ok()?;
+										locr.serialize(&mut ser).ok()?;
 
 										buf
 									};
@@ -387,30 +439,43 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let rtlv = hmlanguages::rtlv::RTLV::new(
-											match game_version {
-												GameVersion::H1 => tonytools::Version::H2016,
-												GameVersion::H2 => tonytools::Version::H2,
-												GameVersion::H3 => tonytools::Version::H3
-											},
-											match game_version {
-												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-												GameVersion::H2 => {
-													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
+										let rtlv = {
+											let mut iteration = 0;
+
+											loop {
+												if let Ok::<_, anyhow::Error>(x) = try {
+													let langmap = get_language_map(game_version, iteration)
+														.context("No more alternate language maps available")?;
+
+													let rtlv = hmlanguages::rtlv::RTLV::new(
+														match game_version {
+															GameVersion::H1 => tonytools::Version::H2016,
+															GameVersion::H2 => tonytools::Version::H2,
+															GameVersion::H3 => tonytools::Version::H3
+														},
+														Some(langmap.1.to_owned())
+													)
+													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+													rtlv.convert(&res_data, to_string(&res_meta)?)
+														.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+												} {
+													break x;
+												} else {
+													iteration += 1;
+
+													if get_language_map(game_version, iteration).is_none() {
+														None?;
+													}
 												}
-												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
 											}
-										)
-										.ok()?;
+										};
 
 										let mut buf = Vec::new();
 										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-										rtlv.convert(&res_data, to_string(&res_meta).ok()?)
-											.ok()?
-											.serialize(&mut ser)
-											.ok()?;
+										rtlv.serialize(&mut ser).ok()?;
 
 										buf
 									};
@@ -435,25 +500,45 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 										)
 										.ok()?;
 
-										let locr = hmlanguages::locr::LOCR::new(
-											app_state.tonytools_hash_list.load().as_ref()?.deref().to_owned(),
-											match game_version {
-												GameVersion::H1 => tonytools::Version::H2016,
-												GameVersion::H2 => tonytools::Version::H2,
-												GameVersion::H3 => tonytools::Version::H3
-											},
-											match game_version {
-												GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-												GameVersion::H2 => {
-													Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into())
-												}
-												GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-											},
-											false
-										)
-										.ok()?;
+										let locr = {
+											let mut iteration = 0;
 
-										let locr = locr.convert(&locr_data, to_string(&locr_meta).ok()?).ok()?;
+											loop {
+												if let Ok::<_, anyhow::Error>(x) = try {
+													let langmap = get_language_map(game_version, iteration)
+														.context("No more alternate language maps available")?;
+
+													let locr = hmlanguages::locr::LOCR::new(
+														app_state
+															.tonytools_hash_list
+															.load()
+															.as_ref()
+															.context("No hash list available")?
+															.deref()
+															.to_owned(),
+														match game_version {
+															GameVersion::H1 => tonytools::Version::H2016,
+															GameVersion::H2 => tonytools::Version::H2,
+															GameVersion::H3 => tonytools::Version::H3
+														},
+														Some(langmap.1.to_owned()),
+														langmap.0
+													)
+													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+													locr.convert(&locr_data, to_string(&locr_meta)?)
+														.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+												} {
+													break x;
+												} else {
+													iteration += 1;
+
+													if get_language_map(game_version, iteration).is_none() {
+														None?;
+													}
+												}
+											}
+										};
 
 										let res_data: [u8; 5] = res_data.try_into().ok()?;
 

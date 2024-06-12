@@ -22,6 +22,7 @@ use crate::{
 	game_detection::GameVersion,
 	general::open_in_editor,
 	hash_list::HashList,
+	languages::get_language_map,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Request,
 		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
@@ -387,27 +388,43 @@ pub fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
-						let clng = hmlanguages::clng::CLNG::new(
-							match game_version {
-								GameVersion::H1 => tonytools::Version::H2016,
-								GameVersion::H2 => tonytools::Version::H2,
-								GameVersion::H3 => tonytools::Version::H3
-							},
-							match game_version {
-								GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-								GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-								GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+						let clng = {
+							let mut iteration = 0;
+
+							loop {
+								if let Ok::<_, anyhow::Error>(x) = try {
+									let langmap = get_language_map(game_version, iteration)
+										.context("No more alternate language maps available")?;
+
+									let clng = hmlanguages::clng::CLNG::new(
+										match game_version {
+											GameVersion::H1 => tonytools::Version::H2016,
+											GameVersion::H2 => tonytools::Version::H2,
+											GameVersion::H3 => tonytools::Version::H3
+										},
+										Some(langmap.1.to_owned())
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+									clng.convert(&res_data, to_string(&res_meta)?)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								} {
+									break x;
+								} else {
+									iteration += 1;
+
+									if get_language_map(game_version, iteration).is_none() {
+										bail!("No more alternate language maps available");
+									}
+								}
 							}
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+						};
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						clng.convert(&res_data, to_string(&res_meta)?)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-							.serialize(&mut ser)?;
+						clng.serialize(&mut ser)?;
 
 						String::from_utf8(buf)?
 					}
@@ -444,36 +461,52 @@ pub fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
-						let dlge = hmlanguages::dlge::DLGE::new(
-							app_state
-								.tonytools_hash_list
-								.load()
-								.as_ref()
-								.context("No TonyTools hash list available")?
-								.deref()
-								.to_owned(),
-							match game_version {
-								GameVersion::H1 => tonytools::Version::H2016,
-								GameVersion::H2 => tonytools::Version::H2,
-								GameVersion::H3 => tonytools::Version::H3
-							},
-							match game_version {
-								GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-								GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-								GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-							},
-							None,
-							false
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+						let dlge = {
+							let mut iteration = 0;
+
+							loop {
+								if let Ok::<_, anyhow::Error>(x) = try {
+									let langmap = get_language_map(game_version, iteration)
+										.context("No more alternate language maps available")?;
+
+									let dlge = hmlanguages::dlge::DLGE::new(
+										app_state
+											.tonytools_hash_list
+											.load()
+											.as_ref()
+											.context("No TonyTools hash list available")?
+											.deref()
+											.to_owned(),
+										match game_version {
+											GameVersion::H1 => tonytools::Version::H2016,
+											GameVersion::H2 => tonytools::Version::H2,
+											GameVersion::H3 => tonytools::Version::H3
+										},
+										Some(langmap.1.to_owned()),
+										None,
+										false
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+									dlge.convert(&res_data, to_string(&res_meta)?)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								} {
+									break x;
+								} else {
+									iteration += 1;
+
+									if get_language_map(game_version, iteration).is_none() {
+										bail!("No more alternate language maps available");
+									}
+								}
+							}
+						};
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						dlge.convert(&res_data, to_string(&res_meta)?)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-							.serialize(&mut ser)?;
+						dlge.serialize(&mut ser)?;
 
 						String::from_utf8(buf)?
 					}
@@ -483,35 +516,51 @@ pub fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
-						let locr = hmlanguages::locr::LOCR::new(
-							app_state
-								.tonytools_hash_list
-								.load()
-								.as_ref()
-								.context("No TonyTools hash list available")?
-								.deref()
-								.to_owned(),
-							match game_version {
-								GameVersion::H1 => tonytools::Version::H2016,
-								GameVersion::H2 => tonytools::Version::H2,
-								GameVersion::H3 => tonytools::Version::H3
-							},
-							match game_version {
-								GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-								GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-								GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-							},
-							false
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+						let locr = {
+							let mut iteration = 0;
+
+							loop {
+								if let Ok::<_, anyhow::Error>(x) = try {
+									let langmap = get_language_map(game_version, iteration)
+										.context("No more alternate language maps available")?;
+
+									let locr = hmlanguages::locr::LOCR::new(
+										app_state
+											.tonytools_hash_list
+											.load()
+											.as_ref()
+											.context("No TonyTools hash list available")?
+											.deref()
+											.to_owned(),
+										match game_version {
+											GameVersion::H1 => tonytools::Version::H2016,
+											GameVersion::H2 => tonytools::Version::H2,
+											GameVersion::H3 => tonytools::Version::H3
+										},
+										Some(langmap.1.to_owned()),
+										langmap.0
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+									locr.convert(&res_data, to_string(&res_meta)?)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								} {
+									break x;
+								} else {
+									iteration += 1;
+
+									if get_language_map(game_version, iteration).is_none() {
+										bail!("No more alternate language maps available");
+									}
+								}
+							}
+						};
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						locr.convert(&res_data, to_string(&res_meta)?)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-							.serialize(&mut ser)?;
+						locr.serialize(&mut ser)?;
 
 						String::from_utf8(buf)?
 					}
@@ -521,27 +570,43 @@ pub fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
-						let rtlv = hmlanguages::rtlv::RTLV::new(
-							match game_version {
-								GameVersion::H1 => tonytools::Version::H2016,
-								GameVersion::H2 => tonytools::Version::H2,
-								GameVersion::H3 => tonytools::Version::H3
-							},
-							match game_version {
-								GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-								GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-								GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+						let rtlv = {
+							let mut iteration = 0;
+
+							loop {
+								if let Ok::<_, anyhow::Error>(x) = try {
+									let langmap = get_language_map(game_version, iteration)
+										.context("No more alternate language maps available")?;
+
+									let rtlv = hmlanguages::rtlv::RTLV::new(
+										match game_version {
+											GameVersion::H1 => tonytools::Version::H2016,
+											GameVersion::H2 => tonytools::Version::H2,
+											GameVersion::H3 => tonytools::Version::H3
+										},
+										Some(langmap.1.to_owned())
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+									rtlv.convert(&res_data, to_string(&res_meta)?)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								} {
+									break x;
+								} else {
+									iteration += 1;
+
+									if get_language_map(game_version, iteration).is_none() {
+										bail!("No more alternate language maps available");
+									}
+								}
 							}
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+						};
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						rtlv.convert(&res_data, to_string(&res_meta)?)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-							.serialize(&mut ser)?;
+						rtlv.serialize(&mut ser)?;
 
 						String::from_utf8(buf)?
 					}
@@ -561,31 +626,45 @@ pub fn initialise_resource_overview(
 								.hash
 						)?;
 
-						let locr = hmlanguages::locr::LOCR::new(
-							app_state
-								.tonytools_hash_list
-								.load()
-								.as_ref()
-								.context("No TonyTools hash list available")?
-								.deref()
-								.to_owned(),
-							match game_version {
-								GameVersion::H1 => tonytools::Version::H2016,
-								GameVersion::H2 => tonytools::Version::H2,
-								GameVersion::H3 => tonytools::Version::H3
-							},
-							match game_version {
-								GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-								GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-								GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-							},
-							false
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+						let locr = {
+							let mut iteration = 0;
 
-						let locr = locr
-							.convert(&locr_data, to_string(&locr_meta)?)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+							loop {
+								if let Ok::<_, anyhow::Error>(x) = try {
+									let langmap = get_language_map(game_version, iteration)
+										.context("No more alternate language maps available")?;
+
+									let locr = hmlanguages::locr::LOCR::new(
+										app_state
+											.tonytools_hash_list
+											.load()
+											.as_ref()
+											.context("No TonyTools hash list available")?
+											.deref()
+											.to_owned(),
+										match game_version {
+											GameVersion::H1 => tonytools::Version::H2016,
+											GameVersion::H2 => tonytools::Version::H2,
+											GameVersion::H3 => tonytools::Version::H3
+										},
+										Some(langmap.1.to_owned()),
+										langmap.0
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+									locr.convert(&locr_data, to_string(&locr_meta)?)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								} {
+									break x;
+								} else {
+									iteration += 1;
+
+									if get_language_map(game_version, iteration).is_none() {
+										bail!("No more alternate language maps available");
+									}
+								}
+							}
+						};
 
 						let res_data: [u8; 5] = res_data.try_into().ok().context("Couldn't read LINE data as u32")?;
 
@@ -1617,27 +1696,43 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						save_handle.path(),
 						match res_meta.hash_resource_type.as_ref() {
 							"CLNG" => {
-								let clng = hmlanguages::clng::CLNG::new(
-									match game_version {
-										GameVersion::H1 => tonytools::Version::H2016,
-										GameVersion::H2 => tonytools::Version::H2,
-										GameVersion::H3 => tonytools::Version::H3
-									},
-									match game_version {
-										GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-										GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-										GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+								let clng = {
+									let mut iteration = 0;
+
+									loop {
+										if let Ok::<_, anyhow::Error>(x) = try {
+											let langmap = get_language_map(game_version, iteration)
+												.context("No more alternate language maps available")?;
+
+											let clng = hmlanguages::clng::CLNG::new(
+												match game_version {
+													GameVersion::H1 => tonytools::Version::H2016,
+													GameVersion::H2 => tonytools::Version::H2,
+													GameVersion::H3 => tonytools::Version::H3
+												},
+												Some(langmap.1.to_owned())
+											)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+											clng.convert(&res_data, to_string(&res_meta)?)
+												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+										} {
+											break x;
+										} else {
+											iteration += 1;
+
+											if get_language_map(game_version, iteration).is_none() {
+												bail!("No more alternate language maps available");
+											}
+										}
 									}
-								)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+								};
 
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-								clng.convert(&res_data, to_string(&res_meta)?)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									.serialize(&mut ser)?;
+								clng.serialize(&mut ser)?;
 
 								buf
 							}
@@ -1666,96 +1761,144 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							}
 
 							"DLGE" => {
-								let dlge = hmlanguages::dlge::DLGE::new(
-									app_state
-										.tonytools_hash_list
-										.load()
-										.as_ref()
-										.context("No TonyTools hash list available")?
-										.deref()
-										.to_owned(),
-									match game_version {
-										GameVersion::H1 => tonytools::Version::H2016,
-										GameVersion::H2 => tonytools::Version::H2,
-										GameVersion::H3 => tonytools::Version::H3
-									},
-									match game_version {
-										GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-										GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-										GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-									},
-									None,
-									false
-								)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+								let dlge = {
+									let mut iteration = 0;
+
+									loop {
+										if let Ok::<_, anyhow::Error>(x) = try {
+											let langmap = get_language_map(game_version, iteration)
+												.context("No more alternate language maps available")?;
+
+											let dlge = hmlanguages::dlge::DLGE::new(
+												app_state
+													.tonytools_hash_list
+													.load()
+													.as_ref()
+													.context("No TonyTools hash list available")?
+													.deref()
+													.to_owned(),
+												match game_version {
+													GameVersion::H1 => tonytools::Version::H2016,
+													GameVersion::H2 => tonytools::Version::H2,
+													GameVersion::H3 => tonytools::Version::H3
+												},
+												Some(langmap.1.to_owned()),
+												None,
+												false
+											)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+											dlge.convert(&res_data, to_string(&res_meta)?)
+												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+										} {
+											break x;
+										} else {
+											iteration += 1;
+
+											if get_language_map(game_version, iteration).is_none() {
+												bail!("No more alternate language maps available");
+											}
+										}
+									}
+								};
 
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-								dlge.convert(&res_data, to_string(&res_meta)?)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									.serialize(&mut ser)?;
+								dlge.serialize(&mut ser)?;
 
 								buf
 							}
 
 							"LOCR" => {
-								let locr = hmlanguages::locr::LOCR::new(
-									app_state
-										.tonytools_hash_list
-										.load()
-										.as_ref()
-										.context("No TonyTools hash list available")?
-										.deref()
-										.to_owned(),
-									match game_version {
-										GameVersion::H1 => tonytools::Version::H2016,
-										GameVersion::H2 => tonytools::Version::H2,
-										GameVersion::H3 => tonytools::Version::H3
-									},
-									match game_version {
-										GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-										GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-										GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
-									},
-									false
-								)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+								let locr = {
+									let mut iteration = 0;
+
+									loop {
+										if let Ok::<_, anyhow::Error>(x) = try {
+											let langmap = get_language_map(game_version, iteration)
+												.context("No more alternate language maps available")?;
+
+											let locr = hmlanguages::locr::LOCR::new(
+												app_state
+													.tonytools_hash_list
+													.load()
+													.as_ref()
+													.context("No TonyTools hash list available")?
+													.deref()
+													.to_owned(),
+												match game_version {
+													GameVersion::H1 => tonytools::Version::H2016,
+													GameVersion::H2 => tonytools::Version::H2,
+													GameVersion::H3 => tonytools::Version::H3
+												},
+												Some(langmap.1.to_owned()),
+												langmap.0
+											)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+											locr.convert(&res_data, to_string(&res_meta)?)
+												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+										} {
+											break x;
+										} else {
+											iteration += 1;
+
+											if get_language_map(game_version, iteration).is_none() {
+												bail!("No more alternate language maps available");
+											}
+										}
+									}
+								};
 
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-								locr.convert(&res_data, to_string(&res_meta)?)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									.serialize(&mut ser)?;
+								locr.serialize(&mut ser)?;
 
 								buf
 							}
 
 							"RTLV" => {
-								let rtlv = hmlanguages::rtlv::RTLV::new(
-									match game_version {
-										GameVersion::H1 => tonytools::Version::H2016,
-										GameVersion::H2 => tonytools::Version::H2,
-										GameVersion::H3 => tonytools::Version::H3
-									},
-									match game_version {
-										GameVersion::H1 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp".into()),
-										GameVersion::H2 => Some("xx,en,fr,it,de,es,ru,mx,br,pl,cn,jp,tc".into()),
-										GameVersion::H3 => Some("xx,en,fr,it,de,es,ru,cn,tc,jp".into())
+								let rtlv = {
+									let mut iteration = 0;
+
+									loop {
+										if let Ok::<_, anyhow::Error>(x) = try {
+											let langmap = get_language_map(game_version, iteration)
+												.context("No more alternate language maps available")?;
+
+											let rtlv = hmlanguages::rtlv::RTLV::new(
+												match game_version {
+													GameVersion::H1 => tonytools::Version::H2016,
+													GameVersion::H2 => tonytools::Version::H2,
+													GameVersion::H3 => tonytools::Version::H3
+												},
+												Some(langmap.1.to_owned())
+											)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+											rtlv.convert(&res_data, to_string(&res_meta)?)
+												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+										} {
+											break x;
+										} else {
+											iteration += 1;
+
+											if get_language_map(game_version, iteration).is_none() {
+												bail!("No more alternate language maps available");
+											}
+										}
 									}
-								)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+								};
 
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-								rtlv.convert(&res_data, to_string(&res_meta)?)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									.serialize(&mut ser)?;
+								rtlv.serialize(&mut ser)?;
 
 								buf
 							}

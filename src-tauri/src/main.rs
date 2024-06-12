@@ -17,6 +17,7 @@ pub mod game_detection;
 pub mod general;
 pub mod hash_list;
 pub mod intellisense;
+pub mod languages;
 pub mod material;
 pub mod model;
 pub mod ores;
@@ -93,6 +94,7 @@ pub const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
 
 pub const TONYTOOLS_HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/hash_list.hmla";
+
 pub trait RunCommandExt {
 	/// Run the command, returning its stdout. If the command fails (status code non-zero), an error is returned with the stderr output.
 	fn run(self) -> Result<String>;

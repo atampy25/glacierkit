@@ -21,6 +21,7 @@
 	import { attachConsole } from "tauri-plugin-log"
 	import { help } from "$lib/helpray"
 	import HelpRay from "$lib/components/HelpRay.svelte"
+	import { trackEvent } from "@aptabase/tauri"
 
 	let tasks: [string, string][] = []
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
@@ -346,7 +347,15 @@
 	<div data-tauri-drag-region class="pointer-events-none cursor-none w-full text-center text-neutral-400">{windowTitle}</div>
 
 	<div data-tauri-drag-region class="flex flex-row items-center justify-end text-white">
-		<div class="h-full p-3.5 hover:bg-neutral-700 active:bg-neutral-600" on:click={() => (helpRayActive = !helpRayActive)}>
+		<div
+			class="h-full p-3.5 hover:bg-neutral-700 active:bg-neutral-600"
+			on:click={() => {
+				helpRayActive = !helpRayActive
+				if (helpRayActive) {
+					trackEvent("Activate help ray")
+				}
+			}}
+		>
 			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
 				<path
 					stroke-linecap="round"
