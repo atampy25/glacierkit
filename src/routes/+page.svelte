@@ -29,7 +29,7 @@
 	import Search from "carbon-icons-svelte/lib/Search.svelte"
 	import ContentSearch from "$lib/tools/ContentSearch.svelte"
 	import ContentSearchResultsEditor from "$lib/editors/contentsearchresults/ContentSearchResultsEditor.svelte"
-	import { open } from "@tauri-apps/api/dialog"
+	import { open, confirm } from "@tauri-apps/api/dialog"
 	import { help } from "$lib/helpray"
 
 	const hints = [
@@ -53,7 +53,7 @@
 		"You can right-click on a dependency in a Resource Overview to open it in a new tab.",
 		"Convert between repository.json/unlockables.json files and JSON.patch.json files easily by right-clicking them in the Files panel.",
 		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
-		"Separate search terms with spaces to find only files which match all search terms.",
+		"Separate multiple search terms with spaces to find only items which match all of the search terms.",
 		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit.",
 		"You can open a file from outside of your current project by pressing CTRL-O."
 	]
@@ -312,6 +312,19 @@
 		control: true,
 		callback: async () => {
 			if (activeTab) {
+				if (tabs.find((a) => a.id === activeTab)?.unsaved) {
+					const result = await confirm("This tab has unsaved changes. Are you sure you want to close it?", {
+						okLabel: "Don't Save",
+						cancelLabel: "Cancel",
+						title: "Unsaved changes",
+						type: "warning"
+					})
+
+					if (!result) {
+						return
+					}
+				}
+
 				trackEvent("Close tab using CTRL-W")
 
 				await event({
@@ -510,6 +523,19 @@
 									}}
 									on:auxclick={async (e) => {
 										if (e.button === 1) {
+											if (tab.unsaved) {
+												const result = await confirm("This tab has unsaved changes. Are you sure you want to close it?", {
+													okLabel: "Don't Save",
+													cancelLabel: "Cancel",
+													title: "Unsaved changes",
+													type: "warning"
+												})
+
+												if (!result) {
+													return
+												}
+											}
+
 											trackEvent("Close tab using middle-click")
 
 											await event({
@@ -550,6 +576,19 @@
 											icon={Close}
 											iconDescription="Close (CTRL-W)"
 											on:click={async () => {
+												if (tab.unsaved) {
+													const result = await confirm("This tab has unsaved changes. Are you sure you want to close it?", {
+														okLabel: "Don't Save",
+														cancelLabel: "Cancel",
+														title: "Unsaved changes",
+														type: "warning"
+													})
+
+													if (!result) {
+														return
+													}
+												}
+
 												trackEvent("Close tab using button")
 
 												await event({

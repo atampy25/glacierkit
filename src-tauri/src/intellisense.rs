@@ -243,12 +243,13 @@ impl Intellisense {
 
 									let det = n41
 										* (n14 * n23 * n32 - n13 * n24 * n32 - n14 * n22 * n33
-											+ n12 * n24 * n33 + n13 * n22 * n34 - n12 * n23 * n34)
-										+ n42
-											* (n11 * n23 * n34 - n11 * n24 * n33 + n14 * n21 * n33 - n13 * n21 * n34
-												+ n13 * n24 * n31 - n14 * n23 * n31) + n43
-										* (n11 * n24 * n32 - n11 * n22 * n34 - n14 * n21 * n32
-											+ n12 * n21 * n34 + n14 * n22 * n31 - n12 * n24 * n31)
+											+ n12 * n24 * n33 + n13 * n22 * n34
+											- n12 * n23 * n34) + n42
+										* (n11 * n23 * n34 - n11 * n24 * n33 + n14 * n21 * n33 - n13 * n21 * n34
+											+ n13 * n24 * n31 - n14 * n23 * n31)
+										+ n43
+											* (n11 * n24 * n32 - n11 * n22 * n34 - n14 * n21 * n32
+												+ n12 * n21 * n34 + n14 * n22 * n31 - n12 * n24 * n31)
 										+ n44
 											* (-n13 * n22 * n31 - n11 * n23 * n32 + n11 * n22 * n33 + n13 * n21 * n32
 												- n12 * n21 * n33 + n12 * n23 * n31);
@@ -388,6 +389,17 @@ impl Intellisense {
 
 		let mut found = vec![];
 
+		if !ignore_own {
+			for (property, property_data) in targeted.properties.as_ref().unwrap_or(&Default::default()) {
+				found.push((
+					property.to_owned(),
+					property_data.property_type.to_owned(),
+					property_data.value.to_owned(),
+					property_data.post_init.unwrap_or(false)
+				));
+			}
+		}
+
 		let (a, b) = rayon::join(
 			|| {
 				anyhow::Ok(
@@ -427,17 +439,6 @@ impl Intellisense {
 			},
 			|| {
 				let mut found = vec![];
-
-				if !ignore_own {
-					for (property, property_data) in targeted.properties.as_ref().unwrap_or(&Default::default()) {
-						found.push((
-							property.to_owned(),
-							property_data.property_type.to_owned(),
-							property_data.value.to_owned(),
-							property_data.post_init.unwrap_or(false)
-						));
-					}
-				}
 
 				found.extend(
 					{
@@ -839,7 +840,7 @@ impl Intellisense {
 		found.extend(a?);
 		found.extend(b?);
 
-		found
+		found.into_iter().unique_by(|x| x.0.to_owned()).collect()
 	}
 
 	/// Get the type, default value and post-init status of a single property of a given sub-entity, by its name.

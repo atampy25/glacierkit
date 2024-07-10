@@ -10,6 +10,7 @@
 #![feature(cursor_remaining)]
 #![feature(option_get_or_insert_default)]
 
+pub mod biome;
 pub mod editor_connection;
 pub mod entity;
 pub mod event_handling;
@@ -33,6 +34,7 @@ use std::{fs, path::Path, sync::Arc, time::Duration};
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
+use biome::format_json;
 use dashmap::DashMap;
 use editor_connection::EditorConnection;
 use entity::{
@@ -881,6 +883,14 @@ fn event(app: AppHandle, event: Event) {
 										name: "Notes".into(),
 										text: notes
 									});
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id.to_owned(),
+											unsaved: true
+										})
+									)?;
 								}
 							},
 
@@ -1361,7 +1371,13 @@ fn event(app: AppHandle, event: Event) {
 										}))
 									);
 
-									serde_json::to_vec(&entity).context("Entity is invalid")?
+									let unformatted = serde_json::to_string(&entity).context("Entity is invalid")?;
+
+									if unformatted.len() < 1024 * 1024 {
+										format_json(&unformatted)?.into_bytes()
+									} else {
+										unformatted.into_bytes()
+									}
 								}
 
 								EditorData::QNPatch {
@@ -1388,12 +1404,18 @@ fn event(app: AppHandle, event: Event) {
 										)))
 									)?;
 
-									serde_json::to_vec(
+									let unformatted = serde_json::to_string(
 										&generate_patch(base, current)
 											.map_err(|x| anyhow!(x))
 											.context("Couldn't generate patch")?
 									)
-									.context("Entity is invalid")?
+									.context("Entity is invalid")?;
+
+									if unformatted.len() < 1024 * 1024 {
+										format_json(&unformatted)?.into_bytes()
+									} else {
+										unformatted.into_bytes()
+									}
 								}
 
 								EditorData::RepositoryPatch {

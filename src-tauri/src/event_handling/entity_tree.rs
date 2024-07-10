@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
 	apply_patch, convert_2016_factory_to_modern,
@@ -34,7 +35,9 @@ use crate::{
 		h3_convert_binary_to_factory, h3_convert_cppt
 	},
 	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash},
-	send_notification, send_request, start_task, Notification, NotificationKind
+	send_notification, send_request, start_task,
+	wwev::parse_wwev,
+	Notification, NotificationKind
 };
 
 use super::entity_monaco::SAFE_TO_SYNC;
@@ -1857,6 +1860,82 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				_ => unreachable!()
+			};
+
+			send_request(
+				app,
+				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+					EntityTreeRequest::NewItems {
+						editor_id: editor_id.to_owned(),
+						new_entities: vec![(
+							entity_id.to_owned(),
+							sub_entity.parent.to_owned(),
+							sub_entity.name.to_owned(),
+							sub_entity.factory.to_owned(),
+							false
+						)]
+					}
+				)))
+			)?;
+
+			entity.entities.insert(entity_id, sub_entity);
+
+			send_request(
+				app,
+				Request::Global(GlobalRequest::SetTabUnsaved {
+					id: editor_id,
+					unsaved: true
+				})
+			)?;
+		} else if hash_list
+			.entries
+			.get(&file)
+			.context("File not in hash list")?
+			.resource_type
+			== "WWEV"
+		{
+			let (_, wwev_data) = extract_latest_resource(game_files, hash_list, &file)?;
+
+			let wwev = parse_wwev(&wwev_data)?;
+
+			let entity_id = random_entity_id();
+
+			let file_path = hash_list
+				.entries
+				.get(&file)
+				.and_then(|x| x.path.to_owned())
+				.unwrap_or(file);
+
+			let sub_entity = SubEntity {
+				parent: Ref::Short((parent_id != "#").then_some(parent_id)),
+				name: wwev.name,
+				factory: "[modules:/zaudioevententity.class].pc_entitytype".into(),
+				factory_flag: None,
+				blueprint: "[modules:/zaudioevententity.class].pc_entityblueprint".into(),
+				editor_only: None,
+				properties: Some({
+					let mut properties = IndexMap::new();
+					properties.insert(
+						"m_pMainEvent".into(),
+						Property {
+							property_type: "ZRuntimeResourceID".into(),
+							value: json!({
+								"resource": file_path,
+								"flag": "5F"
+							}),
+							post_init: None
+						}
+					);
+					properties
+				}),
+				platform_specific_properties: None,
+				events: None,
+				input_copying: None,
+				output_copying: None,
+				property_aliases: None,
+				exposed_entities: None,
+				exposed_interfaces: None,
+				subsets: None
 			};
 
 			send_request(

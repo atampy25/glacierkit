@@ -240,7 +240,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 															GameVersion::H2 => tonytools::Version::H2,
 															GameVersion::H3 => tonytools::Version::H3
 														},
-														Some(langmap.1.to_owned())
+														langmap.1.to_owned()
 													)
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
@@ -333,7 +333,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 															GameVersion::H2 => tonytools::Version::H2,
 															GameVersion::H3 => tonytools::Version::H3
 														},
-														Some(langmap.1.to_owned()),
+														langmap.1.to_owned(),
 														None,
 														false
 													)
@@ -397,7 +397,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 															GameVersion::H2 => tonytools::Version::H2,
 															GameVersion::H3 => tonytools::Version::H3
 														},
-														Some(langmap.1.to_owned()),
+														langmap.1.to_owned(),
 														langmap.0
 													)
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
@@ -439,37 +439,19 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let rtlv = {
-											let mut iteration = 0;
-
-											loop {
-												if let Ok::<_, anyhow::Error>(x) = try {
-													let langmap = get_language_map(game_version, iteration)
-														.context("No more alternate language maps available")?;
-
-													let rtlv = hmlanguages::rtlv::RTLV::new(
-														match game_version {
-															GameVersion::H1 => tonytools::Version::H2016,
-															GameVersion::H2 => tonytools::Version::H2,
-															GameVersion::H3 => tonytools::Version::H3
-														},
-														Some(langmap.1.to_owned())
-													)
-													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-													rtlv.convert(&res_data, to_string(&res_meta)?)
-														.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-												} {
-													break x;
-												} else {
-													iteration += 1;
-
-													if get_language_map(game_version, iteration).is_none() {
-														None?;
-													}
-												}
-											}
-										};
+										let rtlv = hmlanguages::rtlv::RTLV::new(
+											match game_version {
+												GameVersion::H1 => tonytools::Version::H2016,
+												GameVersion::H2 => tonytools::Version::H2,
+												GameVersion::H3 => tonytools::Version::H3
+											},
+											None
+										)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))
+										.ok()?
+										.convert(&res_data, to_string(&res_meta).ok()?)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))
+										.ok()?;
 
 										let mut buf = Vec::new();
 										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -521,7 +503,7 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 															GameVersion::H2 => tonytools::Version::H2,
 															GameVersion::H3 => tonytools::Version::H3
 														},
-														Some(langmap.1.to_owned()),
+														langmap.1.to_owned(),
 														langmap.0
 													)
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;

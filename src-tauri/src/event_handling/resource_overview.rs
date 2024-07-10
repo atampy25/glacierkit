@@ -402,7 +402,7 @@ pub fn initialise_resource_overview(
 											GameVersion::H2 => tonytools::Version::H2,
 											GameVersion::H3 => tonytools::Version::H3
 										},
-										Some(langmap.1.to_owned())
+										langmap.1.to_owned()
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
@@ -482,7 +482,7 @@ pub fn initialise_resource_overview(
 											GameVersion::H2 => tonytools::Version::H2,
 											GameVersion::H3 => tonytools::Version::H3
 										},
-										Some(langmap.1.to_owned()),
+										langmap.1.to_owned(),
 										None,
 										false
 									)
@@ -537,7 +537,7 @@ pub fn initialise_resource_overview(
 											GameVersion::H2 => tonytools::Version::H2,
 											GameVersion::H3 => tonytools::Version::H3
 										},
-										Some(langmap.1.to_owned()),
+										langmap.1.to_owned(),
 										langmap.0
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
@@ -570,37 +570,17 @@ pub fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
-						let rtlv = {
-							let mut iteration = 0;
-
-							loop {
-								if let Ok::<_, anyhow::Error>(x) = try {
-									let langmap = get_language_map(game_version, iteration)
-										.context("No more alternate language maps available")?;
-
-									let rtlv = hmlanguages::rtlv::RTLV::new(
-										match game_version {
-											GameVersion::H1 => tonytools::Version::H2016,
-											GameVersion::H2 => tonytools::Version::H2,
-											GameVersion::H3 => tonytools::Version::H3
-										},
-										Some(langmap.1.to_owned())
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-									rtlv.convert(&res_data, to_string(&res_meta)?)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-								} {
-									break x;
-								} else {
-									iteration += 1;
-
-									if get_language_map(game_version, iteration).is_none() {
-										bail!("No more alternate language maps available");
-									}
-								}
-							}
-						};
+						let rtlv = hmlanguages::rtlv::RTLV::new(
+							match game_version {
+								GameVersion::H1 => tonytools::Version::H2016,
+								GameVersion::H2 => tonytools::Version::H2,
+								GameVersion::H3 => tonytools::Version::H3
+							},
+							None
+						)
+						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						.convert(&res_data, to_string(&res_meta)?)
+						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -647,7 +627,7 @@ pub fn initialise_resource_overview(
 											GameVersion::H2 => tonytools::Version::H2,
 											GameVersion::H3 => tonytools::Version::H3
 										},
-										Some(langmap.1.to_owned()),
+										langmap.1.to_owned(),
 										langmap.0
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
@@ -1710,7 +1690,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 													GameVersion::H2 => tonytools::Version::H2,
 													GameVersion::H3 => tonytools::Version::H3
 												},
-												Some(langmap.1.to_owned())
+												langmap.1.to_owned()
 											)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
@@ -1782,7 +1762,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 													GameVersion::H2 => tonytools::Version::H2,
 													GameVersion::H3 => tonytools::Version::H3
 												},
-												Some(langmap.1.to_owned()),
+												langmap.1.to_owned(),
 												None,
 												false
 											)
@@ -1833,7 +1813,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 													GameVersion::H2 => tonytools::Version::H2,
 													GameVersion::H3 => tonytools::Version::H3
 												},
-												Some(langmap.1.to_owned()),
+												langmap.1.to_owned(),
 												langmap.0
 											)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
@@ -1862,37 +1842,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							}
 
 							"RTLV" => {
-								let rtlv = {
-									let mut iteration = 0;
-
-									loop {
-										if let Ok::<_, anyhow::Error>(x) = try {
-											let langmap = get_language_map(game_version, iteration)
-												.context("No more alternate language maps available")?;
-
-											let rtlv = hmlanguages::rtlv::RTLV::new(
-												match game_version {
-													GameVersion::H1 => tonytools::Version::H2016,
-													GameVersion::H2 => tonytools::Version::H2,
-													GameVersion::H3 => tonytools::Version::H3
-												},
-												Some(langmap.1.to_owned())
-											)
-											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-											rtlv.convert(&res_data, to_string(&res_meta)?)
-												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-										} {
-											break x;
-										} else {
-											iteration += 1;
-
-											if get_language_map(game_version, iteration).is_none() {
-												bail!("No more alternate language maps available");
-											}
-										}
-									}
-								};
+								let rtlv = hmlanguages::rtlv::RTLV::new(
+									match game_version {
+										GameVersion::H1 => tonytools::Version::H2016,
+										GameVersion::H2 => tonytools::Version::H2,
+										GameVersion::H3 => tonytools::Version::H3
+									},
+									None
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								.convert(&res_data, to_string(&res_meta)?)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");

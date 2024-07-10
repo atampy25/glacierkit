@@ -76,6 +76,9 @@ tokio-stream = "0.1.15"
 tonytools = { path = "../../tonytools-rs" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 log = "0.4.21"
+biome_json_formatter = "0.5.7"
+biome_json_parser = "0.5.7"
+biome_formatter = "0.5.7"
 
 [target.'cfg(linux)'.dependencies]
 fork = "0.1.22"

@@ -670,7 +670,7 @@ pub fn get_line_decoration(
 						GameVersion::H2 => tonytools::Version::H2,
 						GameVersion::H3 => tonytools::Version::H3
 					},
-					Some(langmap.1.to_owned()),
+					langmap.1.to_owned(),
 					langmap.0
 				)
 				.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
