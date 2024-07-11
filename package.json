@@ -9,7 +9,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
-		"format-configs": "prettier --write \"./**/*.{json,toml}\""
+		"format-configs": "prettier --write \"./**/*.{json,toml}\"",
+		"tauri": "env-cmd tauri"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.1",
@@ -24,6 +25,7 @@
 		"@types/uuid": "^9",
 		"@typescript-eslint/eslint-plugin": "^6.0.0",
 		"@typescript-eslint/parser": "^6.0.0",
+		"env-cmd": "^10.1.0",
 		"eslint": "^8.56.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.35.1",
