@@ -680,21 +680,6 @@ fn event(app: AppHandle, event: Event) {
 									Clipboard::new()?.set_text(to_string(&data_to_copy)?)?;
 
 									finish_task(&app, task)?;
-
-									if let EditorData::QNPatch {
-										ref base, ref current, ..
-									} = editor_state.data
-									{
-										send_request(
-											&app,
-											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-												EntityTreeRequest::SetDiffInfo {
-													editor_id,
-													diff_info: get_diff_info(base, current)
-												}
-											)))
-										)?;
-									}
 								}
 
 								EntityTreeEvent::Paste { editor_id, parent_id } => {
@@ -2527,6 +2512,7 @@ fn event(app: AppHandle, event: Event) {
 #[context("Couldn't send task start event for {:?} to frontend", name.as_ref())]
 pub fn start_task(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 	let task_id = Uuid::new_v4();
+	trace!("Starting task {}: {}", task_id, name.as_ref());
 	app.emit_all("start-task", (&task_id, name.as_ref()))?;
 	task_id
 }
@@ -2534,6 +2520,7 @@ pub fn start_task(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 #[try_fn]
 #[context("Couldn't send task finish event for {:?} to frontend", task)]
 pub fn finish_task(app: &AppHandle, task: Uuid) -> Result<()> {
+	trace!("Ending task {}", task);
 	app.emit_all("finish-task", &task)?;
 }
 
@@ -2556,11 +2543,13 @@ pub struct Notification {
 #[try_fn]
 #[context("Couldn't send notification {:?} to frontend", notification)]
 pub fn send_notification(app: &AppHandle, notification: Notification) -> Result<()> {
+	trace!("Sending notification: {:?}", notification);
 	app.emit_all("send-notification", (Uuid::new_v4(), &notification))?;
 }
 
 #[try_fn]
 #[context("Couldn't send request {:?} to frontend", request)]
 pub fn send_request(app: &AppHandle, request: Request) -> Result<()> {
+	trace!("Sending request: {:?}", request);
 	app.emit_all("request", &request)?;
 }

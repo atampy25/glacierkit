@@ -93,19 +93,12 @@ pub fn get_local_reference(reference: &Ref) -> Option<String> {
 pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, Vec<ReverseReference>>> {
 	let mut reverse_references: HashMap<String, Vec<ReverseReference>> = HashMap::new();
 
-	for entity_id in entity.entities.keys() {
-		reverse_references.insert(entity_id.to_owned(), vec![]);
-	}
-
 	for (entity_id, entity) in entity.entities.iter() {
 		if let Some(ent) = get_local_reference(&entity.parent) {
-			reverse_references
-				.get_mut(&ent)
-				.expect("We added it earlier")
-				.push(ReverseReference {
-					from: entity_id.to_owned(),
-					data: ReverseReferenceData::Parent
-				});
+			reverse_references.entry(ent).or_default().push(ReverseReference {
+				from: entity_id.to_owned(),
+				data: ReverseReferenceData::Parent
+			});
 		}
 
 		for (property_name, property_data) in entity.properties.as_ref().unwrap_or(&Default::default()) {
@@ -113,30 +106,24 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 				if let Some(ent) = get_local_reference(
 					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
 				) {
-					reverse_references
-						.get_mut(&ent)
-						.expect("We added it earlier")
-						.push(ReverseReference {
-							from: entity_id.to_owned(),
-							data: ReverseReferenceData::Property {
-								property_name: property_name.to_owned()
-							}
-						});
+					reverse_references.entry(ent).or_default().push(ReverseReference {
+						from: entity_id.to_owned(),
+						data: ReverseReferenceData::Property {
+							property_name: property_name.to_owned()
+						}
+					});
 				}
 			} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
 				for reference in
 					from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
 				{
 					if let Some(ent) = get_local_reference(&reference) {
-						reverse_references
-							.get_mut(&ent)
-							.expect("We added it earlier")
-							.push(ReverseReference {
-								from: entity_id.to_owned(),
-								data: ReverseReferenceData::Property {
-									property_name: property_name.to_owned()
-								}
-							});
+						reverse_references.entry(ent).or_default().push(ReverseReference {
+							from: entity_id.to_owned(),
+							data: ReverseReferenceData::Property {
+								property_name: property_name.to_owned()
+							}
+						});
 					}
 				}
 			}
@@ -152,32 +139,26 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 					if let Some(ent) = get_local_reference(
 						&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
 					) {
-						reverse_references
-							.get_mut(&ent)
-							.expect("We added it earlier")
-							.push(ReverseReference {
-								from: entity_id.to_owned(),
-								data: ReverseReferenceData::PlatformSpecificProperty {
-									property_name: property_name.to_owned(),
-									platform: platform.to_owned()
-								}
-							});
+						reverse_references.entry(ent).or_default().push(ReverseReference {
+							from: entity_id.to_owned(),
+							data: ReverseReferenceData::PlatformSpecificProperty {
+								property_name: property_name.to_owned(),
+								platform: platform.to_owned()
+							}
+						});
 					}
 				} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
 					for reference in
 						from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
 					{
 						if let Some(ent) = get_local_reference(&reference) {
-							reverse_references
-								.get_mut(&ent)
-								.expect("We added it earlier")
-								.push(ReverseReference {
-									from: entity_id.to_owned(),
-									data: ReverseReferenceData::PlatformSpecificProperty {
-										property_name: property_name.to_owned(),
-										platform: platform.to_owned()
-									}
-								});
+							reverse_references.entry(ent).or_default().push(ReverseReference {
+								from: entity_id.to_owned(),
+								data: ReverseReferenceData::PlatformSpecificProperty {
+									property_name: property_name.to_owned(),
+									platform: platform.to_owned()
+								}
+							});
 						}
 					}
 				}
@@ -195,16 +176,13 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 					};
 
 					if let Some(ent) = get_local_reference(reference) {
-						reverse_references
-							.get_mut(&ent)
-							.expect("We added it earlier")
-							.push(ReverseReference {
-								from: entity_id.to_owned(),
-								data: ReverseReferenceData::Event {
-									event: event.to_owned(),
-									trigger: trigger.to_owned()
-								}
-							});
+						reverse_references.entry(ent).or_default().push(ReverseReference {
+							from: entity_id.to_owned(),
+							data: ReverseReferenceData::Event {
+								event: event.to_owned(),
+								trigger: trigger.to_owned()
+							}
+						});
 					}
 				}
 			}
@@ -221,16 +199,13 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 					};
 
 					if let Some(ent) = get_local_reference(reference) {
-						reverse_references
-							.get_mut(&ent)
-							.expect("We added it earlier")
-							.push(ReverseReference {
-								from: entity_id.to_owned(),
-								data: ReverseReferenceData::InputCopy {
-									trigger: trigger.to_owned(),
-									propagate: propagate.to_owned()
-								}
-							});
+						reverse_references.entry(ent).or_default().push(ReverseReference {
+							from: entity_id.to_owned(),
+							data: ReverseReferenceData::InputCopy {
+								trigger: trigger.to_owned(),
+								propagate: propagate.to_owned()
+							}
+						});
 					}
 				}
 			}
@@ -247,16 +222,13 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 					};
 
 					if let Some(ent) = get_local_reference(reference) {
-						reverse_references
-							.get_mut(&ent)
-							.expect("We added it earlier")
-							.push(ReverseReference {
-								from: entity_id.to_owned(),
-								data: ReverseReferenceData::OutputCopy {
-									event: event.to_owned(),
-									propagate: propagate.to_owned()
-								}
-							});
+						reverse_references.entry(ent).or_default().push(ReverseReference {
+							from: entity_id.to_owned(),
+							data: ReverseReferenceData::OutputCopy {
+								event: event.to_owned(),
+								propagate: propagate.to_owned()
+							}
+						});
 					}
 				}
 			}
@@ -265,16 +237,13 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 		for (aliased_name, aliases) in entity.property_aliases.as_ref().unwrap_or(&Default::default()) {
 			for alias_data in aliases {
 				if let Some(ent) = get_local_reference(&alias_data.original_entity) {
-					reverse_references
-						.get_mut(&ent)
-						.expect("We added it earlier")
-						.push(ReverseReference {
-							from: entity_id.to_owned(),
-							data: ReverseReferenceData::PropertyAlias {
-								aliased_name: aliased_name.to_owned(),
-								original_property: alias_data.original_property.to_owned()
-							}
-						});
+					reverse_references.entry(ent).or_default().push(ReverseReference {
+						from: entity_id.to_owned(),
+						data: ReverseReferenceData::PropertyAlias {
+							aliased_name: aliased_name.to_owned(),
+							original_property: alias_data.original_property.to_owned()
+						}
+					});
 				}
 			}
 		}
@@ -282,23 +251,20 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 		for (exposed_name, exposed_entity) in entity.exposed_entities.as_ref().unwrap_or(&Default::default()) {
 			for reference in &exposed_entity.refers_to {
 				if let Some(ent) = get_local_reference(reference) {
-					reverse_references
-						.get_mut(&ent)
-						.expect("We added it earlier")
-						.push(ReverseReference {
-							from: entity_id.to_owned(),
-							data: ReverseReferenceData::ExposedEntity {
-								exposed_name: exposed_name.to_owned()
-							}
-						});
+					reverse_references.entry(ent).or_default().push(ReverseReference {
+						from: entity_id.to_owned(),
+						data: ReverseReferenceData::ExposedEntity {
+							exposed_name: exposed_name.to_owned()
+						}
+					});
 				}
 			}
 		}
 
 		for (interface, referenced_entity) in entity.exposed_interfaces.as_ref().unwrap_or(&Default::default()) {
 			reverse_references
-				.get_mut(referenced_entity)
-				.expect("We added it earlier")
+				.entry(referenced_entity.to_owned())
+				.or_default()
 				.push(ReverseReference {
 					from: entity_id.to_owned(),
 					data: ReverseReferenceData::ExposedInterface {
@@ -310,8 +276,8 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 		for (subset, member_of) in entity.subsets.as_ref().unwrap_or(&Default::default()) {
 			for parental_entity in member_of {
 				reverse_references
-					.get_mut(parental_entity)
-					.expect("We added it earlier")
+					.entry(parental_entity.to_owned())
+					.or_default()
 					.push(ReverseReference {
 						from: entity_id.to_owned(),
 						data: ReverseReferenceData::Subset {

@@ -243,7 +243,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 					if app_state.editor_connection.is_connected().await {
 						let prev_props = previous.properties.unwrap_or_default();
 
-						for (property, val) in sub_entity.properties.unwrap_or_default() {
+						for (property, val) in sub_entity.properties.to_owned().unwrap_or_default() {
 							let mut should_sync = false;
 
 							if let Some(previous_val) = prev_props.get(&property)
@@ -269,6 +269,62 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 										}
 									)
 									.await?;
+							}
+						}
+
+						// Set any removed properties back to their default values
+						if let Some(intellisense) = app_state.intellisense.load().as_ref()
+							&& let Some(game_files) = app_state.game_files.load().as_ref()
+							&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+							&& let Some(install) = app_settings.load().game_install.as_ref()
+						{
+							let game_version = app_state
+								.game_installs
+								.iter()
+								.try_find(|x| anyhow::Ok(x.path == *install))?
+								.context("No such game install")?
+								.version;
+
+							for (property, val) in prev_props {
+								if !sub_entity
+									.properties
+									.to_owned()
+									.unwrap_or_default()
+									.contains_key(&property) && SAFE_TO_SYNC.iter().any(|&x| val.property_type == x)
+								{
+									if let Some((_, ty, def_val, _)) = intellisense
+										.get_properties(
+											game_files,
+											&app_state.cached_entities,
+											hash_list,
+											game_version,
+											entity,
+											&entity_id,
+											false
+										)?
+										.into_iter()
+										.find(|(name, _, _, _)| *name == property)
+									{
+										debug!(
+											"Syncing removed property {} for entity {} with default value according \
+											 to intellisense",
+											property, entity_id
+										);
+
+										app_state
+											.editor_connection
+											.set_property(
+												&entity_id,
+												&entity.blueprint_hash,
+												&property,
+												PropertyValue {
+													property_type: ty,
+													data: def_val
+												}
+											)
+											.await?;
+									}
+								}
 							}
 						}
 					}

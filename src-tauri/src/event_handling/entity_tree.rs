@@ -6,6 +6,7 @@ use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
 use indexmap::IndexMap;
 use itertools::Itertools;
+use log::debug;
 use quickentity_rs::{
 	apply_patch, convert_2016_factory_to_modern,
 	patch_structs::{Patch, PatchOperation, SubEntityOperation},
@@ -20,9 +21,9 @@ use uuid::Uuid;
 use crate::{
 	editor_connection::PropertyValue,
 	entity::{
-		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local, get_decorations,
-		get_diff_info, get_local_reference, get_recursive_children, is_valid_entity_factory, random_entity_id,
-		CopiedEntityData, ReverseReferenceData
+		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local,
+		check_local_references_exist, get_decorations, get_diff_info, get_local_reference, get_recursive_children,
+		is_valid_entity_factory, random_entity_id, CopiedEntityData, ReverseReferenceData
 	},
 	finish_task,
 	game_detection::GameVersion,
@@ -2812,6 +2813,7 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 #[try_fn]
 #[context("Couldn't handle restore to original event")]
 pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Reverting {} to original state", entity_id))?;
@@ -2827,6 +2829,27 @@ pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_i
 		Err(anyhow!("Editor {} is not a QN patch editor", editor_id))?;
 		panic!();
 	};
+
+	match check_local_references_exist(
+		base.entities.get(&entity_id).context("Entity didn't exist in base")?,
+		current
+	)? {
+		EditorValidity::Invalid(err) => {
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Error,
+					title: "Entity would be invalid".into(),
+					subtitle: err
+				}
+			)?;
+
+			finish_task(app, task)?;
+			return Ok(());
+		}
+
+		_ => {}
+	}
 
 	if let Some(previous) = current.entities.get(&entity_id).cloned() {
 		current.entities.insert(
@@ -2891,7 +2914,7 @@ pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_i
 		if app_state.editor_connection.is_connected().await {
 			let prev_props = previous.properties.unwrap_or_default();
 
-			for (property, val) in sub_entity.properties.unwrap_or_default() {
+			for (property, val) in sub_entity.properties.to_owned().unwrap_or_default() {
 				let mut should_sync = false;
 
 				if let Some(previous_val) = prev_props.get(&property)
@@ -2915,6 +2938,63 @@ pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_i
 							}
 						)
 						.await?;
+				}
+			}
+
+			// Set any removed properties back to their default values
+			if let Some(intellisense) = app_state.intellisense.load().as_ref()
+				&& let Some(game_files) = app_state.game_files.load().as_ref()
+				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+				&& let Some(install) = app_settings.load().game_install.as_ref()
+			{
+				let game_version = app_state
+					.game_installs
+					.iter()
+					.try_find(|x| anyhow::Ok(x.path == *install))?
+					.context("No such game install")?
+					.version;
+
+				for (property, val) in prev_props {
+					if !sub_entity
+						.properties
+						.to_owned()
+						.unwrap_or_default()
+						.contains_key(&property)
+						&& SAFE_TO_SYNC.iter().any(|&x| val.property_type == x)
+					{
+						if let Some((_, ty, def_val, _)) = intellisense
+							.get_properties(
+								game_files,
+								&app_state.cached_entities,
+								hash_list,
+								game_version,
+								current,
+								&entity_id,
+								false
+							)?
+							.into_iter()
+							.find(|(name, _, _, _)| *name == property)
+						{
+							debug!(
+								"Syncing removed property {} for entity {} with default value according to \
+								 intellisense",
+								property, entity_id
+							);
+
+							app_state
+								.editor_connection
+								.set_property(
+									&entity_id,
+									&current.blueprint_hash,
+									&property,
+									PropertyValue {
+										property_type: ty,
+										data: def_val
+									}
+								)
+								.await?;
+						}
+					}
 				}
 			}
 		}

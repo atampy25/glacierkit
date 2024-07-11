@@ -57,6 +57,7 @@
 	let changedEntities: string[] = []
 
 	let showDiff = false
+	let diffTouchedEntities: string[] = []
 
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
@@ -1011,12 +1012,16 @@
 	}
 
 	function updateDiffing() {
-		for (const { id } of tree.get_json(undefined, { flat: true })) {
-			tree.get_node(id).li_attr.class = ""
-			tree.get_node(id, true)[0]?.classList?.remove?.("item-new")
-			tree.get_node(id, true)[0]?.classList?.remove?.("item-modified")
-			tree.get_node(id, true)[0]?.classList?.remove?.("item-removed")
+		for (const id of diffTouchedEntities) {
+			if (tree.get_node(id)) {
+				tree.get_node(id).li_attr.class = ""
+				tree.get_node(id, true)[0]?.classList?.remove?.("item-new")
+				tree.get_node(id, true)[0]?.classList?.remove?.("item-modified")
+				tree.get_node(id, true)[0]?.classList?.remove?.("item-removed")
+			}
 		}
+
+		diffTouchedEntities = []
 
 		for (const entityID of removedEntities.map((a) => a[0])) {
 			if (tree.get_node(entityID)) {
@@ -1028,11 +1033,13 @@
 			for (const entityID of addedEntities) {
 				tree.get_node(entityID).li_attr.class = "item-new"
 				tree.get_node(entityID, true)[0]?.classList?.add?.("item-new")
+				diffTouchedEntities.push(entityID)
 			}
 
 			for (const entityID of changedEntities) {
 				tree.get_node(entityID).li_attr.class = "item-modified"
 				tree.get_node(entityID, true)[0]?.classList?.add?.("item-modified")
+				diffTouchedEntities.push(entityID)
 			}
 
 			let added = 0
@@ -1090,6 +1097,8 @@
 									)
 								)
 							}
+
+							diffTouchedEntities.push(entityID)
 
 							added += 1
 						}
