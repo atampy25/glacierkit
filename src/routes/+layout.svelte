@@ -343,7 +343,7 @@
 				).json()
 
 				// Exclude last version commit and its post-update commit
-				commitsSinceLastVersion = commits.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2).map((a: { commit: { message: string } }) => a.commit.message)
+				commitsSinceLastVersion = commits.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2).map((a: { commit: { message: string } }) => a.commit.message).filter((a: string) => a !== "Post-update")
 
 				updateModalOpen = true
 			}
