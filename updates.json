@@ -1,11 +1,11 @@
 {
-	"version": "0.1.0",
-	"notes": "",
-	"pub_date": "2023-02-18T08:42:26Z",
+	"version": "1.0.6",
+	"notes": "Fix formatting",
+	"pub_date": "2024-07-11T15:45:22Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVScWpVZGd2b0lOTmYrNnRhdmFKdlp4ZnRmaUZZSU9maDdlbVFINW9JQjVJK01hcGZQUFFXcEFxN3pvNG9nSUtJd2dLRTJSTVdlT0dCcE9GNGFqZWRZUEEwSEhvQ015V3dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzA0NzgwNzE1CWZpbGU6UXVpY2tFbnRpdHkgRWRpdG9yXzEuNTEuMl94NjRfZW4tVVMubXNpLnppcAp2QWJMTThKK2JvOVYwQnNaeUFCbE1aVzlBVDJObjArNmtlbnNRT3Q3ZGliRlNqNm9XUFdlZXhHcUFTNGNTeDVxSVg4ajdEbGNKQ2F1R2J4VUpCNXBBdz09Cg==",
-			"url": "https://github.com/atampy25/quickentity-editor-next/releases/download/1.51.2/QuickEntity.Editor_1.51.2_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1diT3lJdE9uajRXalNNSU0xbVpnWUtGKzhMcDhHODdkYXZvMmpKQkFPandRQzlUMVgzeVFUYys2NkNEQzdtUjZjTlNMZXJ6YmNncGpQYzJ0ZzU3TmdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIwNzE1NDQyCWZpbGU6R2xhY2llcktpdF8xLjAuNl94NjRfZW4tVVMubXNpLnppcApkb2duZzhidzRyckhoK1BqNlMvUEhRTjRFcUZ2Z3FFZzRuNGZ5V3JQZHgrejhicWwxZ25PT2lQL0R0a1JBLzY1dXhIM08wZ1RSdldKRU5FcHhkNUVEUT09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.0.6/GlacierKit_1.0.6_x64_en-US.msi.zip"
 		}
 	}
 }
