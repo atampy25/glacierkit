@@ -74,6 +74,7 @@ use quickentity_rs::{
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
+use rpkg::normalise_to_hash;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, from_str, json, to_string, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
@@ -824,6 +825,57 @@ fn event(app: AppHandle, event: Event) {
 										.editor_connection
 										.signal_pin(&entity_id, &entity.blueprint_hash, &pin, output)
 										.await?;
+								}
+
+								EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
+									if let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
+									{
+										let resource = normalise_to_hash(resource);
+
+										if resource_reverse_dependencies.contains_key(&resource) {
+											let id = Uuid::new_v4();
+
+											app_state.editor_states.insert(
+												id.to_owned(),
+												EditorState {
+													file: None,
+													data: EditorData::ResourceOverview {
+														hash: resource.to_owned()
+													}
+												}
+											);
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::CreateTab {
+													id,
+													name: format!("Resource overview ({resource})"),
+													editor_type: EditorType::ResourceOverview
+												})
+											)?;
+										} else {
+											send_notification(
+												&app,
+												Notification {
+													kind: NotificationKind::Error,
+													title: "Not a vanilla resource".into(),
+													subtitle: "This factory doesn't exist in the base game files."
+														.into()
+												}
+											)?;
+										}
+									} else {
+										send_notification(
+											&app,
+											Notification {
+												kind: NotificationKind::Error,
+												title: "No game selected".into(),
+												subtitle: "You can't open game files without a copy of the game \
+												           selected."
+													.into()
+											}
+										)?;
+									}
 								}
 							},
 

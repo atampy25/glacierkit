@@ -227,6 +227,7 @@
 		const showFollowReferenceCondition = editor.createContextKey<boolean>("showFollowReferenceCondition", false)
 		const showOpenFactoryCondition = editor.createContextKey<boolean>("showOpenFactoryCondition", false)
 		const showSignalPinCondition = editor.createContextKey<boolean>("showSignalPinCondition", false)
+		const showOpenResourceOverviewCondition = editor.createContextKey<boolean>("showOpenResourceOverviewCondition", false)
 
 		editor.onDidChangeCursorPosition((e) => {
 			let entData
@@ -262,6 +263,13 @@
 			} else {
 				showSignalPinCondition.set([...Object.keys(entData.inputCopying || {}), ...Object.keys(entData.outputCopying || {}), ...Object.keys(entData.events || {})].includes(word))
 			}
+
+			showOpenResourceOverviewCondition.set(
+				!editor.getModel()!.getLineContent(e.position.lineNumber).includes(`"factory":`) &&
+					(editor.getModel()!.getLineContent(e.position.lineNumber).includes("assembly:/") ||
+						editor.getModel()!.getLineContent(e.position.lineNumber).includes("modules:/") ||
+						/"00[0-9A-F]{14}"/.test(editor.getModel()!.getLineContent(e.position.lineNumber)))
+			)
 		})
 
 		editor.addAction({
@@ -368,6 +376,40 @@
 								data: {
 									editor_id: editorID,
 									factory: JSON.parse(editor.getValue()).factory
+								}
+							}
+						}
+					}
+				})
+			}
+		})
+
+		editor.addAction({
+			id: "open-resource-overview",
+			label: "Open resource overview in new tab",
+			contextMenuGroupId: "navigation",
+			contextMenuOrder: 0,
+			keybindings: [monaco.KeyCode.F12],
+			precondition: "showOpenResourceOverviewCondition",
+			run: async (ed) => {
+				trackEvent("Open resource overview in new tab from Monaco editor")
+
+				await event({
+					type: "editor",
+					data: {
+						type: "entity",
+						data: {
+							type: "monaco",
+							data: {
+								type: "openResourceOverview",
+								data: {
+									editor_id: editorID,
+									resource: [
+										...editor
+											.getModel()!
+											.getLineContent(ed.getPosition()!.lineNumber)
+											.matchAll(/"(.*?)"/g)
+									].at(-1)![1]
 								}
 							}
 						}

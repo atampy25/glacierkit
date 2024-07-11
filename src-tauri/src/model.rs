@@ -484,6 +484,11 @@ strike! {
 						entity_id: String,
 						pin: String,
 						output: bool
+					},
+
+					OpenResourceOverview {
+						editor_id: Uuid,
+						resource: String
 					}
 				}),
 
