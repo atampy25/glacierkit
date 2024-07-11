@@ -22,6 +22,9 @@
 	import { help } from "$lib/helpray"
 	import HelpRay from "$lib/components/HelpRay.svelte"
 	import { trackEvent } from "@aptabase/tauri"
+	import { checkUpdate, installUpdate, type UpdateManifest } from "@tauri-apps/api/updater"
+	import { getVersion } from "@tauri-apps/api/app"
+	import { relaunch } from "@tauri-apps/api/process"
 
 	let tasks: [string, string][] = []
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
@@ -313,6 +316,37 @@
 			})
 
 			appWindow.show()
+
+			const { shouldUpdate, manifest } = await checkUpdate()
+
+			if (shouldUpdate) {
+				updateManifest = manifest!
+
+				const currentVersion = await getVersion()
+
+				const commits = await (
+					await fetch("https://api.github.com/repos/atampy25/glacierkit/commits", {
+						headers: {
+							Accept: "application/vnd.github.v3+json"
+						}
+					})
+				).json()
+
+				commits.reverse()
+
+				const prevVersionCommit = await (
+					await fetch(`https://api.github.com/repos/atampy25/glacierkit/commits/${currentVersion}`, {
+						headers: {
+							Accept: "application/vnd.github.v3+json"
+						}
+					})
+				).json()
+
+				// Exclude last version commit and its post-update commit
+				commitsSinceLastVersion = commits.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2).map((a: { commit: { message: string } }) => a.commit.message)
+
+				updateModalOpen = true
+			}
 		}
 	})
 
@@ -322,6 +356,10 @@
 	let errorModalError = ""
 
 	let helpRayActive = false
+
+	let updateModalOpen = false
+	let updateManifest: UpdateManifest = { version: "", date: "", body: "" }
+	let commitsSinceLastVersion: string[] = []
 </script>
 
 <ComposedModal
@@ -336,6 +374,33 @@
 		<pre class="mt-2 p-4 bg-neutral-800 overflow-x-auto"><code>{errorModalError}</code></pre>
 	</ModalBody>
 	<ModalFooter danger primaryButtonText="Continue" />
+</ComposedModal>
+
+<ComposedModal
+	open={updateModalOpen}
+	on:submit={async () => {
+		updateModalOpen = false
+
+		await installUpdate()
+		await relaunch()
+	}}
+>
+	<ModalHeader title="Update available to version {updateManifest.version}" />
+	<ModalBody>
+		Changes made since the currently installed version:
+		<ul class="changelog mt-1">
+			{#each commitsSinceLastVersion as commit}
+				<li>{commit}</li>
+			{/each}
+		</ul>
+	</ModalBody>
+	<ModalFooter
+		primaryButtonText="Install update"
+		secondaryButtonText="Not now"
+		on:click:button--secondary={() => {
+			updateModalOpen = false
+		}}
+	/>
 </ComposedModal>
 
 <header data-tauri-drag-region class:bx--header={true}>
@@ -535,5 +600,10 @@
 		padding-right: 0;
 		margin-left: 0.75rem;
 		margin-right: 0.5rem;
+	}
+
+	:global(.changelog li) {
+		list-style-position: inside;
+		list-style-type: disclosure-closed;
 	}
 </style>

@@ -373,7 +373,9 @@ pub fn initialise_resource_overview(
 				"REPO" => ResourceOverviewData::Repository,
 
 				"JSON" => ResourceOverviewData::Json {
-					json: format_json(&String::from_utf8(extract_latest_resource(game_files, hash_list, hash)?.1)?)?
+					json: format_json(&String::from_utf8(
+						extract_latest_resource(game_files, hash_list, hash)?.1
+					)?)?
 				},
 
 				"CLNG" => ResourceOverviewData::HMLanguages {

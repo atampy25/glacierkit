@@ -828,7 +828,8 @@ fn event(app: AppHandle, event: Event) {
 								}
 
 								EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
-									if let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
+									if let Some(resource_reverse_dependencies) =
+										app_state.resource_reverse_dependencies.load().as_ref()
 									{
 										let resource = normalise_to_hash(resource);
 

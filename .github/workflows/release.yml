@@ -1,0 +1,150 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "*.*.*"
+    workflow_dispatch:
+
+jobs:
+    build:
+        runs-on: windows-latest
+        if: github.event.action != 'push' || startsWith(github.ref, 'refs/tags/')
+
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  ref: "main"
+                  fetch-depth: 0
+
+            - name: Get latest tag
+              id: latestTag
+              uses: "WyriHaximus/github-action-get-previous-tag@v1.1.0"
+              with:
+                  fallback: unknown
+
+            - name: Prepare Rust toolchain
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: nightly
+                  target: x86_64-pc-windows-msvc
+                  default: true
+                  components: clippy, rustfmt
+
+            - name: Install dependencies
+              run: |
+                  yarn set version 4.0.2
+                  yarn
+
+            - name: Update package.json version
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "package.json"
+                  field: "version"
+                  value: ${{ steps.latestTag.outputs.tag }}
+
+            - name: Update Cargo.toml version
+              uses: colathro/toml-editor@1.1.1
+              with:
+                  file: "src-tauri/Cargo.toml"
+                  key: "package.version"
+                  value: ${{ steps.latestTag.outputs.tag }}
+
+            - name: Update tauri.conf.json version
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "src-tauri/tauri.conf.json"
+                  field: "package.version"
+                  value: ${{ steps.latestTag.outputs.tag }}
+
+            - name: Update updates.json version
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "updates.json"
+                  field: "version"
+                  value: ${{ steps.latestTag.outputs.tag }}
+
+            - name: Update updates.json notes
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "updates.json"
+                  field: "notes"
+                  value: "${{ github.event.head_commit.message || format('v{0}', steps.latestTag.outputs.tag) }}"
+
+            - name: Update updates.json pub_date
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "updates.json"
+                  field: "pub_date"
+                  value: ${{ github.event.repository.updated_at}}
+
+            - name: Write key file
+              uses: DamianReeves/write-file-action@v1.0
+              with:
+                  path: "src-tauri/gk.key"
+                  contents: ${{ secrets.KEYDATA }}
+
+            - name: Write env file
+              uses: DamianReeves/write-file-action@v1.0
+              with:
+                  path: "./.env"
+                  contents: |
+                      TAURI_PRIVATE_KEY=gk.key
+                      TAURI_KEY_PASSWORD=${{ secrets.KEYPASS }}
+
+            - name: Build
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: |
+                  yarn tauri build
+
+            - name: Remove key file
+              run: |
+                  Remove-Item "src-tauri/gk.key"
+
+            - name: Remove env file
+              run: |
+                  Remove-Item "./.env"
+
+            - name: Read update signature
+              id: updateSignature
+              uses: andstor/file-reader-action@v1.0.0
+              with:
+                  path: "src-tauri/target/release/bundle/msi/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip.sig"
+
+            - name: Update updates.json signature
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "updates.json"
+                  field: "platforms.windows-x86_64.signature"
+                  value: ${{ steps.updateSignature.outputs.contents }}
+
+            - name: Update updates.json URL
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "updates.json"
+                  field: "platforms.windows-x86_64.url"
+                  value: "https://github.com/atampy25/glacierkit/releases/download/${{ steps.latestTag.outputs.tag }}/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip"
+
+            - name: Release
+              uses: softprops/action-gh-release@v1
+              with:
+                  name: ${{ steps.latestTag.outputs.tag }}
+                  body: |
+                      Last commit: ${{ github.event.head_commit.message || format('v{0}', steps.latestTag.outputs.tag) }}
+
+                      No additional scripts or manual steps are required; just download the MSI installer and run it.
+                  tag_name: ${{ steps.latestTag.outputs.tag }}
+                  repository: atampy25/glacierkit
+                  files: |
+                      src-tauri/target/release/bundle/msi/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip
+
+            - name: Format configs
+              run: |
+                  yarn format-configs
+
+            - name: Commit changes
+              uses: EndBug/add-and-commit@v9.1.0
+              with:
+                  default_author: github_actions
+                  message: "Post-update"
