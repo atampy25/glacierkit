@@ -31,6 +31,11 @@ jobs:
                   default: true
                   components: clippy, rustfmt
 
+            - name: Rust cache
+              uses: Swatinem/rust-cache@v2.7.3
+              with:
+                workspaces: "src-tauri -> target"
+
             - name: Install dependencies
               run: |
                   yarn set version 4.0.2
