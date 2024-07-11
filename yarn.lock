@@ -590,6 +590,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@taplo/core@npm:^0.1.0":
+  version: 0.1.1
+  resolution: "@taplo/core@npm:0.1.1"
+  checksum: c36f761431b2e959742d8e186e74306fb8991d84589e2f03b6481244cc407275fa448a217ef87b8aa1e226615fd7ba85c60e6f0221f01d891b90dd30b45cb13b
+  languageName: node
+  linkType: hard
+
+"@taplo/lib@npm:^0.4.0-alpha.2":
+  version: 0.4.0-alpha.2
+  resolution: "@taplo/lib@npm:0.4.0-alpha.2"
+  dependencies:
+    "@taplo/core": "npm:^0.1.0"
+  checksum: 650ed35ba949054eb8dcfbaf77d6154d9639f5d8fa96d89546c399a95e699d7e01f65e308f89478d41e0120baa3572f25595fe088d19e62cc56ad3eb2b5acbb5
+  languageName: node
+  linkType: hard
+
 "@tauri-apps/api@npm:1.5.3, @tauri-apps/api@npm:^1.0.0, @tauri-apps/api@npm:^1.5.3":
   version: 1.5.3
   resolution: "@tauri-apps/api@npm:1.5.3"
@@ -2659,6 +2675,7 @@ __metadata:
     postcss: "npm:^8.4.32"
     prettier: "npm:^3.1.1"
     prettier-plugin-svelte: "npm:^3.1.2"
+    prettier-plugin-toml: "npm:^2.0.1"
     rfc6902: "npm:^5.1.1"
     svelte: "npm:^4.2.7"
     svelte-check: "npm:^3.6.0"
@@ -3082,6 +3099,17 @@ __metadata:
     prettier: ^3.0.0
     svelte: ^3.2.0 || ^4.0.0-next.0 || ^5.0.0-next.0
   checksum: d0dd3f90c97a79c83d7d77e3d675d97f51190b248bac1a6cfec63add9521e69d111f59958e261b4f4b489949cbc3134cc68db440789075598dc548cfadf34fed
+  languageName: node
+  linkType: hard
+
+"prettier-plugin-toml@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "prettier-plugin-toml@npm:2.0.1"
+  dependencies:
+    "@taplo/lib": "npm:^0.4.0-alpha.2"
+  peerDependencies:
+    prettier: ^3.0.3
+  checksum: 8a67133b1a71d82f6fe20fe92e18251ae2930d0fe96d18af8c2333cc8fffce408642b6d6f21441932a97a248815cc82b3f372971eae84aab80cad2f0d78bdc68
   languageName: node
   linkType: hard
 

@@ -8,5 +8,6 @@
 	"useTabs": true,
 	"tabWidth": 4,
 	"semi": false,
-	"htmlWhitespaceSensitivity": "strict"
+	"htmlWhitespaceSensitivity": "strict",
+	"plugins": ["prettier-plugin-toml"]
 }
