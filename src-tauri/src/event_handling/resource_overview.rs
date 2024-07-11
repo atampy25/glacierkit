@@ -18,6 +18,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	biome::format_json,
 	finish_task,
 	game_detection::GameVersion,
 	general::open_in_editor,
@@ -372,16 +373,7 @@ pub fn initialise_resource_overview(
 				"REPO" => ResourceOverviewData::Repository,
 
 				"JSON" => ResourceOverviewData::Json {
-					json: {
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						from_slice::<Value>(&extract_latest_resource(game_files, hash_list, hash)?.1)?
-							.serialize(&mut ser)?;
-
-						String::from_utf8(buf)?
-					}
+					json: format_json(&String::from_utf8(extract_latest_resource(game_files, hash_list, hash)?.1)?)?
 				},
 
 				"CLNG" => ResourceOverviewData::HMLanguages {
