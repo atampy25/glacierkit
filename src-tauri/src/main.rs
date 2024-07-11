@@ -149,6 +149,7 @@ fn main() {
 			tauri_plugin_log::Builder::default()
 				.targets([LogTarget::LogDir, LogTarget::Stdout, LogTarget::Webview])
 				.level_for("tauri_plugin_aptabase", LevelFilter::Off)
+				.level_for("quickentity_rs", LevelFilter::Off)
 				.build()
 		)
 		.plugin(specta)

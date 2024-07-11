@@ -13,7 +13,7 @@ return await TAURI_INVOKE("plugin:tauri-specta|show_in_folder", { path });
 
 /** user-defined types **/
 
-export type ContentSearchEvent = { type: "search"; data: [string, string[], boolean] }
+export type ContentSearchEvent = { type: "search"; data: [string, string[], boolean, string[]] }
 export type ContentSearchResultsEvent = { type: "initialise"; data: { id: string } } | { type: "openResourceOverview"; data: { id: string; hash: string } }
 export type CopiedEntityData = { 
 /**

@@ -1439,8 +1439,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 		},
 
 		ToolEvent::ContentSearch(event) => match event {
-			ContentSearchEvent::Search(query, filetypes, use_qn_format) => {
-				start_content_search(app, query, filetypes, use_qn_format)?;
+			ContentSearchEvent::Search(query, filetypes, use_qn_format, partitions_to_search) => {
+				start_content_search(app, query, filetypes, use_qn_format, partitions_to_search)?;
 			}
 		}
 	}

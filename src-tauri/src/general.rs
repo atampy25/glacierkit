@@ -872,6 +872,17 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 				}
 			});
 
+		send_request(
+			app,
+			Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetPartitions(
+				partition_manager
+					.partitions()
+					.into_iter()
+					.map(|x| x.partition_info().name().as_deref().unwrap_or("<unnamed>").to_owned())
+					.collect()
+			)))
+		)?;
+
 		app_state.game_files.store(Some(partition_manager.into()));
 
 		app_state.resource_reverse_dependencies.store(Some(

@@ -27,9 +27,9 @@ name: string;
  */
 text: string }
 
-export type ContentSearchEvent = { type: "search"; data: [string, string[], boolean] }
+export type ContentSearchEvent = { type: "search"; data: [string, string[], boolean, string[]] }
 
-export type ContentSearchRequest = { type: "setEnabled"; data: boolean }
+export type ContentSearchRequest = { type: "setEnabled"; data: boolean } | { type: "setPartitions"; data: string[] }
 
 export type ContentSearchResultsEvent = { type: "initialise"; data: { id: string } } | { type: "openResourceOverview"; data: { id: string; hash: string } }
 

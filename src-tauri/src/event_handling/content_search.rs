@@ -33,7 +33,13 @@ use crate::{
 
 #[try_fn]
 #[context("Couldn't perform content search")]
-pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<String>, use_qn_format: bool) -> Result<()> {
+pub fn start_content_search(
+	app: &AppHandle,
+	query: String,
+	filetypes: Vec<String>,
+	use_qn_format: bool,
+	partitions_to_search: Vec<String>
+) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -54,6 +60,13 @@ pub fn start_content_search(app: &AppHandle, query: String, filetypes: Vec<Strin
 
 		let resources = game_files
 			.partitions()
+			.into_iter()
+			.filter(|x| {
+				partitions_to_search
+					.iter()
+					.any(|y| y == x.partition_info().name().as_deref().unwrap_or("<unnamed>"))
+			})
+			.collect_vec()
 			.into_par_iter()
 			.rev()
 			.flat_map(|partition| {

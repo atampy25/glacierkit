@@ -337,7 +337,7 @@ strike! {
 			}),
 
 			ContentSearch(pub enum ContentSearchEvent {
-				Search(String, Vec<String>, bool)
+				Search(String, Vec<String>, bool, Vec<String>)
 			})
 		}),
 
@@ -767,7 +767,8 @@ strike! {
 			}),
 
 			ContentSearch(pub enum ContentSearchRequest {
-				SetEnabled(bool)
+				SetEnabled(bool),
+				SetPartitions(Vec<String>)
 			})
 		}),
 
