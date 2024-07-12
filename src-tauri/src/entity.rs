@@ -93,6 +93,12 @@ pub fn get_local_reference(reference: &Ref) -> Option<String> {
 pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, Vec<ReverseReference>>> {
 	let mut reverse_references: HashMap<String, Vec<ReverseReference>> = HashMap::new();
 
+	reverse_references.reserve(entity.entities.len());
+
+	for entity_id in entity.entities.keys() {
+		reverse_references.insert(entity_id.to_owned(), vec![]);
+	}
+
 	for (entity_id, entity) in entity.entities.iter() {
 		if let Some(ent) = get_local_reference(&entity.parent) {
 			reverse_references.entry(ent).or_default().push(ReverseReference {
