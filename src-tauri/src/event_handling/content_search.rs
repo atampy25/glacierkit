@@ -61,11 +61,7 @@ pub fn start_content_search(
 		let resources = game_files
 			.partitions()
 			.into_iter()
-			.filter(|x| {
-				partitions_to_search
-					.iter()
-					.any(|y| y == x.partition_info().name().as_deref().unwrap_or("<unnamed>"))
-			})
+			.filter(|x| partitions_to_search.contains(&x.partition_info().id().to_string()))
 			.collect_vec()
 			.into_par_iter()
 			.rev()

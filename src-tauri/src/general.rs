@@ -878,7 +878,12 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 				partition_manager
 					.partitions()
 					.into_iter()
-					.map(|x| x.partition_info().name().as_deref().unwrap_or("<unnamed>").to_owned())
+					.map(|x| {
+						(
+							x.partition_info().name().as_deref().unwrap_or("<unnamed>").to_owned(),
+							x.partition_info().id().to_string()
+						)
+					})
 					.collect()
 			)))
 		)?;

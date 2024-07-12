@@ -29,7 +29,7 @@ text: string }
 
 export type ContentSearchEvent = { type: "search"; data: [string, string[], boolean, string[]] }
 
-export type ContentSearchRequest = { type: "setEnabled"; data: boolean } | { type: "setPartitions"; data: string[] }
+export type ContentSearchRequest = { type: "setEnabled"; data: boolean } | { type: "setPartitions"; data: ([string, string])[] }
 
 export type ContentSearchResultsEvent = { type: "initialise"; data: { id: string } } | { type: "openResourceOverview"; data: { id: string; hash: string } }
 
@@ -231,7 +231,7 @@ externalScene: string | null;
  */
 exposedEntity?: string | null }
 
-export type GameBrowserEntry = { hash: string; path: string | null; hint: string | null; filetype: string }
+export type GameBrowserEntry = { hash: string; path: string | null; hint: string | null; filetype: string; partition: [string, string] }
 
 export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: [string, SearchFilter] } | { type: "openInEditor"; data: string }
 

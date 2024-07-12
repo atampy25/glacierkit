@@ -12,6 +12,7 @@ use quickentity_rs::{
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use serde_json::{from_slice, from_value, json, to_string, to_value, to_vec, Value};
 use tauri::{async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
@@ -1209,6 +1210,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				let task = start_task(app, format!("Searching game files for {}", query))?;
 
 				if let Some(install) = app_settings.load().game_install.as_ref()
+					&& let Some(game_files) = app_state.game_files.load().as_ref()
 					&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
 				{
 					let install = app_state
@@ -1268,7 +1270,25 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 												hash: hash.to_owned(),
 												path: entry.path.to_owned(),
 												hint: entry.hint.to_owned(),
-												filetype: entry.resource_type.to_owned()
+												filetype: entry.resource_type.to_owned(),
+												partition: {
+													let rrid = RuntimeResourceID::from_hex_string(hash).unwrap();
+
+													let partition = game_files
+														.partitions()
+														.into_iter()
+														.find(|x| x.contains(&rrid))
+														.unwrap();
+
+													(
+														partition.partition_info().id().to_string(),
+														partition
+															.partition_info()
+															.name()
+															.to_owned()
+															.unwrap_or("<unnamed>".into())
+													)
+												}
 											})
 											.collect()
 									} else {
@@ -1298,7 +1318,25 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 												hash: hash.to_owned(),
 												path: entry.path.to_owned(),
 												hint: entry.hint.to_owned(),
-												filetype: entry.resource_type.to_owned()
+												filetype: entry.resource_type.to_owned(),
+												partition: {
+													let rrid = RuntimeResourceID::from_hex_string(hash).unwrap();
+
+													let partition = game_files
+														.partitions()
+														.into_iter()
+														.find(|x| x.contains(&rrid))
+														.unwrap();
+
+													(
+														partition.partition_info().id().to_string(),
+														partition
+															.partition_info()
+															.name()
+															.to_owned()
+															.unwrap_or("<unnamed>".into())
+													)
+												}
 											})
 											.collect()
 									}

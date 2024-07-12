@@ -3,7 +3,7 @@
 	import "jstree"
 	import { onMount } from "svelte"
 	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter } from "$lib/bindings-types"
-	import { Dropdown, Search } from "carbon-components-svelte"
+	import { Checkbox, Dropdown, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { clipboard } from "@tauri-apps/api"
 	import { trackEvent } from "@aptabase/tauri"
@@ -15,7 +15,7 @@
 
 	function compareNodes(a: any, b: any) {
 		if ((!(a.original ? a.original : a).folder && !(b.original ? b.original : b).folder) || ((a.original ? a.original : a).folder && (b.original ? b.original : b).folder)) {
-			return a.text.localeCompare(b.text, undefined, { numeric: true, sensitivity: "base" }) > 0 ? 1 : -1
+			return (a?.original?.chunk || a.text).localeCompare(b?.original?.chunk || b.text, undefined, { numeric: true, sensitivity: "base" }) > 0 ? 1 : -1
 		} else {
 			return (a.original ? a.original : a).folder ? -1 : 1
 		}
@@ -240,7 +240,8 @@
 
 			case "newTree":
 				gameDescription = request.data.game_description
-				await replaceTree(request.data.entries)
+				entries = request.data.entries
+				await refreshTree()
 				break
 
 			default:
@@ -249,12 +250,28 @@
 		}
 	}
 
-	async function replaceTree(entries: GameBrowserEntry[]) {
+	async function refreshTree() {
 		tree.settings!.core.data = []
 
 		const addedFolders = new Set()
+		const addedPartitions = new Set()
 
 		for (const entry of entries) {
+			if (separatePartitions && !addedPartitions.has(entry.partition[0])) {
+				tree.settings!.core.data.push({
+					id: `partition-${entry.partition[0]}`,
+					parent: "#",
+					icon: "fa-solid fa-box",
+					text: `${entry.partition[1]} (${entry.partition[0]})`,
+					folder: true,
+					path: null,
+					filetype: null,
+					chunk: entry.partition[0]
+				})
+
+				addedPartitions.add(entry.partition[0])
+			}
+
 			if (entry.path) {
 				const path = /\[(.*)\](?:\.pc_|\(.*\)\.pc_)/.exec(entry.path)![1]
 				const params = /\[.*\]\((.*)\)\.pc_/.exec(entry.path)?.[1]
@@ -264,10 +281,16 @@
 					.split("/")
 					.map((_, ind, arr) => arr.slice(0, ind + 1).join("/"))
 					.slice(0, -1)) {
-					if (!addedFolders.has(pathSection)) {
+					if (!addedFolders.has(separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection)) {
 						tree.settings!.core.data.push({
-							id: pathSection,
-							parent: pathSection.split("/").slice(0, -1).join("/") || "#",
+							id: separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection,
+							parent: pathSection.split("/").slice(0, -1).join("/")
+								? separatePartitions
+									? `${entry.partition[0]}-${pathSection.split("/").slice(0, -1).join("/")}`
+									: pathSection.split("/").slice(0, -1).join("/")
+								: separatePartitions
+									? `partition-${entry.partition[0]}`
+									: "#",
 							icon: "fa-regular fa-folder",
 							text: pathSection.split("/").at(-1),
 							folder: true,
@@ -275,13 +298,13 @@
 							filetype: null
 						})
 
-						addedFolders.add(pathSection)
+						addedFolders.add(separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection)
 					}
 				}
 
 				tree.settings!.core.data.push({
 					id: entry.hash,
-					parent: path.split("/").slice(0, -1).join("/"),
+					parent: separatePartitions ? `${entry.partition[0]}-${path.split("/").slice(0, -1).join("/")}` : path.split("/").slice(0, -1).join("/"),
 					icon: `${
 						{
 							TEMP: "fa-solid fa-cubes-stacked",
@@ -351,7 +374,7 @@
 			} else {
 				tree.settings!.core.data.push({
 					id: entry.hash,
-					parent: "#",
+					parent: separatePartitions ? `partition-${entry.partition[0]}` : "#",
 					icon: `${
 						{
 							TEMP: "fa-solid fa-cubes-stacked",
@@ -429,11 +452,13 @@
 		} else if (_event.target.value.length === 0) {
 			searchFeedback = ""
 			gameDescription = "Search for a game file above to get started"
-			await replaceTree([])
+			entries = []
+			await refreshTree()
 		} else {
 			searchFeedback = "Search too broad"
 			gameDescription = ""
-			await replaceTree([])
+			entries = []
+			await refreshTree()
 		}
 	}
 
@@ -442,6 +467,10 @@
 	let searchFeedback = ""
 	let searchFilter: SearchFilter = "All"
 	let searchQuery = ""
+	let separatePartitions = false
+	let entries: GameBrowserEntry[] = []
+
+	$: separatePartitions, void refreshTree()
 </script>
 
 <div
@@ -473,7 +502,8 @@
 						on:clear={async () => {
 							searchFeedback = ""
 							gameDescription = ""
-							await replaceTree([])
+							entries = []
+							await refreshTree()
 							searchQuery = ""
 						}}
 						bind:value={searchQuery}
@@ -506,6 +536,15 @@
 						}}
 					/>
 				</div>
+			</div>
+			<div
+				class="mb-3"
+				use:help={{
+					title: "Separate tree by partitions",
+					description: "You can turn this on to group resources in the tree by the game partition, or chunk, they are found in."
+				}}
+			>
+				<Checkbox labelText="Separate tree by partitions" bind:checked={separatePartitions} />
 			</div>
 			<div>{searchFeedback}</div>
 			<span class="text-neutral-400">{gameDescription}</span>

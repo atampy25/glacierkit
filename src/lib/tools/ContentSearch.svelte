@@ -18,7 +18,7 @@
 
 			case "setPartitions":
 				allPartitions = request.data
-				searchPartitions = Object.fromEntries(request.data.map((a) => [a, true]))
+				searchPartitions = Object.fromEntries(request.data.map((a) => [a[1], true]))
 				break
 
 			default:
@@ -27,7 +27,7 @@
 		}
 	}
 
-	let allPartitions: string[] = []
+	let allPartitions: [string, string][] = []
 
 	let enabled = false
 	let searchQuery = ""
@@ -66,7 +66,7 @@
 						iconDescription="Deselect all partitions"
 						size="small"
 						on:click={async () => {
-							searchPartitions = Object.fromEntries(allPartitions.map((a) => [a, false]))
+							searchPartitions = Object.fromEntries(allPartitions.map((a) => [a[1], false]))
 						}}
 					/>
 					<Button
@@ -74,12 +74,12 @@
 						iconDescription="Select all partitions"
 						size="small"
 						on:click={async () => {
-							searchPartitions = Object.fromEntries(allPartitions.map((a) => [a, true]))
+							searchPartitions = Object.fromEntries(allPartitions.map((a) => [a[1], true]))
 						}}
 					/>
 				</div>
-				{#each allPartitions.entries() as [ind, partition]}
-					<Checkbox labelText={`${partition} (chunk${ind})`} bind:checked={searchPartitions[partition]} />
+				{#each allPartitions as [partitionName, partitionId]}
+					<Checkbox labelText={`${partitionName} (${partitionId})`} bind:checked={searchPartitions[partitionId]} />
 				{/each}
 			</div>
 			<Button

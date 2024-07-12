@@ -144,7 +144,8 @@ pub struct GameBrowserEntry {
 	pub hash: String,
 	pub path: Option<String>,
 	pub hint: Option<String>,
-	pub filetype: String
+	pub filetype: String,
+	pub partition: (String, String)
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -773,7 +774,7 @@ strike! {
 
 			ContentSearch(pub enum ContentSearchRequest {
 				SetEnabled(bool),
-				SetPartitions(Vec<String>)
+				SetPartitions(Vec<(String, String)>)
 			})
 		}),
 
