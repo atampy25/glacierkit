@@ -540,11 +540,11 @@
 			<div
 				class="mb-3"
 				use:help={{
-					title: "Separate tree by partitions",
+					title: "Separate tree by partition",
 					description: "You can turn this on to group resources in the tree by the game partition, or chunk, they are found in."
 				}}
 			>
-				<Checkbox labelText="Separate tree by partitions" bind:checked={separatePartitions} />
+				<Checkbox labelText="Separate tree by partition" bind:checked={separatePartitions} />
 			</div>
 			<div>{searchFeedback}</div>
 			<span class="text-neutral-400">{gameDescription}</span>
