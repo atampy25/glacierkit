@@ -41,43 +41,52 @@ pub enum GameVersion {
 #[try_fn]
 #[context("Couldn't detect installed games")]
 pub fn detect_installs() -> Result<Vec<GameInstall>> {
-	let legendary_installed_path = Path::new(&std::env::var("USERPROFILE").context("%USERPROFILE%")?)
-		.join(".config")
-		.join("legendary")
-		.join("installed.json");
+	let legendary_installed_paths = [
+		Path::new(&std::env::var("USERPROFILE").context("%USERPROFILE%")?)
+			.join(".config")
+			.join("legendary")
+			.join("installed.json"),
+		Path::new(&std::env::var("APPDATA").context("%APPDATA%")?)
+			.join("heroic")
+			.join("legendaryConfig")
+			.join("legendary")
+			.join("installed.json")
+	];
 
 	let mut check_paths = vec![];
 
 	// Legendary installs
-	if legendary_installed_path.exists() {
-		let legendary_installed_data: Value =
-			serde_json::from_slice(&fs::read(legendary_installed_path).context("Reading legendary installed")?)
-				.context("Legendary installed as JSON")?;
+	for legendary_installed_path in legendary_installed_paths {
+		if legendary_installed_path.exists() {
+			let legendary_installed_data: Value =
+				serde_json::from_slice(&fs::read(legendary_installed_path).context("Reading legendary installed")?)
+					.context("Legendary installed as JSON")?;
 
-		// H3
-		if let Some(data) = legendary_installed_data.get("Eider") {
-			check_paths.push((
-				PathBuf::from(
-					data.get("install_path")
-						.context("install_path")?
-						.as_str()
-						.context("as_str")?
-				),
-				"Epic Games"
-			));
-		}
+			// H3
+			if let Some(data) = legendary_installed_data.get("Eider") {
+				check_paths.push((
+					PathBuf::from(
+						data.get("install_path")
+							.context("install_path")?
+							.as_str()
+							.context("as_str")?
+					),
+					"Epic Games"
+				));
+			}
 
-		// H1
-		if let Some(data) = legendary_installed_data.get("Barbet") {
-			check_paths.push((
-				PathBuf::from(
-					data.get("install_path")
-						.context("install_path")?
-						.as_str()
-						.context("as_str")?
-				),
-				"Epic Games"
-			));
+			// H1
+			if let Some(data) = legendary_installed_data.get("Barbet") {
+				check_paths.push((
+					PathBuf::from(
+						data.get("install_path")
+							.context("install_path")?
+							.as_str()
+							.context("as_str")?
+					),
+					"Epic Games"
+				));
+			}
 		}
 	}
 
