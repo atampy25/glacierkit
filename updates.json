@@ -1,11 +1,11 @@
 {
-	"version": "1.0.0",
-	"notes": "Release",
-	"pub_date": "2024-07-11T16:30:54Z",
+	"version": "1.0.1",
+	"notes": "Update TonyTools (fixes issues with some RTLV files)",
+	"pub_date": "2024-07-12T00:02:33Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1hxYk05VE45ZzRydDhKemhvTzdhV1d6M0I3UFd5R3VSN08xQWsrZkZhUmdob0hFNGVQQmNlRXpWdHNLcjdOWGtsd0VBaGllbW9qdFFQbWk5RzdXcWdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIwNzE2OTcxCWZpbGU6R2xhY2llcktpdF8xLjAuMF94NjRfZW4tVVMubXNpLnppcApKRlZlK0YzWGhQR3VsN20wN1Rrend3eU9zQWpqNDJpMkliNnpSazlKenVvY0pqVEdqZ2pMV3lYY1N0YldEakhqbU5LbFJJdzU2YS9uTjhqVlp0VlhCQT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.0.0/GlacierKit_1.0.0_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1pJbDVhTXZkZlE1aytaUnE5Q1pTdkUyTnhVaUNYZitnb3o5eWdrRWJNOGlPVCtueU9keWRNQ3ltZ2dIZjNuVTQ3TlpRc2NwajJVSkFnRWZHRFRleXdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIwNzU4Nzc3CWZpbGU6R2xhY2llcktpdF8xLjAuMV94NjRfZW4tVVMubXNpLnppcApXalFEcHhCSGRKVm02aTA1eTZ3WWFaRDlVOEgvdXlKTk1PK0lKcC9vV2k4RE1UdWhjRCt0eVlSNWFPL2ZkbU9pSFlvbTVCeVBNTEVwQmN1Zm5FV1FBdz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.0.1/GlacierKit_1.0.1_x64_en-US.msi.zip"
 		}
 	}
 }
