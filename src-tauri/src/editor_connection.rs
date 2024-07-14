@@ -314,7 +314,7 @@ impl EditorConnection {
 
 		let (tx, rx) = tokio::sync::mpsc::channel(32);
 
-		let mut recvr = debounced(ReceiverStream::new(rx), Duration::from_millis(500));
+		let mut recvr = debounced(ReceiverStream::new(rx), Duration::from_millis(200));
 
 		let _app = app.clone();
 
@@ -374,7 +374,7 @@ impl EditorConnection {
 									PropertyID::Known(name) => name
 								},
 								value.property_type.to_owned(),
-								convert_rt_property_value_to_qn(
+								match convert_rt_property_value_to_qn(
 									&SEntityTemplatePropertyValue {
 										property_type: value.property_type,
 										property_value: value.data
@@ -385,7 +385,23 @@ impl EditorConnection {
 									false
 								)
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
-								.expect("Couldn't convert new property value to QN")
+								{
+									Ok(x) => x,
+									Err(e) => {
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::ErrorReport {
+												error: format!(
+													"{:?}",
+													e.context("Couldn't interpret SDK property changed value")
+												)
+											})
+										)
+										.expect("Couldn't send error report to frontend");
+
+										continue;
+									}
+								}
 							))
 						);
 					}
@@ -823,6 +839,59 @@ impl EditorConnection {
 
 					_ => return Ok(()) // Can't set exposed entities
 				}
+			})
+			.await?;
+		} else if value.property_type == "TArray<SEntityTemplateReference>" {
+			self.send_request(SDKEditorRequest::SetEntityProperty {
+				entity: EntitySelector::Game {
+					id: entity_id.to_owned(),
+					tblu: tblu.to_owned()
+				},
+				property: property
+					.parse()
+					.map(PropertyID::Unknown)
+					.unwrap_or(PropertyID::Known(property.to_owned())),
+				value: match from_value::<Vec<Ref>>(value.data)?
+					.into_iter()
+					.map(|x| match x {
+						Ref::Full(FullRef {
+							entity_ref,
+							external_scene: Some(scene),
+							exposed_entity: None
+						}) => Some(json!({
+							"id": entity_ref,
+							"source": "game",
+							"tblu": normalise_to_hash(scene)
+						})),
+
+						Ref::Short(Some(entity_id)) => Some(json!({
+							"id": entity_id,
+							"source": "game",
+							"tblu": tblu.to_owned()
+						})),
+
+						Ref::Short(None) => Some(Value::Null),
+
+						_ => None // Can't set exposed entities
+					})
+					.collect::<Option<Vec<Value>>>()
+				{
+					Some(x) => Value::Array(x),
+					None => return Ok(())
+				}
+			})
+			.await?;
+		} else if value.property_type == "ZGuid" {
+			self.send_request(SDKEditorRequest::SetEntityProperty {
+				entity: EntitySelector::Game {
+					id: entity_id.to_owned(),
+					tblu: tblu.to_owned()
+				},
+				property: property
+					.parse()
+					.map(PropertyID::Unknown)
+					.unwrap_or(PropertyID::Known(property.to_owned())),
+				value: Value::String(value.data.as_str().context("ZGuid was not string")?.to_uppercase())
 			})
 			.await?;
 		} else {
