@@ -1,11 +1,11 @@
 {
-	"version": "1.1.1",
-	"notes": "Detect Heroic legendary game installs",
-	"pub_date": "2024-07-12T05:46:41Z",
+	"version": "1.1.2",
+	"notes": "Send error report instead of panic on editor property changed",
+	"pub_date": "2024-07-14T04:05:56Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1JRaEJyVFVZdS9IWG94c1Vqd2ViOXg3eVIxZW1nd1VXZE5INVNTekZjSlFPNzBnTHllcldwREFNcVJTb0l5SC9RbldXeGhFQXBBNWFnY1NDTHdaQ3d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIwNzY1NjEyCWZpbGU6R2xhY2llcktpdF8xLjEuMV94NjRfZW4tVVMubXNpLnppcAo5SnYyeTVSTk40QWxJL2VJU0JHZUN4UzhVL1puclk0NWV2UDJWODEvWlRPWGFnL0wwUGhNU1F0OU0waDAzNGl0a0swUlJnbFNETnlIeHh5aHJpUFpCUT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.1.1/GlacierKit_1.1.1_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1dQMzgvK0tldEJWOURvL0M0ZWtEdDZEMWczeDM1ZUhWbmZKemR0a0pBcGlYUlM3dUdPakJMRTVyYXRlUDF1WUpkUHgza2JndWZKUFdrREo5ckppckFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIwOTY3NDE4CWZpbGU6R2xhY2llcktpdF8xLjEuMl94NjRfZW4tVVMubXNpLnppcApiZVVkYTlybE8zdCtSOGN1WUdFRTFrVmlpeVhocG15RkRCVGJkL0R1bWlCQVhJYnA3RElCaVkzSDlYaHNyNVltNUxuUTQ1T0s3SFpXZEhoeTlOdkZBQT09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.1.2/GlacierKit_1.1.2_x64_en-US.msi.zip"
 		}
 	}
 }
