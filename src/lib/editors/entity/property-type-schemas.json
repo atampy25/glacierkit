@@ -2,7 +2,7 @@
 	"bool": {
 		"type": "boolean",
 		"description": "A boolean value.",
-		"default": null
+		"default": false
 	},
 	"ZString": {
 		"type": "string",
@@ -12,35 +12,35 @@
 	"float32": {
 		"type": "number",
 		"description": "A single-precision floating-point number. Can store non-integer values.",
-		"default": null
+		"default": 0
 	},
 	"int32": {
 		"type": "integer",
 		"description": "A signed 32-bit integer. Can store values from -2147483648 to 2147483648.",
-		"default": null
+		"default": 0
 	},
 	"uint8": {
 		"type": "integer",
 		"description": "An unsigned 8-bit integer. Can store values from 0 to 255.",
-		"default": null,
+		"default": 0,
 		"minimum": 0
 	},
 	"uint16": {
 		"type": "integer",
 		"description": "An unsigned 16-bit integer. Can store values from 0 to 65535.",
-		"default": null,
+		"default": 0,
 		"minimum": 0
 	},
 	"uint32": {
 		"type": "integer",
 		"description": "An unsigned 32-bit integer. Can store values from 0 to 4294967295.",
-		"default": null,
+		"default": 0,
 		"minimum": 0
 	},
 	"uint64": {
 		"type": "integer",
 		"description": "An unsigned 64-bit integer. Can store values from 0 to 18446744073709551615.",
-		"default": null,
+		"default": 0,
 		"minimum": 0
 	},
 	"SColorRGB": {
@@ -178,8 +178,7 @@
 				"type": "number"
 			}
 		},
-		"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"],
-		"default": null
+		"required": ["bDynamicScale", "fCloseupDistance", "fDynamicScaleAlpha", "fDynamicScaleBlendRange", "fDynamicScaleNearDistance", "fScale"]
 	},
 	"S25DProjectionSettings": {
 		"type": "object",
@@ -295,8 +294,7 @@
 			"fWorldSizeScalingFactorMax",
 			"fWorldSizeScalingFactorMin",
 			"sWorldSpaceSettings"
-		],
-		"default": null
+		]
 	},
 	"SMatrix43": {
 		"type": "object",
@@ -440,8 +438,7 @@
 			"m_fRHandDamageScalar",
 			"m_fRLegDamageScalar",
 			"m_fTorsoDamageMultiplier"
-		],
-		"default": null
+		]
 	},
 	"SCCEffectSet": {
 		"type": "object",
@@ -454,8 +451,7 @@
 				"type": "string"
 			}
 		},
-		"required": ["m_eDecalEffect", "m_eEmitterEffect"],
-		"default": null
+		"required": ["m_eDecalEffect", "m_eEmitterEffect"]
 	},
 	"SSCCuriousConfiguration": {
 		"type": "object",
@@ -471,8 +467,7 @@
 				"type": "boolean"
 			}
 		},
-		"required": ["m_CanCiviliansInvestigate", "m_CanGuardsInvestigate", "m_CanVIPsInvestigate"],
-		"default": null
+		"required": ["m_CanCiviliansInvestigate", "m_CanGuardsInvestigate", "m_CanVIPsInvestigate"]
 	},
 	"ZCurve": {
 		"type": "object",

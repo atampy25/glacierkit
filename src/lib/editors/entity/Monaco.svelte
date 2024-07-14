@@ -50,10 +50,14 @@
 											},
 											value: valSchema
 										},
-										default: {
-											type: propType,
-											value: valSchema.default
-										}
+										...(Object.hasOwn(valSchema, "default")
+											? {
+													default: {
+														type: propType,
+														value: valSchema.default
+													}
+												}
+											: {})
 									})
 								}),
 								...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
@@ -64,10 +68,14 @@
 											},
 											value: { type: "array", items: valSchema }
 										},
-										default: {
-											type: `TArray<${propType}>`,
-											value: [valSchema.default]
-										}
+										...(Object.hasOwn(valSchema, "default")
+											? {
+													default: {
+														type: `TArray<${propType}>`,
+														value: [valSchema.default]
+													}
+												}
+											: {})
 									})
 								}),
 								...Object.entries(enums).map(([propType, possibleValues]) => {
@@ -123,7 +131,7 @@
 												},
 												value: valSchema
 											},
-											...(valSchema.default
+											...(Object.hasOwn(valSchema, "default")
 												? {
 														default: {
 															type: propType,
@@ -141,7 +149,7 @@
 												},
 												value: { type: "array", items: valSchema }
 											},
-											...(valSchema.default
+											...(Object.hasOwn(valSchema, "default")
 												? {
 														default: {
 															type: `TArray<${propType}>`,

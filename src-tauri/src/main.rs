@@ -139,7 +139,7 @@ fn main() {
 
 	tauri::Builder::default()
 		.plugin(
-			tauri_plugin_aptabase::Builder::new("A-SH-1114087815")
+			tauri_plugin_aptabase::Builder::new("A-SH-1393169212")
 				.with_options(InitOptions {
 					host: Some("http://159.13.49.212".into()),
 					flush_interval: None
