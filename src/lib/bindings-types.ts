@@ -4,7 +4,7 @@ export type Announcement = { id: string; kind: AnnouncementKind; title: string; 
 
 export type AnnouncementKind = "info" | "success" | "warning" | "error"
 
-export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; colourblindMode: boolean; seenAnnouncements: string[] }
+export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; colourblindMode: boolean; editorConnection: boolean; seenAnnouncements: string[] }
 
 export type ArrayPatchOperation = { RemoveItemByValue: JsonValue } | { AddItemAfter: [JsonValue, JsonValue] } | { AddItemBefore: [JsonValue, JsonValue] } | { AddItem: JsonValue }
 
@@ -460,7 +460,7 @@ export type Rotation = { yaw: number; pitch: number; roll: number }
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
-export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeColourblind"; data: boolean } | { type: "changeCustomPaths"; data: string[] }
+export type SettingsEvent = { type: "initialise" } | { type: "changeGameInstall"; data: string | null } | { type: "changeExtractModdedFiles"; data: boolean } | { type: "changeColourblind"; data: boolean } | { type: "changeEditorConnection"; data: boolean } | { type: "changeCustomPaths"; data: string[] }
 
 export type SettingsRequest = { type: "initialise"; data: { game_installs: GameInstall[]; settings: AppSettings } } | { type: "changeProjectSettings"; data: ProjectSettings }
 

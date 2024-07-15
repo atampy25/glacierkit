@@ -15,6 +15,7 @@
 				gameInstalls = request.data.game_installs
 				extractModdedFiles = request.data.settings.extractModdedFiles
 				colourblind = request.data.settings.colourblindMode
+				editorConnectionEnabled = request.data.settings.editorConnection
 				selectedGameInstall = request.data.settings.gameInstall || null
 				break
 
@@ -77,8 +78,27 @@
 		}
 	}
 
+	async function changeEditorConnectionEnabled({ target }: { target: EventTarget | null }) {
+		if (target) {
+			const _target = target as HTMLInputElement
+
+			editorConnectionEnabled = _target.checked
+			await event({
+				type: "tool",
+				data: {
+					type: "settings",
+					data: {
+						type: "changeEditorConnection",
+						data: _target.checked
+					}
+				}
+			})
+		}
+	}
+
 	let extractModdedFiles = false
 	let colourblind = false
+	let editorConnectionEnabled = true
 
 	let projectLoaded = false
 
@@ -116,6 +136,16 @@
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
 				Will use text features like italics and strikethrough in addition to colour to mark contrast.
+			</span>
+		</TooltipIcon>
+	</div>
+	<div class="flex items-center gap-2">
+		<div class="flex-shrink">
+			<Checkbox checked={editorConnectionEnabled} on:change={changeEditorConnectionEnabled} labelText="Enable editor connection" />
+		</div>
+		<TooltipIcon icon={Information}>
+			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
+				By default, GlacierKit connects automatically to the SDK editor and syncs any changes you make. If you don't want this, you can disable the editor connection.
 			</span>
 		</TooltipIcon>
 	</div>

@@ -1413,9 +1413,11 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						interval.tick().await;
 
 						// Attempt to connect every 10 seconds
-						if !app.state::<AppState>().editor_connection.is_connected().await {
-							if TcpStream::connect("localhost:46735").await.is_ok() {
-								let _ = app.state::<AppState>().editor_connection.connect().await;
+						if app.state::<ArcSwap<AppSettings>>().load().editor_connection {
+							if !app.state::<AppState>().editor_connection.is_connected().await {
+								if TcpStream::connect("localhost:46735").await.is_ok() {
+									let _ = app.state::<AppState>().editor_connection.connect().await;
+								}
 							}
 						}
 					}
@@ -1456,6 +1458,24 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			SettingsEvent::ChangeColourblind(value) => {
 				let mut settings = (*app_settings.load_full()).to_owned();
 				settings.colourblind_mode = value;
+				fs::write(
+					app.path_resolver()
+						.app_data_dir()
+						.context("Couldn't get app data dir")?
+						.join("settings.json"),
+					to_vec(&settings)?
+				)?;
+				app_settings.store(settings.into());
+			}
+
+			SettingsEvent::ChangeEditorConnection(value) => {
+				let mut settings = (*app_settings.load_full()).to_owned();
+				settings.editor_connection = value;
+
+				if !value && app_state.editor_connection.is_connected().await {
+					app_state.editor_connection.disconnect().await?;
+				}
+
 				fs::write(
 					app.path_resolver()
 						.app_data_dir()

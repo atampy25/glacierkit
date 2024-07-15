@@ -30,6 +30,7 @@ pub struct AppSettings {
 	pub extract_modded_files: bool,
 	pub game_install: Option<PathBuf>,
 	pub colourblind_mode: bool,
+	pub editor_connection: bool,
 	pub seen_announcements: Vec<String>
 }
 
@@ -39,6 +40,7 @@ impl Default for AppSettings {
 			extract_modded_files: false,
 			game_install: None,
 			colourblind_mode: false,
+			editor_connection: true,
 			seen_announcements: vec![]
 		}
 	}
@@ -333,6 +335,7 @@ strike! {
 				ChangeGameInstall(Option<PathBuf>),
 				ChangeExtractModdedFiles(bool),
 				ChangeColourblind(bool),
+				ChangeEditorConnection(bool),
 
 				ChangeCustomPaths(Vec<String>)
 			}),
