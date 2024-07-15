@@ -61,7 +61,7 @@ pub fn initialise_resource_overview(
 		Request::Editor(EditorRequest::ResourceOverview(ResourceOverviewRequest::Initialise {
 			id,
 			hash: hash.to_owned(),
-			filetype,
+			filetype: filetype.to_owned(),
 			chunk_patch,
 			path_or_hint: hash_list
 				.entries
@@ -97,9 +97,8 @@ pub fn initialise_resource_overview(
 								hash_list
 									.entries
 									.get(hash)
-									.expect("No entry in hash list for resource")
-									.resource_type
-									.to_owned(),
+									.map(|x| x.resource_type.to_owned())
+									.unwrap_or("".into()),
 								hash_list
 									.entries
 									.get(hash)
@@ -109,13 +108,7 @@ pub fn initialise_resource_overview(
 						.collect()
 				})
 				.unwrap_or_default(),
-			data: match hash_list
-				.entries
-				.get(hash)
-				.expect("No entry in hash list for resource")
-				.resource_type
-				.as_ref()
-			{
+			data: match filetype.as_ref() {
 				"TEMP" => {
 					ensure_entity_in_cache(
 						game_files,
