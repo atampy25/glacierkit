@@ -1,11 +1,11 @@
 {
-	"version": "1.2.0",
-	"notes": "Do not panic when resource overview target not in hash list",
-	"pub_date": "2024-07-14T15:48:07Z",
+	"version": "1.2.1",
+	"notes": "Support WSWB preview in resource overview",
+	"pub_date": "2024-07-15T06:57:53Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1lkUFVPaFh1N0ZCc05ETnVRSlV3SkxMdkRqRnEybkpLajZ2c3hQTFk3Mll1Q3lGU2pWa2hhNURPYlBlZ0NFOFdVZkM5a2dkRlVUS3F6Y0hOMGJJSHdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxMDI2NjYzCWZpbGU6R2xhY2llcktpdF8xLjIuMF94NjRfZW4tVVMubXNpLnppcAp2SWpiU2NCZDl2VnBIRUV6WU5hUUQ2WDNyTWZVTWV2QWtEenpoMmM1N1lUZmtuQ0tTdTY5TkEwRmZtUlhHMVZObFRrWXp1S1cvcjQ1dkgycFMwaEVCQT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.0/GlacierKit_1.2.0_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1NkTW9ldzc1bkNQRmZEM3NRcTczdzlsVHNlQytYSERpalZnRTJiZ2xiM1NHOEo2WnJDbmpDSnBFOHNhQXFSYkdjSkFBcVVjaEpxMWFhQzlJUVRobEFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxMTI5MDUxCWZpbGU6R2xhY2llcktpdF8xLjIuMV94NjRfZW4tVVMubXNpLnppcApoVmEyS2xNTzB4bUs0MWdmOEZXc3IrK3JvREd3TDA0NFN2M1JKd3JhSnpmZ1FzeTM5ZnFsQkhqb3BLVjRTWDlFQTZnWU1VYzB6aExZRVlnKzYrTnZEUT09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.1/GlacierKit_1.2.1_x64_en-US.msi.zip"
 		}
 	}
 }
