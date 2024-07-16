@@ -83,7 +83,7 @@
 		bind:value={decimalToHex}
 		on:change={() => {
 			if (decimalToHex) {
-				trackEvent("Calculate decimal to hex")
+				trackEvent("Convert decimal to hex")
 			}
 		}}
 		placeholder="81985529216486895"

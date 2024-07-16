@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use fn_error_context::context;
 use serde_json::to_vec;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_aptabase::EventTracker;
 use tryvial::try_fn;
 
 use crate::{
@@ -84,6 +85,8 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 				if let Some(project) = app_state.project.load().as_ref() {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(factory_hash.to_owned());
+
+					app.track_event("Save custom path by factory input", None);
 
 					send_request(
 						app,
@@ -191,6 +194,8 @@ pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadata
 				if let Some(project) = app_state.project.load().as_ref() {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(blueprint_hash.to_owned());
+
+					app.track_event("Save custom path by blueprint input", None);
 
 					send_request(
 						app,

@@ -188,7 +188,7 @@ pub fn start_content_search(
 										convert_generic_str(
 											&partition.read_resource(resource_id).ok()?,
 											game_version,
-											&filetype
+											if filetype == "WSWB" { "DSWB" } else { &filetype }
 										)
 										.ok()?
 									};

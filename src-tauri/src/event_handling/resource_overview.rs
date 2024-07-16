@@ -134,8 +134,8 @@ pub fn initialise_resource_overview(
 					}
 				}
 
-				"AIRG" | "TBLU" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "DSWB" | "GFXF" | "GIDX" | "WSGB"
-				| "ECPB" | "UICB" | "ENUM" => {
+				"AIRG" | "TBLU" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "WSWB" | "DSWB" | "GFXF" | "GIDX"
+				| "WSGB" | "ECPB" | "UICB" | "ENUM" => {
 					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 					ResourceOverviewData::GenericRL {
@@ -144,8 +144,16 @@ pub fn initialise_resource_overview(
 							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							convert_generic::<Value>(&res_data, game_version, &res_meta.hash_resource_type)?
-								.serialize(&mut ser)?;
+							convert_generic::<Value>(
+								&res_data,
+								game_version,
+								if res_meta.hash_resource_type == "WSWB" {
+									"DSWB"
+								} else {
+									&res_meta.hash_resource_type
+								}
+							)?
+							.serialize(&mut ser)?;
 
 							String::from_utf8(buf)?
 						}

@@ -144,6 +144,19 @@ fn main() {
 					host: Some("http://159.13.49.212".into()),
 					flush_interval: None
 				})
+				.with_panic_hook(Box::new(|client, info, msg| {
+					let location = info
+						.location()
+						.map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
+						.unwrap_or_default();
+
+					client.track_event(
+						"Panic",
+						Some(json!({
+						  "info": format!("{} ({})", msg, location),
+						}))
+					);
+				}))
 				.build()
 		)
 		.plugin(
@@ -1011,8 +1024,7 @@ fn event(app: AppHandle, event: Event) {
 									.context("Couldn't get app data dir")?
 									.join("settings.json"),
 								to_vec(&settings).unwrap()
-							)
-							.unwrap();
+							)?;
 							app_settings.store(settings.into());
 						}
 
@@ -1051,11 +1063,11 @@ fn event(app: AppHandle, event: Event) {
 									settings = read_settings;
 								} else {
 									settings = ProjectSettings::default();
-									fs::write(path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
+									fs::write(path.join("project.json"), to_vec(&settings)?)?;
 								}
 							} else {
 								settings = ProjectSettings::default();
-								fs::write(path.join("project.json"), to_vec(&settings).unwrap()).unwrap();
+								fs::write(path.join("project.json"), to_vec(&settings)?)?;
 							}
 
 							for editor in app.state::<AppState>().editor_states.iter() {

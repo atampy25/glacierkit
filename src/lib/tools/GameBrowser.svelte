@@ -439,6 +439,7 @@
 
 		if (_event.target.value.length >= 3) {
 			searchFeedback = ""
+			await trackEvent("Search game files", { filter: searchFilter, separate_partitions: String(separatePartitions) })
 			await event({
 				type: "tool",
 				data: {
@@ -470,7 +471,11 @@
 	let separatePartitions = false
 	let entries: GameBrowserEntry[] = []
 
-	$: separatePartitions, void refreshTree()
+	$: separatePartitions,
+		(async () => {
+			await refreshTree()
+			await trackEvent("Search game files", { filter: searchFilter, separate_partitions: String(separatePartitions) })
+		})()
 </script>
 
 <div
@@ -522,6 +527,7 @@
 						on:select={async ({ detail: { selectedId } }) => {
 							if (searchQuery.length >= 3) {
 								searchFeedback = ""
+								await trackEvent("Search game files", { filter: selectedId, separate_partitions: String(separatePartitions) })
 								await event({
 									type: "tool",
 									data: {

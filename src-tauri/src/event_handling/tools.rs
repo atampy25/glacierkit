@@ -1390,6 +1390,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					Some(json!({
 						"game_installs": app_state.game_installs.len(),
 						"extract_modded_files": app_settings.load().extract_modded_files,
+						"colourblind_mode": app_settings.load().colourblind_mode,
+						"editor_connection": app_settings.load().editor_connection,
 						"selected_install": selected_install_info
 					}))
 				);
@@ -1488,6 +1490,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 			SettingsEvent::ChangeCustomPaths(value) => {
 				if let Some(project) = app_state.project.load().as_ref() {
+					app.track_event("Edit custom paths list manually", None);
+
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths = value;
 					fs::write(project.path.join("project.json"), to_vec(&settings)?)?;
