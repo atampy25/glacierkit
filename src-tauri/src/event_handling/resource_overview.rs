@@ -155,7 +155,11 @@ pub fn initialise_resource_overview(
 							)?
 							.serialize(&mut ser)?;
 
-							String::from_utf8(buf)?
+							if buf.len() < 1024 * 512 {
+								String::from_utf8(buf)?
+							} else {
+								"Too large to preview".into()
+							}
 						}
 					}
 				}
