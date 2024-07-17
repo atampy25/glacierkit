@@ -1,11 +1,11 @@
 {
-	"version": "1.2.1",
-	"notes": "Support WSWB preview in resource overview",
-	"pub_date": "2024-07-15T06:57:53Z",
+	"version": "1.2.2",
+	"notes": "Properly extract out entity handling logic",
+	"pub_date": "2024-07-16T11:24:22Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1NkTW9ldzc1bkNQRmZEM3NRcTczdzlsVHNlQytYSERpalZnRTJiZ2xiM1NHOEo2WnJDbmpDSnBFOHNhQXFSYkdjSkFBcVVjaEpxMWFhQzlJUVRobEFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxMTI5MDUxCWZpbGU6R2xhY2llcktpdF8xLjIuMV94NjRfZW4tVVMubXNpLnppcApoVmEyS2xNTzB4bUs0MWdmOEZXc3IrK3JvREd3TDA0NFN2M1JKd3JhSnpmZ1FzeTM5ZnFsQkhqb3BLVjRTWDlFQTZnWU1VYzB6aExZRVlnKzYrTnZEUT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.1/GlacierKit_1.2.1_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1h2SGpkRUNWU09BZTBhZ2hwVE56WW0xejhnYXc0a3ZDOVFEcnZGUitZZEE2Mi9jSG1qRWVycEhMU1hXeTYvaWk2dmtaYTIyOFZZQU9GN3BWZGU1dHdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxMTk3MDg1CWZpbGU6R2xhY2llcktpdF8xLjIuMl94NjRfZW4tVVMubXNpLnppcApsSzl6Z3Y5d3B3K0E2YXdyVTY4L1pxTXBraEtKZ3VpZ09HdmhQYVhBRDZuV2hlMUFmanNyZ0JQWlNqK2R5YkZ6Vm0ra2ljQWp0NDVtcWlvUFZVWmJEUT09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.2/GlacierKit_1.2.2_x64_en-US.msi.zip"
 		}
 	}
 }
