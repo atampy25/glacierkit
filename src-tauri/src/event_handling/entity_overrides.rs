@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
 	entity::get_ref_decoration,
-	finish_task,
+	finish_task, get_loaded_game_version,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EntityEditorRequest, EntityOverridesEvent,
 		EntityOverridesRequest, GlobalRequest, Request
@@ -30,12 +30,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 		&& let Some(repository) = app_state.repository.load().as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
+		let game_version = get_loaded_game_version(app, install)?;
 
 		let task = start_task(app, "Updating override decorations")?;
 

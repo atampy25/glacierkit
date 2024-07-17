@@ -22,6 +22,7 @@ use crate::{
 	finish_task,
 	game_detection::GameVersion,
 	general::open_in_editor,
+	get_loaded_game_version,
 	hash_list::HashList,
 	languages::get_language_map,
 	model::{
@@ -51,7 +52,6 @@ pub fn initialise_resource_overview(
 	game_files: &PartitionManager,
 	game_version: GameVersion,
 	resource_reverse_dependencies: &Arc<HashMap<String, Vec<String>>>,
-	install: &PathBuf,
 	hash_list: &Arc<HashList>
 ) -> Result<()> {
 	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, hash)?;
@@ -110,18 +110,7 @@ pub fn initialise_resource_overview(
 				.unwrap_or_default(),
 			data: match filetype.as_ref() {
 				"TEMP" => {
-					ensure_entity_in_cache(
-						game_files,
-						&app_state.cached_entities,
-						app_state
-							.game_installs
-							.iter()
-							.try_find(|x| anyhow::Ok(x.path == *install))?
-							.context("No such game install")?
-							.version,
-						hash_list,
-						hash
-					)?;
+					ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
 					let entity = app_state.cached_entities.get(hash).unwrap();
 
@@ -718,22 +707,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
-
 				initialise_resource_overview(
 					app,
 					&app_state,
 					id,
 					hash,
 					game_files,
-					game_version,
+					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
-					install,
 					hash_list
 				)?;
 			}
@@ -762,22 +743,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
-
 				initialise_resource_overview(
 					app,
 					&app_state,
 					id,
 					hash,
 					game_files,
-					game_version,
+					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
-					install,
 					hash_list
 				)?;
 
@@ -906,12 +879,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				ensure_entity_in_cache(
 					game_files,
 					&app_state.cached_entities,
-					app_state
-						.game_installs
-						.iter()
-						.try_find(|x| anyhow::Ok(x.path == *install))?
-						.context("No such game install")?
-						.version,
+					get_loaded_game_version(app, install)?,
 					hash_list,
 					hash
 				)?;
@@ -956,13 +924,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				let (metadata, data) = extract_latest_resource(game_files, hash_list, hash)?;
 				let metadata_file = generate_rpkg_meta(&metadata)?;
 
-				let data = match app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version
-				{
+				let data = match get_loaded_game_version(app, install)? {
 					GameVersion::H1 => to_vec(
 						&h2016_convert_binary_to_factory(&data)
 							.context("Couldn't convert binary data to ResourceLib factory")?
@@ -1020,14 +982,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
-
-				ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
+				ensure_entity_in_cache(
+					game_files,
+					&app_state.cached_entities,
+					get_loaded_game_version(app, install)?,
+					hash_list,
+					hash
+				)?;
 
 				let (metadata, data) = extract_latest_resource(game_files, hash_list, &{
 					let entity = app_state.cached_entities.get(hash).unwrap();
@@ -1077,12 +1038,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
+				let game_version = get_loaded_game_version(app, install)?;
 
 				ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
@@ -1151,13 +1107,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
-
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
@@ -1179,7 +1128,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						save_handle.path(),
 						to_vec(&convert_generic::<Value>(
 							&res_data,
-							game_version,
+							get_loaded_game_version(app, install)?,
 							&res_meta.hash_resource_type
 						)?)?
 					)?;
@@ -1260,13 +1209,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
-
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
@@ -1336,7 +1278,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 						"TEXT" => {
 							let mut texture = TextureMap::process_data(
-								match game_version {
+								match get_loaded_game_version(app, install)? {
 									GameVersion::H1 => rpkg_rs::WoaVersion::HM2016,
 									GameVersion::H2 => rpkg_rs::WoaVersion::HM2,
 									GameVersion::H3 => rpkg_rs::WoaVersion::HM3
@@ -1351,7 +1293,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								texture
 									.set_mipblock1_data(
 										&texd_data,
-										match game_version {
+										match get_loaded_game_version(app, install)? {
 											GameVersion::H1 => tex_rs::WoaVersion::HM2016,
 											GameVersion::H2 => tex_rs::WoaVersion::HM2,
 											GameVersion::H3 => tex_rs::WoaVersion::HM3
@@ -1647,12 +1589,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
+				let game_version = get_loaded_game_version(app, install)?;
 
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
 

@@ -21,7 +21,6 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::general::{load_game_files, open_file};
 use crate::model::{
 	AppSettings, AppState, ContentSearchEvent, EditorData, EditorState, EditorType, FileBrowserEvent, GameBrowserEntry,
 	GameBrowserEvent, GameBrowserRequest, GlobalRequest, Request, SearchFilter, SettingsEvent, SettingsRequest,
@@ -36,6 +35,10 @@ use crate::rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_
 use crate::{event_handling::content_search::start_content_search, send_request};
 use crate::{finish_task, start_task};
 use crate::{game_detection::GameVersion, general::open_in_editor};
+use crate::{
+	general::{load_game_files, open_file},
+	get_loaded_game_version
+};
 use crate::{send_notification, Notification, NotificationKind};
 
 #[try_fn]
@@ -224,12 +227,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							ensure_entity_in_cache(
 								game_files,
 								&app_state.cached_entities,
-								app_state
-									.game_installs
-									.iter()
-									.try_find(|x| anyhow::Ok(x.path == *install))?
-									.context("No such game install")?
-									.version,
+								get_loaded_game_version(app, install)?,
 								hash_list,
 								&normalise_to_hash(patch.factory_hash.to_owned())
 							)?;
@@ -328,12 +326,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					}
 					entity.comments = comments;
 
-					let game_version = app_state
-						.game_installs
-						.iter()
-						.try_find(|x| anyhow::Ok(x.path == *install))?
-						.context("No such game install")?
-						.version;
+					let game_version = get_loaded_game_version(app, install)?;
 
 					// `ensure_entity_in_cache` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
 					let (temp_meta, temp_data) = extract_latest_resource(
@@ -428,12 +421,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					ensure_entity_in_cache(
 						game_files,
 						&app_state.cached_entities,
-						app_state
-							.game_installs
-							.iter()
-							.try_find(|x| anyhow::Ok(x.path == *install))?
-							.context("No such game install")?
-							.version,
+						get_loaded_game_version(app, install)?,
 						hash_list,
 						&normalise_to_hash(patch.factory_hash.to_owned())
 					)?;

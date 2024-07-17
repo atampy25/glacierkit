@@ -29,7 +29,12 @@ pub mod rpkg_tool;
 pub mod show_in_folder;
 pub mod wwev;
 
-use std::{fs, path::Path, sync::Arc, time::Duration};
+use std::{
+	fs,
+	path::{Path, PathBuf},
+	sync::Arc,
+	time::Duration
+};
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use arboard::Clipboard;
@@ -55,7 +60,7 @@ use event_handling::{
 	unlockables_patch::handle_unlockables_patch_event
 };
 use fn_error_context::context;
-use game_detection::detect_installs;
+use game_detection::{detect_installs, GameVersion};
 use general::open_file;
 use hashbrown::{HashMap, HashSet};
 use indexmap::IndexMap;
@@ -2468,19 +2473,12 @@ fn event(app: AppHandle, event: Event) {
 										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 										&& let Some(install) = app_settings.load().game_install.as_ref()
 									{
-										let game_version = app_state
-											.game_installs
-											.iter()
-											.try_find(|x| anyhow::Ok(x.path == *install))?
-											.context("No such game install")?
-											.version;
-
 										if let Some((_, _, _, post_init)) = intellisense
 											.get_properties(
 												game_files,
 												&app_state.cached_entities,
 												hash_list,
-												game_version,
+												get_loaded_game_version(&app, install)?,
 												entity,
 												&id,
 												true
@@ -2590,6 +2588,17 @@ fn event(app: AppHandle, event: Event) {
 				.expect("Couldn't send error report to frontend");
 		}
 	});
+}
+
+#[try_fn]
+#[context("Couldn't get loaded game version for {:?}", install)]
+pub fn get_loaded_game_version(app: &AppHandle, install: &PathBuf) -> Result<GameVersion> {
+	app.state::<AppState>()
+		.game_installs
+		.iter()
+		.try_find(|x| anyhow::Ok(x.path == *install))?
+		.context("No such game install")?
+		.version
 }
 
 #[try_fn]

@@ -28,7 +28,6 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::event_handling::resource_overview::initialise_resource_overview;
 use crate::game_detection::GameVersion;
 use crate::hash_list::HashList;
 use crate::intellisense::Intellisense;
@@ -39,6 +38,7 @@ use crate::model::{
 use crate::ores::{parse_json_ores, UnlockableItem};
 use crate::repository::RepositoryItem;
 use crate::rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
+use crate::{event_handling::resource_overview::initialise_resource_overview, get_loaded_game_version};
 use crate::{
 	finish_task, send_notification, send_request, start_task, Notification, NotificationKind, HASH_LIST_ENDPOINT,
 	HASH_LIST_VERSION_ENDPOINT, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT
@@ -136,12 +136,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					ensure_entity_in_cache(
 						game_files,
 						&app_state.cached_entities,
-						app_state
-							.game_installs
-							.iter()
-							.try_find(|x| anyhow::Ok(x.path == *install))?
-							.context("No such game install")?
-							.version,
+						get_loaded_game_version(app, install)?,
 						hash_list,
 						&normalise_to_hash(patch.factory_hash.to_owned())
 					)?;
@@ -742,13 +737,6 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	if let Some(path) = app_settings.load().game_install.as_ref() {
 		let task = start_task(app, "Loading game files")?;
 
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.find(|x| x.path == *path)
-			.context("No such game install")?
-			.version;
-
 		let thumbs = IniFileSystem::from(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
 
 		let thumbs = thumbs
@@ -766,7 +754,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		let mut partition_manager = PartitionManager::new(path.join(proj_path).join(relative_runtime_path));
 
-		let mut partitions = match game_version {
+		let mut partitions = match get_loaded_game_version(app, path)? {
 			GameVersion::H1 => PackageDefinitionSource::HM2016(fs::read(
 				path.join(proj_path)
 					.join(relative_runtime_path)
@@ -1036,22 +1024,14 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			if let EditorData::ResourceOverview { ref hash } = editor.data {
 				let task = start_task(app, format!("Refreshing resource overview for {}", hash))?;
 
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
-
 				initialise_resource_overview(
 					app,
 					&app_state,
 					editor.key().to_owned(),
 					hash,
 					game_files,
-					game_version,
+					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
-					install,
 					hash_list
 				)?;
 
@@ -1085,16 +1065,10 @@ pub async fn open_in_editor(
 		"TEMP" => {
 			let task = start_task(app, format!("Loading entity {}", hash))?;
 
-			let game_install_data = app_state
-				.game_installs
-				.iter()
-				.try_find(|x| anyhow::Ok(x.path == *install))?
-				.context("No such game install")?;
-
 			ensure_entity_in_cache(
 				game_files,
 				&app_state.cached_entities,
-				game_install_data.version,
+				get_loaded_game_version(app, install)?,
 				hash_list,
 				&hash
 			)?;

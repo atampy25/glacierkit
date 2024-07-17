@@ -17,7 +17,7 @@ use crate::{
 		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
 		is_valid_entity_factory
 	},
-	finish_task,
+	finish_task, get_loaded_game_version,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, EditorValidity, EntityEditorRequest,
 		EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
@@ -199,13 +199,6 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 						&& let Some(repository) = app_state.repository.load().as_ref()
 						&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
 					{
-						let game_version = app_state
-							.game_installs
-							.iter()
-							.try_find(|x| anyhow::Ok(x.path == *install))?
-							.context("No such game install")?
-							.version;
-
 						let task = start_task(app, "Updating decorations")?;
 
 						let decorations = get_decorations(
@@ -213,7 +206,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							&app_state.cached_entities,
 							repository,
 							hash_list,
-							game_version,
+							get_loaded_game_version(app, install)?,
 							tonytools_hash_list,
 							entity.entities.get(&entity_id).context("No such entity")?,
 							entity
@@ -278,13 +271,6 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 							&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 							&& let Some(install) = app_settings.load().game_install.as_ref()
 						{
-							let game_version = app_state
-								.game_installs
-								.iter()
-								.try_find(|x| anyhow::Ok(x.path == *install))?
-								.context("No such game install")?
-								.version;
-
 							for (property, val) in prev_props {
 								if !sub_entity
 									.properties
@@ -297,7 +283,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 											game_files,
 											&app_state.cached_entities,
 											hash_list,
-											game_version,
+											get_loaded_game_version(app, install)?,
 											entity,
 											&entity_id,
 											false
@@ -417,16 +403,10 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 			if filetype == "TEMP" {
 				let task = start_task(app, format!("Loading entity {}", factory))?;
 
-				let game_install_data = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?;
-
 				ensure_entity_in_cache(
 					game_files,
 					&app_state.cached_entities,
-					game_install_data.version,
+					get_loaded_game_version(app, install)?,
 					hash_list,
 					&factory
 				)?;

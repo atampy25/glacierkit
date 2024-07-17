@@ -27,6 +27,7 @@ use crate::{
 	},
 	finish_task,
 	game_detection::GameVersion,
+	get_loaded_game_version,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorValidity, EntityEditorRequest, EntityMetaPaneRequest,
 		EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
@@ -152,12 +153,7 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 		&& let Some(repository) = app_state.repository.load().as_ref()
 		&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
+		let game_version = get_loaded_game_version(app, install)?;
 
 		let task = start_task(app, format!("Gathering intellisense data for {}", id))?;
 
@@ -1188,12 +1184,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
+		let game_version = get_loaded_game_version(app, install)?;
 
 		let (properties, pins) = if hash_list
 			.entries
@@ -1337,12 +1328,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
+		let game_version = get_loaded_game_version(app, install)?;
 
 		if is_valid_entity_factory(
 			&hash_list
@@ -2127,19 +2113,12 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
-
 		if intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
 				hash_list,
-				game_version,
+				get_loaded_game_version(app, install)?,
 				entity,
 				&entity_id,
 				true
@@ -2322,19 +2301,12 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
-
 		if intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
 				hash_list,
-				game_version,
+				get_loaded_game_version(app, install)?,
 				entity,
 				&entity_id,
 				true
@@ -2517,19 +2489,12 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
-
 		if intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
 				hash_list,
-				game_version,
+				get_loaded_game_version(app, install)?,
 				entity,
 				&entity_id,
 				true
@@ -2712,19 +2677,12 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
-
 		if intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
 				hash_list,
-				game_version,
+				get_loaded_game_version(app, install)?,
 				entity,
 				&entity_id,
 				true
@@ -2947,13 +2905,6 @@ pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_i
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
-				let game_version = app_state
-					.game_installs
-					.iter()
-					.try_find(|x| anyhow::Ok(x.path == *install))?
-					.context("No such game install")?
-					.version;
-
 				for (property, val) in prev_props {
 					if !sub_entity
 						.properties
@@ -2967,7 +2918,7 @@ pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_i
 								game_files,
 								&app_state.cached_entities,
 								hash_list,
-								game_version,
+								get_loaded_game_version(app, install)?,
 								current,
 								&entity_id,
 								false

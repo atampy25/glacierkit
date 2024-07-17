@@ -19,6 +19,7 @@ use uuid::Uuid;
 use crate::{
 	finish_task,
 	game_detection::GameVersion,
+	get_loaded_game_version,
 	languages::get_language_map,
 	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
 	ores::{parse_hashes_ores, parse_json_ores},
@@ -51,12 +52,7 @@ pub fn start_content_search(
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
-		let game_version = app_state
-			.game_installs
-			.iter()
-			.try_find(|x| anyhow::Ok(x.path == *install))?
-			.context("No such game install")?
-			.version;
+		let game_version = get_loaded_game_version(app, install)?;
 
 		let resources = game_files
 			.partitions()
