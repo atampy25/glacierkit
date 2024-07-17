@@ -21,17 +21,20 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::model::{
-	AppSettings, AppState, ContentSearchEvent, EditorData, EditorState, EditorType, FileBrowserEvent, GameBrowserEntry,
-	GameBrowserEvent, GameBrowserRequest, GlobalRequest, Request, SearchFilter, SettingsEvent, SettingsRequest,
-	ToolEvent, ToolRequest
-};
 use crate::ores::{parse_json_ores, UnlockableItem};
 use crate::resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
 	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
 };
 use crate::rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
+use crate::{
+	convert_json_patch_to_merge_patch,
+	model::{
+		AppSettings, AppState, ContentSearchEvent, EditorData, EditorState, EditorType, FileBrowserEvent,
+		GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalRequest, Request, SearchFilter, SettingsEvent,
+		SettingsRequest, ToolEvent, ToolRequest
+	}
+};
 use crate::{event_handling::content_search::start_content_search, send_request};
 use crate::{finish_task, start_task};
 use crate::{game_detection::GameVersion, general::open_in_editor};
@@ -520,186 +523,6 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 						let patch = json_patch::diff(&base, &current);
 
-						let mut merge_patch = json!({});
-
-						for operation in patch.0 {
-							match operation {
-								json_patch::PatchOperation::Add(json_patch::AddOperation { path, value }) => {
-									let mut view = &mut merge_patch;
-
-									if path
-										.chars()
-										.skip(1)
-										.collect::<String>()
-										.split('/')
-										.last()
-										.unwrap()
-										.parse::<usize>()
-										.is_err()
-									{
-										for component in path.chars().skip(1).collect::<String>().split('/') {
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = value;
-									} else {
-										// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-										for component in path
-											.chars()
-											.skip(1)
-											.collect::<String>()
-											.split('/')
-											.collect::<Vec<_>>()
-											.into_iter()
-											.rev()
-											.skip(1)
-											.rev()
-										{
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = current
-											.pointer(
-												&path
-													.chars()
-													.skip(1)
-													.collect::<String>()
-													.split('/')
-													.collect::<Vec<_>>()
-													.into_iter()
-													.rev()
-													.skip(1)
-													.rev()
-													.collect::<Vec<_>>()
-													.join("/")
-											)
-											.unwrap()
-											.to_owned();
-									}
-								}
-
-								json_patch::PatchOperation::Remove(json_patch::RemoveOperation { path }) => {
-									let mut view = &mut merge_patch;
-
-									if path
-										.chars()
-										.skip(1)
-										.collect::<String>()
-										.split('/')
-										.last()
-										.unwrap()
-										.parse::<usize>()
-										.is_err()
-									{
-										for component in path.chars().skip(1).collect::<String>().split('/') {
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = Value::Null;
-									} else {
-										// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-										for component in path
-											.chars()
-											.skip(1)
-											.collect::<String>()
-											.split('/')
-											.collect::<Vec<_>>()
-											.into_iter()
-											.rev()
-											.skip(1)
-											.rev()
-										{
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = current
-											.pointer(
-												&path
-													.chars()
-													.skip(1)
-													.collect::<String>()
-													.split('/')
-													.collect::<Vec<_>>()
-													.into_iter()
-													.rev()
-													.skip(1)
-													.rev()
-													.collect::<Vec<_>>()
-													.join("/")
-											)
-											.unwrap()
-											.to_owned();
-									}
-								}
-
-								json_patch::PatchOperation::Replace(json_patch::ReplaceOperation { path, value }) => {
-									let mut view = &mut merge_patch;
-
-									if path
-										.chars()
-										.skip(1)
-										.collect::<String>()
-										.split('/')
-										.last()
-										.unwrap()
-										.parse::<usize>()
-										.is_err()
-									{
-										for component in path.chars().skip(1).collect::<String>().split('/') {
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = value;
-									} else {
-										// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-										for component in path
-											.chars()
-											.skip(1)
-											.collect::<String>()
-											.split('/')
-											.collect::<Vec<_>>()
-											.into_iter()
-											.rev()
-											.skip(1)
-											.rev()
-										{
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = current
-											.pointer(
-												&path
-													.chars()
-													.skip(1)
-													.collect::<String>()
-													.split('/')
-													.collect::<Vec<_>>()
-													.into_iter()
-													.rev()
-													.skip(1)
-													.rev()
-													.collect::<Vec<_>>()
-													.join("/")
-											)
-											.unwrap()
-											.to_owned();
-									}
-								}
-
-								json_patch::PatchOperation::Move(_) => {
-									unreachable!("Calculation of JSON patch does not emit Move operations")
-								}
-
-								json_patch::PatchOperation::Copy(_) => {
-									unreachable!("Calculation of JSON patch does not emit Copy operations")
-								}
-
-								json_patch::PatchOperation::Test(_) => {
-									unreachable!("Calculation of JSON patch does not emit Test operations")
-								}
-							}
-						}
-
 						fs::write(
 							{
 								let mut x = path.to_owned();
@@ -712,7 +535,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								);
 								x
 							},
-							to_vec(&merge_patch)?
+							to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
 						)?;
 
 						fs::remove_file(&path)?;
@@ -862,186 +685,6 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 						let patch = json_patch::diff(&base, &current);
 
-						let mut merge_patch = json!({});
-
-						for operation in patch.0 {
-							match operation {
-								json_patch::PatchOperation::Add(json_patch::AddOperation { path, value }) => {
-									let mut view = &mut merge_patch;
-
-									if path
-										.chars()
-										.skip(1)
-										.collect::<String>()
-										.split('/')
-										.last()
-										.unwrap()
-										.parse::<usize>()
-										.is_err()
-									{
-										for component in path.chars().skip(1).collect::<String>().split('/') {
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = value;
-									} else {
-										// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-										for component in path
-											.chars()
-											.skip(1)
-											.collect::<String>()
-											.split('/')
-											.collect::<Vec<_>>()
-											.into_iter()
-											.rev()
-											.skip(1)
-											.rev()
-										{
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = current
-											.pointer(
-												&path
-													.chars()
-													.skip(1)
-													.collect::<String>()
-													.split('/')
-													.collect::<Vec<_>>()
-													.into_iter()
-													.rev()
-													.skip(1)
-													.rev()
-													.collect::<Vec<_>>()
-													.join("/")
-											)
-											.unwrap()
-											.to_owned();
-									}
-								}
-
-								json_patch::PatchOperation::Remove(json_patch::RemoveOperation { path }) => {
-									let mut view = &mut merge_patch;
-
-									if path
-										.chars()
-										.skip(1)
-										.collect::<String>()
-										.split('/')
-										.last()
-										.unwrap()
-										.parse::<usize>()
-										.is_err()
-									{
-										for component in path.chars().skip(1).collect::<String>().split('/') {
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = Value::Null;
-									} else {
-										// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-										for component in path
-											.chars()
-											.skip(1)
-											.collect::<String>()
-											.split('/')
-											.collect::<Vec<_>>()
-											.into_iter()
-											.rev()
-											.skip(1)
-											.rev()
-										{
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = current
-											.pointer(
-												&path
-													.chars()
-													.skip(1)
-													.collect::<String>()
-													.split('/')
-													.collect::<Vec<_>>()
-													.into_iter()
-													.rev()
-													.skip(1)
-													.rev()
-													.collect::<Vec<_>>()
-													.join("/")
-											)
-											.unwrap()
-											.to_owned();
-									}
-								}
-
-								json_patch::PatchOperation::Replace(json_patch::ReplaceOperation { path, value }) => {
-									let mut view = &mut merge_patch;
-
-									if path
-										.chars()
-										.skip(1)
-										.collect::<String>()
-										.split('/')
-										.last()
-										.unwrap()
-										.parse::<usize>()
-										.is_err()
-									{
-										for component in path.chars().skip(1).collect::<String>().split('/') {
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = value;
-									} else {
-										// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-										for component in path
-											.chars()
-											.skip(1)
-											.collect::<String>()
-											.split('/')
-											.collect::<Vec<_>>()
-											.into_iter()
-											.rev()
-											.skip(1)
-											.rev()
-										{
-											view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
-										}
-
-										*view = current
-											.pointer(
-												&path
-													.chars()
-													.skip(1)
-													.collect::<String>()
-													.split('/')
-													.collect::<Vec<_>>()
-													.into_iter()
-													.rev()
-													.skip(1)
-													.rev()
-													.collect::<Vec<_>>()
-													.join("/")
-											)
-											.unwrap()
-											.to_owned();
-									}
-								}
-
-								json_patch::PatchOperation::Move(_) => {
-									unreachable!("Calculation of JSON patch does not emit Move operations")
-								}
-
-								json_patch::PatchOperation::Copy(_) => {
-									unreachable!("Calculation of JSON patch does not emit Copy operations")
-								}
-
-								json_patch::PatchOperation::Test(_) => {
-									unreachable!("Calculation of JSON patch does not emit Test operations")
-								}
-							}
-						}
-
 						fs::write(
 							{
 								let mut x = path.to_owned();
@@ -1054,7 +697,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								);
 								x
 							},
-							to_vec(&merge_patch)?
+							to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
 						)?;
 
 						fs::remove_file(&path)?;
