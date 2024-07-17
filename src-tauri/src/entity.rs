@@ -796,10 +796,8 @@ pub fn get_decorations(
 					.context("No resource property on object ZRuntimeResourceID")?
 					.as_str()
 					.context("Resource was not string")?
-			} else if let Some(x) = property_data.value.as_str() {
-				x
 			} else {
-				""
+				property_data.value.as_str().unwrap_or_default()
 			};
 
 			if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
@@ -825,10 +823,8 @@ pub fn get_decorations(
 						.context("No resource property on object ZRuntimeResourceID")?
 						.as_str()
 						.context("Resource was not string")?
-				} else if let Some(x) = val.as_str() {
-					x
 				} else {
-					""
+					val.as_str().unwrap_or_default()
 				};
 
 				if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
@@ -907,10 +903,8 @@ pub fn get_decorations(
 						.context("No resource property on object ZRuntimeResourceID")?
 						.as_str()
 						.context("Resource was not string")?
-				} else if let Some(x) = property_data.value.as_str() {
-					x
 				} else {
-					""
+					property_data.value.as_str().unwrap_or_default()
 				};
 
 				if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
@@ -936,10 +930,8 @@ pub fn get_decorations(
 							.context("No resource property on object ZRuntimeResourceID")?
 							.as_str()
 							.context("Resource was not string")?
-					} else if let Some(x) = val.as_str() {
-						x
 					} else {
-						""
+						val.as_str().unwrap_or_default()
 					};
 
 					if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))

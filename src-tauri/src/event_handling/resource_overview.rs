@@ -1,4 +1,4 @@
-use std::{fs, io::Cursor, ops::Deref, path::PathBuf, sync::Arc};
+use std::{fs, io::Cursor, ops::Deref, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
@@ -9,7 +9,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
 use rpkg_rs::{resource::partition_manager::PartitionManager, GlacierResource};
 use serde::Serialize;
-use serde_json::{from_slice, json, to_string, to_vec, Value};
+use serde_json::{json, to_string, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tauri_plugin_aptabase::EventTracker;
 use tex_rs::texture_map::TextureMap;

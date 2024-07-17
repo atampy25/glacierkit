@@ -183,7 +183,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 
 #[try_fn]
 #[context("Couldn't handle entity overrides event")]
-pub async fn handle_entity_overrides_event(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {

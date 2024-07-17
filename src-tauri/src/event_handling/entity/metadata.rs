@@ -18,7 +18,7 @@ use crate::{
 
 #[try_fn]
 #[context("Couldn't handle entity metadata event")]
-pub async fn handle_entity_metadata_event(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {

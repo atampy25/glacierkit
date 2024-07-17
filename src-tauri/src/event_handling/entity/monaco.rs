@@ -22,9 +22,9 @@ use crate::{
 	get_loaded_game_version,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, EditorValidity, EntityEditorRequest,
-		EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
+		EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
 	},
-	rpkg::{ensure_entity_in_cache, extract_latest_overview_info, normalise_to_hash},
+	rpkg::{extract_latest_overview_info, normalise_to_hash},
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
@@ -75,8 +75,111 @@ pub const SAFE_TO_SYNC: [&str; 43] = [
 ];
 
 #[try_fn]
+#[context("Couldn't handle monaco event")]
+pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	match event {
+		EntityMonacoEvent::UpdateContent {
+			editor_id,
+			entity_id,
+			content
+		} => {
+			update_content(app, editor_id, entity_id, content).await?;
+		}
+
+		EntityMonacoEvent::FollowReference { editor_id, reference } => {
+			send_request(
+				app,
+				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+					EntityTreeRequest::Select {
+						editor_id,
+						id: Some(reference)
+					}
+				)))
+			)?;
+		}
+
+		EntityMonacoEvent::OpenFactory { factory, .. } => {
+			open_factory(app, factory).await?;
+		}
+
+		EntityMonacoEvent::SignalPin {
+			editor_id,
+			entity_id,
+			pin,
+			output
+		} => {
+			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+
+			let entity = match editor_state.data {
+				EditorData::QNEntity { ref entity, .. } => entity,
+				EditorData::QNPatch { ref current, .. } => current,
+
+				_ => {
+					Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+					panic!();
+				}
+			};
+
+			app_state
+				.editor_connection
+				.signal_pin(&entity_id, &entity.blueprint_hash, &pin, output)
+				.await?;
+		}
+
+		EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
+			if let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref() {
+				let resource = normalise_to_hash(resource);
+
+				if resource_reverse_dependencies.contains_key(&resource) {
+					let id = Uuid::new_v4();
+
+					app_state.editor_states.insert(
+						id.to_owned(),
+						EditorState {
+							file: None,
+							data: EditorData::ResourceOverview {
+								hash: resource.to_owned()
+							}
+						}
+					);
+
+					send_request(
+						app,
+						Request::Global(GlobalRequest::CreateTab {
+							id,
+							name: format!("Resource overview ({resource})"),
+							editor_type: EditorType::ResourceOverview
+						})
+					)?;
+				} else {
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Error,
+							title: "Not a vanilla resource".into(),
+							subtitle: "This factory doesn't exist in the base game files.".into()
+						}
+					)?;
+				}
+			} else {
+				send_notification(
+					app,
+					Notification {
+						kind: NotificationKind::Error,
+						title: "No game selected".into(),
+						subtitle: "You can't open game files without a copy of the game selected.".into()
+					}
+				)?;
+			}
+		}
+	}
+}
+
+#[try_fn]
 #[context("Couldn't handle update content event")]
-pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: String, content: String) -> Result<()> {
+pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String, content: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -391,7 +494,7 @@ pub async fn handle_updatecontent(app: &AppHandle, editor_id: Uuid, entity_id: S
 
 #[try_fn]
 #[context("Couldn't handle open factory event")]
-pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> {
+pub async fn open_factory(app: &AppHandle, factory: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 

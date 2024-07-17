@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use anyhow::{anyhow, Context, Result};
+use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
@@ -12,8 +13,9 @@ use quickentity_rs::{
 	patch_structs::{Patch, PatchOperation, SubEntityOperation},
 	qn_structs::{FullRef, Property, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity}
 };
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
-use serde_json::{from_value, json, to_value, Value};
+use serde_json::{from_slice, from_str, from_value, json, to_string, to_value, Value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -29,8 +31,8 @@ use crate::{
 	game_detection::GameVersion,
 	get_loaded_game_version,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorValidity, EntityEditorRequest, EntityMetaPaneRequest,
-		EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
+		AppSettings, AppState, EditorData, EditorRequest, EditorValidity, EntityEditorRequest, EntityGeneralRequest,
+		EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, GlobalRequest, Request
 	},
 	resourcelib::{
 		h2016_convert_binary_to_factory, h2016_convert_cppt, h2_convert_binary_to_factory, h2_convert_cppt,
@@ -42,11 +44,336 @@ use crate::{
 	Notification, NotificationKind
 };
 
-use super::entity_monaco::SAFE_TO_SYNC;
+use super::monaco::SAFE_TO_SYNC;
+
+#[try_fn]
+#[context("Couldn't handle tree event")]
+pub async fn handle(app: &AppHandle, event: EntityTreeEvent) -> Result<()> {
+	match event {
+		EntityTreeEvent::Initialise { editor_id } => {
+			initialise(app, editor_id).await?;
+		}
+
+		EntityTreeEvent::Select { editor_id, id } => {
+			select(app, editor_id, id).await?;
+		}
+
+		EntityTreeEvent::Create { editor_id, id, content } => {
+			create(app, editor_id, id, content).await?;
+		}
+
+		EntityTreeEvent::Delete { editor_id, id } => {
+			delete(app, editor_id, id).await?;
+		}
+
+		EntityTreeEvent::Rename {
+			editor_id,
+			id,
+			new_name
+		} => {
+			rename(app, editor_id, id, new_name).await?;
+		}
+
+		EntityTreeEvent::Reparent {
+			editor_id,
+			id,
+			new_parent
+		} => {
+			reparent(app, editor_id, id, new_parent).await?;
+		}
+
+		EntityTreeEvent::Copy { editor_id, id } => {
+			copy(app, editor_id, id).await?;
+		}
+
+		EntityTreeEvent::Paste { editor_id, parent_id } => {
+			paste(
+				app,
+				editor_id,
+				parent_id,
+				from_str::<CopiedEntityData>(&Clipboard::new()?.get_text()?)?
+			)
+			.await?;
+		}
+
+		EntityTreeEvent::Search { editor_id, query } => {
+			search(app, editor_id, query).await?;
+		}
+
+		EntityTreeEvent::ShowHelpMenu { editor_id, entity_id } => {
+			help_menu(app, editor_id, entity_id).await?;
+		}
+
+		EntityTreeEvent::UseTemplate {
+			editor_id,
+			parent_id,
+			template
+		} => {
+			paste(app, editor_id, parent_id, template).await?;
+		}
+
+		EntityTreeEvent::AddGameBrowserItem {
+			editor_id,
+			parent_id,
+			file
+		} => {
+			add_game_browser_item(app, editor_id, parent_id, file).await?;
+		}
+
+		EntityTreeEvent::SelectEntityInEditor { editor_id, entity_id } => {
+			select_entity_in_editor(app, editor_id, entity_id).await?;
+		}
+
+		EntityTreeEvent::MoveEntityToPlayer { editor_id, entity_id } => {
+			move_entity_to_player(app, editor_id, entity_id).await?;
+		}
+
+		EntityTreeEvent::RotateEntityAsPlayer { editor_id, entity_id } => {
+			rotate_entity_as_player(app, editor_id, entity_id).await?;
+		}
+
+		EntityTreeEvent::MoveEntityToCamera { editor_id, entity_id } => {
+			move_entity_to_camera(app, editor_id, entity_id).await?;
+		}
+
+		EntityTreeEvent::RotateEntityAsCamera { editor_id, entity_id } => {
+			rotate_entity_as_camera(app, editor_id, entity_id).await?;
+		}
+
+		EntityTreeEvent::RestoreToOriginal { editor_id, entity_id } => {
+			restore_to_original(app, editor_id, entity_id).await?;
+		}
+	}
+}
+
+#[try_fn]
+#[context("Couldn't handle initialise event")]
+pub async fn initialise(app: &AppHandle, editor_id: Uuid) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref entity, .. } => entity,
+		EditorData::QNPatch { ref current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let mut entities = vec![];
+	let mut reverse_parent_refs: HashMap<String, Vec<String>> = HashMap::new();
+
+	for (entity_id, entity_data) in entity.entities.iter() {
+		match entity_data.parent {
+			Ref::Full(ref reference) if reference.external_scene.is_none() => {
+				reverse_parent_refs
+					.entry(reference.entity_ref.to_owned())
+					.and_modify(|x| x.push(entity_id.to_owned()))
+					.or_insert(vec![entity_id.to_owned()]);
+			}
+
+			Ref::Short(Some(ref reference)) => {
+				reverse_parent_refs
+					.entry(reference.to_owned())
+					.and_modify(|x| x.push(entity_id.to_owned()))
+					.or_insert(vec![entity_id.to_owned()]);
+			}
+
+			_ => {}
+		}
+	}
+
+	for (entity_id, entity_data) in entity.entities.iter() {
+		entities.push((
+			entity_id.to_owned(),
+			entity_data.parent.to_owned(),
+			entity_data.name.to_owned(),
+			entity_data.factory.to_owned(),
+			reverse_parent_refs.contains_key(entity_id)
+		));
+	}
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::General(
+			EntityGeneralRequest::SetIsPatchEditor {
+				editor_id: editor_id.to_owned(),
+				is_patch_editor: matches!(editor_state.data, EditorData::QNPatch { .. })
+			}
+		)))
+	)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+			EntityTreeRequest::NewTree {
+				editor_id: editor_id.to_owned(),
+				entities
+			}
+		)))
+	)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+			EntityTreeRequest::SetTemplates {
+				editor_id: editor_id.to_owned(),
+				templates: from_slice(include_bytes!("../../../assets/templates.json")).unwrap()
+			}
+		)))
+	)?;
+
+	let editor_connected = app_state.editor_connection.is_connected().await;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+			EntityTreeRequest::SetEditorConnectionAvailable {
+				editor_id: editor_id.to_owned(),
+				editor_connection_available: editor_connected
+			}
+		)))
+	)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::SetEditorConnected {
+				editor_id: editor_id.to_owned(),
+				connected: editor_connected
+			}
+		)))
+	)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
+}
+
+#[try_fn]
+#[context("Couldn't handle create event")]
+pub async fn create(app: &AppHandle, editor_id: Uuid, id: String, content: SubEntity) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	entity.entities.insert(id, content);
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id.to_owned(),
+			unsaved: true
+		})
+	)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
+}
+
+#[try_fn]
+#[context("Couldn't handle rename event")]
+pub async fn rename(app: &AppHandle, editor_id: Uuid, id: String, new_name: String) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	entity.entities.get_mut(&id).context("No such entity")?.name = new_name;
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
+
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	entity
+		.entities
+		.get(&id)
+		.context("No such entity")?
+		.serialize(&mut ser)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::ReplaceContentIfSameEntityID {
+				editor_id: editor_id.to_owned(),
+				entity_id: id.to_owned(),
+				content: String::from_utf8(buf)?
+			}
+		)))
+	)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
+}
 
 #[try_fn]
 #[context("Couldn't handle select event")]
-pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> {
+pub async fn select(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -241,8 +568,72 @@ pub async fn handle_select(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 }
 
 #[try_fn]
+#[context("Couldn't handle reparent event")]
+pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: String, new_parent: Ref) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	entity.entities.get_mut(&id).context("No such entity")?.parent = new_parent;
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetTabUnsaved {
+			id: editor_id,
+			unsaved: true
+		})
+	)?;
+
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	entity
+		.entities
+		.get(&id)
+		.context("No such entity")?
+		.serialize(&mut ser)?;
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+			EntityMonacoRequest::ReplaceContentIfSameEntityID {
+				editor_id: editor_id.to_owned(),
+				entity_id: id.to_owned(),
+				content: String::from_utf8(buf)?
+			}
+		)))
+	)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			app,
+			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetDiffInfo {
+					editor_id,
+					diff_info: get_diff_info(base, current)
+				}
+			)))
+		)?;
+	}
+}
+
+#[try_fn]
 #[context("Couldn't handle delete event")]
-pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> {
+pub async fn delete(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Deleting entity {}", id))?;
@@ -595,8 +986,48 @@ pub async fn handle_delete(app: &AppHandle, editor_id: Uuid, id: String) -> Resu
 }
 
 #[try_fn]
+#[context("Couldn't handle copy event")]
+pub async fn copy(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Copying entity {} and its children", id))?;
+
+	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref entity, .. } => entity,
+		EditorData::QNPatch { ref current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let reverse_refs = calculate_reverse_references(entity)?;
+
+	let entities_to_copy = get_recursive_children(entity, &id, &reverse_refs)?
+		.into_iter()
+		.collect::<HashSet<_>>();
+
+	let data_to_copy = CopiedEntityData {
+		root_entity: id.to_owned(),
+		data: entity
+			.entities
+			.iter()
+			.filter(|(x, _)| entities_to_copy.contains(*x))
+			.map(|(x, y)| (x.to_owned(), y.to_owned()))
+			.collect()
+	};
+
+	Clipboard::new()?.set_text(to_string(&data_to_copy)?)?;
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
 #[context("Couldn't handle paste event")]
-pub async fn handle_paste(
+pub async fn paste(
 	app: &AppHandle,
 	editor_id: Uuid,
 	parent_id: String,
@@ -1158,8 +1589,49 @@ pub async fn handle_paste(
 }
 
 #[try_fn]
+#[context("Couldn't handle search event")]
+pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Searching for {}", query))?;
+
+	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref entity, .. } => entity,
+		EditorData::QNPatch { ref current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+			EntityTreeRequest::SearchResults {
+				editor_id,
+				results: entity
+					.entities
+					.par_iter()
+					.filter(|(id, ent)| {
+						let mut s = format!("{}{}", id, to_string(ent).unwrap());
+						s.make_ascii_lowercase();
+						query.split(' ').all(|q| s.contains(q))
+					})
+					.map(|(id, _)| id.to_owned())
+					.collect()
+			}
+		)))
+	)?;
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
 #[context("Couldn't handle help menu event")]
-pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -1306,7 +1778,7 @@ pub async fn handle_helpmenu(app: &AppHandle, editor_id: Uuid, entity_id: String
 
 #[try_fn]
 #[context("Couldn't handle game browser add event")]
-pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: String, file: String) -> Result<()> {
+pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: String, file: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -1991,7 +2463,7 @@ pub async fn handle_gamebrowseradd(app: &AppHandle, editor_id: Uuid, parent_id: 
 
 #[try_fn]
 #[context("Couldn't handle select entity in editor event")]
-pub async fn handle_selectentityineditor(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+pub async fn select_entity_in_editor(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Selecting {} in editor", entity_id))?;
@@ -2018,7 +2490,7 @@ pub async fn handle_selectentityineditor(app: &AppHandle, editor_id: Uuid, entit
 
 #[try_fn]
 #[context("Couldn't handle move entity to player event")]
-pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -2206,7 +2678,7 @@ pub async fn handle_moveentitytoplayer(app: &AppHandle, editor_id: Uuid, entity_
 
 #[try_fn]
 #[context("Couldn't handle rotate entity as player event")]
-pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -2394,7 +2866,7 @@ pub async fn handle_rotateentityasplayer(app: &AppHandle, editor_id: Uuid, entit
 
 #[try_fn]
 #[context("Couldn't handle move entity to camera event")]
-pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -2582,7 +3054,7 @@ pub async fn handle_moveentitytocamera(app: &AppHandle, editor_id: Uuid, entity_
 
 #[try_fn]
 #[context("Couldn't handle rotate entity as camera event")]
-pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -2770,7 +3242,7 @@ pub async fn handle_rotateentityascamera(app: &AppHandle, editor_id: Uuid, entit
 
 #[try_fn]
 #[context("Couldn't handle restore to original event")]
-pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
+pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -2788,25 +3260,21 @@ pub async fn handle_restoretooriginal(app: &AppHandle, editor_id: Uuid, entity_i
 		panic!();
 	};
 
-	match check_local_references_exist(
+	if let EditorValidity::Invalid(err) = check_local_references_exist(
 		base.entities.get(&entity_id).context("Entity didn't exist in base")?,
 		current
 	)? {
-		EditorValidity::Invalid(err) => {
-			send_notification(
-				app,
-				Notification {
-					kind: NotificationKind::Error,
-					title: "Entity would be invalid".into(),
-					subtitle: err
-				}
-			)?;
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "Entity would be invalid".into(),
+				subtitle: err
+			}
+		)?;
 
-			finish_task(app, task)?;
-			return Ok(());
-		}
-
-		_ => {}
+		finish_task(app, task)?;
+		return Ok(());
 	}
 
 	if let Some(previous) = current.entities.get(&entity_id).cloned() {
