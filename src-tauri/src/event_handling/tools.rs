@@ -1217,7 +1217,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						.game_installs
 						.iter()
 						.find(|x| x.path == *install)
-						.context("No such game install as specified in project.json")?;
+						.context("No such game install")?;
 
 					let filter_includes: &[&str] = match filter {
 						SearchFilter::All => &[],

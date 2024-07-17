@@ -182,6 +182,8 @@ fn main() {
 				}
 			}
 
+			let game_installs = detect_installs().expect("Couldn't detect game installs");
+
 			if invalid {
 				let settings = AppSettings::default();
 				fs::create_dir_all(&app_data_path).expect("Couldn't create app data dir");
@@ -190,6 +192,22 @@ fn main() {
 					to_vec(&settings).expect("Couldn't serialise default app settings")
 				)
 				.expect("Couldn't write default app settings");
+				app.manage(ArcSwap::new(settings.into()));
+			}
+
+			// Check if the game install is still valid
+			if app
+				.state::<ArcSwap<AppSettings>>()
+				.load()
+				.game_install
+				.as_ref()
+				.map(|x| !game_installs.iter().any(|y| y.path == *x))
+				.unwrap_or(false)
+			{
+				let mut settings = (*app.state::<ArcSwap<AppSettings>>().load_full()).to_owned();
+
+				settings.game_install = None;
+
 				app.manage(ArcSwap::new(settings.into()));
 			}
 
@@ -202,7 +220,7 @@ fn main() {
 			info!("Removed temp folder");
 
 			app.manage(AppState {
-				game_installs: detect_installs().expect("Couldn't detect game installs"),
+				game_installs,
 				project: None.into(),
 				hash_list: fs::read(app_data_path.join("hash_list.sml"))
 					.ok()
