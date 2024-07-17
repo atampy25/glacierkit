@@ -921,23 +921,24 @@
 										}
 									})
 								}}
-								on:contextmenu={async (e) => {
-									e.preventDefault()
-									trackEvent("Follow dependency in new tab from resource overview")
+								on:auxclick={async (e) => {
+									if (e.button === 1) {
+										trackEvent("Follow dependency in new tab from resource overview")
 
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
+										await event({
+											type: "editor",
 											data: {
-												type: "followDependencyInNewTab",
+												type: "resourceOverview",
 												data: {
-													id,
-													hash
+													type: "followDependencyInNewTab",
+													data: {
+														id,
+														hash
+													}
 												}
 											}
-										}
-									})
+										})
+									}
 								}}
 							>
 								<div class="text-base -mt-1"
@@ -988,23 +989,24 @@
 										}
 									})
 								}}
-								on:contextmenu={async (e) => {
-									e.preventDefault()
-									trackEvent("Follow reverse dependency in new tab from resource overview")
+								on:auxclick={async (e) => {
+									if (e.button === 1) {
+										trackEvent("Follow reverse dependency in new tab from resource overview")
 
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
+										await event({
+											type: "editor",
 											data: {
-												type: "followDependencyInNewTab",
+												type: "resourceOverview",
 												data: {
-													id,
-													hash
+													type: "followDependencyInNewTab",
+													data: {
+														id,
+														hash
+													}
 												}
 											}
-										}
-									})
+										})
+									}
 								}}
 							>
 								<div class="font-bold text-base -mt-1"

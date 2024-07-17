@@ -50,7 +50,7 @@
 		"Press F1 in any JSON editor to access the Command Palette, which lets you perform common operations like transforming text to lowercase/uppercase, or deleting duplicate lines.",
 		'You can use Find and Replace in any JSON editor with Ctrl-H, or by pressing F1 and typing "replace".',
 		"Right-click an entry in the Game Content panel to copy its hash or path.",
-		"You can right-click on a dependency in a Resource Overview to open it in a new tab.",
+		"You can middle-click on a dependency in a Resource Overview to open it in a new tab.",
 		"Convert between repository.json/unlockables.json files and JSON.patch.json files easily by right-clicking them in the Files panel.",
 		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
 		"Separate multiple search terms with spaces to find only items which match all of the search terms.",
