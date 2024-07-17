@@ -1051,13 +1051,13 @@ pub async fn open_in_editor(
 	game_files: &PartitionManager,
 	install: &PathBuf,
 	hash_list: &HashList,
-	hash: String
+	hash: &str
 ) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match hash_list
 		.entries
-		.get(&hash)
+		.get(hash)
 		.context("Not in hash list")?
 		.resource_type
 		.as_ref()
@@ -1070,10 +1070,10 @@ pub async fn open_in_editor(
 				&app_state.cached_entities,
 				get_loaded_game_version(app, install)?,
 				hash_list,
-				&hash
+				hash
 			)?;
 
-			let entity = app_state.cached_entities.get(&hash).unwrap().to_owned();
+			let entity = app_state.cached_entities.get(hash).unwrap().to_owned();
 
 			let default_tab_name = format!(
 				"{} ({})",
@@ -1085,7 +1085,7 @@ pub async fn open_in_editor(
 				hash
 			);
 
-			let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
+			let tab_name = if let Some(entry) = hash_list.entries.get(hash) {
 				if let Some(path) = entry.path.as_ref() {
 					path.replace("].pc_entitytype", "")
 						.replace("].pc_entitytemplate", "")

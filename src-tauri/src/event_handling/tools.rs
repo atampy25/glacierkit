@@ -1342,7 +1342,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					&& let Some(install) = app_settings.load().game_install.as_ref()
 					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
-					open_in_editor(app, game_files, install, hash_list, hash).await?;
+					open_in_editor(app, game_files, install, hash_list, &hash).await?;
 				}
 			}
 		},

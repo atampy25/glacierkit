@@ -17,7 +17,9 @@ use crate::{
 		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
 		is_valid_entity_factory
 	},
-	finish_task, get_loaded_game_version,
+	finish_task,
+	general::open_in_editor,
+	get_loaded_game_version,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, EditorValidity, EntityEditorRequest,
 		EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
@@ -401,69 +403,7 @@ pub async fn handle_openfactory(app: &AppHandle, factory: String) -> Result<()> 
 
 		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, &factory) {
 			if filetype == "TEMP" {
-				let task = start_task(app, format!("Loading entity {}", factory))?;
-
-				ensure_entity_in_cache(
-					game_files,
-					&app_state.cached_entities,
-					get_loaded_game_version(app, install)?,
-					hash_list,
-					&factory
-				)?;
-
-				let entity = app_state.cached_entities.get(&factory).unwrap().to_owned();
-
-				let default_tab_name = format!(
-					"{} ({})",
-					entity
-						.entities
-						.get(&entity.root_entity)
-						.context("Root entity doesn't exist")?
-						.name,
-					factory
-				);
-
-				let tab_name = if let Some(entry) = hash_list.entries.get(&factory) {
-					if let Some(path) = entry.path.as_ref() {
-						path.replace("].pc_entitytype", "")
-							.replace("].pc_entitytemplate", "")
-							.split('/')
-							.last()
-							.map(|x| x.to_owned())
-							.unwrap_or(default_tab_name)
-					} else if let Some(hint) = entry.hint.as_ref() {
-						format!("{} ({})", hint, factory)
-					} else {
-						default_tab_name
-					}
-				} else {
-					default_tab_name
-				};
-
-				let id = Uuid::new_v4();
-
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: None,
-						data: EditorData::QNPatch {
-							base: Box::new(entity.to_owned()),
-							current: Box::new(entity.to_owned()),
-							settings: Default::default()
-						}
-					}
-				);
-
-				send_request(
-					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: tab_name,
-						editor_type: EditorType::QNPatch
-					})
-				)?;
-
-				finish_task(app, task)?;
+				open_in_editor(app, game_files, install, hash_list, &factory).await?;
 			} else {
 				let id = Uuid::new_v4();
 
