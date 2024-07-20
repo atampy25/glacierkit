@@ -18,7 +18,7 @@
 	import * as monaco from "monaco-editor"
 	import { createPatch } from "rfc6902"
 	import { writeTextFile } from "@tauri-apps/api/fs"
-	import { attachConsole } from "tauri-plugin-log"
+	import { attachConsole, info } from "tauri-plugin-log"
 	import { help } from "$lib/helpray"
 	import HelpRay from "$lib/components/HelpRay.svelte"
 	import { trackEvent } from "@aptabase/tauri"
@@ -123,6 +123,14 @@
 				colors: {}
 			})
 
+			let manifestSchema = {}
+
+			try {
+				manifestSchema = await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
+			} catch (e) {
+				info(`Couldn't get manifest schema: ${String(e)}, ${e.stack}`)
+			}
+
 			monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 				validate: true,
 				enableSchemaRequest: true,
@@ -130,7 +138,7 @@
 					{
 						uri: "monaco-schema://manifest",
 						fileMatch: ["*manifest*"],
-						schema: await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
+						schema: manifestSchema
 					},
 					{
 						uri: "monaco-schema://qn-subentity",
@@ -317,35 +325,39 @@
 
 			appWindow.show()
 
-			const { shouldUpdate, manifest } = await checkUpdate()
-
-			if (shouldUpdate) {
+			try {
+				const { shouldUpdate, manifest } = await checkUpdate()
+	
+				if (shouldUpdate) {
 				updateManifest = manifest!
-
-				const currentVersion = await getVersion()
-
-				const commits = await (
-					await fetch("https://api.github.com/repos/atampy25/glacierkit/commits", {
-						headers: {
-							Accept: "application/vnd.github.v3+json"
-						}
-					})
-				).json()
-
-				commits.reverse()
-
-				const prevVersionCommit = await (
-					await fetch(`https://api.github.com/repos/atampy25/glacierkit/commits/${currentVersion}`, {
-						headers: {
-							Accept: "application/vnd.github.v3+json"
-						}
-					})
-				).json()
-
-				// Exclude last version commit and its post-update commit
-				commitsSinceLastVersion = commits.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2).map((a: { commit: { message: string } }) => a.commit.message).filter((a: string) => a !== "Post-update")
-
-				updateModalOpen = true
+	
+					const currentVersion = await getVersion()
+	
+					const commits = await (
+						await fetch("https://api.github.com/repos/atampy25/glacierkit/commits", {
+							headers: {
+								Accept: "application/vnd.github.v3+json"
+							}
+						})
+					).json()
+	
+					commits.reverse()
+	
+					const prevVersionCommit = await (
+						await fetch(`https://api.github.com/repos/atampy25/glacierkit/commits/${currentVersion}`, {
+							headers: {
+								Accept: "application/vnd.github.v3+json"
+							}
+						})
+					).json()
+	
+					// Exclude last version commit and its post-update commit
+					commitsSinceLastVersion = commits.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2).map((a: { commit: { message: string } }) => a.commit.message).filter((a: string) => a !== "Post-update")
+	
+					updateModalOpen = true
+				}
+			} catch (e) {
+				info(`Ignoring error in update checking: ${String(e)}, ${e.stack}`)
 			}
 		}
 	})

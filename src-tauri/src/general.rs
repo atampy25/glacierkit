@@ -45,7 +45,7 @@ use crate::{
 };
 
 #[try_fn]
-#[context("Couldn't load game files")]
+#[context("Couldn't open file")]
 pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 	let app_state = app.state::<AppState>();
 	let app_settings = app.state::<ArcSwap<AppSettings>>();

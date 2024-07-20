@@ -923,6 +923,7 @@
 								}}
 								on:auxclick={async (e) => {
 									if (e.button === 1) {
+										e.preventDefault()
 										trackEvent("Follow dependency in new tab from resource overview")
 
 										await event({
@@ -991,6 +992,7 @@
 								}}
 								on:auxclick={async (e) => {
 									if (e.button === 1) {
+										e.preventDefault()
 										trackEvent("Follow reverse dependency in new tab from resource overview")
 
 										await event({
