@@ -1,11 +1,11 @@
 {
-	"version": "1.2.3",
-	"notes": "Fix internet connection being required",
-	"pub_date": "2024-07-17T18:26:28Z",
+	"version": "1.2.4",
+	"notes": "Minor memory/performance optimisation",
+	"pub_date": "2024-07-20T12:39:59Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1dwOFlqRVh1MkRDVFFhMmJISFI3RFRYV1hNYURaKzlHeVRsV0daQS93NlE3NDVVVmlVYjlZdUl1bVlRRzNzSmdmTldGKzIrZ0FOd3lxUVRkZkhoOWdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxNDc5MTg1CWZpbGU6R2xhY2llcktpdF8xLjIuM194NjRfZW4tVVMubXNpLnppcApKbDBEVmRscE02RUYvOTZ4YktXY1EyK0lNZkgyeklJNTNyNzZaMjl5V20ySElGNzA3bTRhSFFjUUI1RzREZmRNd245MGhXSFlDdkNzSFJwTWV4OHRDdz09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.3/GlacierKit_1.2.3_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2ZVdW9LY0VJS1hGTmpCU1ZqYVpxcnFpQ3hnNnprVGlYT216dGZDWDd1dko1dExJNmQ3VCt4VW9Pd3ZjR05tSFpaaGFoSlZNOVFZMkxWZ0hSNUYxelFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxNzQ5ODcxCWZpbGU6R2xhY2llcktpdF8xLjIuNF94NjRfZW4tVVMubXNpLnppcApxSkxmUTVPaGZJblNUMmkwb1I1QWE4YXFIVjFBV2h5UTNPS3l1S3FINkR3MDd0QTZDZmV4VEtIRzgxNUUxZ3dLVHVUaU8wVjRpblRHRkhXc2hNMDZDUT09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.4/GlacierKit_1.2.4_x64_en-US.msi.zip"
 		}
 	}
 }

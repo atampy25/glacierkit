@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.2.3"
+version = "1.2.4"
 description = "An integrated modding tool for the HITMAN World of Assassination trilogy."
 authors = ["you"]
 license = ""
@@ -60,7 +60,10 @@ log = "0.4.21"
 biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
-snmalloc-rs = { version = "0.3.6", features = ["lto"] }
+
+[dependencies.snmalloc-rs]
+version = "0.3.6"
+features = ["lto"]
 
 [dependencies.serde_json]
 version = "1.0.110"
