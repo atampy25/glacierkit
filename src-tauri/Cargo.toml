@@ -8,6 +8,10 @@ repository = ""
 default-run = "app"
 edition = "2021"
 
+[profile.release]
+lto = true
+codegen-units = 1
+
 [build-dependencies.tauri-build]
 version = "1.5.1"
 features = []
@@ -56,6 +60,7 @@ log = "0.4.21"
 biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
+snmalloc-rs = { version = "0.3.6", features = ["lto"] }
 
 [dependencies.serde_json]
 version = "1.0.110"
