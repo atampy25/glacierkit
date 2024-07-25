@@ -34,3 +34,27 @@ pub enum RepositoryItemInformation {
 	WeaponConfig,
 	Unknown
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct UnlockableItem {
+	#[serde(rename = "Guid")]
+	pub id: Uuid,
+
+	#[serde(flatten)]
+	pub data: IndexMap<String, Value>
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "data")]
+pub enum UnlockableInformation {
+	Access { id: Option<String> },
+	EvergreenMastery { id: Option<String> },
+	Disguise { id: Option<String> },
+	AgencyPickup { id: Option<String> },
+	Weapon { id: Option<String> },
+	Gear { id: Option<String> },
+	Location { id: Option<String> },
+	Package { id: Option<String> },
+	LoadoutUnlock { id: Option<String> },
+	Unknown { id: Option<String> }
+}

@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::HashSet;
+use hitman_commons::metadata::ResourceID;
 use log::debug;
 use quickentity_rs::qn_structs::Ref;
 
@@ -24,7 +25,7 @@ use crate::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, EditorValidity, EntityEditorRequest,
 		EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
 	},
-	rpkg::{extract_latest_overview_info, normalise_to_hash},
+	rpkg::extract_latest_overview_info,
 	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
@@ -130,7 +131,7 @@ pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
 
 		EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
 			if let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref() {
-				let resource = normalise_to_hash(resource);
+				let resource = ResourceID::from_any(&resource)?;
 
 				if resource_reverse_dependencies.contains_key(&resource) {
 					let id = Uuid::new_v4();
@@ -139,9 +140,7 @@ pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
 						id.to_owned(),
 						EditorState {
 							file: None,
-							data: EditorData::ResourceOverview {
-								hash: resource.to_owned()
-							}
+							data: EditorData::ResourceOverview { hash: resource }
 						}
 					);
 
@@ -206,8 +205,8 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 
 				if sub_entity != previous {
 					if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-						if let Some(entry) = hash_list.entries.get(&normalise_to_hash(sub_entity.factory.to_owned())) {
-							if !is_valid_entity_factory(&entry.resource_type) {
+						if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&sub_entity.factory)?) {
+							if !is_valid_entity_factory(entry.resource_type) {
 								send_request(
 									app,
 									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
@@ -224,11 +223,8 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 							}
 						}
 
-						if let Some(entry) = hash_list
-							.entries
-							.get(&normalise_to_hash(sub_entity.blueprint.to_owned()))
-						{
-							if !is_valid_entity_blueprint(&entry.resource_type) {
+						if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&sub_entity.blueprint)?) {
+							if !is_valid_entity_blueprint(entry.resource_type) {
 								send_request(
 									app,
 									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
@@ -502,11 +498,11 @@ pub async fn open_factory(app: &AppHandle, factory: String) -> Result<()> {
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(game_files) = app_state.game_files.load().as_deref()
 	{
-		let factory = normalise_to_hash(factory);
+		let factory = ResourceID::from_any(&factory)?;
 
-		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, &factory) {
+		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, factory) {
 			if filetype == "TEMP" {
-				open_in_editor(app, game_files, install, hash_list, &factory).await?;
+				open_in_editor(app, game_files, install, hash_list, factory).await?;
 			} else {
 				let id = Uuid::new_v4();
 

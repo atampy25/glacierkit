@@ -60,10 +60,10 @@ log = "0.4.21"
 biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
-
-[dependencies.snmalloc-rs]
-version = "0.3.6"
-features = ["lto"]
+snmalloc-rs = { version = "0.3.6", features = ["lto"] }
+rsevents-extra = "0.2.2"
+hitman-commons = { git = "https://github.com/atampy25/hitman-commons", features = [ "serde", "specta", "rpkg-rs", "tex-rs", "tonytools", "resourcelib", "hash_list"] }
+hitman-formats = { git = "https://github.com/atampy25/hitman-formats", features = ["material", "ores", "wwev"] }
 
 [dependencies.serde_json]
 version = "1.0.110"

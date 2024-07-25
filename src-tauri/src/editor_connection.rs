@@ -10,11 +10,11 @@ use anyhow::{anyhow, Context, Error, Result};
 use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
+use hitman_commons::metadata::ResourceID;
 use indexmap::IndexMap;
 use quickentity_rs::{
 	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn,
-	qn_structs::{FullRef, Property, Ref},
-	rt_structs::SEntityTemplatePropertyValue
+	qn_structs::{FullRef, Property, Ref}
 };
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,6 @@ use crate::{
 		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest,
 		EntityTreeRequest, Event, GlobalRequest, Request
 	},
-	rpkg::normalise_to_hash,
 	send_notification, send_request, Notification, NotificationKind
 };
 
@@ -342,7 +341,7 @@ impl EditorConnection {
 								tblu,
 								from_value(
 									convert_rt_property_value_to_qn(
-										&SEntityTemplatePropertyValue {
+										&hitman_commons::resourcelib::PropertyValue {
 											property_type: transform.property_type,
 											property_value: transform.data
 										},
@@ -375,7 +374,7 @@ impl EditorConnection {
 								},
 								value.property_type.to_owned(),
 								match convert_rt_property_value_to_qn(
-									&SEntityTemplatePropertyValue {
+									&hitman_commons::resourcelib::PropertyValue {
 										property_type: value.property_type,
 										property_value: value.data
 									},
@@ -826,7 +825,7 @@ impl EditorConnection {
 					}) => json!({
 						"id": entity_ref,
 						"source": "game",
-						"tblu": normalise_to_hash(scene)
+						"tblu": ResourceID::from_any(&scene)?.to_string()
 					}),
 
 					Ref::Short(Some(entity_id)) => json!({
@@ -853,28 +852,30 @@ impl EditorConnection {
 					.unwrap_or(PropertyID::Known(property.to_owned())),
 				value: match from_value::<Vec<Ref>>(value.data)?
 					.into_iter()
-					.map(|x| match x {
-						Ref::Full(FullRef {
-							entity_ref,
-							external_scene: Some(scene),
-							exposed_entity: None
-						}) => Some(json!({
-							"id": entity_ref,
-							"source": "game",
-							"tblu": normalise_to_hash(scene)
-						})),
+					.map(|x| {
+						Ok(match x {
+							Ref::Full(FullRef {
+								entity_ref,
+								external_scene: Some(scene),
+								exposed_entity: None
+							}) => Some(json!({
+								"id": entity_ref,
+								"source": "game",
+								"tblu": ResourceID::from_any(&scene)?.to_string()
+							})),
 
-						Ref::Short(Some(entity_id)) => Some(json!({
-							"id": entity_id,
-							"source": "game",
-							"tblu": tblu.to_owned()
-						})),
+							Ref::Short(Some(entity_id)) => Some(json!({
+								"id": entity_id,
+								"source": "game",
+								"tblu": tblu.to_owned()
+							})),
 
-						Ref::Short(None) => Some(Value::Null),
+							Ref::Short(None) => Some(Value::Null),
 
-						_ => None // Can't set exposed entities
+							_ => None // Can't set exposed entities
+						})
 					})
-					.collect::<Option<Vec<Value>>>()
+					.collect::<Result<Option<Vec<Value>>>>()?
 				{
 					Some(x) => Value::Array(x),
 					None => return Ok(())

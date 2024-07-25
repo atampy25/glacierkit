@@ -1,4 +1,4 @@
-use crate::game_detection::GameVersion;
+use hitman_commons::game::GameVersion;
 
 /// Get the language map (and whether to use a symmetric cipher) for the given game version and iteration.
 pub fn get_language_map(version: GameVersion, iteration: u8) -> Option<(bool, Option<Vec<String>>)> {

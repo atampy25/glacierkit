@@ -4,6 +4,10 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 
 use dashmap::DashMap;
 use hashbrown::HashMap;
+use hitman_commons::{
+	hash_list::HashList,
+	metadata::{ResourceID, ResourceType}
+};
 use notify::RecommendedWatcher;
 use notify_debouncer_full::FileIdMap;
 use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
@@ -18,10 +22,8 @@ use crate::{
 	editor_connection::{EditorConnection, QNTransform},
 	entity::{CopiedEntityData, ReverseReference},
 	game_detection::GameInstall,
-	hash_list::HashList,
 	intellisense::Intellisense,
-	ores::{UnlockableInformation, UnlockableItem},
-	repository::{RepositoryItem, RepositoryItemInformation}
+	ores_repo::{RepositoryItem, RepositoryItemInformation, UnlockableInformation, UnlockableItem}
 };
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -56,9 +58,9 @@ pub struct AppState {
 	pub game_files: ArcSwapOption<PartitionManager>,
 
 	/// Resource -> Resources which depend on it
-	pub resource_reverse_dependencies: ArcSwapOption<HashMap<String, Vec<String>>>,
+	pub resource_reverse_dependencies: ArcSwapOption<HashMap<ResourceID, Vec<ResourceID>>>,
 
-	pub cached_entities: Arc<DashMap<String, Entity>>,
+	pub cached_entities: Arc<DashMap<ResourceID, Entity>>,
 	pub repository: ArcSwapOption<Vec<RepositoryItem>>,
 	pub intellisense: ArcSwapOption<Intellisense>,
 
@@ -75,7 +77,7 @@ pub struct EditorState {
 pub enum EditorData {
 	Nil,
 	ResourceOverview {
-		hash: String
+		hash: ResourceID
 	},
 	Text {
 		content: String,
@@ -143,10 +145,10 @@ impl Default for ProjectSettings {
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct GameBrowserEntry {
-	pub hash: String,
+	pub hash: ResourceID,
 	pub path: Option<String>,
 	pub hint: Option<String>,
-	pub filetype: String,
+	pub filetype: ResourceType,
 	pub partition: (String, String)
 }
 
@@ -324,9 +326,9 @@ strike! {
 			}),
 
 			GameBrowser(pub enum GameBrowserEvent {
-				Select(String),
+				Select(ResourceID),
 				Search(String, SearchFilter),
-				OpenInEditor(String)
+				OpenInEditor(ResourceID)
 			}),
 
 			Settings(pub enum SettingsEvent {
@@ -432,7 +434,7 @@ strike! {
 					AddGameBrowserItem {
 						editor_id: Uuid,
 						parent_id: String,
-						file: String
+						file: ResourceID
 					},
 
 					SelectEntityInEditor {
@@ -695,7 +697,7 @@ strike! {
 
 				OpenResourceOverview {
 					id: Uuid,
-					hash: String
+					hash: ResourceID
 				}
 			})
 		}),

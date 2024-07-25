@@ -2,6 +2,7 @@ use std::fs;
 
 use anyhow::{anyhow, Context, Result};
 use fn_error_context::context;
+use hitman_commons::metadata::ResourceID;
 use serde_json::to_vec;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
@@ -12,7 +13,6 @@ use crate::{
 		AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
 		EntityMetadataRequest, GlobalRequest, Request, SettingsRequest, ToolRequest
 	},
-	rpkg::normalise_to_hash,
 	send_notification, send_request, Notification, NotificationKind
 };
 
@@ -81,7 +81,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 		} => {
 			let mut is_patch_editor = false;
 
-			if factory_hash != normalise_to_hash(factory_hash.to_owned()) {
+			if factory_hash != ResourceID::from_any(&factory_hash)?.to_string() {
 				if let Some(project) = app_state.project.load().as_ref() {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(factory_hash.to_owned());
@@ -118,7 +118,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					)?;
 				}
 
-				factory_hash = normalise_to_hash(factory_hash);
+				factory_hash = ResourceID::from_any(&factory_hash)?.to_string();
 
 				send_request(
 					app,
@@ -190,7 +190,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 		} => {
 			let mut is_patch_editor = false;
 
-			if blueprint_hash != normalise_to_hash(blueprint_hash.to_owned()) {
+			if blueprint_hash != ResourceID::from_any(&blueprint_hash)?.to_string() {
 				if let Some(project) = app_state.project.load().as_ref() {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(blueprint_hash.to_owned());
@@ -227,7 +227,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					)?;
 				}
 
-				blueprint_hash = normalise_to_hash(blueprint_hash);
+				blueprint_hash = ResourceID::from_any(&blueprint_hash)?.to_string();
 
 				send_request(
 					app,

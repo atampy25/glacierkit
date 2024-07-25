@@ -3,17 +3,18 @@ use std::{fs, ops::Deref, time::Duration};
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use hitman_commons::{game::GameVersion, metadata::ResourceID, rpkg_tool::RpkgResourceMeta};
+use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
-	apply_patch, convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn, convert_to_rt,
-	generate_patch,
+	apply_patch, convert_to_qn, convert_to_rt, generate_patch,
 	patch_structs::Patch,
 	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
-use serde_json::{from_slice, from_value, json, to_string, to_value, to_vec, Value};
+use serde_json::{from_slice, from_str, from_value, json, to_string, to_value, to_vec, Value};
 use tauri::{async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
 use tokio::net::TcpStream;
@@ -21,12 +22,12 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::ores::{parse_json_ores, UnlockableItem};
+use crate::ores_repo::UnlockableItem;
 use crate::resourcelib::{
 	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
 	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
 };
-use crate::rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
+use crate::rpkg::extract_latest_resource;
 use crate::{
 	convert_json_patch_to_merge_patch,
 	model::{
@@ -37,7 +38,7 @@ use crate::{
 };
 use crate::{event_handling::content_search::start_content_search, send_request};
 use crate::{finish_task, start_task};
-use crate::{game_detection::GameVersion, general::open_in_editor};
+use crate::{general::open_in_editor, rpkg::extract_entity};
 use crate::{
 	general::{load_game_files, open_file},
 	get_loaded_game_version
@@ -227,19 +228,14 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							&& let Some(install) = app_settings.load().game_install.as_ref()
 							&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 						{
-							ensure_entity_in_cache(
+							let mut entity = extract_entity(
 								game_files,
 								&app_state.cached_entities,
 								get_loaded_game_version(app, install)?,
 								hash_list,
-								&normalise_to_hash(patch.factory_hash.to_owned())
-							)?;
-
-							let mut entity = app_state
-								.cached_entities
-								.get(&normalise_to_hash(patch.factory_hash.to_owned()))
-								.unwrap()
-								.to_owned();
+								ResourceID::from_any(&patch.factory_hash)?
+							)?
+							.to_owned();
 
 							let base = entity.to_owned();
 
@@ -331,18 +327,14 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 					let game_version = get_loaded_game_version(app, install)?;
 
-					// `ensure_entity_in_cache` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
-					let (temp_meta, temp_data) = extract_latest_resource(
-						game_files,
-						hash_list,
-						&normalise_to_hash(entity.factory_hash.to_owned())
-					)?;
+					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
+					let (temp_meta, temp_data) =
+						extract_latest_resource(game_files, ResourceID::from_any(&entity.factory_hash)?)?;
 
 					let factory = match game_version {
-						GameVersion::H1 => convert_2016_factory_to_modern(
-							&h2016_convert_binary_to_factory(&temp_data)
-								.context("Couldn't convert binary data to ResourceLib factory")?
-						),
+						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
+							.context("Couldn't convert binary data to ResourceLib factory")?
+							.into_modern(),
 
 						GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
 							.context("Couldn't convert binary data to ResourceLib factory")?,
@@ -351,19 +343,19 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							.context("Couldn't convert binary data to ResourceLib factory")?
 					};
 
-					let blueprint_hash = &temp_meta
-						.hash_reference_data
+					let blueprint_hash = temp_meta
+						.core_info
+						.references
 						.get(factory.blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
-						.hash;
+						.resource;
 
-					let (tblu_meta, tblu_data) = extract_latest_resource(game_files, hash_list, blueprint_hash)?;
+					let (tblu_meta, tblu_data) = extract_latest_resource(game_files, blueprint_hash)?;
 
 					let blueprint = match game_version {
-						GameVersion::H1 => convert_2016_blueprint_to_modern(
-							&h2016_convert_binary_to_blueprint(&tblu_data)
-								.context("Couldn't convert binary data to ResourceLib blueprint")?
-						),
+						GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)
+							.context("Couldn't convert binary data to ResourceLib blueprint")?
+							.into_modern(),
 
 						GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
 							.context("Couldn't convert binary data to ResourceLib blueprint")?,
@@ -372,8 +364,16 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							.context("Couldn't convert binary data to ResourceLib blueprint")?
 					};
 
-					let base = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
-						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+					let base = convert_to_qn(
+						&factory,
+						&RpkgResourceMeta::from_resource_metadata(temp_meta, false)
+							.with_hash_list(&hash_list.entries)?,
+						&blueprint,
+						&RpkgResourceMeta::from_resource_metadata(tblu_meta, false)
+							.with_hash_list(&hash_list.entries)?,
+						false
+					)
+					.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 					fs::write(
 						{
@@ -421,19 +421,14 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					&& let Some(install) = app_settings.load().game_install.as_ref()
 					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
-					ensure_entity_in_cache(
+					let mut entity = extract_entity(
 						game_files,
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
 						hash_list,
-						&normalise_to_hash(patch.factory_hash.to_owned())
-					)?;
-
-					let mut entity = app_state
-						.cached_entities
-						.get(&normalise_to_hash(patch.factory_hash.to_owned()))
-						.unwrap()
-						.to_owned();
+						ResourceID::from_any(&patch.factory_hash)?
+					)?
+					.to_owned();
 
 					apply_patch(&mut entity, patch, true).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
@@ -647,8 +642,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 					{
 						let mut current = to_value(
-							from_value::<Vec<UnlockableItem>>(parse_json_ores(
-								&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
+							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+								&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
 							)?)?
 							.into_iter()
 							.map(|x| {
@@ -741,8 +736,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
 					let mut current = to_value(
-						from_value::<Vec<UnlockableItem>>(parse_json_ores(
-							&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
+						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+							&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -897,13 +892,13 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 													s.contains(y)
 												})
 											})
-											.map(|(hash, entry)| GameBrowserEntry {
-												hash: hash.to_owned(),
+											.map(|(&hash, entry)| GameBrowserEntry {
+												hash,
 												path: entry.path.to_owned(),
 												hint: entry.hint.to_owned(),
-												filetype: entry.resource_type.to_owned(),
+												filetype: entry.resource_type,
 												partition: {
-													let rrid = RuntimeResourceID::from_hex_string(hash).unwrap();
+													let rrid = RuntimeResourceID::from(hash);
 
 													let partition = game_files
 														.partitions()
@@ -928,7 +923,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 											.par_iter()
 											.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
 											.filter(|(_, entry)| {
-												filter_includes.iter().any(|&x| x == entry.resource_type)
+												filter_includes.iter().any(|&x| entry.resource_type == x)
 											})
 											.filter(|(hash, entry)| {
 												query_terms.iter().all(|&y| {
@@ -945,13 +940,13 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 													s.contains(y)
 												})
 											})
-											.map(|(hash, entry)| GameBrowserEntry {
-												hash: hash.to_owned(),
+											.map(|(&hash, entry)| GameBrowserEntry {
+												hash,
 												path: entry.path.to_owned(),
 												hint: entry.hint.to_owned(),
-												filetype: entry.resource_type.to_owned(),
+												filetype: entry.resource_type,
 												partition: {
-													let rrid = RuntimeResourceID::from_hex_string(hash).unwrap();
+													let rrid = RuntimeResourceID::from(hash);
 
 													let partition = game_files
 														.partitions()
@@ -985,7 +980,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					&& let Some(install) = app_settings.load().game_install.as_ref()
 					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
-					open_in_editor(app, game_files, install, hash_list, &hash).await?;
+					open_in_editor(app, game_files, install, hash_list, hash).await?;
 				}
 			}
 		},

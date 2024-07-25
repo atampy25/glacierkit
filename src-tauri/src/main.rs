@@ -16,18 +16,13 @@ pub mod entity;
 pub mod event_handling;
 pub mod game_detection;
 pub mod general;
-pub mod hash_list;
 pub mod intellisense;
 pub mod languages;
-pub mod material;
 pub mod model;
-pub mod ores;
-pub mod repository;
+pub mod ores_repo;
 pub mod resourcelib;
 pub mod rpkg;
-pub mod rpkg_tool;
 pub mod show_in_folder;
-pub mod wwev;
 
 use std::{
 	fs,
@@ -47,9 +42,10 @@ use event_handling::{
 	tools::handle_tool_event, unlockables_patch::handle_unlockables_patch_event
 };
 use fn_error_context::context;
-use game_detection::{detect_installs, GameVersion};
+use game_detection::detect_installs;
 use general::open_file;
 use hashbrown::HashMap;
+use hitman_commons::game::GameVersion;
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{info, trace, LevelFilter};
@@ -217,7 +213,7 @@ fn main() {
 					.ok()
 					.and_then(|x| serde_smile::from_slice(&x).ok())
 					.into(),
-				tonytools_hash_list: fs::read(app_data_path.join("tonytools_hash_list.hlma"))
+				tonytools_hash_list: fs::read(app_data_path.join("tonytools_hash_list.hmla"))
 					.ok()
 					.and_then(|x| tonytools::hashlist::HashList::load(&x).ok().map(|x| x.into()))
 					.into(),
@@ -365,7 +361,7 @@ fn event(app: AppHandle, event: Event) {
 									id.to_owned(),
 									EditorState {
 										file: None,
-										data: EditorData::ResourceOverview { hash: hash.to_owned() }
+										data: EditorData::ResourceOverview { hash }
 									}
 								);
 

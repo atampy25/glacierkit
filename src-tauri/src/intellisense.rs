@@ -1,13 +1,19 @@
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
+use hitman_commons::{
+	game::GameVersion,
+	hash_list::HashList,
+	metadata::{ReferenceType, ResourceID, ResourceType},
+	resourcelib::PropertyID
+};
+use hitman_formats::material::{get_material_overrides, MaterialOverride, MaterialOverrideData};
 use itertools::Itertools;
 use quickentity_rs::{
 	qn_structs::{Entity, Ref, RefMaybeConstantValue, RefWithConstantValue},
-	rt_structs::PropertyID,
 	util_structs::{SMatrix43PropertyValue, ZGuidPropertyValue},
 	RAD2DEG
 };
@@ -19,15 +25,12 @@ use tryvial::try_fn;
 
 use crate::{
 	entity::get_local_reference,
-	game_detection::GameVersion,
-	hash_list::HashList,
-	material::{get_material_properties, MaterialProperty, MaterialPropertyData},
 	resourcelib::{
 		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2016_convert_ecpb, h2016_convert_wsgb, h2_convert_cppt,
 		h2_convert_dswb, h2_convert_ecpb, h2_convert_wsgb, h3_convert_cppt, h3_convert_dswb, h3_convert_ecpb,
 		h3_convert_wsgb, EAttributeKind, EExtendedPropertyType
 	},
-	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
+	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource}
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -49,16 +52,16 @@ pub struct CPPTPinInfo {
 
 pub struct Intellisense {
 	/// CPPT -> Property -> (Type, Value)
-	pub cppt_properties: Arc<DashMap<String, HashMap<String, (String, Value)>>>,
+	pub cppt_properties: Arc<DashMap<ResourceID, HashMap<String, (String, Value)>>>,
 
-	pub cppt_pins: HashMap<String, CPPTPinsInfo>,
+	pub cppt_pins: HashMap<ResourceID, CPPTPinsInfo>,
 
 	/// Property type as enum -> String version
 	pub uicb_prop_types: HashMap<String, String>,
 
-	pub matt_properties: Arc<DashMap<String, Vec<MaterialProperty>>>,
+	pub matt_properties: Arc<DashMap<ResourceID, Vec<MaterialOverride>>>,
 
-	pub file_types: HashMap<String, String>
+	pub file_types: HashMap<ResourceID, ResourceType>
 }
 
 impl Intellisense {
@@ -69,15 +72,15 @@ impl Intellisense {
 		game_files: &PartitionManager,
 		hash_list: &HashList,
 		game_version: GameVersion,
-		cppt: &str
+		cppt: ResourceID
 	) -> Result<HashMap<String, (String, Value)>> {
 		{
-			if let Some(cached) = self.cppt_properties.get(cppt) {
+			if let Some(cached) = self.cppt_properties.get(&cppt) {
 				return Ok(cached.to_owned());
 			}
 		}
 
-		let extracted = extract_latest_resource(game_files, hash_list, cppt)?;
+		let extracted = extract_latest_resource(game_files, cppt)?;
 
 		let cppt_data = match game_version {
 			GameVersion::H1 => h2016_convert_cppt(&extracted.1)?,
@@ -116,16 +119,19 @@ impl Intellisense {
 									if id_low != 4294967295 {
 										let reference = extracted
 											.0
-											.hash_reference_data
+											.core_info
+											.references
 											.get(id_low as usize)
 											.context("No such referenced resource")?;
 
-										if reference.flag == "1F" {
-											json!(reference.hash)
+										if reference.flags.reference_type == ReferenceType::Install
+											&& !reference.flags.acquired
+										{
+											json!(hash_list.to_path(&reference.resource))
 										} else {
 											json!({
-												"resource": reference.hash,
-												"flag": reference.flag
+												"resource": hash_list.to_path(&reference.resource),
+												"flag": format!("{:02X}", reference.flags.as_modern())
 											})
 										}
 									} else {
@@ -326,7 +332,7 @@ impl Intellisense {
 				.collect::<Result<_>>()?
 		);
 
-		self.cppt_properties.get(cppt).expect("We just added it").to_owned()
+		self.cppt_properties.get(&cppt).expect("We just added it").to_owned()
 	}
 
 	#[try_fn]
@@ -335,39 +341,39 @@ impl Intellisense {
 		&self,
 		game_files: &PartitionManager,
 		hash_list: &HashList,
-		matt: &str
-	) -> Result<Vec<MaterialProperty>> {
+		matt: ResourceID
+	) -> Result<Vec<MaterialOverride>> {
 		{
-			if let Some(cached) = self.matt_properties.get(matt) {
-				return Ok(cached.to_owned());
+			if let Some(x) = self.matt_properties.get(&matt) {
+				return Ok(x.to_owned());
 			}
 		}
 
-		let (matt_meta, matt_data) = extract_latest_resource(game_files, hash_list, matt)?;
+		let (matt_meta, matt_data) = extract_latest_resource(game_files, matt)?;
 
 		let (_, matb_data) = extract_latest_resource(
 			game_files,
-			hash_list,
-			&matt_meta
-				.hash_reference_data
+			matt_meta
+				.core_info
+				.references
 				.iter()
 				.find(|x| {
 					hash_list
 						.entries
-						.get(&normalise_to_hash(x.hash.to_owned()))
+						.get(&x.resource)
 						.map(|entry| entry.resource_type == "MATB")
 						.unwrap_or(false)
 				})
 				.context("MATT has no MATB dependency")?
-				.hash
+				.resource
 		)?;
 
 		self.matt_properties.insert(
 			matt.into(),
-			get_material_properties(&matt_data, &matt_meta, &matb_data)?
+			get_material_overrides(&matt_data, &matt_meta.core_info.references, &matb_data)?
 		);
 
-		self.matt_properties.get(matt).expect("We just added it").to_owned()
+		self.matt_properties.get(&matt).expect("We just added it").to_owned()
 	}
 
 	/// Get the names, types, default values and post-init status of all properties of a given sub-entity.
@@ -378,7 +384,7 @@ impl Intellisense {
 	pub fn get_properties(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &DashMap<String, Entity>,
+		cached_entities: &DashMap<ResourceID, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -442,23 +448,20 @@ impl Intellisense {
 
 				found.extend(
 					{
-						if let Some(ty) = self.file_types.get(&normalise_to_hash(targeted.factory.to_owned()))
+						if let Some(ty) = self.file_types.get(&ResourceID::from_any(&targeted.factory)?)
 							&& ty == "ASET"
 						{
-							extract_latest_metadata(
-								game_files,
-								hash_list,
-								&normalise_to_hash(targeted.factory.to_owned())
-							)?
-							.hash_reference_data
-							.into_iter()
-							.rev()
-							.skip(1)
-							.rev()
-							.map(|x| normalise_to_hash(x.hash))
-							.collect_vec()
+							extract_latest_metadata(game_files, ResourceID::from_any(&targeted.factory)?)?
+								.core_info
+								.references
+								.into_iter()
+								.rev()
+								.skip(1)
+								.rev()
+								.map(|x| x.resource)
+								.collect_vec()
 						} else {
-							vec![normalise_to_hash(targeted.factory.to_owned())]
+							vec![ResourceID::from_any(&targeted.factory)?]
 						}
 					}
 					.into_par_iter()
@@ -469,8 +472,9 @@ impl Intellisense {
 							if let Some(ty) = self.file_types.get(&factory) {
 								match ty.as_ref() {
 									"CPPT" => {
-										for (prop_name, (prop_type, default_val)) in
-											self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
+										for (prop_name, (prop_type, default_val)) in self
+											.get_cppt_properties(game_files, hash_list, game_version, factory)?
+											.to_owned()
 										{
 											found.push((prop_name, prop_type, default_val, false));
 										}
@@ -482,7 +486,7 @@ impl Intellisense {
 											game_files,
 											hash_list,
 											game_version,
-											"002C4526CC9753E6"
+											"002C4526CC9753E6".parse()?
 										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
@@ -490,19 +494,19 @@ impl Intellisense {
 										for entry in convert_uicb(
 											&extract_latest_resource(
 												game_files,
-												hash_list,
-												&extract_latest_metadata(game_files, hash_list, &factory)?
-													.hash_reference_data
+												extract_latest_metadata(game_files, factory)?
+													.core_info
+													.references
 													.into_iter()
 													.find(|x| {
 														hash_list
 															.entries
-															.get(&normalise_to_hash(x.hash.to_owned()))
+															.get(&x.resource)
 															.map(|entry| entry.resource_type == "UICB")
 															.unwrap_or(false)
 													})
 													.context("No blueprint dependency on UICT")?
-													.hash
+													.resource
 											)?
 											.1
 										)?
@@ -538,14 +542,14 @@ impl Intellisense {
 											game_files,
 											hash_list,
 											game_version,
-											"00B4B11DA327CAD0"
+											"00B4B11DA327CAD0".parse()?
 										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
 
-										for property in self.get_matt_properties(game_files, hash_list, &factory)? {
+										for property in self.get_matt_properties(game_files, hash_list, factory)? {
 											match property.data {
-												MaterialPropertyData::Texture(texture) => {
+												MaterialOverrideData::Texture(texture) => {
 													found.push((
 														property.name.to_owned(),
 														"ZRuntimeResourceID".into(),
@@ -575,7 +579,7 @@ impl Intellisense {
 													));
 												}
 
-												MaterialPropertyData::ColorRGB(r, g, b) => {
+												MaterialOverrideData::ColorRGB(r, g, b) => {
 													found.push((
 														property.name.to_owned(),
 														"SColorRGB".into(),
@@ -596,7 +600,7 @@ impl Intellisense {
 													));
 												}
 
-												MaterialPropertyData::ColorRGBA(r, g, b, a) => {
+												MaterialOverrideData::ColorRGBA(r, g, b, a) => {
 													found.push((
 														property.name.to_owned(),
 														"SColorRGBA".into(),
@@ -618,7 +622,7 @@ impl Intellisense {
 													));
 												}
 
-												MaterialPropertyData::Float(val) => {
+												MaterialOverrideData::Float(val) => {
 													found.push((
 														property.name.to_owned(),
 														"float32".into(),
@@ -634,7 +638,7 @@ impl Intellisense {
 													));
 												}
 
-												MaterialPropertyData::Vector2(x, y) => {
+												MaterialOverrideData::Vector2(x, y) => {
 													found.push((
 														property.name.to_owned(),
 														"SVector2".into(),
@@ -653,7 +657,7 @@ impl Intellisense {
 													));
 												}
 
-												MaterialPropertyData::Vector3(x, y, z) => {
+												MaterialOverrideData::Vector3(x, y, z) => {
 													found.push((
 														property.name.to_owned(),
 														"SVector3".into(),
@@ -673,7 +677,7 @@ impl Intellisense {
 													));
 												}
 
-												MaterialPropertyData::Vector4(x, y, z, w) => {
+												MaterialOverrideData::Vector4(x, y, z, w) => {
 													found.push((
 														property.name.to_owned(),
 														"SVector4".into(),
@@ -703,7 +707,7 @@ impl Intellisense {
 											game_files,
 											hash_list,
 											game_version,
-											"00797DC916520C4D"
+											"00797DC916520C4D".parse()?
 										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
@@ -715,26 +719,26 @@ impl Intellisense {
 											game_files,
 											hash_list,
 											game_version,
-											"00D3003AAA7B3817"
+											"00D3003AAA7B3817".parse()?
 										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
 
 										let ecpb_data = extract_latest_resource(
 											game_files,
-											hash_list,
-											&extract_latest_metadata(game_files, hash_list, &factory)?
-												.hash_reference_data
+											extract_latest_metadata(game_files, factory)?
+												.core_info
+												.references
 												.into_iter()
 												.find(|x| {
 													hash_list
 														.entries
-														.get(&normalise_to_hash(x.hash.to_owned()))
+														.get(&x.resource)
 														.map(|entry| entry.resource_type == "ECPB")
 														.unwrap_or(false)
 												})
 												.context("No blueprint dependency on ECPT")?
-												.hash
+												.resource
 										)?
 										.1;
 
@@ -779,7 +783,7 @@ impl Intellisense {
 											game_files,
 											hash_list,
 											game_version,
-											"0028607138892D70"
+											"0028607138892D70".parse()?
 										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
@@ -791,24 +795,20 @@ impl Intellisense {
 											game_files,
 											hash_list,
 											game_version,
-											"000D409686293996"
+											"000D409686293996".parse()?
 										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
 									}
 
 									"TEMP" => {
-										ensure_entity_in_cache(
+										let extracted = extract_entity(
 											game_files,
 											cached_entities,
 											game_version,
 											hash_list,
-											&normalise_to_hash(factory.to_owned())
+											factory
 										)?;
-
-										let extracted = cached_entities
-											.get(&normalise_to_hash(factory.to_owned()))
-											.expect("Ensured");
 
 										found.extend(self.get_properties(
 											game_files,
@@ -851,7 +851,7 @@ impl Intellisense {
 	pub fn get_specific_property(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &DashMap<String, Entity>,
+		cached_entities: &DashMap<ResourceID, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -899,25 +899,26 @@ impl Intellisense {
 			)));
 		}
 
-		for factory in if let Some(ty) = self.file_types.get(&normalise_to_hash(targeted.factory.to_owned()))
+		for factory in if let Some(ty) = self.file_types.get(&ResourceID::from_any(&targeted.factory)?)
 			&& ty == "ASET"
 		{
-			extract_latest_metadata(game_files, hash_list, &normalise_to_hash(targeted.factory.to_owned()))?
-				.hash_reference_data
+			extract_latest_metadata(game_files, ResourceID::from_any(&targeted.factory)?)?
+				.core_info
+				.references
 				.into_iter()
 				.rev()
 				.skip(1)
 				.rev()
-				.map(|x| normalise_to_hash(x.hash))
+				.map(|x| x.resource)
 				.collect_vec()
 		} else {
-			vec![normalise_to_hash(targeted.factory.to_owned())]
+			vec![ResourceID::from_any(&targeted.factory)?]
 		} {
 			if let Some(ty) = self.file_types.get(&factory) {
 				match ty.as_ref() {
 					"CPPT" => {
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, &factory)?
+							self.get_cppt_properties(game_files, hash_list, game_version, factory)?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
@@ -928,7 +929,7 @@ impl Intellisense {
 					"UICT" => {
 						// All UI controls have the properties of ZUIControlEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, "002C4526CC9753E6")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "002C4526CC9753E6".parse()?)?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
@@ -938,19 +939,19 @@ impl Intellisense {
 						for entry in convert_uicb(
 							&extract_latest_resource(
 								game_files,
-								hash_list,
-								&extract_latest_metadata(game_files, hash_list, &factory)?
-									.hash_reference_data
+								extract_latest_metadata(game_files, factory)?
+									.core_info
+									.references
 									.into_iter()
 									.find(|x| {
 										hash_list
 											.entries
-											.get(&normalise_to_hash(x.hash.to_owned()))
+											.get(&x.resource)
 											.map(|entry| entry.resource_type == "UICB")
 											.unwrap_or(false)
 									})
 									.context("No blueprint dependency on UICT")?
-									.hash
+									.resource
 							)?
 							.1
 						)?
@@ -982,16 +983,16 @@ impl Intellisense {
 					"MATT" => {
 						// All materials have the properties of ZRenderMaterialEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, "00B4B11DA327CAD0")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "00B4B11DA327CAD0".parse()?)?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
 							}
 						}
 
-						for property in self.get_matt_properties(game_files, hash_list, &factory)? {
+						for property in self.get_matt_properties(game_files, hash_list, factory)? {
 							match property.data {
-								MaterialPropertyData::Texture(texture) => {
+								MaterialOverrideData::Texture(texture) => {
 									if property.name == property_to_find {
 										return Ok(Some((
 											"ZRuntimeResourceID".into(),
@@ -1016,7 +1017,7 @@ impl Intellisense {
 									}
 								}
 
-								MaterialPropertyData::ColorRGB(r, g, b) => {
+								MaterialOverrideData::ColorRGB(r, g, b) => {
 									if property.name == property_to_find {
 										return Ok(Some((
 											"SColorRGB".into(),
@@ -1039,7 +1040,7 @@ impl Intellisense {
 									}
 								}
 
-								MaterialPropertyData::ColorRGBA(r, g, b, a) => {
+								MaterialOverrideData::ColorRGBA(r, g, b, a) => {
 									if property.name == property_to_find {
 										return Ok(Some((
 											"SColorRGBA".into(),
@@ -1063,7 +1064,7 @@ impl Intellisense {
 									}
 								}
 
-								MaterialPropertyData::Float(val) => {
+								MaterialOverrideData::Float(val) => {
 									if property.name == property_to_find {
 										return Ok(Some(("float32".into(), to_value(val)?, false)));
 									}
@@ -1077,7 +1078,7 @@ impl Intellisense {
 									}
 								}
 
-								MaterialPropertyData::Vector2(x, y) => {
+								MaterialOverrideData::Vector2(x, y) => {
 									if property.name == property_to_find {
 										return Ok(Some((
 											"SVector2".into(),
@@ -1098,7 +1099,7 @@ impl Intellisense {
 									}
 								}
 
-								MaterialPropertyData::Vector3(x, y, z) => {
+								MaterialOverrideData::Vector3(x, y, z) => {
 									if property.name == property_to_find {
 										return Ok(Some((
 											"SVector3".into(),
@@ -1120,7 +1121,7 @@ impl Intellisense {
 									}
 								}
 
-								MaterialPropertyData::Vector4(x, y, z, w) => {
+								MaterialOverrideData::Vector4(x, y, z, w) => {
 									if property.name == property_to_find {
 										return Ok(Some((
 											"SVector4".into(),
@@ -1149,7 +1150,7 @@ impl Intellisense {
 					"WSWT" => {
 						// All switch groups have the properties of ZAudioSwitchEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, "00797DC916520C4D")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "00797DC916520C4D".parse()?)?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
@@ -1159,7 +1160,7 @@ impl Intellisense {
 					"ECPT" => {
 						// All extended CPP entities have the properties of ZMaterialOverwriteAspect
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, "00D3003AAA7B3817")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "00D3003AAA7B3817".parse()?)?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
@@ -1168,19 +1169,19 @@ impl Intellisense {
 
 						let ecpb_data = extract_latest_resource(
 							game_files,
-							hash_list,
-							&extract_latest_metadata(game_files, hash_list, &factory)?
-								.hash_reference_data
+							extract_latest_metadata(game_files, factory)?
+								.core_info
+								.references
 								.into_iter()
 								.find(|x| {
 									hash_list
 										.entries
-										.get(&normalise_to_hash(x.hash.to_owned()))
+										.get(&x.resource)
 										.map(|entry| entry.resource_type == "ECPB")
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on ECPT")?
-								.hash
+								.resource
 						)?
 						.1;
 
@@ -1223,7 +1224,7 @@ impl Intellisense {
 					"AIBX" => {
 						// All behaviour trees have the properties of ZBehaviorTreeEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, "0028607138892D70")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "0028607138892D70".parse()?)?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
@@ -1234,7 +1235,7 @@ impl Intellisense {
 					"WSGT" => {
 						// All state groups have the properties of ZAudioStateEntity
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, "000D409686293996")?
+							self.get_cppt_properties(game_files, hash_list, game_version, "000D409686293996".parse()?)?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
@@ -1243,17 +1244,7 @@ impl Intellisense {
 					}
 
 					"TEMP" => {
-						ensure_entity_in_cache(
-							game_files,
-							cached_entities,
-							game_version,
-							hash_list,
-							&normalise_to_hash(factory.to_owned())
-						)?;
-
-						let extracted = cached_entities
-							.get(&normalise_to_hash(factory.to_owned()))
-							.expect("Ensured");
+						let extracted = extract_entity(game_files, cached_entities, game_version, hash_list, factory)?;
 
 						if let Some(data) = self.get_specific_property(
 							game_files,
@@ -1282,7 +1273,7 @@ impl Intellisense {
 	pub fn get_pins(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &DashMap<String, Entity>,
+		cached_entities: &DashMap<ResourceID, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -1373,19 +1364,20 @@ impl Intellisense {
 		}
 
 		let (fac_input, fac_output): (Vec<_>, Vec<_>) = {
-			if let Some(ty) = self.file_types.get(&normalise_to_hash(targeted.factory.to_owned()))
+			if let Some(ty) = self.file_types.get(&ResourceID::from_any(&targeted.factory)?)
 				&& ty == "ASET"
 			{
-				extract_latest_metadata(game_files, hash_list, &normalise_to_hash(targeted.factory.to_owned()))?
-					.hash_reference_data
+				extract_latest_metadata(game_files, ResourceID::from_any(&targeted.factory)?)?
+					.core_info
+					.references
 					.into_iter()
 					.rev()
 					.skip(1)
 					.rev()
-					.map(|x| normalise_to_hash(x.hash))
+					.map(|x| x.resource)
 					.collect_vec()
 			} else {
-				vec![normalise_to_hash(targeted.factory.to_owned())]
+				vec![ResourceID::from_any(&targeted.factory)?]
 			}
 		}
 		.into_par_iter()
@@ -1404,26 +1396,29 @@ impl Intellisense {
 
 						"UICT" => {
 							// All UI controls have the pins of ZUIControlEntity
-							let cppt_data = self.cppt_pins.get("002C4526CC9753E6").context("No such CPPT in pins")?;
+							let cppt_data = self
+								.cppt_pins
+								.get(&"002C4526CC9753E6".parse::<ResourceID>()?)
+								.context("No such CPPT in pins")?;
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
 							for entry in convert_uicb(
 								&extract_latest_resource(
 									game_files,
-									hash_list,
-									&extract_latest_metadata(game_files, hash_list, &factory)?
-										.hash_reference_data
+									extract_latest_metadata(game_files, factory)?
+										.core_info
+										.references
 										.into_iter()
 										.find(|x| {
 											hash_list
 												.entries
-												.get(&normalise_to_hash(x.hash.to_owned()))
+												.get(&x.resource)
 												.map(|entry| entry.resource_type == "UICB")
 												.unwrap_or(false)
 										})
 										.context("No blueprint dependency on UICT")?
-										.hash
+										.resource
 								)?
 								.1
 							)?
@@ -1441,12 +1436,16 @@ impl Intellisense {
 
 						"MATT" => {
 							// All materials have the pins of ZRenderMaterialEntity
-							let cppt_data = self.cppt_pins.get("00B4B11DA327CAD0").context("No such CPPT in pins")?;
+							let cppt_data = self
+								.cppt_pins
+								.get(&"00B4B11DA327CAD0".parse::<ResourceID>()?)
+								.context("No such CPPT in pins")?;
+
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-							for property in self.get_matt_properties(game_files, hash_list, &factory)? {
-								if !matches!(property.data, MaterialPropertyData::Texture(_)) {
+							for property in self.get_matt_properties(game_files, hash_list, factory)? {
+								if !matches!(property.data, MaterialOverrideData::Texture(_)) {
 									input.push(property.name);
 								}
 							}
@@ -1454,35 +1453,36 @@ impl Intellisense {
 
 						"WSWT" => {
 							// All switch groups have the pins of ZAudioSwitchEntity
-							let cppt_data = self.cppt_pins.get("00797DC916520C4D").context("No such CPPT in pins")?;
+							let cppt_data = self
+								.cppt_pins
+								.get(&"00797DC916520C4D".parse::<ResourceID>()?)
+								.context("No such CPPT in pins")?;
+
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-							let wswt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
+							let wswt_meta = extract_latest_metadata(game_files, factory)?;
 
-							let dswb_hash = &wswt_meta
-								.hash_reference_data
-								.iter()
+							let dswb_hash = wswt_meta
+								.core_info
+								.references
+								.into_iter()
 								.find(|x| {
 									hash_list
 										.entries
-										.get(&normalise_to_hash(x.hash.to_owned()))
+										.get(&x.resource)
 										.map(|entry| entry.resource_type == "DSWB" || entry.resource_type == "WSWB")
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on WSWT")?
-								.hash;
+								.resource;
 
 							let dswb_data = match game_version {
 								GameVersion::H1 => {
-									h2016_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
+									h2016_convert_dswb(&extract_latest_resource(game_files, dswb_hash)?.1)?
 								}
-								GameVersion::H2 => {
-									h2_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
-								}
-								GameVersion::H3 => {
-									h3_convert_dswb(&extract_latest_resource(game_files, hash_list, dswb_hash)?.1)?
-								}
+								GameVersion::H2 => h2_convert_dswb(&extract_latest_resource(game_files, dswb_hash)?.1)?,
+								GameVersion::H3 => h3_convert_dswb(&extract_latest_resource(game_files, dswb_hash)?.1)?
 							};
 
 							input.extend(dswb_data.m_aSwitches);
@@ -1490,66 +1490,66 @@ impl Intellisense {
 
 						"ECPT" => {
 							// All extended CPP entities have the pins of ZMaterialOverwriteAspect
-							let cppt_data = self.cppt_pins.get("00D3003AAA7B3817").context("No such CPPT in pins")?;
+							let cppt_data = self
+								.cppt_pins
+								.get(&"00D3003AAA7B3817".parse::<ResourceID>()?)
+								.context("No such CPPT in pins")?;
+
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 						}
 
 						"AIBX" => {
 							// All behaviour trees have the pins of ZBehaviorTreeEntity
-							let cppt_data = self.cppt_pins.get("0028607138892D70").context("No such CPPT in pins")?;
+							let cppt_data = self
+								.cppt_pins
+								.get(&"0028607138892D70".parse::<ResourceID>()?)
+								.context("No such CPPT in pins")?;
+
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 						}
 
 						"WSGT" => {
 							// All state groups have the pins of ZAudioStateEntity
-							let cppt_data = self.cppt_pins.get("000D409686293996").context("No such CPPT in pins")?;
+							let cppt_data = self
+								.cppt_pins
+								.get(&"000D409686293996".parse::<ResourceID>()?)
+								.context("No such CPPT in pins")?;
+
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-							let wsgt_meta = extract_latest_metadata(game_files, hash_list, &factory)?;
+							let wsgt_meta = extract_latest_metadata(game_files, factory)?;
 
-							let wsgb_hash = &wsgt_meta
-								.hash_reference_data
-								.iter()
+							let wsgb_hash = wsgt_meta
+								.core_info
+								.references
+								.into_iter()
 								.find(|x| {
 									hash_list
 										.entries
-										.get(&normalise_to_hash(x.hash.to_owned()))
+										.get(&x.resource)
 										.map(|entry| entry.resource_type == "WSGB")
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on WSWT")?
-								.hash;
+								.resource;
 
 							let wsgb_data = match game_version {
 								GameVersion::H1 => {
-									h2016_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
+									h2016_convert_wsgb(&extract_latest_resource(game_files, wsgb_hash)?.1)?
 								}
-								GameVersion::H2 => {
-									h2_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
-								}
-								GameVersion::H3 => {
-									h3_convert_wsgb(&extract_latest_resource(game_files, hash_list, wsgb_hash)?.1)?
-								}
+								GameVersion::H2 => h2_convert_wsgb(&extract_latest_resource(game_files, wsgb_hash)?.1)?,
+								GameVersion::H3 => h3_convert_wsgb(&extract_latest_resource(game_files, wsgb_hash)?.1)?
 							};
 
 							input.extend(wsgb_data.m_aSwitches);
 						}
 
 						"TEMP" => {
-							ensure_entity_in_cache(
-								game_files,
-								cached_entities,
-								game_version,
-								hash_list,
-								&normalise_to_hash(factory.to_owned())
-							)?;
-
-							let extracted = cached_entities
-								.get(&normalise_to_hash(factory.to_owned()))
-								.expect("Ensured");
+							let extracted =
+								extract_entity(game_files, cached_entities, game_version, hash_list, factory)?;
 
 							let found = self.get_pins(
 								game_files,

@@ -1,8 +1,13 @@
+use std::str::FromStr;
+
 use anyhow::{anyhow, bail};
 use anyhow::{Context, Result};
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
+use hitman_commons::game::GameVersion;
+use hitman_commons::hash_list::HashList;
+use hitman_commons::metadata::{ResourceID, ResourceType};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};
@@ -18,12 +23,11 @@ use tryvial::try_fn;
 use velcro::vec;
 
 use crate::languages::get_language_map;
+use crate::rpkg::extract_entity;
 use crate::{
-	game_detection::GameVersion,
-	hash_list::HashList,
 	model::EditorValidity,
-	repository::RepositoryItem,
-	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash}
+	ores_repo::RepositoryItem,
+	rpkg::{extract_latest_metadata, extract_latest_resource}
 };
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -568,7 +572,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 
 pub fn get_ref_decoration(
 	game_files: &PartitionManager,
-	cached_entities: &DashMap<String, Entity>,
+	cached_entities: &DashMap<ResourceID, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
 	entity: &Entity,
@@ -581,24 +585,18 @@ pub fn get_ref_decoration(
 			Ref::Short(None) => None,
 
 			Ref::Full(reference) => Some((reference.entity_ref.to_owned(), {
-				ensure_entity_in_cache(
+				extract_entity(
 					game_files,
 					cached_entities,
 					game_version,
 					hash_list,
-					&normalise_to_hash(reference.external_scene.as_ref().expect("Not a local reference").into())
+					ResourceID::from_any(reference.external_scene.as_ref().expect("Not a local reference")).ok()?
 				)
-				.ok()?;
-
-				cached_entities
-					.get(&normalise_to_hash(
-						reference.external_scene.as_ref().expect("Not a local reference").into()
-					))
-					.expect("Ensured")
-					.entities
-					.get(&reference.entity_ref)?
-					.name
-					.to_owned()
+				.ok()?
+				.entities
+				.get(&reference.entity_ref)?
+				.name
+				.to_owned()
 			})),
 
 			_ => unreachable!()
@@ -613,18 +611,18 @@ pub fn get_line_decoration(
 	hash_list: &HashList,
 	game_version: GameVersion,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
-	line: &str
+	line: ResourceID
 ) -> Result<String> {
-	let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, line)?;
+	let (res_meta, res_data) = extract_latest_resource(game_files, line)?;
 
 	let (locr_meta, locr_data) = extract_latest_resource(
 		game_files,
-		hash_list,
-		&res_meta
-			.hash_reference_data
+		res_meta
+			.core_info
+			.references
 			.first()
 			.context("No LOCR dependency on LINE")?
-			.hash
+			.resource
 	)?;
 
 	let locr = {
@@ -637,11 +635,7 @@ pub fn get_line_decoration(
 
 				let locr = hmlanguages::locr::LOCR::new(
 					tonytools_hash_list.to_owned(),
-					match game_version {
-						GameVersion::H1 => tonytools::Version::H2016,
-						GameVersion::H2 => tonytools::Version::H2,
-						GameVersion::H3 => tonytools::Version::H3
-					},
+					game_version.into(),
 					langmap.1.to_owned(),
 					langmap.0
 				)
@@ -706,7 +700,7 @@ pub fn get_line_decoration(
 #[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
 pub fn get_decorations(
 	game_files: &PartitionManager,
-	cached_entities: &DashMap<String, Entity>,
+	cached_entities: &DashMap<ResourceID, Entity>,
 	repository: &[RepositoryItem],
 	hash_list: &HashList,
 	game_version: GameVersion,
@@ -729,7 +723,7 @@ pub fn get_decorations(
 
 	// Hint decoration for unknown paths
 	if sub_entity.factory.starts_with('0') {
-		if let Some(entry) = hash_list.entries.get(&sub_entity.factory) {
+		if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(&sub_entity.factory)?) {
 			if let Some(hint) = entry.hint.as_ref() {
 				decorations.push((sub_entity.factory.to_owned(), hint.to_owned()));
 			}
@@ -737,7 +731,7 @@ pub fn get_decorations(
 	}
 
 	if sub_entity.blueprint.starts_with('0') {
-		if let Some(entry) = hash_list.entries.get(&sub_entity.blueprint) {
+		if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(&sub_entity.blueprint)?) {
 			if let Some(hint) = entry.hint.as_ref() {
 				decorations.push((sub_entity.blueprint.to_owned(), hint.to_owned()));
 			}
@@ -800,15 +794,21 @@ pub fn get_decorations(
 				property_data.value.as_str().unwrap_or_default()
 			};
 
-			if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+			if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
 				&& entry.resource_type == "LINE"
 			{
 				decorations.push((
 					res.to_owned(),
-					get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+					get_line_decoration(
+						game_files,
+						hash_list,
+						game_version,
+						tonytools_hash_list,
+						ResourceID::from_any(&res)?
+					)?
 				));
 			} else if res.starts_with('0') {
-				if let Some(entry) = hash_list.entries.get(res) {
+				if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 					if let Some(hint) = entry.hint.as_ref() {
 						decorations.push((res.to_owned(), hint.to_owned()));
 					}
@@ -827,15 +827,21 @@ pub fn get_decorations(
 					val.as_str().unwrap_or_default()
 				};
 
-				if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
 					&& entry.resource_type == "LINE"
 				{
 					decorations.push((
 						res.to_owned(),
-						get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+						get_line_decoration(
+							game_files,
+							hash_list,
+							game_version,
+							tonytools_hash_list,
+							ResourceID::from_any(&res)?
+						)?
 					));
 				} else if res.starts_with('0') {
-					if let Some(entry) = hash_list.entries.get(res) {
+					if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 						if let Some(hint) = entry.hint.as_ref() {
 							decorations.push((res.to_owned(), hint.to_owned()));
 						}
@@ -907,15 +913,21 @@ pub fn get_decorations(
 					property_data.value.as_str().unwrap_or_default()
 				};
 
-				if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
 					&& entry.resource_type == "LINE"
 				{
 					decorations.push((
 						res.to_owned(),
-						get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+						get_line_decoration(
+							game_files,
+							hash_list,
+							game_version,
+							tonytools_hash_list,
+							ResourceID::from_any(&res)?
+						)?
 					));
 				} else if res.starts_with('0') {
-					if let Some(entry) = hash_list.entries.get(res) {
+					if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(&res)?) {
 						if let Some(hint) = entry.hint.as_ref() {
 							decorations.push((res.to_owned(), hint.to_owned()));
 						}
@@ -934,15 +946,21 @@ pub fn get_decorations(
 						val.as_str().unwrap_or_default()
 					};
 
-					if let Some(entry) = hash_list.entries.get(&normalise_to_hash(res.to_owned()))
+					if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
 						&& entry.resource_type == "LINE"
 					{
 						decorations.push((
 							res.to_owned(),
-							get_line_decoration(game_files, hash_list, game_version, tonytools_hash_list, res)?
+							get_line_decoration(
+								game_files,
+								hash_list,
+								game_version,
+								tonytools_hash_list,
+								ResourceID::from_any(&res)?
+							)?
 						));
 					} else if res.starts_with('0') {
-						if let Some(entry) = hash_list.entries.get(res) {
+						if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(&res)?) {
 							if let Some(hint) = entry.hint.as_ref() {
 								decorations.push((res.to_owned(), hint.to_owned()));
 							}
@@ -1084,31 +1102,33 @@ pub fn get_decorations(
 
 	if hash_list
 		.entries
-		.get(&normalise_to_hash(sub_entity.factory.to_owned()))
+		.get(&ResourceID::from_any(&sub_entity.factory)?)
 		.map(|entry| entry.resource_type == "MATT")
 		.unwrap_or(false)
 	{
-		if let Some(mati) = extract_latest_metadata(game_files, hash_list, &sub_entity.factory)?
-			.hash_reference_data
+		if let Some(mati) = extract_latest_metadata(game_files, ResourceID::from_any(&sub_entity.factory)?)?
+			.core_info
+			.references
 			.into_iter()
 			.find(|x| {
 				hash_list
 					.entries
-					.get(&normalise_to_hash(x.hash.to_owned()))
+					.get(&x.resource)
 					.map(|entry| entry.resource_type == "MATI")
 					.unwrap_or(false)
 			}) {
-			if let Some(mate) = extract_latest_metadata(game_files, hash_list, &mati.hash)?
-				.hash_reference_data
+			if let Some(mate) = extract_latest_metadata(game_files, mati.resource)?
+				.core_info
+				.references
 				.into_iter()
 				.find(|x| {
 					hash_list
 						.entries
-						.get(&normalise_to_hash(x.hash.to_owned()))
+						.get(&x.resource)
 						.map(|entry| entry.resource_type == "MATE")
 						.unwrap_or(false)
 				}) {
-				let mate_data = extract_latest_resource(game_files, hash_list, &mate.hash)?.1;
+				let mate_data = extract_latest_resource(game_files, mate.resource)?.1;
 
 				let mut beginning = mate_data.len() - 1;
 				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {
@@ -1144,7 +1164,7 @@ pub fn get_decorations(
 	decorations.into_iter().unique().collect()
 }
 
-pub fn is_valid_entity_factory(resource_type: &str) -> bool {
+pub fn is_valid_entity_factory(resource_type: ResourceType) -> bool {
 	resource_type == "TEMP"
 		|| resource_type == "CPPT"
 		|| resource_type == "ASET"
@@ -1156,7 +1176,7 @@ pub fn is_valid_entity_factory(resource_type: &str) -> bool {
 		|| resource_type == "WSGT"
 }
 
-pub fn is_valid_entity_blueprint(resource_type: &str) -> bool {
+pub fn is_valid_entity_blueprint(resource_type: ResourceType) -> bool {
 	resource_type == "TBLU"
 		|| resource_type == "CBLU"
 		|| resource_type == "ASEB"

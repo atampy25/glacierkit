@@ -5,11 +5,13 @@ use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
+use hitman_commons::{game::GameVersion, metadata::ResourceID};
+use hitman_formats::wwev::WwiseEvent;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use log::debug;
 use quickentity_rs::{
-	apply_patch, convert_2016_factory_to_modern,
+	apply_patch,
 	patch_structs::{Patch, PatchOperation, SubEntityOperation},
 	qn_structs::{FullRef, Property, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity}
 };
@@ -27,9 +29,7 @@ use crate::{
 		check_local_references_exist, get_decorations, get_diff_info, get_local_reference, get_recursive_children,
 		is_valid_entity_factory, random_entity_id, CopiedEntityData, ReverseReferenceData
 	},
-	finish_task,
-	game_detection::GameVersion,
-	get_loaded_game_version,
+	finish_task, get_loaded_game_version,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorValidity, EntityEditorRequest, EntityGeneralRequest,
 		EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, GlobalRequest, Request
@@ -38,10 +38,8 @@ use crate::{
 		h2016_convert_binary_to_factory, h2016_convert_cppt, h2_convert_binary_to_factory, h2_convert_cppt,
 		h3_convert_binary_to_factory, h3_convert_cppt
 	},
-	rpkg::{ensure_entity_in_cache, extract_latest_metadata, extract_latest_resource, normalise_to_hash},
-	send_notification, send_request, start_task,
-	wwev::parse_wwev,
-	Notification, NotificationKind
+	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource},
+	send_notification, send_request, start_task, Notification, NotificationKind
 };
 
 use super::monaco::SAFE_TO_SYNC;
@@ -1660,22 +1658,17 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> R
 
 		let (properties, pins) = if hash_list
 			.entries
-			.get(&sub_entity.factory)
+			.get(&ResourceID::from_any(&sub_entity.factory)?)
 			.map(|entry| entry.resource_type == "TEMP")
 			.unwrap_or(false)
 		{
-			ensure_entity_in_cache(
+			let underlying_entity = extract_entity(
 				game_files,
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
-				&normalise_to_hash(sub_entity.factory.to_owned())
+				ResourceID::from_any(&sub_entity.factory)?
 			)?;
-
-			let underlying_entity = app_state
-				.cached_entities
-				.get(&normalise_to_hash(sub_entity.factory.to_owned()))
-				.unwrap();
 
 			(
 				intellisense.get_properties(
@@ -1778,7 +1771,12 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> R
 
 #[try_fn]
 #[context("Couldn't handle game browser add event")]
-pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: String, file: String) -> Result<()> {
+pub async fn add_game_browser_item(
+	app: &AppHandle,
+	editor_id: Uuid,
+	parent_id: String,
+	file: ResourceID
+) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -1803,7 +1801,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 		let game_version = get_loaded_game_version(app, install)?;
 
 		if is_valid_entity_factory(
-			&hash_list
+			hash_list
 				.entries
 				.get(&file)
 				.context("File not in hash list")?
@@ -1816,16 +1814,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				.get(&file)
 				.context("File not in hash list")?
 				.resource_type
-				.as_str()
+				.as_ref()
 			{
 				"TEMP" => {
-					let (temp_meta, temp_data) = extract_latest_resource(game_files, hash_list, &file)?;
+					let (temp_meta, temp_data) = extract_latest_resource(game_files, file)?;
 
 					let factory = match game_version {
-						GameVersion::H1 => convert_2016_factory_to_modern(
-							&h2016_convert_binary_to_factory(&temp_data)
-								.context("Couldn't convert binary data to ResourceLib factory")?
-						),
+						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
+							.context("Couldn't convert binary data to ResourceLib factory")?
+							.into_modern(),
 
 						GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
 							.context("Couldn't convert binary data to ResourceLib factory")?,
@@ -1835,22 +1832,14 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					};
 
 					let blueprint_hash = &temp_meta
-						.hash_reference_data
+						.core_info
+						.references
 						.get(factory.blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
-						.hash;
+						.resource;
 
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -1879,7 +1868,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"CPPT" => {
-					let (cppt_meta, cppt_data) = extract_latest_resource(game_files, hash_list, &file)?;
+					let (cppt_meta, cppt_data) = extract_latest_resource(game_files, file)?;
 
 					let factory =
 						match game_version {
@@ -1894,22 +1883,14 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						};
 
 					let blueprint_hash = &cppt_meta
-						.hash_reference_data
+						.core_info
+						.references
 						.get(factory.blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
-						.hash;
+						.resource;
 
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -1937,24 +1918,16 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"ASET" => {
-					let blueprint_hash = extract_latest_metadata(game_files, hash_list, &file)?
-						.hash_reference_data
+					let blueprint_hash = extract_latest_metadata(game_files, file)?
+						.core_info
+						.references
 						.into_iter()
 						.last()
 						.context("ASET had no dependencies")?
-						.hash;
+						.resource;
 
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(&blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -1976,24 +1949,16 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"UICT" => {
-					let blueprint_hash = extract_latest_metadata(game_files, hash_list, &file)?
-						.hash_reference_data
+					let blueprint_hash = extract_latest_metadata(game_files, file)?
+						.core_info
+						.references
 						.into_iter()
 						.last()
 						.context("UICT had no dependencies")?
-						.hash;
+						.resource;
 
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(&blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -2022,37 +1987,22 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"MATT" => {
-					let blueprint_hash = {
-						let mut blueprint_hash = String::new();
+					let blueprint_hash = extract_latest_metadata(game_files, file)?
+						.core_info
+						.references
+						.into_iter()
+						.try_find(|dep| {
+							anyhow::Ok(
+								extract_latest_metadata(game_files, dep.resource)?
+									.core_info
+									.resource_type == "MATB"
+							)
+						})?
+						.context("No blueprint dependency found")?
+						.resource;
 
-						for dep in extract_latest_metadata(game_files, hash_list, &file)?
-							.hash_reference_data
-							.into_iter()
-						{
-							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "MATB" {
-								blueprint_hash = dep.hash.to_owned();
-								break;
-							}
-						}
-
-						if blueprint_hash.is_empty() {
-							Err(anyhow!("MATT had no MATB dependency"))?;
-						}
-
-						blueprint_hash
-					};
-
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(&blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -2081,39 +2031,24 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"WSWT" => {
-					let blueprint_hash = {
-						let mut blueprint_hash = String::new();
+					let blueprint_hash = extract_latest_metadata(game_files, file)?
+						.core_info
+						.references
+						.into_iter()
+						.try_find(|dep| {
+							anyhow::Ok({
+								let x = extract_latest_metadata(game_files, dep.resource)?
+									.core_info
+									.resource_type;
 
-						for dep in extract_latest_metadata(game_files, hash_list, &file)?
-							.hash_reference_data
-							.into_iter()
-						{
-							let metadata = extract_latest_metadata(game_files, hash_list, &dep.hash)?;
+								x == "WSWB" || x == "DSWB"
+							})
+						})?
+						.context("No blueprint dependency found")?
+						.resource;
 
-							if metadata.hash_resource_type == "WSWB" || metadata.hash_resource_type == "DSWB" {
-								blueprint_hash = dep.hash.to_owned();
-								break;
-							}
-						}
-
-						if blueprint_hash.is_empty() {
-							Err(anyhow!("WSWT had no WSWB/DSWB dependency"))?;
-						}
-
-						blueprint_hash
-					};
-
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(&blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -2142,37 +2077,22 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"ECPT" => {
-					let blueprint_hash = {
-						let mut blueprint_hash = String::new();
+					let blueprint_hash = extract_latest_metadata(game_files, file)?
+						.core_info
+						.references
+						.into_iter()
+						.try_find(|dep| {
+							anyhow::Ok(
+								extract_latest_metadata(game_files, dep.resource)?
+									.core_info
+									.resource_type == "ECPB"
+							)
+						})?
+						.context("No blueprint dependency found")?
+						.resource;
 
-						for dep in extract_latest_metadata(game_files, hash_list, &file)?
-							.hash_reference_data
-							.into_iter()
-						{
-							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "ECPB" {
-								blueprint_hash = dep.hash.to_owned();
-								break;
-							}
-						}
-
-						if blueprint_hash.is_empty() {
-							Err(anyhow!("ECPT had no ECPB dependency"))?;
-						}
-
-						blueprint_hash
-					};
-
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(&blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -2201,37 +2121,22 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"AIBX" => {
-					let blueprint_hash = {
-						let mut blueprint_hash = String::new();
+					let blueprint_hash = extract_latest_metadata(game_files, file)?
+						.core_info
+						.references
+						.into_iter()
+						.try_find(|dep| {
+							anyhow::Ok(
+								extract_latest_metadata(game_files, dep.resource)?
+									.core_info
+									.resource_type == "AIBB"
+							)
+						})?
+						.context("No blueprint dependency found")?
+						.resource;
 
-						for dep in extract_latest_metadata(game_files, hash_list, &file)?
-							.hash_reference_data
-							.into_iter()
-						{
-							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "AIBB" {
-								blueprint_hash = dep.hash.to_owned();
-								break;
-							}
-						}
-
-						if blueprint_hash.is_empty() {
-							Err(anyhow!("AIBX had no AIBB dependency"))?;
-						}
-
-						blueprint_hash
-					};
-
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(&blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -2260,37 +2165,22 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"WSGT" => {
-					let blueprint_hash = {
-						let mut blueprint_hash = String::new();
+					let blueprint_hash = extract_latest_metadata(game_files, file)?
+						.core_info
+						.references
+						.into_iter()
+						.try_find(|dep| {
+							anyhow::Ok(
+								extract_latest_metadata(game_files, dep.resource)?
+									.core_info
+									.resource_type == "WSGB"
+							)
+						})?
+						.context("No blueprint dependency found")?
+						.resource;
 
-						for dep in extract_latest_metadata(game_files, hash_list, &file)?
-							.hash_reference_data
-							.into_iter()
-						{
-							if extract_latest_metadata(game_files, hash_list, &dep.hash)?.hash_resource_type == "WSGB" {
-								blueprint_hash = dep.hash.to_owned();
-								break;
-							}
-						}
-
-						if blueprint_hash.is_empty() {
-							Err(anyhow!("WSGT had no WSGB dependency"))?;
-						}
-
-						blueprint_hash
-					};
-
-					let factory_path = hash_list
-						.entries
-						.get(&file)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(file);
-
-					let blueprint_path = hash_list
-						.entries
-						.get(&blueprint_hash)
-						.and_then(|x| x.path.to_owned())
-						.unwrap_or(blueprint_hash.to_owned());
+					let factory_path = hash_list.to_path(&file);
+					let blueprint_path = hash_list.to_path(&blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -2353,17 +2243,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 			.resource_type
 			== "WWEV"
 		{
-			let (_, wwev_data) = extract_latest_resource(game_files, hash_list, &file)?;
+			let (_, wwev_data) = extract_latest_resource(game_files, file)?;
 
-			let wwev = parse_wwev(&wwev_data)?;
+			let wwev = WwiseEvent::parse(&wwev_data)?;
 
 			let entity_id = random_entity_id();
 
-			let file_path = hash_list
-				.entries
-				.get(&file)
-				.and_then(|x| x.path.to_owned())
-				.unwrap_or(file);
+			let file_path = hash_list.to_path(&file);
 
 			let sub_entity = SubEntity {
 				parent: Ref::Short((parent_id != "#").then_some(parent_id)),

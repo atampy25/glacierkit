@@ -4,6 +4,11 @@ use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::HashMap;
+use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::ResourceID, rpkg_tool::RpkgResourceMeta};
+use hitman_formats::{
+	ores::{parse_hashes_ores, parse_json_ores},
+	wwev::{WwiseEvent, WwiseEventData}
+};
 use image::{io::Reader as ImageReader, ImageFormat};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
@@ -20,26 +25,20 @@ use uuid::Uuid;
 use crate::{
 	biome::format_json,
 	finish_task,
-	game_detection::GameVersion,
 	general::open_in_editor,
 	get_loaded_game_version,
-	hash_list::HashList,
 	languages::get_language_map,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Request,
 		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
 	},
-	ores::{parse_hashes_ores, parse_json_ores},
 	resourcelib::{
 		convert_generic, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
 		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
 		h3_convert_binary_to_factory
 	},
-	rpkg::{ensure_entity_in_cache, extract_latest_overview_info, extract_latest_resource},
-	rpkg_tool::generate_rpkg_meta,
-	send_notification, send_request, start_task,
-	wwev::{parse_wwev, WwiseEventData},
-	Notification, NotificationKind, RunCommandExt
+	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource},
+	send_notification, send_request, start_task, Notification, NotificationKind, RunCommandExt
 };
 
 #[try_fn]
@@ -48,10 +47,10 @@ pub fn initialise_resource_overview(
 	app: &AppHandle,
 	app_state: &State<AppState>,
 	id: Uuid,
-	hash: &String,
+	hash: ResourceID,
 	game_files: &PartitionManager,
 	game_version: GameVersion,
-	resource_reverse_dependencies: &Arc<HashMap<String, Vec<String>>>,
+	resource_reverse_dependencies: &Arc<HashMap<ResourceID, Vec<ResourceID>>>,
 	hash_list: &Arc<HashList>
 ) -> Result<()> {
 	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, hash)?;
@@ -60,22 +59,22 @@ pub fn initialise_resource_overview(
 		app,
 		Request::Editor(EditorRequest::ResourceOverview(ResourceOverviewRequest::Initialise {
 			id,
-			hash: hash.to_owned(),
-			filetype: filetype.to_owned(),
+			hash: hash.to_string(),
+			filetype: filetype.into(),
 			chunk_patch,
 			path_or_hint: hash_list
 				.entries
-				.get(hash)
+				.get(&hash)
 				.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
 			dependencies: deps
 				.par_iter()
 				.map(|(hash, flag)| {
 					(
-						hash.to_owned(),
+						hash.to_string(),
 						hash_list
 							.entries
 							.get(hash)
-							.map(|x| x.resource_type.to_owned())
+							.map(|x| x.resource_type.into())
 							.unwrap_or("".into()),
 						hash_list
 							.entries
@@ -87,17 +86,17 @@ pub fn initialise_resource_overview(
 				})
 				.collect(),
 			reverse_dependencies: resource_reverse_dependencies
-				.get(hash)
+				.get(&hash)
 				.map(|hashes| {
 					hashes
 						.iter()
 						.map(|hash| {
 							(
-								hash.to_owned(),
+								hash.to_string(),
 								hash_list
 									.entries
 									.get(hash)
-									.map(|x| x.resource_type.to_owned())
+									.map(|x| x.resource_type.into())
 									.unwrap_or("".into()),
 								hash_list
 									.entries
@@ -110,22 +109,20 @@ pub fn initialise_resource_overview(
 				.unwrap_or_default(),
 			data: match filetype.as_ref() {
 				"TEMP" => {
-					ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
-
-					let entity = app_state.cached_entities.get(hash).unwrap();
+					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
 					ResourceOverviewData::Entity {
 						blueprint_hash: entity.blueprint_hash.to_owned(),
 						blueprint_path_or_hint: hash_list
 							.entries
-							.get(&entity.blueprint_hash)
+							.get(&ResourceID::from_any(&entity.blueprint_hash)?)
 							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
 					}
 				}
 
 				"AIRG" | "TBLU" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "WSWB" | "DSWB" | "GFXF" | "GIDX"
 				| "WSGB" | "ECPB" | "UICB" | "ENUM" => {
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					ResourceOverviewData::GenericRL {
 						json: {
@@ -136,10 +133,10 @@ pub fn initialise_resource_overview(
 							convert_generic::<Value>(
 								&res_data,
 								game_version,
-								if res_meta.hash_resource_type == "WSWB" {
-									"DSWB"
+								if res_meta.core_info.resource_type == "WSWB" {
+									"DSWB".try_into()?
 								} else {
-									&res_meta.hash_resource_type
+									res_meta.core_info.resource_type
 								}
 							)?
 							.serialize(&mut ser)?;
@@ -153,11 +150,11 @@ pub fn initialise_resource_overview(
 					}
 				}
 
-				"ORES" if hash == "0057C2C3941115CA" => ResourceOverviewData::Unlockables,
+				"ORES" if hash == "0057C2C3941115CA".parse()? => ResourceOverviewData::Unlockables,
 
 				"ORES" => ResourceOverviewData::Ores {
 					json: {
-						let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let (_, res_data) = extract_latest_resource(game_files, hash)?;
 						let res_data = parse_hashes_ores(&res_data)?;
 
 						let mut buf = Vec::new();
@@ -176,7 +173,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					ImageReader::new(Cursor::new(res_data))
 						.with_guessed_format()?
@@ -195,30 +192,16 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let mut texture = TextureMap::process_data(
-						match game_version {
-							GameVersion::H1 => rpkg_rs::WoaVersion::HM2016,
-							GameVersion::H2 => rpkg_rs::WoaVersion::HM2,
-							GameVersion::H3 => rpkg_rs::WoaVersion::HM3
-						},
-						res_data
-					)
-					.context("Couldn't process texture data")?;
+					let mut texture = TextureMap::process_data(game_version.into(), res_data)
+						.context("Couldn't process texture data")?;
 
-					if let Some(texd_depend) = res_meta.hash_reference_data.first() {
-						let (_, texd_data) = extract_latest_resource(game_files, hash_list, &texd_depend.hash)?;
+					if let Some(texd_depend) = res_meta.core_info.references.first() {
+						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
 
 						texture
-							.set_mipblock1_data(
-								&texd_data,
-								match game_version {
-									GameVersion::H1 => tex_rs::WoaVersion::HM2016,
-									GameVersion::H2 => tex_rs::WoaVersion::HM2,
-									GameVersion::H3 => tex_rs::WoaVersion::HM3
-								}
-							)
+							.set_mipblock1_data(&texd_data, game_version.into())
 							.context("Couldn't process TEXD data")?;
 					}
 
@@ -268,11 +251,11 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let mut wav_paths = vec![];
 
-					let wwev = parse_wwev(&res_data)?;
+					let wwev = WwiseEvent::parse(&res_data)?;
 
 					match wwev.data {
 						WwiseEventData::NonStreamed(objects) => {
@@ -303,13 +286,14 @@ pub fn initialise_resource_overview(
 							for object in objects {
 								let temp_file_id = Uuid::new_v4();
 
-								let wwem_hash = &res_meta
-									.hash_reference_data
+								let wwem_hash = res_meta
+									.core_info
+									.references
 									.get(object.dependency_index as usize)
 									.context("No such WWEM dependency")?
-									.hash;
+									.resource;
 
-								let (_, wem_data) = extract_latest_resource(game_files, hash_list, wwem_hash)?;
+								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
 								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
@@ -325,7 +309,7 @@ pub fn initialise_resource_overview(
 									.context("VGMStream command failed")?;
 
 								wav_paths.push((
-									wwem_hash.to_owned(),
+									wwem_hash.to_string(),
 									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
 								))
 							}
@@ -344,7 +328,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
 
@@ -367,14 +351,12 @@ pub fn initialise_resource_overview(
 				"REPO" => ResourceOverviewData::Repository,
 
 				"JSON" => ResourceOverviewData::Json {
-					json: format_json(&String::from_utf8(
-						extract_latest_resource(game_files, hash_list, hash)?.1
-					)?)?
+					json: format_json(&String::from_utf8(extract_latest_resource(game_files, hash)?.1)?)?
 				},
 
 				"CLNG" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let clng = {
 							let mut iteration = 0;
@@ -384,15 +366,8 @@ pub fn initialise_resource_overview(
 									let langmap = get_language_map(game_version, iteration)
 										.context("No more alternate language maps available")?;
 
-									let clng = hmlanguages::clng::CLNG::new(
-										match game_version {
-											GameVersion::H1 => tonytools::Version::H2016,
-											GameVersion::H2 => tonytools::Version::H2,
-											GameVersion::H3 => tonytools::Version::H3
-										},
-										langmap.1.to_owned()
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+									let clng = hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 									clng.convert(&res_data, to_string(&res_meta)?)
 										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -420,7 +395,7 @@ pub fn initialise_resource_overview(
 
 				"DITL" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let ditl = hmlanguages::ditl::DITL::new(
 							app_state
@@ -447,7 +422,7 @@ pub fn initialise_resource_overview(
 
 				"DLGE" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let dlge = {
 							let mut iteration = 0;
@@ -465,11 +440,7 @@ pub fn initialise_resource_overview(
 											.context("No TonyTools hash list available")?
 											.deref()
 											.to_owned(),
-										match game_version {
-											GameVersion::H1 => tonytools::Version::H2016,
-											GameVersion::H2 => tonytools::Version::H2,
-											GameVersion::H3 => tonytools::Version::H3
-										},
+										game_version.into(),
 										langmap.1.to_owned(),
 										None,
 										false
@@ -502,7 +473,7 @@ pub fn initialise_resource_overview(
 
 				"LOCR" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let locr = {
 							let mut iteration = 0;
@@ -520,11 +491,7 @@ pub fn initialise_resource_overview(
 											.context("No TonyTools hash list available")?
 											.deref()
 											.to_owned(),
-										match game_version {
-											GameVersion::H1 => tonytools::Version::H2016,
-											GameVersion::H2 => tonytools::Version::H2,
-											GameVersion::H3 => tonytools::Version::H3
-										},
+										game_version.into(),
 										langmap.1.to_owned(),
 										langmap.0
 									)
@@ -556,19 +523,12 @@ pub fn initialise_resource_overview(
 
 				"RTLV" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let rtlv = hmlanguages::rtlv::RTLV::new(
-							match game_version {
-								GameVersion::H1 => tonytools::Version::H2016,
-								GameVersion::H2 => tonytools::Version::H2,
-								GameVersion::H3 => tonytools::Version::H3
-							},
-							None
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-						.convert(&res_data, to_string(&res_meta)?)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+						let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+							.convert(&res_data, to_string(&res_meta)?)
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -582,16 +542,16 @@ pub fn initialise_resource_overview(
 
 				"LINE" => ResourceOverviewData::LocalisedLine {
 					languages: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let (locr_meta, locr_data) = extract_latest_resource(
 							game_files,
-							hash_list,
-							&res_meta
-								.hash_reference_data
+							res_meta
+								.core_info
+								.references
 								.first()
 								.context("No LOCR dependency on LINE")?
-								.hash
+								.resource
 						)?;
 
 						let locr = {
@@ -610,11 +570,7 @@ pub fn initialise_resource_overview(
 											.context("No TonyTools hash list available")?
 											.deref()
 											.to_owned(),
-										match game_version {
-											GameVersion::H1 => tonytools::Version::H2016,
-											GameVersion::H2 => tonytools::Version::H2,
-											GameVersion::H3 => tonytools::Version::H3
-										},
+										game_version.into(),
 										langmap.1.to_owned(),
 										langmap.0
 									)
@@ -692,7 +648,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -734,7 +690,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			*hash = new_hash.to_owned();
+			*hash = ResourceID::from_any(&new_hash)?;
 
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
@@ -747,7 +703,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					app,
 					&app_state,
 					id,
-					hash,
+					*hash,
 					game_files,
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
@@ -773,7 +729,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				id.to_owned(),
 				EditorState {
 					file: None,
-					data: EditorData::ResourceOverview { hash: hash.to_owned() }
+					data: EditorData::ResourceOverview {
+						hash: ResourceID::from_any(&hash)?
+					}
 				}
 			);
 
@@ -792,7 +750,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 				match editor_state.data {
-					EditorData::ResourceOverview { ref hash, .. } => hash,
+					EditorData::ResourceOverview { hash, .. } => hash,
 
 					_ => {
 						Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -806,7 +764,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				open_in_editor(app, game_files, install, hash_list, &hash).await?;
+				open_in_editor(app, game_files, install, hash_list, hash).await?;
 			}
 		}
 
@@ -814,7 +772,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -825,12 +783,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (metadata, data) = extract_latest_resource(game_files, hash_list, hash)?;
-				let metadata_file = generate_rpkg_meta(&metadata)?;
+				let (metadata, data) = extract_latest_resource(game_files, hash)?;
+				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false)
+					.to_binary()
+					.context("Couldn't serialise meta file")?;
 
 				let file_type = hash_list
 					.entries
-					.get(hash)
+					.get(&hash)
 					.expect("Can only open files from the hash list")
 					.resource_type
 					.to_owned();
@@ -843,7 +803,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				if let Some(save_handle) = dialog
 					.set_file_name(&format!("{}.{}", hash, file_type))
-					.add_filter(&format!("{} file", file_type), &[&file_type])
+					.add_filter(&format!("{} file", file_type), &[file_type.as_ref()])
 					.save_file()
 					.await
 				{
@@ -864,7 +824,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -876,18 +836,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				ensure_entity_in_cache(
+				let entity_json = to_vec(&*extract_entity(
 					game_files,
 					&app_state.cached_entities,
 					get_loaded_game_version(app, install)?,
 					hash_list,
 					hash
-				)?;
-
-				let entity_json = {
-					let entity = app_state.cached_entities.get(hash).unwrap();
-					to_vec(&*entity)?
-				};
+				)?)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract entity");
 
@@ -909,7 +864,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -921,8 +876,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (metadata, data) = extract_latest_resource(game_files, hash_list, hash)?;
-				let metadata_file = generate_rpkg_meta(&metadata)?;
+				let (metadata, data) = extract_latest_resource(game_files, hash)?;
+				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false)
+					.to_binary()
+					.context("Couldn't serialise meta file")?;
 
 				let data = match get_loaded_game_version(app, install)? {
 					GameVersion::H1 => to_vec(
@@ -970,7 +927,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -982,20 +939,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				ensure_entity_in_cache(
+				let (metadata, data) = extract_latest_resource(
 					game_files,
-					&app_state.cached_entities,
-					get_loaded_game_version(app, install)?,
-					hash_list,
-					hash
+					ResourceID::from_any(
+						&extract_entity(
+							game_files,
+							&app_state.cached_entities,
+							get_loaded_game_version(app, install)?,
+							hash_list,
+							hash
+						)?
+						.blueprint_hash
+					)?
 				)?;
 
-				let (metadata, data) = extract_latest_resource(game_files, hash_list, &{
-					let entity = app_state.cached_entities.get(hash).unwrap();
-					entity.blueprint_hash.to_owned()
-				})?;
-
-				let metadata_file = generate_rpkg_meta(&metadata)?;
+				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false)
+					.to_binary()
+					.context("Couldn't serialise meta file")?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1004,7 +964,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(save_handle) = dialog
-					.set_file_name(&format!("{}.TBLU", metadata.hash_value))
+					.set_file_name(&format!("{}.TBLU", metadata.core_info.id))
 					.add_filter("TBLU file", &["TBLU"])
 					.save_file()
 					.await
@@ -1026,7 +986,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1040,14 +1000,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let game_version = get_loaded_game_version(app, install)?;
 
-				ensure_entity_in_cache(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
+				let (metadata, data) = extract_latest_resource(
+					game_files,
+					ResourceID::from_any(
+						&extract_entity(
+							game_files,
+							&app_state.cached_entities,
+							get_loaded_game_version(app, install)?,
+							hash_list,
+							hash
+						)?
+						.blueprint_hash
+					)?
+				)?;
 
-				let (metadata, data) = extract_latest_resource(game_files, hash_list, &{
-					let entity = app_state.cached_entities.get(hash).unwrap();
-					entity.blueprint_hash.to_owned()
-				})?;
-
-				let metadata_file = generate_rpkg_meta(&metadata)?;
+				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false)
+					.to_binary()
+					.context("Couldn't serialise meta file")?;
 
 				let data = match game_version {
 					GameVersion::H1 => to_vec(
@@ -1073,7 +1042,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(save_handle) = dialog
-					.set_file_name(&format!("{}.TBLU", metadata.hash_value))
+					.set_file_name(&format!("{}.TBLU", metadata.core_info.id))
 					.add_filter("TBLU.json file", &["TBLU.json"])
 					.save_file()
 					.await
@@ -1095,7 +1064,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1107,7 +1076,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1116,10 +1085,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(save_handle) = dialog
-					.set_file_name(&format!("{}.{}.json", hash, res_meta.hash_resource_type))
+					.set_file_name(&format!("{}.{}.json", hash, res_meta.core_info.resource_type))
 					.add_filter(
-						&format!("{}.json file", res_meta.hash_resource_type),
-						&[&format!("{}.json", res_meta.hash_resource_type)]
+						&format!("{}.json file", res_meta.core_info.resource_type),
+						&[&format!("{}.json", res_meta.core_info.resource_type)]
 					)
 					.save_file()
 					.await
@@ -1129,7 +1098,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						to_vec(&convert_generic::<Value>(
 							&res_data,
 							get_loaded_game_version(app, install)?,
-							&res_meta.hash_resource_type
+							res_meta.core_info.resource_type
 						)?)?
 					)?;
 				}
@@ -1140,7 +1109,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1151,8 +1120,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				if hash == "0057C2C3941115CA" {
-					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+				if hash == "0057C2C3941115CA".parse()? {
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1168,10 +1137,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						.save_file()
 						.await
 					{
-						fs::write(save_handle.path(), to_vec(&res_data)?)?;
+						fs::write(save_handle.path(), res_data)?;
 					}
 				} else {
-					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1197,7 +1166,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1209,7 +1178,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
-				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1241,7 +1210,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						}))
 					);
 
-					match res_meta.hash_resource_type.as_str() {
+					match res_meta.core_info.resource_type.as_ref() {
 						"GFXI" => {
 							let reader = ImageReader::new(Cursor::new(res_data.to_owned())).with_guessed_format()?;
 
@@ -1277,28 +1246,15 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						}
 
 						"TEXT" => {
-							let mut texture = TextureMap::process_data(
-								match get_loaded_game_version(app, install)? {
-									GameVersion::H1 => rpkg_rs::WoaVersion::HM2016,
-									GameVersion::H2 => rpkg_rs::WoaVersion::HM2,
-									GameVersion::H3 => rpkg_rs::WoaVersion::HM3
-								},
-								res_data
-							)
-							.context("Couldn't process texture data")?;
+							let mut texture =
+								TextureMap::process_data(get_loaded_game_version(app, install)?.into(), res_data)
+									.context("Couldn't process texture data")?;
 
-							if let Some(texd_depend) = res_meta.hash_reference_data.first() {
-								let (_, texd_data) = extract_latest_resource(game_files, hash_list, &texd_depend.hash)?;
+							if let Some(texd_depend) = res_meta.core_info.references.first() {
+								let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
 
 								texture
-									.set_mipblock1_data(
-										&texd_data,
-										match get_loaded_game_version(app, install)? {
-											GameVersion::H1 => tex_rs::WoaVersion::HM2016,
-											GameVersion::H2 => tex_rs::WoaVersion::HM2,
-											GameVersion::H3 => tex_rs::WoaVersion::HM3
-										}
-									)
+									.set_mipblock1_data(&texd_data, get_loaded_game_version(app, install)?.into())
 									.context("Couldn't process TEXD data")?;
 							}
 
@@ -1347,7 +1303,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1370,7 +1326,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.save_file()
 					.await
 				{
-					let (_, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
@@ -1396,7 +1352,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1416,9 +1372,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(save_handle) = dialog.pick_folder().await {
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let wwev = parse_wwev(&res_data)?;
+					let wwev = WwiseEvent::parse(&res_data)?;
 
 					let mut idx = 0;
 
@@ -1452,13 +1408,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							for object in objects {
 								let temp_file_id = Uuid::new_v4();
 
-								let wwem_hash = &res_meta
-									.hash_reference_data
+								let wwem_hash = res_meta
+									.core_info
+									.references
 									.get(object.dependency_index as usize)
 									.context("No such WWEM dependency")?
-									.hash;
+									.resource;
 
-								let (_, wem_data) = extract_latest_resource(game_files, hash_list, wwem_hash)?;
+								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
 								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
@@ -1489,7 +1446,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1514,9 +1471,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				{
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let wwev = parse_wwev(&res_data)?;
+					let wwev = WwiseEvent::parse(&res_data)?;
 
 					match wwev.data {
 						WwiseEventData::NonStreamed(objects) => {
@@ -1542,8 +1499,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						WwiseEventData::Streamed(objects) => {
 							let temp_file_id = Uuid::new_v4();
 
-							let wwem_hash = &res_meta
-								.hash_reference_data
+							let wwem_hash = res_meta
+								.core_info
+								.references
 								.get(
 									objects
 										.get(index as usize)
@@ -1551,9 +1509,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 										.dependency_index as usize
 								)
 								.context("No such WWEM dependency")?
-								.hash;
+								.resource;
 
-							let (_, wem_data) = extract_latest_resource(game_files, hash_list, wwem_hash)?;
+							let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
 							fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
@@ -1577,7 +1535,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref hash, .. } => hash,
+				EditorData::ResourceOverview { hash, .. } => hash,
 
 				_ => {
 					Err(anyhow!("Editor {} is not a resource overview", id))?;
@@ -1591,7 +1549,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let game_version = get_loaded_game_version(app, install)?;
 
-				let (res_meta, res_data) = extract_latest_resource(game_files, hash_list, hash)?;
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1600,17 +1558,24 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(save_handle) = dialog
-					.set_file_name(&format!("{}.{}.json", hash, res_meta.hash_resource_type.to_lowercase()))
+					.set_file_name(&format!(
+						"{}.{}.json",
+						hash,
+						res_meta.core_info.resource_type.as_ref().to_lowercase()
+					))
 					.add_filter(
-						&format!("{}.json file", res_meta.hash_resource_type.to_lowercase()),
-						&[&format!("{}.json", res_meta.hash_resource_type.to_lowercase())]
+						&format!("{}.json file", res_meta.core_info.resource_type.as_ref().to_lowercase()),
+						&[&format!(
+							"{}.json",
+							res_meta.core_info.resource_type.as_ref().to_lowercase()
+						)]
 					)
 					.save_file()
 					.await
 				{
 					fs::write(
 						save_handle.path(),
-						match res_meta.hash_resource_type.as_ref() {
+						match res_meta.core_info.resource_type.as_ref() {
 							"CLNG" => {
 								let clng = {
 									let mut iteration = 0;
@@ -1620,15 +1585,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 											let langmap = get_language_map(game_version, iteration)
 												.context("No more alternate language maps available")?;
 
-											let clng = hmlanguages::clng::CLNG::new(
-												match game_version {
-													GameVersion::H1 => tonytools::Version::H2016,
-													GameVersion::H2 => tonytools::Version::H2,
-													GameVersion::H3 => tonytools::Version::H3
-												},
-												langmap.1.to_owned()
-											)
-											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+											let clng =
+												hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
+													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 											clng.convert(&res_data, to_string(&res_meta)?)
 												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -1693,11 +1652,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 													.context("No TonyTools hash list available")?
 													.deref()
 													.to_owned(),
-												match game_version {
-													GameVersion::H1 => tonytools::Version::H2016,
-													GameVersion::H2 => tonytools::Version::H2,
-													GameVersion::H3 => tonytools::Version::H3
-												},
+												game_version.into(),
 												langmap.1.to_owned(),
 												None,
 												false
@@ -1744,11 +1699,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 													.context("No TonyTools hash list available")?
 													.deref()
 													.to_owned(),
-												match game_version {
-													GameVersion::H1 => tonytools::Version::H2016,
-													GameVersion::H2 => tonytools::Version::H2,
-													GameVersion::H3 => tonytools::Version::H3
-												},
+												game_version.into(),
 												langmap.1.to_owned(),
 												langmap.0
 											)
@@ -1778,17 +1729,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							}
 
 							"RTLV" => {
-								let rtlv = hmlanguages::rtlv::RTLV::new(
-									match game_version {
-										GameVersion::H1 => tonytools::Version::H2016,
-										GameVersion::H2 => tonytools::Version::H2,
-										GameVersion::H3 => tonytools::Version::H3
-									},
-									None
-								)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-								.convert(&res_data, to_string(&res_meta)?)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+								let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									.convert(&res_data, to_string(&res_meta)?)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 								let mut buf = Vec::new();
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");

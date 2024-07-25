@@ -1,102 +1,33 @@
+use std::ops::Deref;
+
 use anyhow::{anyhow, bail, Context, Result};
-use dashmap::DashMap;
+use dashmap::{mapref::one::Ref, DashMap};
 use fn_error_context::context;
-use quickentity_rs::{
-	convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn,
-	qn_structs::Entity,
-	rpkg_structs::{ResourceDependency, ResourceMeta}
+use hitman_commons::{
+	game::GameVersion,
+	hash_list::HashList,
+	metadata::{ExtendedResourceMetadata, ResourceID, ResourceType},
+	rpkg_tool::RpkgResourceMeta
 };
+use quickentity_rs::{convert_to_qn, qn_structs::Entity};
 use rpkg_rs::resource::{
-	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_package::ResourceReferenceFlags,
-	resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
+	partition_manager::PartitionManager, resource_package::ResourceReferenceFlags, resource_partition::PatchId,
+	runtime_resource_id::RuntimeResourceID
 };
 use tryvial::try_fn;
 
-use crate::{
-	game_detection::GameVersion,
-	hash_list::HashList,
-	resourcelib::{
-		h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
-		h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
-	}
+use crate::resourcelib::{
+	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
+	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
 };
 
-pub fn convert_resource_info_to_rpkg_meta_no_hl(info: &ResourceInfo) -> ResourceMeta {
-	ResourceMeta {
-		hash_offset: info.data_offset(),
-		hash_size: (info.compressed_size().unwrap_or(0) | (if info.is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
-		hash_size_final: info.size(),
-		hash_value: info.rrid().to_hex_string(),
-		hash_size_in_memory: info.system_memory_requirement(),
-		hash_size_in_video_memory: info.video_memory_requirement(),
-		hash_resource_type: info.data_type(),
-		hash_reference_data: info
-			.references()
-			.iter()
-			.map(|(hash, flag)| ResourceDependency {
-				flag: format!(
-					"{:02X}",
-					match flag {
-						ResourceReferenceFlags::Legacy(x) => x,
-						ResourceReferenceFlags::Standard(x) => x
-					}
-				),
-				hash: hash.to_hex_string()
-			})
-			.collect(),
-		hash_reference_table_size: info.reference_chunk_size() as u32,
-		hash_reference_table_dummy: info.states_chunk_size() as u32
-	}
-}
-
-pub fn convert_resource_info_to_rpkg_meta(hash_list: &HashList, info: &ResourceInfo) -> ResourceMeta {
-	ResourceMeta {
-		hash_offset: info.data_offset(),
-		hash_size: (info.compressed_size().unwrap_or(0) | (if info.is_scrambled() { 0x80000000 } else { 0x0 })) as u32,
-		hash_size_final: info.size(),
-		hash_value: info.rrid().to_hex_string(),
-		hash_size_in_memory: info.system_memory_requirement(),
-		hash_size_in_video_memory: info.video_memory_requirement(),
-		hash_resource_type: info.data_type(),
-		hash_reference_data: info
-			.references()
-			.iter()
-			.map(|(hash, flag)| ResourceDependency {
-				flag: format!(
-					"{:02X}",
-					match flag {
-						ResourceReferenceFlags::Legacy(x) => x,
-						ResourceReferenceFlags::Standard(x) => x
-					}
-				),
-				hash: hash_list
-					.entries
-					.get(&hash.to_hex_string())
-					.map(|entry| {
-						entry
-							.path
-							.as_ref()
-							.map(|x| x.to_owned())
-							.unwrap_or_else(|| hash.to_hex_string())
-					})
-					.unwrap_or_else(|| hash.to_hex_string())
-			})
-			.collect(),
-		hash_reference_table_size: info.reference_chunk_size() as u32,
-		hash_reference_table_dummy: info.states_chunk_size() as u32
-	}
-}
-
-/// Extract the latest copy of a resource by its hash or path.
+/// Extract the latest copy of a resource.
 #[context("Couldn't extract resource {}", resource)]
 pub fn extract_latest_resource(
 	game_files: &PartitionManager,
-	hash_list: &HashList,
-	resource: &str
-) -> Result<(ResourceMeta, Vec<u8>)> {
-	let resource = normalise_to_hash(resource.into());
-
-	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
+	resource: ResourceID
+) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
+	let resource_id = RuntimeResourceID::from(resource);
 
 	for partition in game_files.partitions() {
 		if let Some((info, _)) = partition
@@ -105,7 +36,7 @@ pub fn extract_latest_resource(
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			return Ok((
-				convert_resource_info_to_rpkg_meta(hash_list, info),
+				info.try_into()?,
 				partition
 					.read_resource(&resource_id)
 					.context("Couldn't extract resource using rpkg-rs")?
@@ -116,41 +47,13 @@ pub fn extract_latest_resource(
 	bail!("Couldn't find the resource in any partition");
 }
 
-/// Extract the latest copy of a resource by its hash or path, without using the hash list.
-#[context("Couldn't extract resource {}", resource)]
-pub fn extract_latest_resource_no_hl(game_files: &PartitionManager, resource: &str) -> Result<(ResourceMeta, Vec<u8>)> {
-	let resource = normalise_to_hash(resource.into());
-
-	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
-
-	for partition in game_files.partitions() {
-		if let Some((info, _)) = partition
-			.latest_resources()
-			.into_iter()
-			.find(|(x, _)| *x.rrid() == resource_id)
-		{
-			return Ok((
-				convert_resource_info_to_rpkg_meta_no_hl(info),
-				partition
-					.read_resource(&resource_id)
-					.context("Couldn't extract resource using rpkg-rs")?
-			));
-		}
-	}
-
-	bail!("Couldn't find the resource in any partition");
-}
-
-/// Get the metadata of the latest copy of a resource by its hash or path. Faster than fully extracting the resource.
+/// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
 #[context("Couldn't extract metadata for resource {}", resource)]
 pub fn extract_latest_metadata(
 	game_files: &PartitionManager,
-	hash_list: &HashList,
-	resource: &str
-) -> Result<ResourceMeta> {
-	let resource = normalise_to_hash(resource.into());
-
-	let resource_id = RuntimeResourceID::from_hex_string(&resource)?;
+	resource: ResourceID
+) -> Result<ExtendedResourceMetadata> {
+	let resource_id = RuntimeResourceID::from(resource);
 
 	for partition in game_files.partitions() {
 		if let Some((info, _)) = partition
@@ -158,20 +61,20 @@ pub fn extract_latest_metadata(
 			.into_iter()
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
-			return Ok(convert_resource_info_to_rpkg_meta(hash_list, info));
+			return Ok(info.try_into()?);
 		}
 	}
 
 	bail!("Couldn't find the resource in any partition");
 }
 
-/// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource by its hash.
-#[context("Couldn't extract overview info for resource {}", hash)]
+/// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource.
+#[context("Couldn't extract overview info for resource {}", resource)]
 pub fn extract_latest_overview_info(
 	game_files: &PartitionManager,
-	hash: &str
-) -> Result<(String, String, Vec<(String, String)>)> {
-	let resource_id = RuntimeResourceID::from_hex_string(hash)?;
+	resource: ResourceID
+) -> Result<(ResourceType, String, Vec<(ResourceID, String)>)> {
+	let resource_id = RuntimeResourceID::from(resource);
 
 	for partition in game_files.partitions() {
 		if let Some((info, patchlevel)) = partition
@@ -180,7 +83,7 @@ pub fn extract_latest_overview_info(
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			return Ok((
-				info.data_type(),
+				info.data_type().try_into()?,
 				match patchlevel {
 					PatchId::Base => partition.partition_info().id().to_string(),
 					PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
@@ -188,8 +91,8 @@ pub fn extract_latest_overview_info(
 				info.references()
 					.iter()
 					.map(|(res_id, flag)| {
-						(
-							res_id.to_hex_string(),
+						Ok((
+							(*res_id).try_into()?,
 							format!(
 								"{:02X}",
 								match flag {
@@ -197,9 +100,9 @@ pub fn extract_latest_overview_info(
 									ResourceReferenceFlags::Standard(x) => x
 								}
 							)
-						)
+						))
 					})
-					.collect()
+					.collect::<Result<_>>()?
 			));
 		}
 	}
@@ -207,35 +110,34 @@ pub fn extract_latest_overview_info(
 	bail!("Couldn't find the resource in any RPKG");
 }
 
-/// Extract an entity by its factory's hash (you must normalise paths yourself) and put it in the cache. Returns early if the entity is already cached.
+/// Extract an entity by its factory and put it in the cache. Returns early if the entity is already cached.
 #[try_fn]
-#[context("Couldn't ensure caching of entity {}", factory_hash)]
-pub fn ensure_entity_in_cache(
+#[context("Couldn't extract and cache entity {}", factory_id)]
+pub fn extract_entity<'a>(
 	resource_packages: &PartitionManager,
-	cached_entities: &DashMap<String, Entity>,
+	cached_entities: &'a DashMap<ResourceID, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
-	factory_hash: &str
-) -> Result<()> {
+	factory_id: ResourceID
+) -> Result<Ref<'a, ResourceID, Entity>> {
 	{
-		if cached_entities.contains_key(factory_hash) {
-			return Ok(());
+		if let Some(x) = cached_entities.get(&factory_id) {
+			return Ok(x);
 		}
 	}
 
 	let (temp_meta, temp_data) =
-		extract_latest_resource(resource_packages, hash_list, factory_hash).context("Couldn't extract TEMP")?;
+		extract_latest_resource(resource_packages, factory_id).context("Couldn't extract TEMP")?;
 
-	if temp_meta.hash_resource_type != "TEMP" {
+	if temp_meta.core_info.resource_type != "TEMP" {
 		bail!("Given factory was not a TEMP");
 	}
 
 	let factory =
 		match game_version {
-			GameVersion::H1 => convert_2016_factory_to_modern(
-				&h2016_convert_binary_to_factory(&temp_data)
-					.context("Couldn't convert binary data to ResourceLib factory")?
-			),
+			GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
+				.context("Couldn't convert binary data to ResourceLib factory")?
+				.into_modern(),
 
 			GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
 				.context("Couldn't convert binary data to ResourceLib factory")?,
@@ -244,20 +146,20 @@ pub fn ensure_entity_in_cache(
 				.context("Couldn't convert binary data to ResourceLib factory")?
 		};
 
-	let blueprint_hash = &temp_meta
-		.hash_reference_data
+	let blueprint_id = temp_meta
+		.core_info
+		.references
 		.get(factory.blueprint_index_in_resource_header as usize)
 		.context("Blueprint referenced in factory does not exist in dependencies")?
-		.hash;
+		.resource;
 
 	let (tblu_meta, tblu_data) =
-		extract_latest_resource(resource_packages, hash_list, blueprint_hash).context("Couldn't extract TBLU")?;
+		extract_latest_resource(resource_packages, blueprint_id).context("Couldn't extract TBLU")?;
 
 	let blueprint = match game_version {
-		GameVersion::H1 => convert_2016_blueprint_to_modern(
-			&h2016_convert_binary_to_blueprint(&tblu_data)
-				.context("Couldn't convert binary data to ResourceLib blueprint")?
-		),
+		GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)
+			.context("Couldn't convert binary data to ResourceLib blueprint")?
+			.into_modern(),
 
 		GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
 			.context("Couldn't convert binary data to ResourceLib blueprint")?,
@@ -266,23 +168,16 @@ pub fn ensure_entity_in_cache(
 			.context("Couldn't convert binary data to ResourceLib blueprint")?
 	};
 
-	let entity = convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
-		.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+	let entity = convert_to_qn(
+		&factory,
+		&RpkgResourceMeta::from_resource_metadata(temp_meta, false).with_hash_list(&hash_list.entries)?,
+		&blueprint,
+		&RpkgResourceMeta::from_resource_metadata(tblu_meta, false).with_hash_list(&hash_list.entries)?,
+		false
+	)
+	.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-	cached_entities.insert(factory_hash.to_owned(), entity.to_owned());
-}
+	cached_entities.insert(factory_id, entity.to_owned());
 
-pub fn normalise_to_hash(hash_or_path: String) -> String {
-	if hash_or_path.starts_with('0') {
-		hash_or_path
-	} else {
-		format!("{:0>16X}", {
-			let digest = md5::compute(hash_or_path.to_lowercase());
-			let mut hash = 0u64;
-			for i in 1..8 {
-				hash |= u64::from(digest[i]) << (8 * (7 - i));
-			}
-			hash
-		})
-	}
+	cached_entities.get(&factory_id).expect("We just added it")
 }

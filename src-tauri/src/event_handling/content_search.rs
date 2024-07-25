@@ -1,11 +1,13 @@
-use std::{ops::Deref, time::Instant};
+use std::{ops::Deref, str::FromStr, time::Instant};
 
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
+use hitman_commons::{game::GameVersion, metadata::ResourceID, rpkg_tool::RpkgResourceMeta};
+use hitman_formats::ores::{parse_hashes_ores, parse_json_ores};
 use itertools::Itertools;
-use quickentity_rs::{convert_2016_blueprint_to_modern, convert_2016_factory_to_modern, convert_to_qn};
+use quickentity_rs::convert_to_qn;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend, ParallelIterator};
 use regex::bytes::Regex;
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
@@ -17,18 +19,15 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
-	finish_task,
-	game_detection::GameVersion,
-	get_loaded_game_version,
+	finish_task, get_loaded_game_version,
 	languages::get_language_map,
 	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
-	ores::{parse_hashes_ores, parse_json_ores},
 	resourcelib::{
 		convert_generic_str, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
 		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
 		h3_convert_binary_to_factory
 	},
-	rpkg::{convert_resource_info_to_rpkg_meta_no_hl, extract_latest_resource_no_hl},
+	rpkg::extract_latest_resource,
 	send_request, start_task
 };
 
@@ -93,13 +92,13 @@ pub fn start_content_search(
 										if use_qn_format {
 											let (temp_data, temp_meta) = (
 												partition.read_resource(resource_id).ok()?,
-												convert_resource_info_to_rpkg_meta_no_hl(resource_info)
+												RpkgResourceMeta::try_from(*resource_info).ok()?
 											);
 
 											let factory = match game_version {
-												GameVersion::H1 => convert_2016_factory_to_modern(
-													&h2016_convert_binary_to_factory(&temp_data).ok()?
-												),
+												GameVersion::H1 => {
+													h2016_convert_binary_to_factory(&temp_data).ok()?.into_modern()
+												}
 
 												GameVersion::H2 => h2_convert_binary_to_factory(&temp_data).ok()?,
 
@@ -115,15 +114,16 @@ pub fn start_content_search(
 
 											let (tblu_data, tblu_meta) = (
 												partition.read_resource(&tblu_rrid).ok()?,
-												convert_resource_info_to_rpkg_meta_no_hl(
+												RpkgResourceMeta::try_from(
 													partition.get_resource_info(&tblu_rrid).ok()?
 												)
+												.ok()?
 											);
 
 											let blueprint = match game_version {
-												GameVersion::H1 => convert_2016_blueprint_to_modern(
-													&h2016_convert_binary_to_blueprint(&tblu_data).ok()?
-												),
+												GameVersion::H1 => {
+													h2016_convert_binary_to_blueprint(&tblu_data).ok()?.into_modern()
+												}
 
 												GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data).ok()?,
 
@@ -139,9 +139,9 @@ pub fn start_content_search(
 											let temp_data = partition.read_resource(resource_id).ok()?;
 
 											let factory = match game_version {
-												GameVersion::H1 => convert_2016_factory_to_modern(
-													&h2016_convert_binary_to_factory(&temp_data).ok()?
-												),
+												GameVersion::H1 => {
+													h2016_convert_binary_to_factory(&temp_data).ok()?.into_modern()
+												}
 
 												GameVersion::H2 => h2_convert_binary_to_factory(&temp_data).ok()?,
 
@@ -155,9 +155,9 @@ pub fn start_content_search(
 											let tblu_data = partition.read_resource(tblu_rrid).ok()?;
 
 											let blueprint = match game_version {
-												GameVersion::H1 => convert_2016_blueprint_to_modern(
-													&h2016_convert_binary_to_blueprint(&tblu_data).ok()?
-												),
+												GameVersion::H1 => {
+													h2016_convert_binary_to_blueprint(&tblu_data).ok()?.into_modern()
+												}
 
 												GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data).ok()?,
 
@@ -184,7 +184,11 @@ pub fn start_content_search(
 										convert_generic_str(
 											&partition.read_resource(resource_id).ok()?,
 											game_version,
-											if filetype == "WSWB" { "DSWB" } else { &filetype }
+											if filetype == "WSWB" {
+												"DSWB".try_into().ok()?
+											} else {
+												filetype.try_into().ok()?
+											}
 										)
 										.ok()?
 									};
@@ -211,7 +215,7 @@ pub fn start_content_search(
 										let data = partition.read_resource(resource_id).ok()?;
 
 										if resource_id.to_hex_string() == "0057C2C3941115CA" {
-											to_vec(&parse_json_ores(&data).ok()?).ok()?
+											parse_json_ores(&data).ok()?.into_bytes()
 										} else {
 											to_vec(&parse_hashes_ores(&data).ok()?).ok()?
 										}
@@ -227,7 +231,7 @@ pub fn start_content_search(
 								"CLNG" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -240,11 +244,7 @@ pub fn start_content_search(
 														.context("No more alternate language maps available")?;
 
 													let clng = hmlanguages::clng::CLNG::new(
-														match game_version {
-															GameVersion::H1 => tonytools::Version::H2016,
-															GameVersion::H2 => tonytools::Version::H2,
-															GameVersion::H3 => tonytools::Version::H3
-														},
+														game_version.into(),
 														langmap.1.to_owned()
 													)
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
@@ -282,7 +282,7 @@ pub fn start_content_search(
 								"DITL" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -313,7 +313,7 @@ pub fn start_content_search(
 								"DLGE" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -333,11 +333,7 @@ pub fn start_content_search(
 															.context("No hash list available")?
 															.deref()
 															.to_owned(),
-														match game_version {
-															GameVersion::H1 => tonytools::Version::H2016,
-															GameVersion::H2 => tonytools::Version::H2,
-															GameVersion::H3 => tonytools::Version::H3
-														},
+														game_version.into(),
 														langmap.1.to_owned(),
 														None,
 														false
@@ -377,7 +373,7 @@ pub fn start_content_search(
 								"LOCR" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -397,11 +393,7 @@ pub fn start_content_search(
 															.context("No hash list available")?
 															.deref()
 															.to_owned(),
-														match game_version {
-															GameVersion::H1 => tonytools::Version::H2016,
-															GameVersion::H2 => tonytools::Version::H2,
-															GameVersion::H3 => tonytools::Version::H3
-														},
+														game_version.into(),
 														langmap.1.to_owned(),
 														langmap.0
 													)
@@ -440,23 +432,16 @@ pub fn start_content_search(
 								"RTLV" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let rtlv = hmlanguages::rtlv::RTLV::new(
-											match game_version {
-												GameVersion::H1 => tonytools::Version::H2016,
-												GameVersion::H2 => tonytools::Version::H2,
-												GameVersion::H3 => tonytools::Version::H3
-											},
-											None
-										)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))
-										.ok()?
-										.convert(&res_data, to_string(&res_meta).ok()?)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))
-										.ok()?;
+										let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))
+											.ok()?
+											.convert(&res_data, to_string(&res_meta).ok()?)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))
+											.ok()?;
 
 										let mut buf = Vec::new();
 										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -477,13 +462,13 @@ pub fn start_content_search(
 								"LINE" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											convert_resource_info_to_rpkg_meta_no_hl(resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let (locr_meta, locr_data) = extract_latest_resource_no_hl(
+										let (locr_meta, locr_data) = extract_latest_resource(
 											game_files,
-											&res_meta.hash_reference_data.first()?.hash
+											ResourceID::from_str(&res_meta.hash_reference_data.first()?.hash).ok()?
 										)
 										.ok()?;
 
@@ -503,11 +488,7 @@ pub fn start_content_search(
 															.context("No hash list available")?
 															.deref()
 															.to_owned(),
-														match game_version {
-															GameVersion::H1 => tonytools::Version::H2016,
-															GameVersion::H2 => tonytools::Version::H2,
-															GameVersion::H3 => tonytools::Version::H3
-														},
+														game_version.into(),
 														langmap.1.to_owned(),
 														langmap.0
 													)
@@ -614,13 +595,13 @@ pub fn start_content_search(
 			.map(|hash| {
 				let filetype = hash_list
 					.entries
-					.get(&hash)
-					.map(|x| x.resource_type.to_owned())
+					.get(&ResourceID::from_str(&hash).expect("Invalid ID added to matching array"))
+					.map(|x| x.resource_type.into())
 					.unwrap_or("".into());
 
 				let path = hash_list
 					.entries
-					.get(&hash)
+					.get(&ResourceID::from_str(&hash).expect("Invalid ID added to matching array"))
 					.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned());
 
 				(hash, filetype, path)

@@ -6,9 +6,9 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use enumset::EnumSetType;
 use fn_error_context::context;
 use hashbrown::HashMap;
+use hitman_commons::game::GameVersion;
 use itertools::Itertools;
 use registry::{Data, Hive, Security};
 use serde::{Deserialize, Serialize};
@@ -28,14 +28,6 @@ pub struct GameInstall {
 	pub version: GameVersion,
 	pub platform: String,
 	pub path: PathBuf
-}
-
-#[derive(Type, Serialize, Deserialize, Debug, PartialOrd, Ord, Hash, EnumSetType)]
-#[serde(rename_all = "camelCase")]
-pub enum GameVersion {
-	H1,
-	H2,
-	H3
 }
 
 #[try_fn]

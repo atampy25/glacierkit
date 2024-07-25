@@ -15,7 +15,7 @@ use crate::{
 		AppState, EditorData, EditorRequest, GlobalRequest, RepositoryPatchEditorEvent, RepositoryPatchEditorRequest,
 		Request
 	},
-	repository::{RepositoryItem, RepositoryItemInformation},
+	ores_repo::{RepositoryItem, RepositoryItemInformation},
 	send_request, start_task
 };
 

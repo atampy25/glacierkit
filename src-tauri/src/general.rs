@@ -8,6 +8,8 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
+use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::ResourceID};
+use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
@@ -28,20 +30,20 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::game_detection::GameVersion;
-use crate::hash_list::HashList;
-use crate::intellisense::Intellisense;
-use crate::model::{
-	AppSettings, AppState, ContentSearchRequest, EditorData, EditorState, EditorType, FileBrowserRequest,
-	GameBrowserRequest, GlobalRequest, JsonPatchType, Request, TextFileType, ToolRequest
-};
-use crate::ores::{parse_json_ores, UnlockableItem};
-use crate::repository::RepositoryItem;
-use crate::rpkg::{ensure_entity_in_cache, extract_latest_resource, normalise_to_hash};
+use crate::ores_repo::RepositoryItem;
+use crate::rpkg::extract_latest_resource;
 use crate::{event_handling::resource_overview::initialise_resource_overview, get_loaded_game_version};
 use crate::{
 	finish_task, send_notification, send_request, start_task, Notification, NotificationKind, HASH_LIST_ENDPOINT,
 	HASH_LIST_VERSION_ENDPOINT, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT
+};
+use crate::{intellisense::Intellisense, ores_repo::UnlockableItem};
+use crate::{
+	model::{
+		AppSettings, AppState, ContentSearchRequest, EditorData, EditorState, EditorType, FileBrowserRequest,
+		GameBrowserRequest, GlobalRequest, JsonPatchType, Request, TextFileType, ToolRequest
+	},
+	rpkg::extract_entity
 };
 
 #[try_fn]
@@ -133,19 +135,14 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					let patch: Patch =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
 
-					ensure_entity_in_cache(
+					let mut entity = extract_entity(
 						game_files,
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
 						hash_list,
-						&normalise_to_hash(patch.factory_hash.to_owned())
-					)?;
-
-					let mut entity = app_state
-						.cached_entities
-						.get(&normalise_to_hash(patch.factory_hash.to_owned()))
-						.unwrap()
-						.to_owned();
+						ResourceID::from_any(&patch.factory_hash)?
+					)?
+					.to_owned();
 
 					let base = entity.to_owned();
 
@@ -361,8 +358,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
 					let mut unlockables = to_value(
-						from_value::<Vec<UnlockableItem>>(parse_json_ores(
-							&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
+						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+							&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -384,7 +381,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						.collect::<IndexMap<String, IndexMap<String, Value>>>()
 					)?;
 
-					let base = parse_json_ores(&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1)?;
+					let base = from_str::<Value>(&parse_json_ores(
+						&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
+					)?)?;
 
 					let patch: Value =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
@@ -542,8 +541,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 						{
 							let mut unlockables = to_value(
-								from_value::<Vec<UnlockableItem>>(parse_json_ores(
-									&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
+								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+									&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
 								)?)?
 								.into_iter()
 								.map(|x| {
@@ -565,9 +564,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.collect::<IndexMap<String, IndexMap<String, Value>>>()
 							)?;
 
-							let base = parse_json_ores(
-								&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
-							)?;
+							let base = from_str::<Value>(&parse_json_ores(
+								&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
+							)?)?;
 
 							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 								.context("Invalid JSON")?;
@@ -824,7 +823,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		finish_task(app, loading_task)?;
 		let task = start_task(app, "Caching reverse references")?;
 
-		let mut reverse_dependencies: DashMap<String, Vec<String>> = DashMap::new();
+		let mut reverse_dependencies: DashMap<ResourceID, Vec<ResourceID>> = DashMap::new();
 
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
 		let resources = partition_manager
@@ -832,10 +831,12 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			.into_par_iter()
 			.rev()
 			.flat_map(|partition| {
-				partition
-					.latest_resources()
-					.into_par_iter()
-					.map(|(resource, _)| (resource.rrid(), resource.references()))
+				partition.latest_resources().into_par_iter().map(|(resource, _)| {
+					(
+						ResourceID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
+						resource.references()
+					)
+				})
 			})
 			.collect::<HashMap<_, _>>();
 
@@ -843,16 +844,17 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			.try_reserve(resources.len())
 			.map_err(|e| anyhow!("Reserve error: {e:?}"))?;
 
-		reverse_dependencies.par_extend(resources.par_keys().map(|x| (x.to_hex_string(), Default::default())));
+		reverse_dependencies.par_extend(resources.par_keys().map(|&x| (x, Default::default())));
 
 		resources
 			.into_par_iter()
 			.flat_map(|(resource_id, resource_references)| {
-				let res_id_str = resource_id.to_hex_string();
-
-				resource_references
-					.par_iter()
-					.map(move |(reference_id, _)| (reference_id.to_hex_string(), res_id_str.to_owned()))
+				resource_references.par_iter().map(move |(reference_id, _)| {
+					(
+						(*reference_id).try_into().expect("Invalid ID in game files"),
+						resource_id
+					)
+				})
 			})
 			.for_each(|(key, value)| {
 				if let Some(mut x) = reverse_dependencies.get_mut(&key) {
@@ -908,7 +910,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			if current_version < new_version {
 				if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
 					if let Ok(data) = data.bytes().await {
-						let hash_list = HashList::from_slice(&data)?;
+						let hash_list = HashList::from_compressed(&data)?;
 
 						fs::write(
 							app.path_resolver()
@@ -951,7 +953,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 							app.path_resolver()
 								.app_data_dir()
 								.context("Couldn't get app data dir")?
-								.join("tonytools_hash_list.hlma"),
+								.join("tonytools_hash_list.hmla"),
 							data
 						)?;
 
@@ -1006,7 +1008,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		let task = start_task(app, "Caching repository")?;
 
 		app_state.repository.store(Some(
-			from_slice::<Vec<RepositoryItem>>(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?
+			from_slice::<Vec<RepositoryItem>>(&extract_latest_resource(game_files, "00204D1AFD76AB13".parse()?)?.1)?
 				.into()
 		));
 
@@ -1021,7 +1023,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		let task = start_task(app, "Refreshing editors")?;
 
 		for editor in app_state.editor_states.iter_mut() {
-			if let EditorData::ResourceOverview { ref hash } = editor.data {
+			if let EditorData::ResourceOverview { hash } = editor.data {
 				let task = start_task(app, format!("Refreshing resource overview for {}", hash))?;
 
 				initialise_resource_overview(
@@ -1051,13 +1053,13 @@ pub async fn open_in_editor(
 	game_files: &PartitionManager,
 	install: &PathBuf,
 	hash_list: &HashList,
-	hash: &str
+	hash: ResourceID
 ) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match hash_list
 		.entries
-		.get(hash)
+		.get(&hash)
 		.context("Not in hash list")?
 		.resource_type
 		.as_ref()
@@ -1065,15 +1067,14 @@ pub async fn open_in_editor(
 		"TEMP" => {
 			let task = start_task(app, format!("Loading entity {}", hash))?;
 
-			ensure_entity_in_cache(
+			let entity = extract_entity(
 				game_files,
 				&app_state.cached_entities,
 				get_loaded_game_version(app, install)?,
 				hash_list,
 				hash
-			)?;
-
-			let entity = app_state.cached_entities.get(hash).unwrap().to_owned();
+			)?
+			.to_owned();
 
 			let default_tab_name = format!(
 				"{} ({})",
@@ -1085,7 +1086,7 @@ pub async fn open_in_editor(
 				hash
 			);
 
-			let tab_name = if let Some(entry) = hash_list.entries.get(hash) {
+			let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
 				if let Some(path) = entry.path.as_ref() {
 					path.replace("].pc_entitytype", "")
 						.replace("].pc_entitytemplate", "")
@@ -1136,7 +1137,7 @@ pub async fn open_in_editor(
 			let repository: Vec<RepositoryItem> = if let Some(x) = app_state.repository.load().as_ref() {
 				x.par_iter().cloned().collect()
 			} else {
-				from_slice(&extract_latest_resource(game_files, hash_list, "00204D1AFD76AB13")?.1)?
+				from_slice(&extract_latest_resource(game_files, "00204D1AFD76AB13".parse()?)?.1)?
 			};
 
 			app_state.editor_states.insert(
@@ -1165,13 +1166,13 @@ pub async fn open_in_editor(
 			finish_task(app, task)?;
 		}
 
-		"ORES" if hash == "0057C2C3941115CA" => {
+		"ORES" if hash == "0057C2C3941115CA".parse()? => {
 			let task = start_task(app, "Loading unlockables")?;
 
 			let id = Uuid::new_v4();
 
-			let unlockables: Vec<UnlockableItem> = from_value(parse_json_ores(
-				&extract_latest_resource(game_files, hash_list, "0057C2C3941115CA")?.1
+			let unlockables: Vec<UnlockableItem> = from_str(&parse_json_ores(
+				&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
 			)?)?;
 
 			app_state.editor_states.insert(

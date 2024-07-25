@@ -16,7 +16,7 @@ use crate::{
 		AppState, EditorData, EditorRequest, GlobalRequest, Request, UnlockablesPatchEditorEvent,
 		UnlockablesPatchEditorRequest
 	},
-	ores::{UnlockableInformation, UnlockableItem},
+	ores_repo::{UnlockableInformation, UnlockableItem},
 	send_request, start_task
 };
 

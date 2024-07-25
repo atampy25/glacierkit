@@ -245,6 +245,8 @@ export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { t
 
 export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } }
 
+export type HashData = { resourceType: string; path: string | null; hint: string | null }
+
 export type JsonPatchType = "MergePatch" | "JsonPatch"
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key in string]: JsonValue }
@@ -430,6 +432,10 @@ ref: Ref;
  */
 value: SimpleProperty }
 
+export type ReferenceFlags = { type: ReferenceType; acquired: boolean; languageCode: number }
+
+export type ReferenceType = "install" | "normal" | "weak"
+
 export type RepositoryItemInformation = { type: "NPC"; data: { name: string } } | { type: "Item"; data: { name: string } } | { type: "Weapon"; data: { name: string } } | { type: "Modifier"; data: { kind: string } } | { type: "MapArea"; data: { name: string } } | { type: "Outfit"; data: { name: string } } | { type: "Setpiece"; data: { traits: string[] } } | { type: "DifficultyParameter"; data: { name: string } } | { type: "AmmoConfig"; data: { name: string } } | { type: "MagazineConfig"; data: { size: number; tags: string[] } } | { type: "AmmoBehaviour"; data: { name: string } } | { type: "MasteryItem"; data: { name: string } } | { type: "ScoreMultiplier"; data: { name: string } } | { type: "ItemBundle"; data: { name: string } } | { type: "ItemList" } | { type: "WeaponConfig" } | { type: "Unknown" }
 
 export type RepositoryPatchEditorEvent = { type: "initialise"; data: { id: string } } | { type: "createRepositoryItem"; data: { id: string } } | { type: "resetModifications"; data: { id: string; item: string } } | { type: "modifyItem"; data: { id: string; item: string; data: string } } | { type: "selectItem"; data: { id: string; item: string } }
@@ -437,6 +443,11 @@ export type RepositoryPatchEditorEvent = { type: "initialise"; data: { id: strin
 export type RepositoryPatchEditorRequest = { type: "setRepositoryItems"; data: { id: string; items: ([string, RepositoryItemInformation])[] } } | { type: "setModifiedRepositoryItems"; data: { id: string; modified: string[] } } | { type: "addNewRepositoryItem"; data: { id: string; new_item: [string, RepositoryItemInformation] } } | { type: "removeRepositoryItem"; data: { id: string; item: string } } | { type: "setMonacoContent"; data: { id: string; item: string; orig_data: string; data: string } } | { type: "deselectMonaco"; data: { id: string } } | { type: "modifyItemInformation"; data: { id: string; item: string; info: RepositoryItemInformation } }
 
 export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; data: EditorRequest } | { type: "global"; data: GlobalRequest }
+
+/**
+ * Core information about a resource.
+ */
+export type ResourceMetadata = { id: string; type: string; references: ResourceReference[] }
 
 export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL"; data: { json: string } } | { type: "Json"; data: { json: string } } | { type: "Ores"; data: { json: string } } | { type: "Image"; data: { image_path: string; dds_data: [string, string] | null } } | { type: "Audio"; data: { wav_path: string } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } } | { type: "Repository" } | { type: "Unlockables" } | { type: "HMLanguages"; data: { json: string } } | { type: "LocalisedLine"; data: { languages: ([string, string])[] } }
 
@@ -452,11 +463,15 @@ dependencies: ([string, string, string | null, string, boolean])[];
  */
 reverse_dependencies: ([string, string, string | null])[]; data: ResourceOverviewData } }
 
+export type ResourceReference = ({ type: ReferenceType; acquired: boolean; languageCode: number }) & { resource: string }
+
 export type ReverseReference = { from: string; data: ReverseReferenceData }
 
 export type ReverseReferenceData = { type: "parent" } | { type: "property"; data: { property_name: string } } | { type: "platformSpecificProperty"; data: { property_name: string; platform: string } } | { type: "event"; data: { event: string; trigger: string } } | { type: "inputCopy"; data: { trigger: string; propagate: string } } | { type: "outputCopy"; data: { event: string; propagate: string } } | { type: "propertyAlias"; data: { aliased_name: string; original_property: string } } | { type: "exposedEntity"; data: { exposed_name: string } } | { type: "exposedInterface"; data: { interface: string } } | { type: "subset"; data: { subset: string } }
 
 export type Rotation = { yaw: number; pitch: number; roll: number }
+
+export type RpkgResourceReference = { hash: string; flag: string }
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
