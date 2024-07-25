@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
@@ -89,7 +89,7 @@ impl Intellisense {
 		};
 
 		self.cppt_properties.insert(
-			cppt.into(),
+			cppt,
 			cppt_data
 				.property_values
 				.into_iter()
@@ -369,7 +369,7 @@ impl Intellisense {
 		)?;
 
 		self.matt_properties.insert(
-			matt.into(),
+			matt,
 			get_material_overrides(&matt_data, &matt_meta.core_info.references, &matb_data)?
 		);
 

@@ -1839,7 +1839,7 @@ pub async fn add_game_browser_item(
 						.resource;
 
 					let factory_path = hash_list.to_path(&file);
-					let blueprint_path = hash_list.to_path(&blueprint_hash);
+					let blueprint_path = hash_list.to_path(blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -1890,7 +1890,7 @@ pub async fn add_game_browser_item(
 						.resource;
 
 					let factory_path = hash_list.to_path(&file);
-					let blueprint_path = hash_list.to_path(&blueprint_hash);
+					let blueprint_path = hash_list.to_path(blueprint_hash);
 
 					SubEntity {
 						parent: Ref::Short((parent_id != "#").then_some(parent_id)),
@@ -2470,8 +2470,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
-		if intellisense
+		&& intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
@@ -2483,36 +2482,35 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 			)?
 			.into_iter()
 			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
-		{
-			entity
-				.entities
-				.get_mut(&entity_id)
-				.context("No such entity")?
-				.properties
-				.as_mut()
-				.unwrap()
-				.insert(
-					String::from("m_eRoomBehaviour"),
-					Property {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						value: Value::String("ROOM_DYNAMIC".into()),
-						post_init: None
-					}
-				);
+	{
+		entity
+			.entities
+			.get_mut(&entity_id)
+			.context("No such entity")?
+			.properties
+			.as_mut()
+			.unwrap()
+			.insert(
+				String::from("m_eRoomBehaviour"),
+				Property {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					value: Value::String("ROOM_DYNAMIC".into()),
+					post_init: None
+				}
+			);
 
-			app_state
-				.editor_connection
-				.set_property(
-					&entity_id,
-					&entity.blueprint_hash,
-					"m_eRoomBehaviour",
-					PropertyValue {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						data: Value::String("ROOM_DYNAMIC".into())
-					}
-				)
-				.await?;
-		}
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eRoomBehaviour",
+				PropertyValue {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					data: Value::String("ROOM_DYNAMIC".into())
+				}
+			)
+			.await?;
 	}
 
 	send_request(
@@ -2658,8 +2656,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
-		if intellisense
+		&& intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
@@ -2671,36 +2668,35 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			)?
 			.into_iter()
 			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
-		{
-			entity
-				.entities
-				.get_mut(&entity_id)
-				.context("No such entity")?
-				.properties
-				.as_mut()
-				.unwrap()
-				.insert(
-					String::from("m_eRoomBehaviour"),
-					Property {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						value: Value::String("ROOM_DYNAMIC".into()),
-						post_init: None
-					}
-				);
+	{
+		entity
+			.entities
+			.get_mut(&entity_id)
+			.context("No such entity")?
+			.properties
+			.as_mut()
+			.unwrap()
+			.insert(
+				String::from("m_eRoomBehaviour"),
+				Property {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					value: Value::String("ROOM_DYNAMIC".into()),
+					post_init: None
+				}
+			);
 
-			app_state
-				.editor_connection
-				.set_property(
-					&entity_id,
-					&entity.blueprint_hash,
-					"m_eRoomBehaviour",
-					PropertyValue {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						data: Value::String("ROOM_DYNAMIC".into())
-					}
-				)
-				.await?;
-		}
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eRoomBehaviour",
+				PropertyValue {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					data: Value::String("ROOM_DYNAMIC".into())
+				}
+			)
+			.await?;
 	}
 
 	send_request(
@@ -2846,8 +2842,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
-		if intellisense
+		&& intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
@@ -2859,36 +2854,35 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 			)?
 			.into_iter()
 			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
-		{
-			entity
-				.entities
-				.get_mut(&entity_id)
-				.context("No such entity")?
-				.properties
-				.as_mut()
-				.unwrap()
-				.insert(
-					String::from("m_eRoomBehaviour"),
-					Property {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						value: Value::String("ROOM_DYNAMIC".into()),
-						post_init: None
-					}
-				);
+	{
+		entity
+			.entities
+			.get_mut(&entity_id)
+			.context("No such entity")?
+			.properties
+			.as_mut()
+			.unwrap()
+			.insert(
+				String::from("m_eRoomBehaviour"),
+				Property {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					value: Value::String("ROOM_DYNAMIC".into()),
+					post_init: None
+				}
+			);
 
-			app_state
-				.editor_connection
-				.set_property(
-					&entity_id,
-					&entity.blueprint_hash,
-					"m_eRoomBehaviour",
-					PropertyValue {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						data: Value::String("ROOM_DYNAMIC".into())
-					}
-				)
-				.await?;
-		}
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eRoomBehaviour",
+				PropertyValue {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					data: Value::String("ROOM_DYNAMIC".into())
+				}
+			)
+			.await?;
 	}
 
 	send_request(
@@ -3034,8 +3028,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 		&& let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
-		if intellisense
+		&& intellisense
 			.get_properties(
 				game_files,
 				&app_state.cached_entities,
@@ -3047,36 +3040,35 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 			)?
 			.into_iter()
 			.any(|(name, _, _, _)| name == "m_eRoomBehaviour")
-		{
-			entity
-				.entities
-				.get_mut(&entity_id)
-				.context("No such entity")?
-				.properties
-				.as_mut()
-				.unwrap()
-				.insert(
-					String::from("m_eRoomBehaviour"),
-					Property {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						value: Value::String("ROOM_DYNAMIC".into()),
-						post_init: None
-					}
-				);
+	{
+		entity
+			.entities
+			.get_mut(&entity_id)
+			.context("No such entity")?
+			.properties
+			.as_mut()
+			.unwrap()
+			.insert(
+				String::from("m_eRoomBehaviour"),
+				Property {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					value: Value::String("ROOM_DYNAMIC".into()),
+					post_init: None
+				}
+			);
 
-			app_state
-				.editor_connection
-				.set_property(
-					&entity_id,
-					&entity.blueprint_hash,
-					"m_eRoomBehaviour",
-					PropertyValue {
-						property_type: "ZSpatialEntity.ERoomBehaviour".into(),
-						data: Value::String("ROOM_DYNAMIC".into())
-					}
-				)
-				.await?;
-		}
+		app_state
+			.editor_connection
+			.set_property(
+				&entity_id,
+				&entity.blueprint_hash,
+				"m_eRoomBehaviour",
+				PropertyValue {
+					property_type: "ZSpatialEntity.ERoomBehaviour".into(),
+					data: Value::String("ROOM_DYNAMIC".into())
+				}
+			)
+			.await?;
 	}
 
 	send_request(

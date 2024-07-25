@@ -794,7 +794,7 @@ pub fn get_decorations(
 				property_data.value.as_str().unwrap_or_default()
 			};
 
-			if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
+			if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 				&& entry.resource_type == "LINE"
 			{
 				decorations.push((
@@ -804,7 +804,7 @@ pub fn get_decorations(
 						hash_list,
 						game_version,
 						tonytools_hash_list,
-						ResourceID::from_any(&res)?
+						ResourceID::from_any(res)?
 					)?
 				));
 			} else if res.starts_with('0') {
@@ -827,7 +827,7 @@ pub fn get_decorations(
 					val.as_str().unwrap_or_default()
 				};
 
-				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
+				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 					&& entry.resource_type == "LINE"
 				{
 					decorations.push((
@@ -837,7 +837,7 @@ pub fn get_decorations(
 							hash_list,
 							game_version,
 							tonytools_hash_list,
-							ResourceID::from_any(&res)?
+							ResourceID::from_any(res)?
 						)?
 					));
 				} else if res.starts_with('0') {
@@ -913,7 +913,7 @@ pub fn get_decorations(
 					property_data.value.as_str().unwrap_or_default()
 				};
 
-				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
+				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 					&& entry.resource_type == "LINE"
 				{
 					decorations.push((
@@ -923,11 +923,11 @@ pub fn get_decorations(
 							hash_list,
 							game_version,
 							tonytools_hash_list,
-							ResourceID::from_any(&res)?
+							ResourceID::from_any(res)?
 						)?
 					));
 				} else if res.starts_with('0') {
-					if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(&res)?) {
+					if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 						if let Some(hint) = entry.hint.as_ref() {
 							decorations.push((res.to_owned(), hint.to_owned()));
 						}
@@ -946,7 +946,7 @@ pub fn get_decorations(
 						val.as_str().unwrap_or_default()
 					};
 
-					if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(&res)?)
+					if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 						&& entry.resource_type == "LINE"
 					{
 						decorations.push((
@@ -956,11 +956,11 @@ pub fn get_decorations(
 								hash_list,
 								game_version,
 								tonytools_hash_list,
-								ResourceID::from_any(&res)?
+								ResourceID::from_any(res)?
 							)?
 						));
 					} else if res.starts_with('0') {
-						if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(&res)?) {
+						if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 							if let Some(hint) = entry.hint.as_ref() {
 								decorations.push((res.to_owned(), hint.to_owned()));
 							}
