@@ -1,11 +1,11 @@
 {
-	"version": "1.2.6",
-	"notes": "Fix HMLanguages integration",
-	"pub_date": "2024-07-25T09:13:22Z",
+	"version": "1.2.7",
+	"notes": "Fix LINE support",
+	"pub_date": "2024-07-26T08:51:38Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1FlWXc5enV1VFZ3SHQvMURRMTZmSXRXSC91UVdvZFBiYnM1K0ZDU2VYdS9ZQmw5dTNKekJvTlVaUkFzbGRybHRJYkRHamkxa21MODByR0FWRVczS2dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxOTgzODg3CWZpbGU6R2xhY2llcktpdF8xLjIuNl94NjRfZW4tVVMubXNpLnppcApRV0NYNGFhNnFPNVEvTGxESjBYcEVTZmVZL2ZvckxuUTNpV3hVZlBnaUxTend4aTV3djRvSHFPRWtMeGNrelJRVGRCTERHT3J5bWhqekF0K1BnS0lDdz09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.6/GlacierKit_1.2.6_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2ZpNytJWTFGR1pEaDRNaW52SXN2aFdiV2VDeit3MGJTMnBBNGdBZTFwRXRid1VOZmZBemppb2Q5bzBVeDl0NjZjdE1PZngySmpOWnRzOHhUT1ZuZ3d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyMDE0MDgxCWZpbGU6R2xhY2llcktpdF8xLjIuN194NjRfZW4tVVMubXNpLnppcApGSzhVVzV0Z1prcDdTQXRybzZPb0d4azJ2RFJ0UlFCZEZxMEsvS1BZZXdaK2poeDRha01PT0krclhiSmU0VVhDL0hGVGtsUXhiR2pSV2VBNHNMejVDdz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.7/GlacierKit_1.2.7_x64_en-US.msi.zip"
 		}
 	}
 }
