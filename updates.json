@@ -1,11 +1,11 @@
 {
-	"version": "1.2.5",
-	"notes": "Clippy cleanup",
-	"pub_date": "2024-07-23T15:51:22Z",
+	"version": "1.2.6",
+	"notes": "Fix HMLanguages integration",
+	"pub_date": "2024-07-25T09:13:22Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2NndE9ZTEd2WTZhOS9iMm0reTN3ZHFNNEJONVdPZWd5cU5SOWNuc3cxODVYK1F4WGp3cng1THdFd0ZhZXc5d2s4RkhzUzd2dS9YcGxXN1E3WTNZL3dNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxODk4NzkxCWZpbGU6R2xhY2llcktpdF8xLjIuNV94NjRfZW4tVVMubXNpLnppcApaWnZ3b3lUVFRjOEFTRTU0VThvQU4xamlQVTFYRjd6RVNka1FvZ3ZQSFI1TTRvZnFnbXVRbFNsQXlaaE5JYkQ1QkdFdUViWklwZkhpNUFVZGtqN1NEZz09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.5/GlacierKit_1.2.5_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1FlWXc5enV1VFZ3SHQvMURRMTZmSXRXSC91UVdvZFBiYnM1K0ZDU2VYdS9ZQmw5dTNKekJvTlVaUkFzbGRybHRJYkRHamkxa21MODByR0FWRVczS2dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIxOTgzODg3CWZpbGU6R2xhY2llcktpdF8xLjIuNl94NjRfZW4tVVMubXNpLnppcApRV0NYNGFhNnFPNVEvTGxESjBYcEVTZmVZL2ZvckxuUTNpV3hVZlBnaUxTend4aTV3djRvSHFPRWtMeGNrelJRVGRCTERHT3J5bWhqekF0K1BnS0lDdz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.2.6/GlacierKit_1.2.6_x64_en-US.msi.zip"
 		}
 	}
 }
