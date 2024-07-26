@@ -639,7 +639,6 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					== "0057C2C3941115CA"
 				{
 					if let Some(game_files) = app_state.game_files.load().as_ref()
-						&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 					{
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
@@ -733,7 +732,6 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 			FileBrowserEvent::ConvertUnlockablesPatchToJsonPatch { path } => {
 				if let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
 					let mut current = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(

@@ -608,7 +608,6 @@ pub fn get_ref_decoration(
 #[context("Couldn't get decoration for LINE {}", line)]
 pub fn get_line_decoration(
 	game_files: &PartitionManager,
-	hash_list: &HashList,
 	game_version: GameVersion,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	line: ResourceID
@@ -801,7 +800,6 @@ pub fn get_decorations(
 					res.to_owned(),
 					get_line_decoration(
 						game_files,
-						hash_list,
 						game_version,
 						tonytools_hash_list,
 						ResourceID::from_any(res)?
@@ -834,7 +832,6 @@ pub fn get_decorations(
 						res.to_owned(),
 						get_line_decoration(
 							game_files,
-							hash_list,
 							game_version,
 							tonytools_hash_list,
 							ResourceID::from_any(res)?
@@ -920,7 +917,6 @@ pub fn get_decorations(
 						res.to_owned(),
 						get_line_decoration(
 							game_files,
-							hash_list,
 							game_version,
 							tonytools_hash_list,
 							ResourceID::from_any(res)?
@@ -953,7 +949,6 @@ pub fn get_decorations(
 							res.to_owned(),
 							get_line_decoration(
 								game_files,
-								hash_list,
 								game_version,
 								tonytools_hash_list,
 								ResourceID::from_any(res)?

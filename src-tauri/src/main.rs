@@ -57,7 +57,6 @@ use model::{
 };
 use notify::Watcher;
 use quickentity_rs::{generate_patch, qn_structs::Property};
-use rayon::iter::ParallelIterator;
 use rfd::AsyncFileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};

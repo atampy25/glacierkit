@@ -405,6 +405,12 @@ impl EditorConnection {
 						);
 					}
 
+					// Ignore editor entities
+					SDKEditorEvent::EntityTransformUpdated { .. } => {}
+
+					// Ignore editor entities
+					SDKEditorEvent::EntityPropertyChanged { .. } => {}
+
 					_ => panic!("This event kind should not be debounced")
 				}
 			}

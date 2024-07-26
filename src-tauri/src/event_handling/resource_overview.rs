@@ -9,7 +9,7 @@ use hitman_formats::{
 	ores::{parse_hashes_ores, parse_json_ores},
 	wwev::{WwiseEvent, WwiseEventData}
 };
-use image::{io::Reader as ImageReader, ImageFormat};
+use image::{ImageFormat, ImageReader};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
 use rpkg_rs::{resource::partition_manager::PartitionManager, GlacierResource};
@@ -369,8 +369,14 @@ pub fn initialise_resource_overview(
 									let clng = hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
 										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-									clng.convert(&res_data, to_string(&res_meta)?)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									clng.convert(
+										&res_data,
+										to_string(
+											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
+												.with_hash_list(&hash_list.entries)?
+										)?
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 								} {
 									break x;
 								} else {
@@ -412,9 +418,15 @@ pub fn initialise_resource_overview(
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						ditl.convert(&res_data, to_string(&res_meta)?)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-							.serialize(&mut ser)?;
+						ditl.convert(
+							&res_data,
+							to_string(
+								&RpkgResourceMeta::from_resource_metadata(res_meta, false)
+									.with_hash_list(&hash_list.entries)?
+							)?
+						)
+						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						.serialize(&mut ser)?;
 
 						String::from_utf8(buf)?
 					}
@@ -447,8 +459,14 @@ pub fn initialise_resource_overview(
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-									dlge.convert(&res_data, to_string(&res_meta)?)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									dlge.convert(
+										&res_data,
+										to_string(
+											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
+												.with_hash_list(&hash_list.entries)?
+										)?
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 								} {
 									break x;
 								} else {
@@ -497,8 +515,14 @@ pub fn initialise_resource_overview(
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-									locr.convert(&res_data, to_string(&res_meta)?)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									locr.convert(
+										&res_data,
+										to_string(
+											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
+												.with_hash_list(&hash_list.entries)?
+										)?
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 								} {
 									break x;
 								} else {
@@ -527,7 +551,13 @@ pub fn initialise_resource_overview(
 
 						let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
 							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-							.convert(&res_data, to_string(&res_meta)?)
+							.convert(
+								&res_data,
+								to_string(
+									&RpkgResourceMeta::from_resource_metadata(res_meta, false)
+										.with_hash_list(&hash_list.entries)?
+								)?
+							)
 							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 						let mut buf = Vec::new();
@@ -874,7 +904,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let (metadata, data) = extract_latest_resource(game_files, hash)?;
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false)
@@ -1074,7 +1103,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
@@ -1118,7 +1146,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				if hash == "0057C2C3941115CA".parse()? {
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
@@ -1175,7 +1202,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
@@ -1312,7 +1338,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1361,7 +1386,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let mut dialog = AsyncFileDialog::new().set_title("Extract all WAVs to folder");
 
@@ -1455,7 +1479,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
@@ -1589,8 +1612,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 												hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-											clng.convert(&res_data, to_string(&res_meta)?)
-												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+											clng.convert(
+												&res_data,
+												to_string(
+													&RpkgResourceMeta::from_resource_metadata(
+														res_meta.to_owned(),
+														false
+													)
+													.with_hash_list(&hash_list.entries)?
+												)?
+											)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 										} {
 											break x;
 										} else {
@@ -1628,9 +1660,15 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-								ditl.convert(&res_data, to_string(&res_meta)?)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									.serialize(&mut ser)?;
+								ditl.convert(
+									&res_data,
+									to_string(
+										&RpkgResourceMeta::from_resource_metadata(res_meta, false)
+											.with_hash_list(&hash_list.entries)?
+									)?
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								.serialize(&mut ser)?;
 
 								buf
 							}
@@ -1659,8 +1697,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 											)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-											dlge.convert(&res_data, to_string(&res_meta)?)
-												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+											dlge.convert(
+												&res_data,
+												to_string(
+													&RpkgResourceMeta::from_resource_metadata(
+														res_meta.to_owned(),
+														false
+													)
+													.with_hash_list(&hash_list.entries)?
+												)?
+											)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 										} {
 											break x;
 										} else {
@@ -1705,8 +1752,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 											)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-											locr.convert(&res_data, to_string(&res_meta)?)
-												.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+											locr.convert(
+												&res_data,
+												to_string(
+													&RpkgResourceMeta::from_resource_metadata(
+														res_meta.to_owned(),
+														false
+													)
+													.with_hash_list(&hash_list.entries)?
+												)?
+											)
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 										} {
 											break x;
 										} else {
@@ -1731,7 +1787,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							"RTLV" => {
 								let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									.convert(&res_data, to_string(&res_meta)?)
+									.convert(
+										&res_data,
+										to_string(
+											&RpkgResourceMeta::from_resource_metadata(res_meta, false)
+												.with_hash_list(&hash_list.entries)?
+										)?
+									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 								let mut buf = Vec::new();

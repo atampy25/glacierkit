@@ -92,7 +92,7 @@ pub fn start_content_search(
 										if use_qn_format {
 											let (temp_data, temp_meta) = (
 												partition.read_resource(resource_id).ok()?,
-												RpkgResourceMeta::try_from(*resource_info).ok()?
+												RpkgResourceMeta::from(*resource_info)
 											);
 
 											let factory = match game_version {
@@ -231,7 +231,7 @@ pub fn start_content_search(
 								"CLNG" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::try_from(*resource_info).ok()?,
+											RpkgResourceMeta::from(*resource_info),
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -282,7 +282,7 @@ pub fn start_content_search(
 								"DITL" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::try_from(*resource_info).ok()?,
+											RpkgResourceMeta::from(*resource_info),
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -313,7 +313,7 @@ pub fn start_content_search(
 								"DLGE" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::try_from(*resource_info).ok()?,
+											RpkgResourceMeta::from(*resource_info),
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -373,7 +373,7 @@ pub fn start_content_search(
 								"LOCR" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::try_from(*resource_info).ok()?,
+											RpkgResourceMeta::from(*resource_info),
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -432,7 +432,7 @@ pub fn start_content_search(
 								"RTLV" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::try_from(*resource_info).ok()?,
+											RpkgResourceMeta::from(*resource_info),
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -462,7 +462,7 @@ pub fn start_content_search(
 								"LINE" => {
 									let s: Option<_> = try {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::try_from(*resource_info).ok()?,
+											RpkgResourceMeta::from(*resource_info),
 											partition.read_resource(resource_id).ok()?
 										);
 

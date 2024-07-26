@@ -354,9 +354,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"unlockables.json" => {
 				let id = Uuid::new_v4();
 
-				if let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-				{
+				if let Some(game_files) = app_state.game_files.load().as_ref() {
 					let mut unlockables = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
 							&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
@@ -537,9 +535,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					{
 						let id = Uuid::new_v4();
 
-						if let Some(game_files) = app_state.game_files.load().as_ref()
-							&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-						{
+						if let Some(game_files) = app_state.game_files.load().as_ref() {
 							let mut unlockables = to_value(
 								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
 									&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
@@ -1002,9 +998,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		finish_task(app, task)?
 	};
 
-	if let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-	{
+	if let Some(game_files) = app_state.game_files.load().as_ref() {
 		let task = start_task(app, "Caching repository")?;
 
 		app_state.repository.store(Some(
