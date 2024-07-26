@@ -606,8 +606,14 @@ pub fn initialise_resource_overview(
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-									locr.convert(&locr_data, to_string(&locr_meta)?)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									locr.convert(
+										&locr_data,
+										to_string(&RpkgResourceMeta::from_resource_metadata(
+											locr_meta.to_owned(),
+											false
+										))?
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 								} {
 									break x;
 								} else {
@@ -1145,8 +1151,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-			{
+			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				if hash == "0057C2C3941115CA".parse()? {
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
@@ -1337,8 +1342,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-			{
+			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
@@ -1385,8 +1389,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-			{
+			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let mut dialog = AsyncFileDialog::new().set_title("Extract all WAVs to folder");
 
 				if let Some(project) = app_state.project.load().as_ref() {
@@ -1478,8 +1481,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-			{
+			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {

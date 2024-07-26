@@ -494,8 +494,14 @@ pub fn start_content_search(
 													)
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-													locr.convert(&locr_data, to_string(&locr_meta)?)
-														.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+													locr.convert(
+														&locr_data,
+														to_string(&RpkgResourceMeta::from_resource_metadata(
+															locr_meta.to_owned(),
+															false
+														))?
+													)
+													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 												} {
 													break x;
 												} else {

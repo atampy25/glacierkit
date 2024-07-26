@@ -8,6 +8,7 @@ use hashbrown::HashMap;
 use hitman_commons::game::GameVersion;
 use hitman_commons::hash_list::HashList;
 use hitman_commons::metadata::{ResourceID, ResourceType};
+use hitman_commons::rpkg_tool::RpkgResourceMeta;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};
@@ -640,8 +641,11 @@ pub fn get_line_decoration(
 				)
 				.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-				locr.convert(&locr_data, to_string(&locr_meta)?)
-					.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+				locr.convert(
+					&locr_data,
+					to_string(&RpkgResourceMeta::from_resource_metadata(locr_meta.to_owned(), false))?
+				)
+				.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 			} {
 				break x;
 			} else {
