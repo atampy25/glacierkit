@@ -200,7 +200,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				}
 			}
 
-			"json" => {
+			"json" | "JSON" => {
 				let id = Uuid::new_v4();
 
 				let file_type = if path.file_name().context("No file name")?.to_string_lossy() == "manifest.json" {
