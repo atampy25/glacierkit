@@ -921,12 +921,12 @@
 										}
 									})
 								}}
-								on:auxclick={async (e) => {
+								on:mousedown={(e) => {
 									if (e.button === 1) {
 										e.preventDefault()
 										trackEvent("Follow dependency in new tab from resource overview")
 
-										await event({
+										void event({
 											type: "editor",
 											data: {
 												type: "resourceOverview",
@@ -990,12 +990,12 @@
 										}
 									})
 								}}
-								on:auxclick={async (e) => {
+								on:mousedown={(e) => {
 									if (e.button === 1) {
 										e.preventDefault()
 										trackEvent("Follow reverse dependency in new tab from resource overview")
 
-										await event({
+										void event({
 											type: "editor",
 											data: {
 												type: "resourceOverview",

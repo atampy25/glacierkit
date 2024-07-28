@@ -521,8 +521,10 @@
 											})
 										}
 									}}
-									on:auxclick={async (e) => {
+									on:mousedown={async (e) => {
 										if (e.button === 1) {
+											e.preventDefault()
+
 											if (tab.unsaved) {
 												const result = await confirm("This tab has unsaved changes. Are you sure you want to close it?", {
 													okLabel: "Don't Save",
