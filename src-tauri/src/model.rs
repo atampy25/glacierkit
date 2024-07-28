@@ -708,7 +708,8 @@ strike! {
 			SelectAndOpenFile,
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
-			SaveTab(Uuid)
+			SaveTab(Uuid),
+			UploadLogAndReport(String)
 		}),
 
 		EditorConnection(pub enum EditorConnectionEvent {

@@ -84,6 +84,8 @@ pub const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
 pub const TONYTOOLS_HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/hash_list.hmla";
 
+pub const UPLOAD_LOG_ENDPOINT: &str = "https://hitman-resources.netlify.app/.netlify/functions/upload-gk-log";
+
 pub trait RunCommandExt {
 	/// Run the command, returning its stdout. If the command fails (status code non-zero), an error is returned with the stderr output.
 	fn run(self) -> Result<String>;
@@ -139,7 +141,7 @@ fn main() {
 					client.track_event(
 						"Panic",
 						Some(json!({
-						  "info": format!("{} ({})", msg, location),
+						  "info": format!("{} - {}", msg, location),
 						}))
 					);
 				}))
@@ -1253,6 +1255,29 @@ fn event(app: AppHandle, event: Event) {
 
 							finish_task(&app, task)?;
 						}
+
+						GlobalEvent::UploadLogAndReport(error) => {
+							let log_contents = fs::read_to_string(
+								app.path_resolver()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("GlacierKit.log")
+							)
+							.context("Couldn't read log file")?;
+
+							if let Ok(res) = reqwest::Client::new()
+								.post(UPLOAD_LOG_ENDPOINT)
+								.json(&json!({
+									"content": log_contents
+								}))
+								.send()
+								.await
+								.and_then(|x| x.error_for_status())
+							{
+								let log_url = res.text().await.context("Couldn't decode log upload response")?;
+								app.track_event("Error with log", Some(json!({ "error": error, "log": log_url })));
+							}
+						}
 					},
 
 					Event::EditorConnection(event) => match event {
@@ -1467,7 +1492,6 @@ fn event(app: AppHandle, event: Event) {
 					}
 				}
 			} {
-				app.track_event("Error", Some(json!({ "error": format!("{:?}", e) })));
 				send_request(
 					&app,
 					Request::Global(GlobalRequest::ErrorReport {
@@ -1494,7 +1518,6 @@ fn event(app: AppHandle, event: Event) {
 				_ => format!("{:?}", e)
 			};
 
-			cloned_app.track_event("Error", Some(json!({ "error": error.to_owned() })));
 			send_request(&cloned_app, Request::Global(GlobalRequest::ErrorReport { error }))
 				.expect("Couldn't send error report to frontend");
 		}

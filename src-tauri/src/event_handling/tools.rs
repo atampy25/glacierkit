@@ -638,8 +638,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.context("File key was not string")?
 					== "0057C2C3941115CA"
 				{
-					if let Some(game_files) = app_state.game_files.load().as_ref()
-					{
+					if let Some(game_files) = app_state.game_files.load().as_ref() {
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
 								&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
@@ -731,8 +730,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::ConvertUnlockablesPatchToJsonPatch { path } => {
-				if let Some(game_files) = app_state.game_files.load().as_ref()
-				{
+				if let Some(game_files) = app_state.game_files.load().as_ref() {
 					let mut current = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
 							&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1

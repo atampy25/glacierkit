@@ -25,6 +25,7 @@
 	import { checkUpdate, installUpdate, type UpdateManifest } from "@tauri-apps/api/updater"
 	import { getVersion } from "@tauri-apps/api/app"
 	import { relaunch } from "@tauri-apps/api/process"
+	import { event } from "$lib/utils"
 
 	let tasks: [string, string][] = []
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
@@ -36,7 +37,9 @@
 
 	window.addEventListener("error", (evt) => {
 		if (evt.error) {
-			errorModalError = String(evt.error)
+			void trackEvent("Frontend error", { error: String(evt.error), stack: evt.error.stack })
+
+			errorModalError = `${String(evt.error)}, ${evt.error.stack}`
 			errorModalOpen = true
 			tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
 		}
@@ -75,6 +78,8 @@
 
 				if (request.type === "global" && request.data.type === "errorReport") {
 					console.log("Layout handling request", request)
+
+					void trackEvent("Error", { error: request.data.data.error })
 
 					errorModalError = request.data.data.error
 					errorModalOpen = true
@@ -327,12 +332,12 @@
 
 			try {
 				const { shouldUpdate, manifest } = await checkUpdate()
-	
+
 				if (shouldUpdate) {
-				updateManifest = manifest!
-	
+					updateManifest = manifest!
+
 					const currentVersion = await getVersion()
-	
+
 					const commits = await (
 						await fetch("https://api.github.com/repos/atampy25/glacierkit/commits", {
 							headers: {
@@ -340,9 +345,9 @@
 							}
 						})
 					).json()
-	
+
 					commits.reverse()
-	
+
 					const prevVersionCommit = await (
 						await fetch(`https://api.github.com/repos/atampy25/glacierkit/commits/${currentVersion}`, {
 							headers: {
@@ -350,10 +355,13 @@
 							}
 						})
 					).json()
-	
+
 					// Exclude last version commit and its post-update commit
-					commitsSinceLastVersion = commits.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2).map((a: { commit: { message: string } }) => a.commit.message).filter((a: string) => a !== "Post-update")
-	
+					commitsSinceLastVersion = commits
+						.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2)
+						.map((a: { commit: { message: string } }) => a.commit.message)
+						.filter((a: string) => a !== "Post-update")
+
 					updateModalOpen = true
 				}
 			} catch (e) {
@@ -376,16 +384,31 @@
 
 <ComposedModal
 	open={errorModalOpen}
-	on:submit={() => {
+	on:click:button--primary={async () => {
 		errorModalOpen = false
+
+		await event({
+			type: "global",
+			data: {
+				type: "uploadLogAndReport",
+				data: errorModalError
+			}
+		})
 	}}
 >
 	<ModalHeader title="Error" />
 	<ModalBody>
-		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability.
+		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability. You can send your log file to Atampy26 to help fix
+		this issue. If you choose not to, you can find it in <code>%appdata%\app.glacierkit\logs</code>.
 		<pre class="mt-2 p-4 bg-neutral-800 overflow-x-auto"><code>{errorModalError}</code></pre>
 	</ModalBody>
-	<ModalFooter danger primaryButtonText="Continue" />
+	<ModalFooter
+		primaryButtonText="Upload log and continue"
+		secondaryButtonText="Continue without uploading log"
+		on:click:button--secondary={() => {
+			errorModalOpen = false
+		}}
+	/>
 </ComposedModal>
 
 <ComposedModal
@@ -419,7 +442,9 @@
 	<SkipToContent />
 
 	<!-- svelte-ignore a11y-missing-attribute -->
-	<a data-tauri-drag-region class:bx--header__name={true} use:help={{ title: "GlacierKit title", description: "This is in fact the app you are using." }}>GlacierKit<span class="font-normal ml-1">{#await getVersion() then x}{x}{/await}</span></a>
+	<a data-tauri-drag-region class:bx--header__name={true} use:help={{ title: "GlacierKit title", description: "This is in fact the app you are using." }}
+		>GlacierKit<span class="font-normal ml-1">{#await getVersion() then x}{x}{/await}</span></a
+	>
 
 	<div data-tauri-drag-region class="pointer-events-none cursor-none w-full text-center text-neutral-400">{windowTitle}</div>
 
