@@ -7,8 +7,6 @@ use hitman_commons::metadata::ResourceType;
 use hitman_commons::resourcelib::{
 	EntityBlueprint, EntityBlueprintLegacy, EntityFactory, EntityFactoryLegacy, Property
 };
-use lazy_static::lazy_static;
-use rsevents_extra::Semaphore;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
@@ -23,16 +21,9 @@ use self::bindings_2016::{
 };
 use self::bindings_3::{HM3_GetConverterForResource, HM3_GetGeneratorForResource, JsonString as JsonString3};
 
-lazy_static! {
-	static ref CONVERTER_SEMAPHORE: Semaphore = Semaphore::new(1, 1);
-	static ref GENERATOR_SEMAPHORE: Semaphore = Semaphore::new(1, 1);
-}
-
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
 pub fn h3_convert_binary_to_factory(data: &[u8]) -> Result<EntityFactory> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("TEMP")?.as_ptr());
 
@@ -66,8 +57,6 @@ pub fn h3_convert_binary_to_factory(data: &[u8]) -> Result<EntityFactory> {
 #[try_fn]
 #[context("Couldn't convert ResourceLib TEMP to binary data")]
 pub fn h3_convert_factory_to_binary(data: &EntityFactory) -> Result<Vec<u8>> {
-	let _lock = GENERATOR_SEMAPHORE.wait();
-
 	unsafe {
 		let generator = HM3_GetGeneratorForResource(CString::new("TEMP")?.as_ptr());
 
@@ -99,8 +88,6 @@ pub fn h3_convert_factory_to_binary(data: &EntityFactory) -> Result<Vec<u8>> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TBLU")]
 pub fn h3_convert_binary_to_blueprint(data: &[u8]) -> Result<EntityBlueprint> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("TBLU")?.as_ptr());
 
@@ -134,8 +121,6 @@ pub fn h3_convert_binary_to_blueprint(data: &[u8]) -> Result<EntityBlueprint> {
 #[try_fn]
 #[context("Couldn't convert ResourceLib TBLU to binary data")]
 pub fn h3_convert_blueprint_to_binary(data: &EntityBlueprint) -> Result<Vec<u8>> {
-	let _lock = GENERATOR_SEMAPHORE.wait();
-
 	unsafe {
 		let generator = HM3_GetGeneratorForResource(CString::new("TBLU")?.as_ptr());
 
@@ -174,8 +159,6 @@ pub struct SCppEntity {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib CPPT")]
 pub fn h3_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("CPPT")?.as_ptr());
 
@@ -214,8 +197,6 @@ pub struct SwitchGroup {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib DSWB")]
 pub fn h3_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("DSWB")?.as_ptr());
 
@@ -249,8 +230,6 @@ pub fn h3_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib WSGB")]
 pub fn h3_convert_wsgb(data: &[u8]) -> Result<SwitchGroup> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("WSGB")?.as_ptr());
 
@@ -312,8 +291,6 @@ pub enum EExtendedPropertyType {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib ECPB")]
 pub fn h3_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("ECPB")?.as_ptr());
 
@@ -380,8 +357,6 @@ pub enum EAttributeType {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib UICB")]
 pub fn convert_uicb(data: &[u8]) -> Result<SUIControlBlueprint> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM3_GetConverterForResource(CString::new("UICB")?.as_ptr());
 
@@ -415,8 +390,6 @@ pub fn convert_uicb(data: &[u8]) -> Result<SUIControlBlueprint> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
 pub fn h2_convert_binary_to_factory(data: &[u8]) -> Result<EntityFactory> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2_GetConverterForResource(CString::new("TEMP")?.as_ptr());
 
@@ -450,8 +423,6 @@ pub fn h2_convert_binary_to_factory(data: &[u8]) -> Result<EntityFactory> {
 #[try_fn]
 #[context("Couldn't convert ResourceLib TEMP to binary data")]
 pub fn h2_convert_factory_to_binary(data: &EntityFactory) -> Result<Vec<u8>> {
-	let _lock = GENERATOR_SEMAPHORE.wait();
-
 	unsafe {
 		let generator = HM2_GetGeneratorForResource(CString::new("TEMP")?.as_ptr());
 
@@ -483,8 +454,6 @@ pub fn h2_convert_factory_to_binary(data: &EntityFactory) -> Result<Vec<u8>> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TBLU")]
 pub fn h2_convert_binary_to_blueprint(data: &[u8]) -> Result<EntityBlueprint> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2_GetConverterForResource(CString::new("TBLU")?.as_ptr());
 
@@ -518,8 +487,6 @@ pub fn h2_convert_binary_to_blueprint(data: &[u8]) -> Result<EntityBlueprint> {
 #[try_fn]
 #[context("Couldn't convert ResourceLib TBLU to binary data")]
 pub fn h2_convert_blueprint_to_binary(data: &EntityBlueprint) -> Result<Vec<u8>> {
-	let _lock = GENERATOR_SEMAPHORE.wait();
-
 	unsafe {
 		let generator = HM2_GetGeneratorForResource(CString::new("TBLU")?.as_ptr());
 
@@ -551,8 +518,6 @@ pub fn h2_convert_blueprint_to_binary(data: &EntityBlueprint) -> Result<Vec<u8>>
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib CPPT")]
 pub fn h2_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2_GetConverterForResource(CString::new("CPPT")?.as_ptr());
 
@@ -586,8 +551,6 @@ pub fn h2_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib DSWB")]
 pub fn h2_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2_GetConverterForResource(CString::new("DSWB")?.as_ptr());
 
@@ -621,8 +584,6 @@ pub fn h2_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib WSGB")]
 pub fn h2_convert_wsgb(data: &[u8]) -> Result<SwitchGroup> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2_GetConverterForResource(CString::new("WSGB")?.as_ptr());
 
@@ -656,8 +617,6 @@ pub fn h2_convert_wsgb(data: &[u8]) -> Result<SwitchGroup> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib ECPB")]
 pub fn h2_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2_GetConverterForResource(CString::new("ECPB")?.as_ptr());
 
@@ -691,8 +650,6 @@ pub fn h2_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]
 pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<EntityFactoryLegacy> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2016_GetConverterForResource(CString::new("TEMP")?.as_ptr());
 
@@ -726,8 +683,6 @@ pub fn h2016_convert_binary_to_factory(data: &[u8]) -> Result<EntityFactoryLegac
 #[try_fn]
 #[context("Couldn't convert ResourceLib TEMP to binary data")]
 pub fn h2016_convert_factory_to_binary(data: &EntityFactoryLegacy) -> Result<Vec<u8>> {
-	let _lock = GENERATOR_SEMAPHORE.wait();
-
 	unsafe {
 		let generator = HM2016_GetGeneratorForResource(CString::new("TEMP")?.as_ptr());
 
@@ -759,8 +714,6 @@ pub fn h2016_convert_factory_to_binary(data: &EntityFactoryLegacy) -> Result<Vec
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TBLU")]
 pub fn h2016_convert_binary_to_blueprint(data: &[u8]) -> Result<EntityBlueprintLegacy> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2016_GetConverterForResource(CString::new("TBLU")?.as_ptr());
 
@@ -794,8 +747,6 @@ pub fn h2016_convert_binary_to_blueprint(data: &[u8]) -> Result<EntityBlueprintL
 #[try_fn]
 #[context("Couldn't convert ResourceLib TBLU to binary data")]
 pub fn h2016_convert_blueprint_to_binary(data: &EntityBlueprintLegacy) -> Result<Vec<u8>> {
-	let _lock = GENERATOR_SEMAPHORE.wait();
-
 	unsafe {
 		let generator = HM2016_GetGeneratorForResource(CString::new("TBLU")?.as_ptr());
 
@@ -827,8 +778,6 @@ pub fn h2016_convert_blueprint_to_binary(data: &EntityBlueprintLegacy) -> Result
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib CPPT")]
 pub fn h2016_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2016_GetConverterForResource(CString::new("CPPT")?.as_ptr());
 
@@ -862,8 +811,6 @@ pub fn h2016_convert_cppt(data: &[u8]) -> Result<SCppEntity> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib DSWB")]
 pub fn h2016_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2016_GetConverterForResource(CString::new("DSWB")?.as_ptr());
 
@@ -897,8 +844,6 @@ pub fn h2016_convert_dswb(data: &[u8]) -> Result<SwitchGroup> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib ECPB")]
 pub fn h2016_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2016_GetConverterForResource(CString::new("ECPB")?.as_ptr());
 
@@ -932,8 +877,6 @@ pub fn h2016_convert_ecpb(data: &[u8]) -> Result<SExtendedCppEntityBlueprint> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib WSGB")]
 pub fn h2016_convert_wsgb(data: &[u8]) -> Result<SwitchGroup> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		let converter = HM2016_GetConverterForResource(CString::new("WSGB")?.as_ptr());
 
@@ -967,8 +910,6 @@ pub fn h2016_convert_wsgb(data: &[u8]) -> Result<SwitchGroup> {
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib format")]
 pub fn convert_generic<T: DeserializeOwned>(data: &[u8], game: GameVersion, resource_type: ResourceType) -> Result<T> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		match game {
 			GameVersion::H1 => {
@@ -1064,8 +1005,6 @@ pub fn convert_generic<T: DeserializeOwned>(data: &[u8], game: GameVersion, reso
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib format")]
 pub fn convert_generic_str(data: &[u8], game: GameVersion, resource_type: ResourceType) -> Result<String> {
-	let _lock = CONVERTER_SEMAPHORE.wait();
-
 	unsafe {
 		match game {
 			GameVersion::H1 => {

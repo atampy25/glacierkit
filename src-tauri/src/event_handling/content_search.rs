@@ -114,10 +114,7 @@ pub fn start_content_search(
 
 											let (tblu_data, tblu_meta) = (
 												partition.read_resource(&tblu_rrid).ok()?,
-												RpkgResourceMeta::try_from(
-													partition.get_resource_info(&tblu_rrid).ok()?
-												)
-												.ok()?
+												RpkgResourceMeta::from(partition.get_resource_info(&tblu_rrid).ok()?)
 											);
 
 											let blueprint = match game_version {
