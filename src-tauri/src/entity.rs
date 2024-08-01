@@ -612,7 +612,7 @@ pub fn get_line_decoration(
 	game_version: GameVersion,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	line: ResourceID
-) -> Result<String> {
+) -> Result<Option<String>> {
 	let (res_meta, res_data) = extract_latest_resource(game_files, line)?;
 
 	let (locr_meta, locr_data) = extract_latest_resource(
@@ -671,31 +671,15 @@ pub fn get_line_decoration(
 			.get("en")
 			.context("No en key in LOCR")?
 			.get(&line_str)
-			.unwrap_or(
-				locr.languages
-					.get("xx")
-					.context("No xx key in LOCR")?
-					.get(&line_str)
-					.context("No value in xx for key")?
-			)
-			.as_str()
-			.context("LOCR key was not string")?
-			.to_owned()
+			.or_else(|| locr.languages.get("xx").and_then(|x| x.get(&line_str)))
+			.and_then(|x| x.as_str().to_owned())
 	} else {
 		locr.languages
 			.get("en")
 			.context("No en key in LOCR")?
 			.get(&line_hash)
-			.unwrap_or(
-				locr.languages
-					.get("xx")
-					.context("No xx key in LOCR")?
-					.get(&line_hash)
-					.context("No value in xx for key")?
-			)
-			.as_str()
-			.context("LOCR key was not string")?
-			.to_owned()
+			.or_else(|| locr.languages.get("xx").and_then(|x| x.get(&line_hash)))
+			.and_then(|x| x.as_str().to_owned())
 	}
 }
 

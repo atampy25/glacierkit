@@ -398,8 +398,8 @@
 >
 	<ModalHeader title="Error" />
 	<ModalBody>
-		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability. You can send your log file to Atampy26 to help fix
-		this issue. If you choose not to, you can find it in <code>%appdata%\app.glacierkit\logs</code>.
+		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability. You can send your log file to Atampy26
+		automatically to help fix this issue. If you choose not to, you can find it in <code>%appdata%\app.glacierkit\logs</code>.
 		<pre class="mt-2 p-4 bg-neutral-800 overflow-x-auto"><code>{errorModalError}</code></pre>
 	</ModalBody>
 	<ModalFooter
