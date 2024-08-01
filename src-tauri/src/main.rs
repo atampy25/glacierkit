@@ -141,7 +141,7 @@ fn main() {
 					client.track_event(
 						"Panic",
 						Some(json!({
-						  "info": format!("{} - {}", msg, location),
+						  "info": format!("{} - {}", location, msg),
 						}))
 					);
 				}))
