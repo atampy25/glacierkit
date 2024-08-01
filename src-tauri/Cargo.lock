@@ -2606,7 +2606,7 @@ dependencies = [
 [[package]]
 name = "hitman-formats"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-formats#6fa86abb904adff3dceeae119a2a91ad97760205"
+source = "git+https://github.com/atampy25/hitman-formats#59e7bdf78fd8af91f63e6ab3566283e12a2759de"
 dependencies = [
  "hex",
  "hitman-commons",
