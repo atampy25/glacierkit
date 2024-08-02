@@ -7,7 +7,6 @@
 #![allow(clippy::type_complexity)]
 #![feature(let_chains)]
 #![feature(async_closure)]
-#![feature(cursor_remaining)]
 #![feature(option_get_or_insert_default)]
 
 pub mod biome;

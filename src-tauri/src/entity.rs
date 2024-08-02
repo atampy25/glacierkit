@@ -672,14 +672,16 @@ pub fn get_line_decoration(
 			.context("No en key in LOCR")?
 			.get(&line_str)
 			.or_else(|| locr.languages.get("xx").and_then(|x| x.get(&line_str)))
-			.and_then(|x| x.as_str().to_owned())
+			.and_then(|x| x.as_str())
+			.map(|x| x.to_owned())
 	} else {
 		locr.languages
 			.get("en")
 			.context("No en key in LOCR")?
 			.get(&line_hash)
 			.or_else(|| locr.languages.get("xx").and_then(|x| x.get(&line_hash)))
-			.and_then(|x| x.as_str().to_owned())
+			.and_then(|x| x.as_str())
+			.map(|x| x.to_owned())
 	}
 }
 
@@ -784,15 +786,14 @@ pub fn get_decorations(
 			if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 				&& entry.resource_type == "LINE"
 			{
-				decorations.push((
-					res.to_owned(),
-					get_line_decoration(
-						game_files,
-						game_version,
-						tonytools_hash_list,
-						ResourceID::from_any(res)?
-					)?
-				));
+				if let Some(decoration) = get_line_decoration(
+					game_files,
+					game_version,
+					tonytools_hash_list,
+					ResourceID::from_any(res)?
+				)? {
+					decorations.push((res.to_owned(), decoration));
+				}
 			} else if res.starts_with('0') {
 				if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 					if let Some(hint) = entry.hint.as_ref() {
@@ -816,15 +817,14 @@ pub fn get_decorations(
 				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 					&& entry.resource_type == "LINE"
 				{
-					decorations.push((
-						res.to_owned(),
-						get_line_decoration(
-							game_files,
-							game_version,
-							tonytools_hash_list,
-							ResourceID::from_any(res)?
-						)?
-					));
+					if let Some(decoration) = get_line_decoration(
+						game_files,
+						game_version,
+						tonytools_hash_list,
+						ResourceID::from_any(res)?
+					)? {
+						decorations.push((res.to_owned(), decoration));
+					}
 				} else if res.starts_with('0') {
 					if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 						if let Some(hint) = entry.hint.as_ref() {
@@ -901,15 +901,14 @@ pub fn get_decorations(
 				if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 					&& entry.resource_type == "LINE"
 				{
-					decorations.push((
-						res.to_owned(),
-						get_line_decoration(
-							game_files,
-							game_version,
-							tonytools_hash_list,
-							ResourceID::from_any(res)?
-						)?
-					));
+					if let Some(decoration) = get_line_decoration(
+						game_files,
+						game_version,
+						tonytools_hash_list,
+						ResourceID::from_any(res)?
+					)? {
+						decorations.push((res.to_owned(), decoration));
+					}
 				} else if res.starts_with('0') {
 					if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 						if let Some(hint) = entry.hint.as_ref() {
@@ -933,15 +932,14 @@ pub fn get_decorations(
 					if let Some(entry) = hash_list.entries.get(&ResourceID::from_any(res)?)
 						&& entry.resource_type == "LINE"
 					{
-						decorations.push((
-							res.to_owned(),
-							get_line_decoration(
-								game_files,
-								game_version,
-								tonytools_hash_list,
-								ResourceID::from_any(res)?
-							)?
-						));
+						if let Some(decoration) = get_line_decoration(
+							game_files,
+							game_version,
+							tonytools_hash_list,
+							ResourceID::from_any(res)?
+						)? {
+							decorations.push((res.to_owned(), decoration));
+						}
 					} else if res.starts_with('0') {
 						if let Some(entry) = hash_list.entries.get(&ResourceID::from_str(res)?) {
 							if let Some(hint) = entry.hint.as_ref() {
