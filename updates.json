@@ -1,11 +1,11 @@
 {
-	"version": "1.3.0",
-	"notes": "Fix middle click actions when scrollbar is present",
-	"pub_date": "2024-07-26T17:14:53Z",
+	"version": "1.3.5",
+	"notes": "Fix \"fix decorations for nonexistent LINEs\"",
+	"pub_date": "2024-08-01T08:42:56Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1REUXFBRTFweTlWNUlUc1N2NURiUTNJb1IvTkZURkpub0lvWGJpbFB3ZkQ1enRiSmJPQzJlRitOYTc3enF6bmkvZ1BEVmhYSTg4b3dDOTJ4dzgzdWc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyMTUwNDQ4CWZpbGU6R2xhY2llcktpdF8xLjMuMF94NjRfZW4tVVMubXNpLnppcAptL2VWRVZFUlVlNStzM2IyamFhOWhqM01nV3lmejJPV1BPYmtLSGdrdU9jV2M5RXBiTWN0MDltSk9FZzA0cDMxODMwQVFHaDFreEdrVlRDb0c1NkhCUT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.3.0/GlacierKit_1.3.0_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1ZNVmxCN1VGVlpzT01EZjNVbjIrOGhWUzNobU9zbWxTMnNXRklwZzE0YmVnWVZJakJnRnFzR1JDald5d080RUhFaHA3VGRwVFpKRjRvYTlQNVBuSVFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyNjA0MDEwCWZpbGU6R2xhY2llcktpdF8xLjMuNV94NjRfZW4tVVMubXNpLnppcAo5NWJ2NFhzUEJ6cGVNZUpSOGVCR1hFVDB5R0JjMDlXYTNLbE93UmNTcGx2OGt6MDMwNlFxYlhIY2xQTGVmdFhWeWRBcHhoTy91d1Jicll5Z25PWVBDQT09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.3.5/GlacierKit_1.3.5_x64_en-US.msi.zip"
 		}
 	}
 }
