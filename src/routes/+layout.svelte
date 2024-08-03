@@ -101,6 +101,18 @@
 						})
 					)
 				}
+
+				if (request.type === "global" && request.data.type === "requestLastPanicUpload") {
+					console.log("Layout handling request", request)
+
+					lastPanicModalOpen = true
+				}
+
+				if (request.type === "global" && request.data.type === "logUploadRejected") {
+					console.log("Layout handling request", request)
+
+					logUploadRejectedModalOpen = true
+				}
 			})
 
 			destroyFunc.run = () => {
@@ -380,6 +392,10 @@
 	let updateModalOpen = false
 	let updateManifest: UpdateManifest = { version: "", date: "", body: "" }
 	let commitsSinceLastVersion: string[] = []
+
+	let lastPanicModalOpen = false
+
+	let logUploadRejectedModalOpen = false
 </script>
 
 <ComposedModal
@@ -409,6 +425,54 @@
 			errorModalOpen = false
 		}}
 	/>
+</ComposedModal>
+
+<ComposedModal
+	open={lastPanicModalOpen}
+	on:click:button--primary={async () => {
+		lastPanicModalOpen = false
+
+		await event({
+			type: "global",
+			data: {
+				type: "uploadLastPanic"
+			}
+		})
+	}}
+>
+	<ModalHeader title="Crash report" />
+	<ModalBody>
+		It seems GlacierKit crashed the last time it was used. You can send a crash report, including your log and the error message, to Atampy26 automatically to help fix this issue. If you choose
+		not to, you can find it in <code>%appdata%\app.glacierkit</code>.
+		<pre class="mt-2 p-4 bg-neutral-800 overflow-x-auto"><code>{errorModalError}</code></pre>
+	</ModalBody>
+	<ModalFooter
+		primaryButtonText="Send crash report"
+		secondaryButtonText="Continue without sending report"
+		on:click:button--secondary={async () => {
+			lastPanicModalOpen = false
+
+			await event({
+				type: "global",
+				data: {
+					type: "clearLastPanic"
+				}
+			})
+		}}
+	/>
+</ComposedModal>
+
+<ComposedModal
+	open={logUploadRejectedModalOpen}
+	on:submit={() => {
+		logUploadRejectedModalOpen = false
+	}}
+>
+	<ModalHeader title="Upload failed" />
+	<ModalBody>
+		The file is likely too large to be uploaded automatically. You can find it in <code>%appdata%\app.glacierkit</code>; please send it to Atampy26 via Discord.
+	</ModalBody>
+	<ModalFooter primaryButtonText="OK" />
 </ComposedModal>
 
 <ComposedModal

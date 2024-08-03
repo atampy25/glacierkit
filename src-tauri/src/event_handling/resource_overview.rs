@@ -846,10 +846,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(save_handle.path(), data)?;
 
 					fs::write(
-						save_handle.path().parent().unwrap().join(format!(
-							"{}.meta",
-							save_handle.path().file_name().unwrap().to_string_lossy()
-						)),
+						save_handle
+							.path()
+							.parent()
+							.unwrap()
+							.join(format!("{}.{}.meta", hash, file_type)),
 						metadata_file
 					)?;
 				}
@@ -912,9 +913,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
 				let (metadata, data) = extract_latest_resource(game_files, hash)?;
-				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false)
-					.to_binary()
-					.context("Couldn't serialise meta file")?;
+				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false);
 
 				let data = match get_loaded_game_version(app, install)? {
 					GameVersion::H1 => to_vec(
@@ -948,11 +947,12 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(save_handle.path(), data)?;
 
 					fs::write(
-						save_handle.path().parent().unwrap().join(format!(
-							"{}.meta",
-							save_handle.path().file_name().unwrap().to_string_lossy()
-						)),
-						metadata_file
+						save_handle
+							.path()
+							.parent()
+							.unwrap()
+							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
+						to_string(&metadata_file).context("Couldn't serialise meta file")?
 					)?;
 				}
 			}
@@ -1007,10 +1007,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(save_handle.path(), data)?;
 
 					fs::write(
-						save_handle.path().parent().unwrap().join(format!(
-							"{}.meta",
-							save_handle.path().file_name().unwrap().to_string_lossy()
-						)),
+						save_handle
+							.path()
+							.parent()
+							.unwrap()
+							.join(format!("{}.{}.meta", hash, metadata.core_info.resource_type)),
 						metadata_file
 					)?;
 				}
@@ -1049,9 +1050,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?
 				)?;
 
-				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false)
-					.to_binary()
-					.context("Couldn't serialise meta file")?;
+				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false);
 
 				let data = match game_version {
 					GameVersion::H1 => to_vec(
@@ -1077,7 +1076,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(save_handle) = dialog
-					.set_file_name(&format!("{}.TBLU", metadata.core_info.id))
+					.set_file_name(&format!("{}.TBLU.json", metadata.core_info.id))
 					.add_filter("TBLU.json file", &["TBLU.json"])
 					.save_file()
 					.await
@@ -1085,11 +1084,12 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(save_handle.path(), data)?;
 
 					fs::write(
-						save_handle.path().parent().unwrap().join(format!(
-							"{}.meta",
-							save_handle.path().file_name().unwrap().to_string_lossy()
-						)),
-						metadata_file
+						save_handle
+							.path()
+							.parent()
+							.unwrap()
+							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
+						to_string(&metadata_file).context("Couldn't serialise meta file")?
 					)?;
 				}
 			}
@@ -1134,6 +1134,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							get_loaded_game_version(app, install)?,
 							res_meta.core_info.resource_type
 						)?)?
+					)?;
+
+					fs::write(
+						save_handle
+							.path()
+							.parent()
+							.unwrap()
+							.join(format!("{}.{}.meta.json", hash, res_meta.core_info.resource_type)),
+						to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))
+							.context("Couldn't serialise meta file")?
 					)?;
 				}
 			}

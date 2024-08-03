@@ -24,10 +24,13 @@ pub mod rpkg;
 pub mod show_in_folder;
 
 use std::{
+	backtrace::{Backtrace, BacktraceStatus},
+	cell::Cell,
+	fmt::Write,
 	fs,
 	path::{Path, PathBuf},
 	sync::Arc,
-	time::Duration
+	time::{Duration, SystemTime, UNIX_EPOCH}
 };
 
 use anyhow::{anyhow, bail, Context, Error, Result};
@@ -56,11 +59,15 @@ use model::{
 };
 use notify::Watcher;
 use quickentity_rs::{generate_patch, qn_structs::Property};
+use rand::{thread_rng, Rng};
 use rfd::AsyncFileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
-use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
+use tauri::{
+	api::process::Command,
+	async_runtime, AppHandle, Manager
+};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_log::LogTarget;
 use tryvial::try_fn;
@@ -85,6 +92,9 @@ pub const TONYTOOLS_HASH_LIST_ENDPOINT: &str =
 
 pub const UPLOAD_LOG_ENDPOINT: &str = "https://hitman-resources.netlify.app/.netlify/functions/upload-gk-log";
 
+thread_local!(static IS_MAIN_THREAD: Cell<bool> = const { Cell::new(false) });
+thread_local!(static LOG_DIR: Cell<PathBuf> = Cell::new(Default::default()));
+
 pub trait RunCommandExt {
 	/// Run the command, returning its stdout. If the command fails (status code non-zero), an error is returned with the stderr output.
 	fn run(self) -> Result<String>;
@@ -105,6 +115,8 @@ impl RunCommandExt for Command {
 }
 
 fn main() {
+	IS_MAIN_THREAD.set(true);
+
 	let specta = {
 		let specta_builder =
 			tauri_specta::ts::builder().commands(tauri_specta::collect_commands![event, show_in_folder]);
@@ -131,18 +143,61 @@ fn main() {
 					host: Some("http://159.13.49.212".into()),
 					flush_interval: None
 				})
-				.with_panic_hook(Box::new(|client, info, msg| {
-					let location = info
-						.location()
-						.map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
-						.unwrap_or_default();
+				.with_panic_hook(Box::new(move |client, info, msg| {
+					if IS_MAIN_THREAD.get() {
+						let location = info
+							.location()
+							.map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
+							.unwrap_or_default();
 
-					client.track_event(
-						"Panic",
-						Some(json!({
-						  "info": format!("{} - {}", location, msg),
-						}))
-					);
+						client.track_event(
+							"Panic",
+							Some(json!({
+							  "info": format!("{} - {}", location, msg),
+							}))
+						);
+
+						let mut panic_report = String::new();
+
+						let _ = writeln!(&mut panic_report, "GlacierKit v{}", env!("CARGO_PKG_VERSION"));
+						let _ = writeln!(&mut panic_report, "Panic in {} - {}", location, msg);
+						let _ = writeln!(
+							&mut panic_report,
+							"Panic time: {}",
+							SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+						);
+						let _ = writeln!(&mut panic_report, "System information: {}", os_info::get());
+						let _ = writeln!(&mut panic_report, "---");
+						let backtrace = Backtrace::force_capture();
+						match backtrace.status() {
+							BacktraceStatus::Disabled => {
+								let _ = writeln!(&mut panic_report, "Backtrace disabled");
+							}
+
+							BacktraceStatus::Unsupported => {
+								let _ = writeln!(&mut panic_report, "Backtrace unsupported");
+							}
+
+							BacktraceStatus::Captured => {
+								let _ = writeln!(&mut panic_report, "Backtrace:");
+								let _ = writeln!(&mut panic_report, "{}", backtrace);
+							}
+
+							_ => {
+								let _ = writeln!(&mut panic_report, "Backtrace unavailable");
+							}
+						}
+						let _ = writeln!(&mut panic_report, "---");
+						let log_dir = LOG_DIR.take();
+						if let Ok(log_contents) = fs::read_to_string(log_dir.join("GlacierKit.log")) {
+							let _ = writeln!(&mut panic_report, "Log:");
+							let _ = write!(&mut panic_report, "{}", log_contents);
+						} else {
+							let _ = writeln!(&mut panic_report, "Log unavailable");
+						}
+
+						let _ = fs::write(log_dir.join("..").join("last_panic.txt"), panic_report);
+					}
 				}))
 				.build()
 		)
@@ -155,6 +210,8 @@ fn main() {
 		)
 		.plugin(specta)
 		.setup(|app| {
+			LOG_DIR.set(app.path_resolver().app_log_dir().expect("Couldn't get log dir"));
+
 			app.track_event("App started", None);
 
 			info!("Starting app");
@@ -1275,7 +1332,63 @@ fn event(app: AppHandle, event: Event) {
 							{
 								let log_url = res.text().await.context("Couldn't decode log upload response")?;
 								app.track_event("Error with log", Some(json!({ "error": error, "log": log_url })));
+							} else {
+								send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
 							}
+						}
+
+						GlobalEvent::UploadLastPanic => {
+							let last_panic = fs::read_to_string(
+								app.path_resolver()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("..")
+									.join("last_panic.txt")
+							)
+							.context("Couldn't read panic report")?;
+
+							if let Ok(res) = reqwest::Client::new()
+								.post(UPLOAD_LOG_ENDPOINT)
+								.json(&json!({
+									"content": last_panic
+								}))
+								.send()
+								.await
+								.and_then(|x| x.error_for_status())
+							{
+								let report_url = res.text().await.context("Couldn't decode report upload response")?;
+								app.track_event("Panic report", Some(json!({ "report": report_url })));
+							} else {
+								send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
+							}
+
+							fs::rename(
+								app.path_resolver()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("..")
+									.join("last_panic.txt"),
+								app.path_resolver()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("..")
+									.join(format!("panic_{}.txt", thread_rng().gen::<u32>()))
+							)?;
+						}
+
+						GlobalEvent::ClearLastPanic => {
+							fs::rename(
+								app.path_resolver()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("..")
+									.join("last_panic.txt"),
+								app.path_resolver()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("..")
+									.join(format!("panic_{}.txt", thread_rng().gen::<u32>()))
+							)?;
 						}
 					},
 

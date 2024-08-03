@@ -709,7 +709,9 @@ strike! {
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid),
-			UploadLogAndReport(String)
+			UploadLogAndReport(String),
+			UploadLastPanic,
+			ClearLastPanic
 		}),
 
 		EditorConnection(pub enum EditorConnectionEvent {
@@ -1098,7 +1100,9 @@ strike! {
 				current: Value,
 				save_path: PathBuf,
 				file_and_type: (String, String)
-			}
+			},
+			RequestLastPanicUpload,
+			LogUploadRejected
 		})
 	}
 }

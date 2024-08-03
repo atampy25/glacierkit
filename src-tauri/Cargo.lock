@@ -186,6 +186,7 @@ dependencies = [
  "measure_time",
  "notify",
  "notify-debouncer-full",
+ "os_info",
  "parking_lot",
  "quickentity-rs",
  "rand 0.8.5",

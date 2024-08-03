@@ -1026,6 +1026,17 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					}))
 				)?;
 
+				if app
+					.path_resolver()
+					.app_log_dir()
+					.context("Couldn't get log dir")?
+					.join("..")
+					.join("last_panic.txt")
+					.exists()
+				{
+					send_request(app, Request::Global(GlobalRequest::RequestLastPanicUpload))?;
+				}
+
 				load_game_files(app).await?;
 
 				let app = app.clone();
