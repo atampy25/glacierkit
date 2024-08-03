@@ -1,11 +1,11 @@
 {
-	"version": "1.3.5",
-	"notes": "Fix \"fix decorations for nonexistent LINEs\"",
-	"pub_date": "2024-08-01T08:42:56Z",
+	"version": "1.4.0",
+	"notes": "Better CTD handling",
+	"pub_date": "2024-08-02T13:07:01Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1ZNVmxCN1VGVlpzT01EZjNVbjIrOGhWUzNobU9zbWxTMnNXRklwZzE0YmVnWVZJakJnRnFzR1JDald5d080RUhFaHA3VGRwVFpKRjRvYTlQNVBuSVFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyNjA0MDEwCWZpbGU6R2xhY2llcktpdF8xLjMuNV94NjRfZW4tVVMubXNpLnppcAo5NWJ2NFhzUEJ6cGVNZUpSOGVCR1hFVDB5R0JjMDlXYTNLbE93UmNTcGx2OGt6MDMwNlFxYlhIY2xQTGVmdFhWeWRBcHhoTy91d1Jicll5Z25PWVBDQT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.3.5/GlacierKit_1.3.5_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2JmaGFYVXlwU3VPL0lUbHh6OWRlTm1pTkRNdFlWNzJ5YlUvT3VRSGlCSXRrdWVuN2xXSG9kcUVDNDhWdnFnbmZneUw1Wk91dk1kV3VGcytPekZDS3dRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyNjc0MjYxCWZpbGU6R2xhY2llcktpdF8xLjQuMF94NjRfZW4tVVMubXNpLnppcApidmtEbStpN2hUenZ2SENiRjh1ckdLWFRVTnRPV0NJMjM5ZmI1SXN1K2NRTzJDYlg4WHF3NENHQXNCN21tRWNWdlM0dVRxYXBVeHVFM2g0aHFMVnhCQT09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.4.0/GlacierKit_1.4.0_x64_en-US.msi.zip"
 		}
 	}
 }
