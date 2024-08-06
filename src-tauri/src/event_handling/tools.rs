@@ -3,7 +3,7 @@ use std::{fs, ops::Deref, time::Duration};
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
-use hitman_commons::{game::GameVersion, metadata::ResourceID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -233,7 +233,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								&app_state.cached_entities,
 								get_loaded_game_version(app, install)?,
 								hash_list,
-								ResourceID::from_any(&patch.factory_hash)?
+								RuntimeID::from_any(&patch.factory_hash)?
 							)?
 							.to_owned();
 
@@ -329,7 +329,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
 					let (temp_meta, temp_data) =
-						extract_latest_resource(game_files, ResourceID::from_any(&entity.factory_hash)?)?;
+						extract_latest_resource(game_files, RuntimeID::from_any(&entity.factory_hash)?)?;
 
 					let factory = match game_version {
 						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
@@ -426,7 +426,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
 						hash_list,
-						ResourceID::from_any(&patch.factory_hash)?
+						RuntimeID::from_any(&patch.factory_hash)?
 					)?
 					.to_owned();
 

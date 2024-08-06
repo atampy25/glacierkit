@@ -8,7 +8,7 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::ResourceID};
+use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -140,7 +140,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
 						hash_list,
-						ResourceID::from_any(&patch.factory_hash)?
+						RuntimeID::from_any(&patch.factory_hash)?
 					)?
 					.to_owned();
 
@@ -819,7 +819,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		finish_task(app, loading_task)?;
 		let task = start_task(app, "Caching reverse references")?;
 
-		let mut reverse_dependencies: DashMap<ResourceID, Vec<ResourceID>> = DashMap::new();
+		let mut reverse_dependencies: DashMap<RuntimeID, Vec<RuntimeID>> = DashMap::new();
 
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
 		let resources = partition_manager
@@ -829,7 +829,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			.flat_map(|partition| {
 				partition.latest_resources().into_par_iter().map(|(resource, _)| {
 					(
-						ResourceID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
+						RuntimeID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
 						resource.references()
 					)
 				})
@@ -1047,7 +1047,7 @@ pub async fn open_in_editor(
 	game_files: &PartitionManager,
 	install: &PathBuf,
 	hash_list: &HashList,
-	hash: ResourceID
+	hash: RuntimeID
 ) -> Result<()> {
 	let app_state = app.state::<AppState>();
 

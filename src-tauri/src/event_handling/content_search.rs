@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
-use hitman_commons::{game::GameVersion, metadata::ResourceID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::ores::{parse_hashes_ores, parse_json_ores};
 use itertools::Itertools;
 use quickentity_rs::convert_to_qn;
@@ -465,7 +465,7 @@ pub fn start_content_search(
 
 										let (locr_meta, locr_data) = extract_latest_resource(
 											game_files,
-											ResourceID::from_str(&res_meta.hash_reference_data.first()?.hash).ok()?
+											RuntimeID::from_str(&res_meta.hash_reference_data.first()?.hash).ok()?
 										)
 										.ok()?;
 
@@ -598,13 +598,13 @@ pub fn start_content_search(
 			.map(|hash| {
 				let filetype = hash_list
 					.entries
-					.get(&ResourceID::from_str(&hash).expect("Invalid ID added to matching array"))
+					.get(&RuntimeID::from_str(&hash).expect("Invalid ID added to matching array"))
 					.map(|x| x.resource_type.into())
 					.unwrap_or("".into());
 
 				let path = hash_list
 					.entries
-					.get(&ResourceID::from_str(&hash).expect("Invalid ID added to matching array"))
+					.get(&RuntimeID::from_str(&hash).expect("Invalid ID added to matching array"))
 					.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned());
 
 				(hash, filetype, path)

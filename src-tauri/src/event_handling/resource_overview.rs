@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::ResourceID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::{
 	ores::{parse_hashes_ores, parse_json_ores},
 	wwev::{WwiseEvent, WwiseEventData}
@@ -47,10 +47,10 @@ pub fn initialise_resource_overview(
 	app: &AppHandle,
 	app_state: &State<AppState>,
 	id: Uuid,
-	hash: ResourceID,
+	hash: RuntimeID,
 	game_files: &PartitionManager,
 	game_version: GameVersion,
-	resource_reverse_dependencies: &Arc<HashMap<ResourceID, Vec<ResourceID>>>,
+	resource_reverse_dependencies: &Arc<HashMap<RuntimeID, Vec<RuntimeID>>>,
 	hash_list: &Arc<HashList>
 ) -> Result<()> {
 	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, hash)?;
@@ -115,7 +115,7 @@ pub fn initialise_resource_overview(
 						blueprint_hash: entity.blueprint_hash.to_owned(),
 						blueprint_path_or_hint: hash_list
 							.entries
-							.get(&ResourceID::from_any(&entity.blueprint_hash)?)
+							.get(&RuntimeID::from_any(&entity.blueprint_hash)?)
 							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
 					}
 				}
@@ -726,7 +726,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			*hash = ResourceID::from_any(&new_hash)?;
+			*hash = RuntimeID::from_any(&new_hash)?;
 
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
@@ -766,7 +766,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				EditorState {
 					file: None,
 					data: EditorData::ResourceOverview {
-						hash: ResourceID::from_any(&hash)?
+						hash: RuntimeID::from_any(&hash)?
 					}
 				}
 			);
@@ -976,7 +976,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					ResourceID::from_any(
+					RuntimeID::from_any(
 						&extract_entity(
 							game_files,
 							&app_state.cached_entities,
@@ -1038,7 +1038,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					ResourceID::from_any(
+					RuntimeID::from_any(
 						&extract_entity(
 							game_files,
 							&app_state.cached_entities,

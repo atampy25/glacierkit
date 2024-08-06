@@ -64,10 +64,7 @@ use rfd::AsyncFileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
-use tauri::{
-	api::process::Command,
-	async_runtime, AppHandle, Manager
-};
+use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_log::LogTarget;
 use tryvial::try_fn;
@@ -1689,9 +1686,9 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					}
 
 					*view = new
-						.pointer(
-							&path
-								.chars()
+						.pointer(&format!(
+							"/{}",
+							path.chars()
 								.skip(1)
 								.collect::<String>()
 								.split('/')
@@ -1702,7 +1699,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 								.rev()
 								.collect::<Vec<_>>()
 								.join("/")
-						)
+						))
 						.unwrap()
 						.to_owned();
 				}
@@ -1743,9 +1740,9 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					}
 
 					*view = new
-						.pointer(
-							&path
-								.chars()
+						.pointer(&format!(
+							"/{}",
+							path.chars()
 								.skip(1)
 								.collect::<String>()
 								.split('/')
@@ -1756,7 +1753,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 								.rev()
 								.collect::<Vec<_>>()
 								.join("/")
-						)
+						))
 						.unwrap()
 						.to_owned();
 				}
@@ -1797,9 +1794,9 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					}
 
 					*view = new
-						.pointer(
-							&path
-								.split('/')
+						.pointer(&format!(
+							"/{}",
+							path.split('/')
 								.collect::<Vec<_>>()
 								.into_iter()
 								.rev()
@@ -1807,7 +1804,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 								.rev()
 								.collect::<Vec<_>>()
 								.join("/")
-						)
+						))
 						.unwrap()
 						.to_owned();
 				}

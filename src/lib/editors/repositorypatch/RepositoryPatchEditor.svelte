@@ -394,7 +394,7 @@
 			<div class="mt-2 basis-0 flex-grow flex flex-col gap-1 overflow-y-auto">
 				{#each repositoryItems
 					.filter((a) => searchFilter === "All" || a[1].type === searchFilter)
-					.filter((a) => (searchQuery ? JSON.stringify(a).toLowerCase().includes(searchQuery) : true))
+					.filter((a) => (searchQuery ? searchQuery.split(" ").every((b) => JSON.stringify(a).toLowerCase().includes(b)) : true))
 					.filter((a) => !modifiedRepositoryItems.has(a[0])) as [itemId, info] (itemId)}
 					<div
 						class="p-4 bg-neutral-900 flex items-center cursor-pointer break-all mr-2"

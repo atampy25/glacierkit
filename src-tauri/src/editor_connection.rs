@@ -10,7 +10,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
-use hitman_commons::metadata::ResourceID;
+use hitman_commons::metadata::RuntimeID;
 use indexmap::IndexMap;
 use quickentity_rs::{
 	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn,
@@ -831,7 +831,7 @@ impl EditorConnection {
 					}) => json!({
 						"id": entity_ref,
 						"source": "game",
-						"tblu": ResourceID::from_any(&scene)?.to_string()
+						"tblu": RuntimeID::from_any(&scene)?.to_string()
 					}),
 
 					Ref::Short(Some(entity_id)) => json!({
@@ -867,7 +867,7 @@ impl EditorConnection {
 							}) => Some(json!({
 								"id": entity_ref,
 								"source": "game",
-								"tblu": ResourceID::from_any(&scene)?.to_string()
+								"tblu": RuntimeID::from_any(&scene)?.to_string()
 							})),
 
 							Ref::Short(Some(entity_id)) => Some(json!({

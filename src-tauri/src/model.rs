@@ -6,7 +6,7 @@ use dashmap::DashMap;
 use hashbrown::HashMap;
 use hitman_commons::{
 	hash_list::HashList,
-	metadata::{ResourceID, ResourceType}
+	metadata::{ResourceType, RuntimeID}
 };
 use notify::RecommendedWatcher;
 use notify_debouncer_full::FileIdMap;
@@ -58,9 +58,9 @@ pub struct AppState {
 	pub game_files: ArcSwapOption<PartitionManager>,
 
 	/// Resource -> Resources which depend on it
-	pub resource_reverse_dependencies: ArcSwapOption<HashMap<ResourceID, Vec<ResourceID>>>,
+	pub resource_reverse_dependencies: ArcSwapOption<HashMap<RuntimeID, Vec<RuntimeID>>>,
 
-	pub cached_entities: Arc<DashMap<ResourceID, Entity>>,
+	pub cached_entities: Arc<DashMap<RuntimeID, Entity>>,
 	pub repository: ArcSwapOption<Vec<RepositoryItem>>,
 	pub intellisense: ArcSwapOption<Intellisense>,
 
@@ -77,7 +77,7 @@ pub struct EditorState {
 pub enum EditorData {
 	Nil,
 	ResourceOverview {
-		hash: ResourceID
+		hash: RuntimeID
 	},
 	Text {
 		content: String,
@@ -145,7 +145,7 @@ impl Default for ProjectSettings {
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct GameBrowserEntry {
-	pub hash: ResourceID,
+	pub hash: RuntimeID,
 	pub path: Option<String>,
 	pub hint: Option<String>,
 	pub filetype: ResourceType,
@@ -326,9 +326,9 @@ strike! {
 			}),
 
 			GameBrowser(pub enum GameBrowserEvent {
-				Select(ResourceID),
+				Select(RuntimeID),
 				Search(String, SearchFilter),
-				OpenInEditor(ResourceID)
+				OpenInEditor(RuntimeID)
 			}),
 
 			Settings(pub enum SettingsEvent {
@@ -434,7 +434,7 @@ strike! {
 					AddGameBrowserItem {
 						editor_id: Uuid,
 						parent_id: String,
-						file: ResourceID
+						file: RuntimeID
 					},
 
 					SelectEntityInEditor {
@@ -697,7 +697,7 @@ strike! {
 
 				OpenResourceOverview {
 					id: Uuid,
-					hash: ResourceID
+					hash: RuntimeID
 				}
 			})
 		}),

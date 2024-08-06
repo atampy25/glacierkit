@@ -5,7 +5,7 @@ use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
-use hitman_commons::{game::GameVersion, metadata::ResourceID};
+use hitman_commons::{game::GameVersion, metadata::RuntimeID};
 use hitman_formats::wwev::WwiseEvent;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -1658,7 +1658,7 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> R
 
 		let (properties, pins) = if hash_list
 			.entries
-			.get(&ResourceID::from_any(&sub_entity.factory)?)
+			.get(&RuntimeID::from_any(&sub_entity.factory)?)
 			.map(|entry| entry.resource_type == "TEMP")
 			.unwrap_or(false)
 		{
@@ -1667,7 +1667,7 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> R
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
-				ResourceID::from_any(&sub_entity.factory)?
+				RuntimeID::from_any(&sub_entity.factory)?
 			)?;
 
 			(
@@ -1775,7 +1775,7 @@ pub async fn add_game_browser_item(
 	app: &AppHandle,
 	editor_id: Uuid,
 	parent_id: String,
-	file: ResourceID
+	file: RuntimeID
 ) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();

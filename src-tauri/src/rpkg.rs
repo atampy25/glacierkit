@@ -4,7 +4,7 @@ use fn_error_context::context;
 use hitman_commons::{
 	game::GameVersion,
 	hash_list::HashList,
-	metadata::{ExtendedResourceMetadata, ResourceID, ResourceType},
+	metadata::{ExtendedResourceMetadata, ResourceType, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
 use quickentity_rs::{convert_to_qn, qn_structs::Entity};
@@ -23,7 +23,7 @@ use crate::resourcelib::{
 #[context("Couldn't extract resource {}", resource)]
 pub fn extract_latest_resource(
 	game_files: &PartitionManager,
-	resource: ResourceID
+	resource: RuntimeID
 ) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
 	let resource_id = RuntimeResourceID::from(resource);
 
@@ -47,10 +47,7 @@ pub fn extract_latest_resource(
 
 /// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
 #[context("Couldn't extract metadata for resource {}", resource)]
-pub fn extract_latest_metadata(
-	game_files: &PartitionManager,
-	resource: ResourceID
-) -> Result<ExtendedResourceMetadata> {
+pub fn extract_latest_metadata(game_files: &PartitionManager, resource: RuntimeID) -> Result<ExtendedResourceMetadata> {
 	let resource_id = RuntimeResourceID::from(resource);
 
 	for partition in game_files.partitions() {
@@ -70,8 +67,8 @@ pub fn extract_latest_metadata(
 #[context("Couldn't extract overview info for resource {}", resource)]
 pub fn extract_latest_overview_info(
 	game_files: &PartitionManager,
-	resource: ResourceID
-) -> Result<(ResourceType, String, Vec<(ResourceID, String)>)> {
+	resource: RuntimeID
+) -> Result<(ResourceType, String, Vec<(RuntimeID, String)>)> {
 	let resource_id = RuntimeResourceID::from(resource);
 
 	for partition in game_files.partitions() {
@@ -113,11 +110,11 @@ pub fn extract_latest_overview_info(
 #[context("Couldn't extract and cache entity {}", factory_id)]
 pub fn extract_entity<'a>(
 	resource_packages: &PartitionManager,
-	cached_entities: &'a DashMap<ResourceID, Entity>,
+	cached_entities: &'a DashMap<RuntimeID, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
-	factory_id: ResourceID
-) -> Result<Ref<'a, ResourceID, Entity>> {
+	factory_id: RuntimeID
+) -> Result<Ref<'a, RuntimeID, Entity>> {
 	{
 		if let Some(x) = cached_entities.get(&factory_id) {
 			return Ok(x);

@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use hitman_commons::{
 	game::GameVersion,
 	hash_list::HashList,
-	metadata::{ReferenceType, ResourceID, ResourceType},
+	metadata::{ReferenceType, ResourceType, RuntimeID},
 	resourcelib::PropertyID
 };
 use hitman_formats::material::{get_material_overrides, MaterialOverride, MaterialOverrideData};
@@ -52,16 +52,16 @@ pub struct CPPTPinInfo {
 
 pub struct Intellisense {
 	/// CPPT -> Property -> (Type, Value)
-	pub cppt_properties: Arc<DashMap<ResourceID, HashMap<String, (String, Value)>>>,
+	pub cppt_properties: Arc<DashMap<RuntimeID, HashMap<String, (String, Value)>>>,
 
-	pub cppt_pins: HashMap<ResourceID, CPPTPinsInfo>,
+	pub cppt_pins: HashMap<RuntimeID, CPPTPinsInfo>,
 
 	/// Property type as enum -> String version
 	pub uicb_prop_types: HashMap<String, String>,
 
-	pub matt_properties: Arc<DashMap<ResourceID, Vec<MaterialOverride>>>,
+	pub matt_properties: Arc<DashMap<RuntimeID, Vec<MaterialOverride>>>,
 
-	pub file_types: HashMap<ResourceID, ResourceType>
+	pub file_types: HashMap<RuntimeID, ResourceType>
 }
 
 impl Intellisense {
@@ -72,7 +72,7 @@ impl Intellisense {
 		game_files: &PartitionManager,
 		hash_list: &HashList,
 		game_version: GameVersion,
-		cppt: ResourceID
+		cppt: RuntimeID
 	) -> Result<HashMap<String, (String, Value)>> {
 		{
 			if let Some(cached) = self.cppt_properties.get(&cppt) {
@@ -341,7 +341,7 @@ impl Intellisense {
 		&self,
 		game_files: &PartitionManager,
 		hash_list: &HashList,
-		matt: ResourceID
+		matt: RuntimeID
 	) -> Result<Vec<MaterialOverride>> {
 		{
 			if let Some(x) = self.matt_properties.get(&matt) {
@@ -384,7 +384,7 @@ impl Intellisense {
 	pub fn get_properties(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &DashMap<ResourceID, Entity>,
+		cached_entities: &DashMap<RuntimeID, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -448,10 +448,10 @@ impl Intellisense {
 
 				found.extend(
 					{
-						if let Some(ty) = self.file_types.get(&ResourceID::from_any(&targeted.factory)?)
+						if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 							&& ty == "ASET"
 						{
-							extract_latest_metadata(game_files, ResourceID::from_any(&targeted.factory)?)?
+							extract_latest_metadata(game_files, RuntimeID::from_any(&targeted.factory)?)?
 								.core_info
 								.references
 								.into_iter()
@@ -461,7 +461,7 @@ impl Intellisense {
 								.map(|x| x.resource)
 								.collect_vec()
 						} else {
-							vec![ResourceID::from_any(&targeted.factory)?]
+							vec![RuntimeID::from_any(&targeted.factory)?]
 						}
 					}
 					.into_par_iter()
@@ -851,7 +851,7 @@ impl Intellisense {
 	pub fn get_specific_property(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &DashMap<ResourceID, Entity>,
+		cached_entities: &DashMap<RuntimeID, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -899,10 +899,10 @@ impl Intellisense {
 			)));
 		}
 
-		for factory in if let Some(ty) = self.file_types.get(&ResourceID::from_any(&targeted.factory)?)
+		for factory in if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 			&& ty == "ASET"
 		{
-			extract_latest_metadata(game_files, ResourceID::from_any(&targeted.factory)?)?
+			extract_latest_metadata(game_files, RuntimeID::from_any(&targeted.factory)?)?
 				.core_info
 				.references
 				.into_iter()
@@ -912,7 +912,7 @@ impl Intellisense {
 				.map(|x| x.resource)
 				.collect_vec()
 		} else {
-			vec![ResourceID::from_any(&targeted.factory)?]
+			vec![RuntimeID::from_any(&targeted.factory)?]
 		} {
 			if let Some(ty) = self.file_types.get(&factory) {
 				match ty.as_ref() {
@@ -1273,7 +1273,7 @@ impl Intellisense {
 	pub fn get_pins(
 		&self,
 		game_files: &PartitionManager,
-		cached_entities: &DashMap<ResourceID, Entity>,
+		cached_entities: &DashMap<RuntimeID, Entity>,
 		hash_list: &HashList,
 		game_version: GameVersion,
 		entity: &Entity,
@@ -1364,10 +1364,10 @@ impl Intellisense {
 		}
 
 		let (fac_input, fac_output): (Vec<_>, Vec<_>) = {
-			if let Some(ty) = self.file_types.get(&ResourceID::from_any(&targeted.factory)?)
+			if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 				&& ty == "ASET"
 			{
-				extract_latest_metadata(game_files, ResourceID::from_any(&targeted.factory)?)?
+				extract_latest_metadata(game_files, RuntimeID::from_any(&targeted.factory)?)?
 					.core_info
 					.references
 					.into_iter()
@@ -1377,7 +1377,7 @@ impl Intellisense {
 					.map(|x| x.resource)
 					.collect_vec()
 			} else {
-				vec![ResourceID::from_any(&targeted.factory)?]
+				vec![RuntimeID::from_any(&targeted.factory)?]
 			}
 		}
 		.into_par_iter()
@@ -1398,7 +1398,7 @@ impl Intellisense {
 							// All UI controls have the pins of ZUIControlEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"002C4526CC9753E6".parse::<ResourceID>()?)
+								.get(&"002C4526CC9753E6".parse::<RuntimeID>()?)
 								.context("No such CPPT in pins")?;
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
@@ -1438,7 +1438,7 @@ impl Intellisense {
 							// All materials have the pins of ZRenderMaterialEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"00B4B11DA327CAD0".parse::<ResourceID>()?)
+								.get(&"00B4B11DA327CAD0".parse::<RuntimeID>()?)
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1455,7 +1455,7 @@ impl Intellisense {
 							// All switch groups have the pins of ZAudioSwitchEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"00797DC916520C4D".parse::<ResourceID>()?)
+								.get(&"00797DC916520C4D".parse::<RuntimeID>()?)
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1492,7 +1492,7 @@ impl Intellisense {
 							// All extended CPP entities have the pins of ZMaterialOverwriteAspect
 							let cppt_data = self
 								.cppt_pins
-								.get(&"00D3003AAA7B3817".parse::<ResourceID>()?)
+								.get(&"00D3003AAA7B3817".parse::<RuntimeID>()?)
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1503,7 +1503,7 @@ impl Intellisense {
 							// All behaviour trees have the pins of ZBehaviorTreeEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"0028607138892D70".parse::<ResourceID>()?)
+								.get(&"0028607138892D70".parse::<RuntimeID>()?)
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1514,7 +1514,7 @@ impl Intellisense {
 							// All state groups have the pins of ZAudioStateEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"000D409686293996".parse::<ResourceID>()?)
+								.get(&"000D409686293996".parse::<RuntimeID>()?)
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
