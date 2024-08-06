@@ -464,7 +464,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs#c79f88e767491db29049f4c2ce15d2b9c59b42cb"
+source = "git+https://github.com/atampy25/quickentity-rs#a5dec35bf70b2ce80e353194a3826e3f1413e703"
 
 [[package]]
 name = "autocfg"
@@ -2587,13 +2587,12 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 [[package]]
 name = "hitman-commons"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-commons#d3efd5dc038e3f4055f34cf4770213bc4ff09585"
+source = "git+https://github.com/atampy25/hitman-commons#76968d49a84e9c6491d35ce195f5474ac3aa74d2"
 dependencies = [
  "brotli-decompressor 4.0.1",
  "hashbrown 0.14.5",
  "md5",
  "rpkg-rs",
- "schemars",
  "serde",
  "serde-hex",
  "serde-smile",
@@ -2608,7 +2607,7 @@ dependencies = [
 [[package]]
 name = "hitman-formats"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-formats#e274ced317be2b384efeee2cd610c27e493f78a8"
+source = "git+https://github.com/atampy25/hitman-formats#bba21f25fc2fc589317bf6c9e3d90f9bb70a6d76"
 dependencies = [
  "hex",
  "hitman-commons",
@@ -4572,7 +4571,7 @@ dependencies = [
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs#c79f88e767491db29049f4c2ce15d2b9c59b42cb"
+source = "git+https://github.com/atampy25/quickentity-rs#a5dec35bf70b2ce80e353194a3826e3f1413e703"
 dependencies = [
  "anyhow",
  "auto_context",
