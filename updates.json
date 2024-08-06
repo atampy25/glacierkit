@@ -1,11 +1,11 @@
 {
-	"version": "1.4.0",
-	"notes": "Better CTD handling",
-	"pub_date": "2024-08-02T13:07:01Z",
+	"version": "1.4.1",
+	"notes": "Fix merge patch generation for unlockables and repository",
+	"pub_date": "2024-08-05T01:44:01Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2JmaGFYVXlwU3VPL0lUbHh6OWRlTm1pTkRNdFlWNzJ5YlUvT3VRSGlCSXRrdWVuN2xXSG9kcUVDNDhWdnFnbmZneUw1Wk91dk1kV3VGcytPekZDS3dRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyNjc0MjYxCWZpbGU6R2xhY2llcktpdF8xLjQuMF94NjRfZW4tVVMubXNpLnppcApidmtEbStpN2hUenZ2SENiRjh1ckdLWFRVTnRPV0NJMjM5ZmI1SXN1K2NRTzJDYlg4WHF3NENHQXNCN21tRWNWdlM0dVRxYXBVeHVFM2g0aHFMVnhCQT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.4.0/GlacierKit_1.4.0_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2ZDRnUwNFZmaDhHdWNLT1l5UHFYb0NZbE1xUlJuT2NBdnRVMDMvMGdVZlpid2FNVUlmcGs1aXlCenlZdjFXeUxvUmNzalZPQkwrSEhPa2pEY3FnclFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyOTIxMjgwCWZpbGU6R2xhY2llcktpdF8xLjQuMV94NjRfZW4tVVMubXNpLnppcApOSUFmeVdvQTlpZWlQZkJZR3dJYmd0bi9oaFdSSTRsN3VyTmI1Y0R4ZkVUdjMxWFBVOFIvUkZVbDBUakFTL2lUMkxIYjNMdHQ4VlBRc3hwWkhnWjBBdz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.4.1/GlacierKit_1.4.1_x64_en-US.msi.zip"
 		}
 	}
 }
