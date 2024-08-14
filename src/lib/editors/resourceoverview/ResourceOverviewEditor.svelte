@@ -12,6 +12,7 @@
 	import Monaco from "./Monaco.svelte"
 	import { v4 } from "uuid"
 	import { help } from "$lib/helpray"
+	import MeshPreview from "$lib/components/MeshPreview.svelte"
 
 	export let id: string
 
@@ -282,6 +283,67 @@
 							}
 						})
 					}}>Extract file</Button
+				>
+			</div>
+		{:else if data.type === "Mesh"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<MeshPreview obj_path= {convertFileSrc(data.data.obj_path)} bounding_box= {data.data.bounding_box} width={255} height={255} />
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract image file as original")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Inspect model")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "openInEditor",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Inspect model</Button
 				>
 			</div>
 		{:else if data.type === "Audio"}
