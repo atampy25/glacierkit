@@ -4467,7 +4467,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 [[package]]
 name = "prim-rs"
 version = "0.1.1"
-source = "git+https://github.com/dafitius/GlacierFormats-rs?branch=main#a8e1f7c5915a24f0d1d4503092f00b94213c765b"
+source = "git+https://github.com/dafitius/GlacierFormats-rs?branch=main#e4a5b89b1769a1f3927647a37be0f7e71d5834c2"
 dependencies = [
  "base64 0.22.1",
  "bincode",
