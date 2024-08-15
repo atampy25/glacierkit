@@ -326,25 +326,6 @@
 						})
 					}}>Extract file</Button
 				>
-				<Button
-					icon={DocumentExport}
-					on:click={async () => {
-						trackEvent("Inspect model")
-
-						await event({
-							type: "editor",
-							data: {
-								type: "resourceOverview",
-								data: {
-									type: "openInEditor",
-									data: {
-										id
-									}
-								}
-							}
-						})
-					}}>Inspect model</Button
-				>
 			</div>
 		{:else if data.type === "Audio"}
 			<div class="text-2xl mb-2 font-bold break-all">
