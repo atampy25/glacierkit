@@ -61,19 +61,18 @@ jobs:
                   field: "package.version"
                   value: ${{ steps.latestTag.outputs.tag }}
 
+            - name: Write env file
+              uses: DamianReeves/write-file-action@v1.0
+              with:
+                  path: "./.env"
+                  contents: |
+                      DUMMY_ENV=dummy
+
             - name: Build
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: |
                   yarn tauri build
-
-            - name: Remove key file
-              run: |
-                  Remove-Item "src-tauri/gk.key"
-
-            - name: Remove env file
-              run: |
-                  Remove-Item "./.env"
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
