@@ -2812,7 +2812,7 @@ __metadata:
     rfc6902: "npm:^5.1.1"
     svelte: "npm:^4.2.7"
     svelte-check: "npm:^3.6.0"
-    svelte-splitpanes: "npm:^8.0.0"
+    svelte-splitpanes: "npm:0.8.0"
     tailwindcss: "npm:^3.4.0"
     tauri-plugin-log: "https://github.com/tauri-apps/tauri-plugin-log#v1"
     three: "npm:^0.167.1"
@@ -3785,14 +3785,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"svelte-splitpanes@npm:^8.0.0":
-  version: 8.0.5
-  resolution: "svelte-splitpanes@npm:8.0.5"
+"svelte-splitpanes@npm:0.8.0":
+  version: 0.8.0
+  resolution: "svelte-splitpanes@npm:0.8.0"
   dependencies:
     esm-env-robust: "npm:0.0.3"
   peerDependencies:
-    svelte: ^4.2.18
-  checksum: 0ae5f1390fb81741edabc220877f9050a0e8f4581abbf5b2d9000ba6d56b797ff1887146fa47a7d1ab68fd429c33c535bdf70e17278dfab262bcd1d04b5c01f6
+    svelte: ^4.0.2
+  checksum: 0976d3e93c6b1df2328165bdd0fb3a681e095b65844e5cf32bc0413fd557e2c01c8235d816a41bfa8c0bef163c9246590ee207b6c585cb8f81fabf2ed1d3a2f2
   languageName: node
   linkType: hard
 

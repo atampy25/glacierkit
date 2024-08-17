@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::{fs, io::{Cursor, Write}, ops::Deref, sync::Arc};
+use std::{fmt::Write, fs, io::Cursor, ops::Deref, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
@@ -11,6 +10,7 @@ use hitman_formats::{
 	wwev::{WwiseEvent, WwiseEventData}
 };
 use image::{ImageFormat, ImageReader};
+use prim_rs::render_primitive::RenderPrimitive;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rfd::AsyncFileDialog;
 use rpkg_rs::{resource::partition_manager::PartitionManager, GlacierResource};
@@ -19,7 +19,6 @@ use serde_json::{json, to_string, to_vec, Value};
 use tauri::{api::process::Command, AppHandle, Manager, State};
 use tauri_plugin_aptabase::EventTracker;
 use tex_rs::texture_map::TextureMap;
-use prim_rs::render_primitive::RenderPrimitive;
 use tonytools::hmlanguages;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -193,56 +192,61 @@ pub fn initialise_resource_overview(
 					let temp_file_id = Uuid::new_v4();
 
 					fs::create_dir_all(data_dir.join("temp"))?;
-					let output_path = data_dir.join("temp").join(format!("{}.obj", temp_file_id));
-
-					let mut writer = File::create(&output_path)?;
 
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let model = RenderPrimitive::process_data(game_version.into(), res_data)
 						.context("Couldn't process texture data")?;
 
-					//higher is less detail
+					// Higher is less detail
 					let preferred_lod = 1;
 
-					//get only the meshes, we don't need any weight metadata for a preview
+					// Get only the meshes, we don't need weight metadata for the preview
 					let meshes = model
 						.data
 						.objects
 						.iter()
-						.filter_map(|mesh_obj| match mesh_obj {
-							prim_rs::render_primitive::MeshObject::Normal(mesh) => Some(mesh),
-							prim_rs::render_primitive::MeshObject::Weighted(mesh) => Some(&mesh.prim_mesh),
-							prim_rs::render_primitive::MeshObject::Linked(mesh) => Some(&mesh.prim_mesh)
+						.map(|mesh_obj| match mesh_obj {
+							prim_rs::render_primitive::MeshObject::Normal(mesh) => mesh,
+							prim_rs::render_primitive::MeshObject::Weighted(mesh) => &mesh.prim_mesh,
+							prim_rs::render_primitive::MeshObject::Linked(mesh) => &mesh.prim_mesh
 						})
 						.collect::<Vec<_>>();
 
-					//save only the meshes valid for the preferred LOD level
-					let meshes_lod = meshes.iter().filter(|mesh| {
-						mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod)
-					});
+					// Get only the meshes for the preferred LOD level
+					let meshes = meshes
+						.iter()
+						.filter(|mesh| mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod));
 
 					let mut previous_vertex_count: usize = 1;
-					let mut bounding_box: [f32; 6] = [0.0,0.0,0.0,0.0,0.0,0.0];
+					let mut bounding_box: [f32; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
-					for (i, mesh) in meshes_lod.enumerate() {
-						writeln!(writer, "o object.00{}", i)?;
+					let mut obj = String::new();
+
+					for (idx, mesh) in meshes.enumerate() {
+						writeln!(obj, "o object.00{}", idx)?;
+
 						for position in &mesh.sub_mesh.buffers.position {
-							writeln!(writer, "v {} {} {}", position.x, position.y, position.z)?;
+							writeln!(obj, "v {} {} {}", position.x, position.y, position.z)?;
 						}
+
 						for vm in &mesh.sub_mesh.buffers.main {
-							writeln!(writer, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
+							writeln!(obj, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
 						}
+
 						for idx in mesh.sub_mesh.indices.chunks(3) {
 							let [idx1, idx2, idx3] = [
 								idx[0] as usize + previous_vertex_count,
 								idx[1] as usize + previous_vertex_count,
 								idx[2] as usize + previous_vertex_count
 							];
-							writeln!(writer, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
+							writeln!(obj, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
 						}
-						previous_vertex_count += &mesh.sub_mesh.buffers.position.len();
+
+						previous_vertex_count += mesh.sub_mesh.buffers.position.len();
+
 						let bb = mesh.sub_mesh.calc_bb();
+
 						bounding_box[0] = bounding_box[0].min(bb.min.x);
 						bounding_box[1] = bounding_box[1].min(bb.min.y);
 						bounding_box[2] = bounding_box[2].min(bb.min.z);
@@ -250,14 +254,9 @@ pub fn initialise_resource_overview(
 						bounding_box[3] = bounding_box[3].max(bb.max.x);
 						bounding_box[4] = bounding_box[4].max(bb.max.y);
 						bounding_box[5] = bounding_box[5].max(bb.max.z);
-					};
-
-
-
-					ResourceOverviewData::Mesh {
-						obj_path: output_path,
-						bounding_box,
 					}
+
+					ResourceOverviewData::Mesh { obj, bounding_box }
 				}
 
 				"TEXT" => {

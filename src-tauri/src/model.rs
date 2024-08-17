@@ -227,8 +227,8 @@ pub enum ResourceOverviewData {
 		wav_path: PathBuf
 	},
 	Mesh {
-		obj_path: PathBuf,
-		bounding_box: [f32; 6],
+		obj: String,
+		bounding_box: [f32; 6]
 	},
 	MultiAudio {
 		name: String,

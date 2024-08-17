@@ -304,13 +304,15 @@
 				</div>
 			</div>
 			<h4 class="mb-1">Preview</h4>
-			<MeshPreview obj_path= {convertFileSrc(data.data.obj_path)} bounding_box= {data.data.bounding_box} width={255} height={255} />
+			<div class="mb-4 h-[30vh]">
+				<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
+			</div>
 			<h4 class="mb-1">Actions</h4>
 			<div class="flex flex-wrap gap-2 mb-4">
 				<Button
 					icon={DocumentExport}
 					on:click={async () => {
-						trackEvent("Extract image file as original")
+						trackEvent("Extract mesh file as original")
 
 						await event({
 							type: "editor",
