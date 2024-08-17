@@ -3,6 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use arc_swap::{ArcSwap, ArcSwapOption};
 
 use dashmap::DashMap;
+use derivative::Derivative;
 use hashbrown::HashMap;
 use hitman_commons::{
 	hash_list::HashList,
@@ -202,8 +203,9 @@ pub struct PastableTemplateCategory {
 	pub templates: Vec<PastableTemplate>
 }
 
-#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[derive(Type, Serialize, Deserialize, Clone, Derivative)]
 #[serde(tag = "type", content = "data")]
+#[derivative(Debug)]
 pub enum ResourceOverviewData {
 	Generic,
 	Entity {
@@ -227,6 +229,7 @@ pub enum ResourceOverviewData {
 		wav_path: PathBuf
 	},
 	Mesh {
+		#[derivative(Debug = "ignore")]
 		obj: String,
 		bounding_box: [f32; 6]
 	},
@@ -732,7 +735,8 @@ strike! {
 }
 
 strike! {
-	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, Debug)]]
+	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, Derivative)]]
+	#[strikethrough[derivative(Debug)]]
 	#[strikethrough[serde(rename_all = "camelCase", tag = "type", content = "data")]]
 	pub enum Request {
 		Tool(pub enum ToolRequest {
@@ -763,6 +767,7 @@ strike! {
 					base_path: PathBuf,
 
 					/// Relative path, is folder
+					#[derivative(Debug = "ignore")]
 					files: Vec<(PathBuf, bool)>
 				}
 			}),
@@ -772,6 +777,8 @@ strike! {
 
 				NewTree {
 					game_description: String,
+
+					#[derivative(Debug = "ignore")]
 					entries: Vec<GameBrowserEntry>
 				}
 			}),
@@ -822,6 +829,7 @@ strike! {
 						editor_id: Uuid,
 
 						/// ID, parent, name, factory, has reverse parent refs
+						#[derivative(Debug = "ignore")]
 						entities: Vec<(String, Ref, String, String, bool)>
 					},
 
@@ -831,6 +839,7 @@ strike! {
 						editor_id: Uuid,
 
 						/// ID, parent, name, factory, has reverse parent refs
+						#[derivative(Debug = "ignore")]
 						new_entities: Vec<(String, Ref, String, String, bool)>
 					},
 
@@ -838,6 +847,7 @@ strike! {
 						editor_id: Uuid,
 
 						/// The IDs of the entities matching the query
+						#[derivative(Debug = "ignore")]
 						results: Vec<String>
 					},
 
@@ -983,9 +993,11 @@ strike! {
 					path_or_hint: Option<String>,
 
 					/// Hash, type, path/hint, flag, is actually in current game version
+					#[derivative(Debug = "ignore")]
 					dependencies: Vec<(String, String, Option<String>, String, bool)>,
 
 					/// Hash, type, path/hint
+					#[derivative(Debug = "ignore")]
 					reverse_dependencies: Vec<(String, String, Option<String>)>,
 
 					data: ResourceOverviewData
@@ -995,6 +1007,8 @@ strike! {
 			RepositoryPatch(pub enum RepositoryPatchEditorRequest {
 				SetRepositoryItems {
 					id: Uuid,
+
+					#[derivative(Debug = "ignore")]
 					items: Vec<(Uuid, RepositoryItemInformation)>
 				},
 
@@ -1034,6 +1048,8 @@ strike! {
 			UnlockablesPatch(pub enum UnlockablesPatchEditorRequest {
 				SetUnlockables {
 					id: Uuid,
+
+					#[derivative(Debug = "ignore")]
 					unlockables: Vec<(Uuid, UnlockableInformation)>
 				},
 
@@ -1075,6 +1091,7 @@ strike! {
 					id: Uuid,
 
 					/// Hash, type, path/hint
+					#[derivative(Debug = "ignore")]
 					results: Vec<(String, String, Option<String>)>
 				}
 			})

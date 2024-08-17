@@ -60,6 +60,7 @@ biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
 os_info = "3.8.2"
+derivative = "2.2.0"
 
 [dependencies.snmalloc-rs]
 version = "0.3.6"
