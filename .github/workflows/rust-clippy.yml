@@ -41,9 +41,11 @@ jobs:
       - name: Install dependencies
         run: cargo install clippy-sarif sarif-fmt
 
+      - name: Change directory
+        run: cd src-tauri
+
       - name: Run clippy
         run:
-          cd src-tauri
           cargo clippy
           --all-features
           --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt

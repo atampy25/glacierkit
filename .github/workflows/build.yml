@@ -1,0 +1,82 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+    build:
+        runs-on: windows-latest
+
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  ref: "main"
+                  fetch-depth: 0
+
+            - name: Get latest tag
+              id: latestTag
+              uses: "WyriHaximus/github-action-get-previous-tag@v1.1.0"
+              with:
+                  fallback: unknown
+
+            - name: Prepare Rust toolchain
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: nightly
+                  target: x86_64-pc-windows-msvc
+                  default: true
+                  components: clippy, rustfmt
+
+            - name: Rust cache
+              uses: Swatinem/rust-cache@v2.7.3
+              with:
+                workspaces: "src-tauri -> target"
+
+            - name: Install dependencies
+              run: |
+                  yarn set version 4.0.2
+                  yarn
+
+            - name: Update package.json version
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "package.json"
+                  field: "version"
+                  value: ${{ steps.latestTag.outputs.tag }}
+
+            - name: Update Cargo.toml version
+              uses: colathro/toml-editor@1.1.1
+              with:
+                  file: "src-tauri/Cargo.toml"
+                  key: "package.version"
+                  value: ${{ steps.latestTag.outputs.tag }}
+
+            - name: Update tauri.conf.json version
+              uses: jossef/action-set-json-field@v2
+              with:
+                  file: "src-tauri/tauri.conf.json"
+                  field: "package.version"
+                  value: ${{ steps.latestTag.outputs.tag }}
+
+            - name: Build
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: |
+                  yarn tauri build
+
+            - name: Remove key file
+              run: |
+                  Remove-Item "src-tauri/gk.key"
+
+            - name: Remove env file
+              run: |
+                  Remove-Item "./.env"
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: Installer
+                path: src-tauri/target/release/bundle/msi/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip
