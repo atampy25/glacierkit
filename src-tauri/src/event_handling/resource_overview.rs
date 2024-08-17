@@ -188,11 +188,6 @@ pub fn initialise_resource_overview(
 				}
 
 				"PRIM" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
-					let temp_file_id = Uuid::new_v4();
-
-					fs::create_dir_all(data_dir.join("temp"))?;
-
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let model = RenderPrimitive::process_data(game_version.into(), res_data)

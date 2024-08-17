@@ -77,11 +77,15 @@ pub fn extract_latest_overview_info(
 			.into_iter()
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
+			let package_name = match patchlevel {
+				PatchId::Base => partition.partition_info().id().to_string(),
+				PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
+			};
 			return Ok((
 				info.data_type().try_into()?,
-				match patchlevel {
-					PatchId::Base => partition.partition_info().id().to_string(),
-					PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
+				match partition.partition_info().name(){
+					Some(name) => format!("{} ({})", name, package_name),
+					None => package_name,
 				},
 				info.references()
 					.iter()
