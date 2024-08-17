@@ -41,18 +41,14 @@ jobs:
       - name: Install dependencies
         run: cargo install clippy-sarif sarif-fmt
 
-      - name: Change directory
-        run: cd src-tauri
-
       - name: Run clippy
-        run:
-          cargo clippy
-          --all-features
-          --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+        run: |
+          cd src-tauri
+          cargo clippy --all-features --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
         continue-on-error: true
 
       - name: Upload analysis results to GitHub
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: rust-clippy-results.sarif
+          sarif_file: src-tauri/rust-clippy-results.sarif
           wait-for-processing: true
