@@ -12,6 +12,7 @@
 	import Monaco from "./Monaco.svelte"
 	import { v4 } from "uuid"
 	import { help } from "$lib/helpray"
+	import MeshPreview from "$lib/components/MeshPreview.svelte"
 
 	export let id: string
 
@@ -268,6 +269,50 @@
 					icon={DocumentExport}
 					on:click={async () => {
 						trackEvent("Extract image file as original")
+
+						await event({
+							type: "editor",
+							data: {
+								type: "resourceOverview",
+								data: {
+									type: "extractAsFile",
+									data: {
+										id
+									}
+								}
+							}
+						})
+					}}>Extract file</Button
+				>
+			</div>
+		{:else if data.type === "Mesh"}
+			<div class="text-2xl mb-2 font-bold break-all">
+				{pathOrHint || "No path"}
+			</div>
+			<div class="flex flex-wrap gap-8 items-center mb-4">
+				<div>
+					<div>Hash</div>
+					<div class="text-xl">{hash}</div>
+				</div>
+				<div>
+					<div>Type</div>
+					<div class="text-xl">{filetype}</div>
+				</div>
+				<div>
+					<div>Chunk</div>
+					<div class="text-xl">{chunk}</div>
+				</div>
+			</div>
+			<h4 class="mb-1">Preview</h4>
+			<div class="mb-4 h-[30vh]">
+				<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
+			</div>
+			<h4 class="mb-1">Actions</h4>
+			<div class="flex flex-wrap gap-2 mb-4">
+				<Button
+					icon={DocumentExport}
+					on:click={async () => {
+						trackEvent("Extract mesh file as original")
 
 						await event({
 							type: "editor",

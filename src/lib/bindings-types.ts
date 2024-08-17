@@ -245,8 +245,6 @@ export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { t
 
 export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } } | { type: "requestLastPanicUpload" } | { type: "logUploadRejected" }
 
-export type HashData = { resourceType: string; path: string | null; hint: string | null }
-
 export type JsonPatchType = "MergePatch" | "JsonPatch"
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key in string]: JsonValue }
@@ -434,7 +432,7 @@ value: SimpleProperty }
 
 export type ReferenceFlags = { type: ReferenceType; acquired: boolean; languageCode: number }
 
-export type ReferenceType = "install" | "normal" | "weak"
+export type ReferenceType = "install" | "normal" | "weak" | "media" | "state" | "entityType"
 
 export type RepositoryItemInformation = { type: "NPC"; data: { name: string } } | { type: "Item"; data: { name: string } } | { type: "Weapon"; data: { name: string } } | { type: "Modifier"; data: { kind: string } } | { type: "MapArea"; data: { name: string } } | { type: "Outfit"; data: { name: string } } | { type: "Setpiece"; data: { traits: string[] } } | { type: "DifficultyParameter"; data: { name: string } } | { type: "AmmoConfig"; data: { name: string } } | { type: "MagazineConfig"; data: { size: number; tags: string[] } } | { type: "AmmoBehaviour"; data: { name: string } } | { type: "MasteryItem"; data: { name: string } } | { type: "ScoreMultiplier"; data: { name: string } } | { type: "ItemBundle"; data: { name: string } } | { type: "ItemList" } | { type: "WeaponConfig" } | { type: "Unknown" }
 
@@ -444,12 +442,7 @@ export type RepositoryPatchEditorRequest = { type: "setRepositoryItems"; data: {
 
 export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; data: EditorRequest } | { type: "global"; data: GlobalRequest }
 
-/**
- * Core information about a resource.
- */
-export type ResourceMetadata = { id: string; type: string; references: ResourceReference[] }
-
-export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL"; data: { json: string } } | { type: "Json"; data: { json: string } } | { type: "Ores"; data: { json: string } } | { type: "Image"; data: { image_path: string; dds_data: [string, string] | null } } | { type: "Audio"; data: { wav_path: string } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } } | { type: "Repository" } | { type: "Unlockables" } | { type: "HMLanguages"; data: { json: string } } | { type: "LocalisedLine"; data: { languages: ([string, string])[] } }
+export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL"; data: { json: string } } | { type: "Json"; data: { json: string } } | { type: "Ores"; data: { json: string } } | { type: "Image"; data: { image_path: string; dds_data: [string, string] | null } } | { type: "Audio"; data: { wav_path: string } } | { type: "Mesh"; data: { obj: string; bounding_box: [number, number, number, number, number, number] } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } } | { type: "Repository" } | { type: "Unlockables" } | { type: "HMLanguages"; data: { json: string } } | { type: "LocalisedLine"; data: { languages: ([string, string])[] } }
 
 export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "followDependencyInNewTab"; data: { id: string; hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } } | { type: "extractAsRTGeneric"; data: { id: string } } | { type: "extractAsImage"; data: { id: string } } | { type: "extractAsWav"; data: { id: string } } | { type: "extractMultiWav"; data: { id: string } } | { type: "extractSpecificMultiWav"; data: { id: string; index: number } } | { type: "extractORESAsJson"; data: { id: string } } | { type: "extractAsHMLanguages"; data: { id: string } }
 

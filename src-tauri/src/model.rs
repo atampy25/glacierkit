@@ -226,6 +226,10 @@ pub enum ResourceOverviewData {
 	Audio {
 		wav_path: PathBuf
 	},
+	Mesh {
+		obj: String,
+		bounding_box: [f32; 6]
+	},
 	MultiAudio {
 		name: String,
 		wav_paths: Vec<(String, PathBuf)>

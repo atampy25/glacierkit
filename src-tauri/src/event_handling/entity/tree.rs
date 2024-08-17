@@ -1771,12 +1771,7 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> R
 
 #[try_fn]
 #[context("Couldn't handle game browser add event")]
-pub async fn add_game_browser_item(
-	app: &AppHandle,
-	editor_id: Uuid,
-	parent_id: String,
-	file: RuntimeID
-) -> Result<()> {
+pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: String, file: RuntimeID) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
