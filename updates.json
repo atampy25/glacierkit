@@ -1,11 +1,11 @@
 {
-	"version": "1.4.1",
-	"notes": "Fix merge patch generation for unlockables and repository",
-	"pub_date": "2024-08-05T01:44:01Z",
+	"version": "1.5.0",
+	"notes": "Give up on clippy CI",
+	"pub_date": "2024-08-17T05:40:28Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2ZDRnUwNFZmaDhHdWNLT1l5UHFYb0NZbE1xUlJuT2NBdnRVMDMvMGdVZlpid2FNVUlmcGs1aXlCenlZdjFXeUxvUmNzalZPQkwrSEhPa2pEY3FnclFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIyOTIxMjgwCWZpbGU6R2xhY2llcktpdF8xLjQuMV94NjRfZW4tVVMubXNpLnppcApOSUFmeVdvQTlpZWlQZkJZR3dJYmd0bi9oaFdSSTRsN3VyTmI1Y0R4ZkVUdjMxWFBVOFIvUkZVbDBUakFTL2lUMkxIYjNMdHQ4VlBRc3hwWkhnWjBBdz09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.4.1/GlacierKit_1.4.1_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1lqWVFvVHhQY1V1SDNkejlEcStmVHBlZ0J2Tm9vdlhqUk9vbjJxUmhUWnoxREI1NHU4WXVnT001dTJ5dWVGeG0ya3gyVkdwdmNKUmJmaW9OczA5eUFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzIzODc1MDkyCWZpbGU6R2xhY2llcktpdF8xLjUuMF94NjRfZW4tVVMubXNpLnppcApUWGtyU2o1VytqTWZXbFFaTjRjUWtvYmZVbDNDdkJad1g4WVVLQ1pERkRIMThsMndXdFcwUVBFalFFV2QyZjdKVXNKN2Jnejh1L2FobHBRS2Z3T3RDdz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.5.0/GlacierKit_1.5.0_x64_en-US.msi.zip"
 		}
 	}
 }
