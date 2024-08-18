@@ -1,8 +1,18 @@
+#[cfg(target_os = "windows")]
+mod windows {
+	use registry::{Data, Hive, Security};
+	use std::os::windows::process::CommandExt;
+	use anyhow::anyhow;
+	use std::{
+		path::Path,
+		process::Command
+	};
+	use serde_json::Value;
+}
+
 use std::{
 	fs,
-	os::windows::process::CommandExt,
-	path::{Path, PathBuf},
-	process::Command
+	path::PathBuf,
 };
 
 use anyhow::{bail, Context, Result};
@@ -10,9 +20,7 @@ use fn_error_context::context;
 use hashbrown::HashMap;
 use hitman_commons::game::GameVersion;
 use itertools::Itertools;
-use registry::{Data, Hive, Security};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use specta::Type;
 use tryvial::try_fn;
 
@@ -30,6 +38,7 @@ pub struct GameInstall {
 	pub path: PathBuf
 }
 
+#[cfg(target_os = "windows")]
 #[try_fn]
 #[context("Couldn't detect installed games")]
 pub fn detect_installs() -> Result<Vec<GameInstall>> {
@@ -241,6 +250,102 @@ pub fn detect_installs() -> Result<Vec<GameInstall>> {
 			}
 		}
 	}
+
+	let mut game_installs = vec![];
+
+	for (path, platform) in check_paths {
+		// Game folder has Retail
+		let subfolder_retail = path.join("Retail").is_dir();
+
+		if subfolder_retail {
+			game_installs.push(GameInstall {
+				path: path.join("Retail"),
+				platform: platform.into(),
+				version: if path.join("Retail").join("HITMAN3.exe").is_file() {
+					GameVersion::H3
+				} else if path.join("Retail").join("HITMAN2.exe").is_file() {
+					GameVersion::H2
+				} else if path.join("Retail").join("HITMAN.exe").is_file() {
+					GameVersion::H1
+				} else {
+					bail!("Unknown game added to check paths");
+				}
+			});
+		}
+	}
+
+	game_installs
+		.into_iter()
+		.unique_by(|x| x.path.to_owned())
+		.sorted_unstable_by_key(|x| x.version)
+		.collect()
+}
+
+#[cfg(target_os = "linux")]
+#[try_fn]
+#[context("Couldn't detect installed games")]
+pub fn detect_installs() -> Result<Vec<GameInstall>> {
+	let mut check_paths = vec![];
+
+	// 	Steam installs
+	match home::home_dir() {
+		Some(home) => {
+			let steampath = home.join(".steam/debian-installation");
+			match steampath.exists() {
+				true => {
+					if let Ok(s) = fs::read_to_string(
+						if steampath.join("config").join("libraryfolders.vdf").exists() {
+							steampath.join("config").join("libraryfolders.vdf")
+						} else {
+							steampath.join("steamapps").join("libraryfolders.vdf")
+						}
+					) {
+						let folders: HashMap<String, SteamLibraryFolder> =
+							keyvalues_serde::from_str(&s).context("VDF parse")?;
+		
+						for folder in folders.values() {
+							// H1, H1 free trial
+							if folder.apps.contains_key("236870") || folder.apps.contains_key("649780") {
+								check_paths.push((
+									PathBuf::from(&folder.path)
+										.join("steamapps")
+										.join("common")
+										.join("HITMAN™"),
+									"Steam"
+								));
+							}
+		
+							// H2
+							if folder.apps.contains_key("863550") {
+								check_paths.push((
+									PathBuf::from(&folder.path)
+										.join("steamapps")
+										.join("common")
+										.join("HITMAN2"),
+									"Steam"
+								));
+							}
+		
+							// H3, H3 demo
+							if folder.apps.contains_key("1659040") || folder.apps.contains_key("1847520") {
+								check_paths.push((
+									PathBuf::from(&folder.path)
+										.join("steamapps")
+										.join("common")
+										.join("HITMAN 3"),
+									"Steam"
+								));
+							}
+						}
+					};
+				}
+		
+				false => {}
+			}
+		},
+		None => {},
+	}
+	
 
 	let mut game_installs = vec![];
 

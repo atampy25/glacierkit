@@ -175,6 +175,7 @@ dependencies = [
  "hex",
  "hitman-commons",
  "hitman-formats",
+ "home",
  "hrtime",
  "image 0.25.2",
  "indexmap 2.3.0",
