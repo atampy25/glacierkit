@@ -304,7 +304,7 @@ mod detection {
 		// 	Steam installs
 		match home::home_dir() {
 			Some(home) => {
-				let steampath = home.join(".steam/debian-installation");
+				let steampath = home.join(".local/share/Steam");
 				if steampath.exists() {
 					if let Ok(s) = fs::read_to_string(if steampath.join("config").join("libraryfolders.vdf").exists() {
 						steampath.join("config").join("libraryfolders.vdf")
