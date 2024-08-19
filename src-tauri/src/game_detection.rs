@@ -289,7 +289,7 @@ mod detection {
 mod detection {
 	use std::{fs, path::PathBuf};
 	use super::{GameInstall, SteamLibraryFolder};
-	
+	use itertools::Itertools;
 	use anyhow::{bail, Context, Result};
 	use fn_error_context::context;
 	use hashbrown::HashMap;
