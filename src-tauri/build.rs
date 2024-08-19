@@ -1,6 +1,3 @@
-use std::path::Path;
-use std::env;
-
 fn main() {
     // Windows-specific linking
     #[cfg(target_os = "windows")]
@@ -14,8 +11,8 @@ fn main() {
     // Linux-specific linking
     #[cfg(target_os = "linux")]
     {
-		let dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-		let resourcelib_dir = Path::new(&dir).join("ResourceLib/ResourceLib-linux-x64");
+		let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+		let resourcelib_dir = std::path::Path::new(&dir).join("ResourceLib/ResourceLib-linux-x64");
         
 		println!("cargo:rustc-link-search={}", resourcelib_dir.display());        
 		println!("cargo:rustc-link-arg=-Wl,-rpath={}", resourcelib_dir.display());
