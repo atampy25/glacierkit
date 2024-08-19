@@ -288,14 +288,12 @@ mod detection {
 #[cfg(target_os = "linux")]
 mod detection {
 	use std::{fs, path::PathBuf};
-
+	use super::{GameInstall, SteamLibraryFolder};
+	
 	use anyhow::{bail, Context, Result};
 	use fn_error_context::context;
 	use hashbrown::HashMap;
 	use hitman_commons::game::GameVersion;
-	use itertools::Itertools;
-	use serde::{Deserialize, Serialize};
-	use specta::Type;
 	use tryvial::try_fn;
 
 	#[try_fn]
