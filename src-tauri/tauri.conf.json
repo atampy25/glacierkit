@@ -1,7 +1,7 @@
 {
 	"$schema": "../node_modules/@tauri-apps/cli/schema.json",
 	"build": {
-		"beforeBuildCommand": "yarn build && cmd /c copyThings.bat",
+		"beforeBuildCommand": "yarn build",
 		"beforeDevCommand": "yarn dev",
 		"devPath": "http://localhost:5173",
 		"distDir": "../build"
