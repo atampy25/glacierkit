@@ -476,7 +476,7 @@
 					</div>
 				</div>
 			</Pane>
-			<Pane size={35} class="h-full flex flex-col">
+			<Pane size={45} class="h-full flex flex-col">
 				<ContentSwitcher class="h-10 pb-2" bind:selectedIndex={referenceTab}>
 					<Switch>
 						<div style="display: flex; align-items: left;">
@@ -529,7 +529,7 @@
 													><span class="font-bold">{hash}.{type}</span>
 													{flag}</div
 												>
-												<div class="break-all">{(path || "").split("/").pop()?.split("]")[0] || ""}</div>
+												<div class="break-all">{path || ""}</div>
 												{#if !inGame}
 													<div class="text-base">Not present in game files</div>
 												{/if}
@@ -587,7 +587,7 @@
 												<div class="font-bold text-base -mt-1"
 													>{hash}{#if type}.{type}{/if}</div
 												>
-												<div class="break-all">{(path || "").split("/").pop()?.split("]")[0] || ""}</div>
+												<div class="break-all">{path || ""}</div>
 											</ClickableTile>
 										{:else}
 											<div class="bg-[#303030] p-3">
