@@ -607,7 +607,7 @@
 							{/each}
 						</SortableList>
 						{#each tabs as tab (tab.id)}
-							<div class="flex-grow" class:hidden={activeTab !== tab.id}>
+							<div class="flex-grow overflow-auto" class:hidden={activeTab !== tab.id}>
 								<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />
 							</div>
 						{/each}

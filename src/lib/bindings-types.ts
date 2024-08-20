@@ -442,6 +442,10 @@ export type RepositoryPatchEditorRequest = { type: "setRepositoryItems"; data: {
 
 export type Request = { type: "tool"; data: ToolRequest } | { type: "editor"; data: EditorRequest } | { type: "global"; data: GlobalRequest }
 
+export type ResourceChangelogEntry = { operation: ResourceChangelogOperation; partition: string; patch: string; description: string }
+
+export type ResourceChangelogOperation = "Delete" | "Init" | "Edit"
+
 export type ResourceOverviewData = { type: "Generic" } | { type: "Entity"; data: { blueprint_hash: string; blueprint_path_or_hint: string | null } } | { type: "GenericRL"; data: { json: string } } | { type: "Json"; data: { json: string } } | { type: "Ores"; data: { json: string } } | { type: "Image"; data: { image_path: string; dds_data: [string, string] | null } } | { type: "Audio"; data: { wav_path: string } } | { type: "Mesh"; data: { obj: string; bounding_box: [number, number, number, number, number, number] } } | { type: "MultiAudio"; data: { name: string; wav_paths: ([string, string])[] } } | { type: "Repository" } | { type: "Unlockables" } | { type: "HMLanguages"; data: { json: string } } | { type: "LocalisedLine"; data: { languages: ([string, string])[] } }
 
 export type ResourceOverviewEvent = { type: "initialise"; data: { id: string } } | { type: "followDependency"; data: { id: string; new_hash: string } } | { type: "followDependencyInNewTab"; data: { id: string; hash: string } } | { type: "openInEditor"; data: { id: string } } | { type: "extractAsQN"; data: { id: string } } | { type: "extractAsFile"; data: { id: string } } | { type: "extractTEMPAsRT"; data: { id: string } } | { type: "extractTBLUAsFile"; data: { id: string } } | { type: "extractTBLUAsRT"; data: { id: string } } | { type: "extractAsRTGeneric"; data: { id: string } } | { type: "extractAsImage"; data: { id: string } } | { type: "extractAsWav"; data: { id: string } } | { type: "extractMultiWav"; data: { id: string } } | { type: "extractSpecificMultiWav"; data: { id: string; index: number } } | { type: "extractORESAsJson"; data: { id: string } } | { type: "extractAsHMLanguages"; data: { id: string } }
@@ -454,7 +458,7 @@ dependencies: ([string, string, string | null, string, boolean])[];
 /**
  * Hash, type, path/hint
  */
-reverse_dependencies: ([string, string, string | null])[]; data: ResourceOverviewData } }
+reverse_dependencies: ([string, string, string | null])[]; changelog: ResourceChangelogEntry[]; data: ResourceOverviewData } }
 
 export type ResourceReference = ({ type: ReferenceType; acquired: boolean; languageCode: number }) & { resource: string }
 
