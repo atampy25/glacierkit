@@ -38,7 +38,7 @@ use crate::{
 		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
 		h3_convert_binary_to_factory
 	},
-	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource},
+	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource, extract_resource_changelog},
 	send_notification, send_request, start_task, Notification, NotificationKind, RunCommandExt
 };
 
@@ -108,6 +108,7 @@ pub fn initialise_resource_overview(
 						.collect()
 				})
 				.unwrap_or_default(),
+			changelog: extract_resource_changelog(game_files, hash)?,
 			data: match filetype.as_ref() {
 				"TEMP" => {
 					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
@@ -188,11 +189,6 @@ pub fn initialise_resource_overview(
 				}
 
 				"PRIM" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
-					let temp_file_id = Uuid::new_v4();
-
-					fs::create_dir_all(data_dir.join("temp"))?;
-
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let model = RenderPrimitive::process_data(game_version.into(), res_data)

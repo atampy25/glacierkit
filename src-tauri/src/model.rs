@@ -248,6 +248,22 @@ pub enum ResourceOverviewData {
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceChangelogEntry {
+	pub operation: ResourceChangelogOperation,
+	pub partition: String,
+	pub patch: String,
+	pub description: String
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
+pub enum ResourceChangelogOperation {
+	Delete,
+	Init,
+	Edit
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
 pub enum SearchFilter {
 	All,
 	Templates,
@@ -999,6 +1015,8 @@ strike! {
 					/// Hash, type, path/hint
 					#[derivative(Debug = "ignore")]
 					reverse_dependencies: Vec<(String, String, Option<String>)>,
+
+					changelog: Vec<ResourceChangelogEntry>,
 
 					data: ResourceOverviewData
 				}
