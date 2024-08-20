@@ -455,14 +455,13 @@
 										{#each changelog as event}
 										<TableRow>
 											<TableCell>
-												{#if event.operation == "Init"}
-													<AddLarge/>
-												{:else if event.operation == "Edit"}
-													<SoftwareResource/>
-												{:else if event.operation == "Delete"}
-													<TrashCan/>
-												{/if}
-												
+											{#if event.operation == "Init"}
+												<AddLarge title="Added"/>
+											{:else if event.operation == "Edit"}
+												<SoftwareResource title="Edited"/>
+											{:else if event.operation == "Delete"}
+												<TrashCan title="Deleted"/>
+											{/if}
 											</TableCell>
 											<TableCell>{event.partition}</TableCell>
 											<TableCell>{event.patch}</TableCell>
