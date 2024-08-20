@@ -206,7 +206,7 @@ pub fn extract_resource_changelog(
 		for occurence in occurrences.iter().sorted() {
 			
 			let partition_name = match partition.partition_info().name(){
-				Some(name) => format!("{} ({})", name, partition.partition_info().id().to_string()),
+				Some(name) => format!("{} ({})", name, partition.partition_info().id()),
 				None => partition.partition_info().id().to_string(),
 			};
 
@@ -220,15 +220,15 @@ pub fn extract_resource_changelog(
 								Some(last_info) => {
 									
 									match info.size() as isize - last_info.size() as isize{
-										size if size == 0=>{
-											(ResourceChangelogOperation::Edit, format!("Updated resource"))
+										0 =>{
+											(ResourceChangelogOperation::Edit, "Updated resource".to_string())
 										}
 										size_diff => {(ResourceChangelogOperation::Edit, format!("Updated resource   {:>+0.2}kb", size_diff  as f32 / 1000.0))}
 									}
 									
 								},
 								None => {
-									(ResourceChangelogOperation::Init, format!("Added resource to partition"))
+									(ResourceChangelogOperation::Init, "Added resource to partition".to_string())
 								}
 							};
 							last_occurence = Some(info);
@@ -241,7 +241,7 @@ pub fn extract_resource_changelog(
 			};
 
 			if let Some((operation, description)) = op_desc{
-				events.push((operation, partition_name, occurence.clone(), description));
+				events.push((operation, partition_name, *occurence, description));
 			}
 		}
 	}
@@ -261,7 +261,7 @@ pub fn extract_resource_changelog(
 			patch: 
 			match event.2 {
 				PatchId::Base => {
-					format!("Base")
+					"Base".to_string()
 				},
 				PatchId::Patch(n) => {
 					format!("Patch {}", n)
