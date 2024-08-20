@@ -177,14 +177,10 @@
 					case "global":
 						switch (request.data.type) {
 							case "errorReport":
-								// Handled by +layout.svelte
-								break
-
 							case "setWindowTitle":
-								// Handled by +layout.svelte
-								break
-
 							case "computeJSONPatchAndSave":
+							case "requestLastPanicUpload":
+							case "logUploadRejected":
 								// Handled by +layout.svelte
 								break
 
@@ -218,8 +214,10 @@
 								break
 
 							case "removeTab":
-								const tabIndex = tabs.findIndex((a) => a.id === request.data.data)
-								tabs = tabs.filter((a) => a.id !== request.data.data)
+								const tabId = request.data.data
+
+								const tabIndex = tabs.findIndex((a) => a.id === tabId)
+								tabs = tabs.filter((a) => a.id !== tabId)
 
 								if (activeTab === request.data.data) {
 									activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
@@ -607,7 +605,7 @@
 							{/each}
 						</SortableList>
 						{#each tabs as tab (tab.id)}
-							<div class="flex-grow overflow-auto" class:hidden={activeTab !== tab.id}>
+							<div class="flex-grow" class:hidden={activeTab !== tab.id}>
 								<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />
 							</div>
 						{/each}

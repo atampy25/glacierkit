@@ -54,13 +54,8 @@
 
 	let previewImage: any = null
 	let referenceTab = 0
-	let previewAvailable: boolean = true
 
-	function editorAvailable(type: string): boolean {
-		if (type === "Entity" || type === "Repository" || type === "Unlockables") {
-			return true
-		} else return false
-	}
+	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Ores", "Json", "HMLanguages", "LocalisedLine"]
 
 	onMount(async () => {
 		await event({
@@ -101,14 +96,14 @@
 </script>
 
 <div
-	class="w-full h-full flex flex-col p-4"
+	class="w-full h-full max-h-full flex flex-col p-4"
 	use:help={{
 		title: "Resource overview",
 		description: "The resource overview shows basic information about (and potentially previews of) game resources, and lets you perform actions like extracting them in different formats."
 	}}
 >
 	{#if data}
-		<div class="text-2xl mb-2 font-bold break-all">
+		<div class="text-2xl mb-3 font-bold break-all">
 			{pathOrHint || "No path"}
 		</div>
 		<div class="flex flex-wrap gap-8 items-center mb-4">
@@ -126,323 +121,600 @@
 			</div>
 		</div>
 
-		<Splitpanes theme="" class="h-full flex-auto overflow-auto">
-			<Pane minSize={50} class="h-full flex flex-col pr-1 ">
-				<div class="overflow-y-auto no-scrollbar" >
-					<div class="pb-2" hidden={!previewAvailable}>
-						<Tile>
-							<h4 class="mb-1">Preview</h4>
-							{#if data.type === "Image"}
-								{#if previewImage}
-									<div class="text-neutral-400 mb-2 flex items-center gap-4">
-										<span>Resolution: {previewImage.naturalWidth}x{previewImage.naturalHeight}</span>
-										{#if data.data.dds_data}
-											<span>Type: {data.data.dds_data[0]}</span>
-											<span>Format: {data.data.dds_data[1]}</span>
+		<div style="height: calc(100vh - 18rem)">
+			<Splitpanes theme="">
+				<Pane minSize={50} class="h-full">
+					<div class="h-full overflow-y-auto pr-2">
+						{#if typesWithPreview.includes(data.type)}
+							<div
+								class="mb-2"
+								use:help={{
+									title: "Preview",
+									description: "A preview of the resource."
+								}}
+							>
+								<Tile>
+									<h4 class="mb-1">Preview</h4>
+									{#if data.type === "Image"}
+										{#if previewImage}
+											<div class="text-neutral-400 mb-2 flex items-center gap-4">
+												<span>Resolution: {previewImage.naturalWidth}x{previewImage.naturalHeight}</span>
+												{#if data.data.dds_data}
+													<span>Type: {data.data.dds_data[0]}</span>
+													<span>Format: {data.data.dds_data[1]}</span>
+												{/if}
+											</div>
 										{/if}
-									</div>
-								{/if}
-	
-								<img
-									class="mb-4 h-[30vh] w-fit bg-[#7f7f7f] aspect-square"
-									style="image-rendering: pixelated"
-									bind:this={previewImage}
-									on:load={() => {
-										previewImage = previewImage
-									}}
-									src={convertFileSrc(data.data.image_path)}
-									alt="Resource preview"
-								/>
-							{:else if data.type === "Mesh"}
-								<div class="mb-4 h-[30vh]">
-									<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
-								</div>
-							{:else if data.type === "Audio"}
-								<div class="mb-4">
-									<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
-								</div>
-							{:else if data.type === "MultiAudio"}
-								<div class="mb-4">
-									<div class="text-neutral-400 mb-2">{data.data.name}</div>
-									{#if data.data.wav_paths.length}
-										<MultiWaveformPlayer
-											src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
-											on:download={async ({ detail }) => {
-												trackEvent("Extract specific audio from WWEV file as WAV")
-	
+
+										<img
+											class="h-[30vh] w-fit bg-[#7f7f7f] aspect-square"
+											style="image-rendering: pixelated"
+											bind:this={previewImage}
+											on:load={() => {
+												previewImage = previewImage
+											}}
+											src={convertFileSrc(data.data.image_path)}
+											alt="Resource preview"
+										/>
+									{:else if data.type === "Mesh"}
+										<div class="h-[30vh]">
+											<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
+										</div>
+									{:else if data.type === "Audio"}
+										<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
+									{:else if data.type === "MultiAudio"}
+										<div class="text-neutral-400 mb-2">{data.data.name}</div>
+										{#if data.data.wav_paths.length}
+											<MultiWaveformPlayer
+												src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
+												on:download={async ({ detail }) => {
+													trackEvent("Extract specific audio from WWEV file as WAV")
+
+													await event({
+														type: "editor",
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractSpecificMultiWav",
+																data: {
+																	id,
+																	index: detail
+																}
+															}
+														}
+													})
+												}}
+											/>
+										{:else}
+											<div class="-mt-1 text-lg">No linked audio</div>
+										{/if}
+									{:else if data.type === "GenericRL" || data.type === "Ores" || data.type === "Json" || data.type === "HMLanguages"}
+										<div class="h-[30vh]">
+											<Monaco id={v4()} content={data.data.json} />
+										</div>
+									{:else if data.type === "LocalisedLine"}
+										<div class="max-h-[30vh] overflow-y-auto">
+											<DataTable
+												headers={[
+													{ key: "lang", value: "Language", width: "8rem" },
+													{ key: "val", value: "String" }
+												]}
+												rows={data.data.languages.map(([lang, val], ind) => ({ id: ind, lang, val }))}
+											/>
+										</div>
+									{/if}
+								</Tile>
+							</div>
+						{/if}
+						<div
+							class="mb-2"
+							use:help={{
+								title: "Actions",
+								description: "Actions you can perform on the resource."
+							}}
+						>
+							<Tile>
+								<h4 class="mb-2">Actions</h4>
+								<div class="flex flex-wrap gap-2">
+									{#if data.type === "Entity"}
+										<Button
+											icon={Edit}
+											on:click={async () => {
+												trackEvent("Open QN entity in editor from resource overview")
+
 												await event({
 													type: "editor",
 													data: {
 														type: "resourceOverview",
 														data: {
-															type: "extractSpecificMultiWav",
+															type: "openInEditor",
 															data: {
-																id,
-																index: detail
+																id
 															}
 														}
 													}
 												})
-											}}
-										/>
-									{:else}
-										<div class="-mt-1 text-lg">No linked audio</div>
+											}}>Open in editor</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract entity to QN JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsQN",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract as QuickEntity JSON</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract TEMP as binary file")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract TEMP as binary file</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract TEMP as RL JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractTEMPAsRT",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract TEMP as ResourceLib JSON</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract TBLU as binary file")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractTBLUAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract TBLU as binary file</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract TBLU as RL JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractTBLUAsRT",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract TBLU as ResourceLib JSON</Button
+										>
+									{:else if data.type === "Image"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												// Analytics tracked on Rust end
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsImage",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract image</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract image file as original")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "Audio"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract audio file as WAV")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsWav",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract as WAV</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract audio file as original")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "MultiAudio"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract WWEV file as WAVs")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractMultiWav",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract all as WAVs</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract WWEV file as original")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "GenericRL"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract generic ResourceLib file as JSON", { hash, filetype })
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsRTGeneric",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract as ResourceLib JSON</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract generic ResourceLib file as binary")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "Ores"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract ORES as JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractORESAsJson",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract as JSON</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract ORES as binary")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "Repository"}
+										<Button
+											icon={Edit}
+											on:click={async () => {
+												trackEvent("Open repository in editor from resource overview")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "openInEditor",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Open in editor</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract repository to file")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "Unlockables"}
+										<Button
+											icon={Edit}
+											on:click={async () => {
+												trackEvent("Open unlockables in editor from resource overview")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "openInEditor",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Open in editor</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract unlockables as JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractORESAsJson",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract as JSON</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract unlockables as binary")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "HMLanguages"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract HMLanguages file as JSON", { filetype })
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsHMLanguages",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract as JSON</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract HMLanguages file as binary", { hash, filetype })
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "Mesh"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract mesh file as original")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "Json" || data.type === "LocalisedLine" || data.type === "Generic"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract generic file", { hash, filetype })
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
 									{/if}
 								</div>
-							{:else if data.type === "GenericRL" || data.type === "Ores" || data.type === "Json" || data.type === "HMLanguages"}
-								<div class="mb-4 h-[30vh]">
-									<Monaco id={v4()} content={data.data.json} />
-								</div>
-							{:else if data.type === "LocalisedLine"}
-								<div class="mb-4 max-h-[30vh] overflow-y-auto">
-									<DataTable
-										headers={[
-											{ key: "lang", value: "Language", width: "8rem" },
-											{ key: "val", value: "String" }
-										]}
-										rows={data.data.languages.map(([lang, val], ind) => ({ id: ind, lang, val }))}
-									/>
-								</div>
-							{:else}
-								{(previewAvailable = false)}
-							{/if}
-						</Tile>
-					</div>
-					<div class="pb-2">
-					<Tile>
-						<h4 class="mb-2 pb-2">Actions</h4>
-						<div class="flex flex-wrap gap-2 mb-4">
-							{#if editorAvailable(data.type)}
-								<Button
-									icon={Edit}
-									on:click={async () => {
-										trackEvent(`Open ${data?.type ?? "data"} in editor from resource overview`)
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "openInEditor",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Open in editor</Button
-								>
-							{/if}
-							{#if data.type === "Entity"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract entity to QN JSON")
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractAsQN",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Extract as QuickEntity JSON</Button
-								>
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract TEMP as RL JSON")
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractTEMPAsRT",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Extract TEMP as ResourceLib JSON</Button
-								>
-							{:else if data.type === "Image"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										// Analytics tracked on Rust end
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractAsImage",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Extract image</Button
-								>
-							{:else if data.type === "Audio"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract audio file as WAV")
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractAsWav",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Extract as WAV</Button
-								>
-							{:else if data.type === "MultiAudio"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract WWEV file as WAVs")
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractMultiWav",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Extract all as WAVs</Button
-								>
-							{:else if data.type === "GenericRL"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract generic ResourceLib file as JSON", { hash, filetype })
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractAsRTGeneric",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Extract as ResourceLib JSON</Button
-								>
-							{:else if data.type === "Ores"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract ORES as JSON")
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractORESAsJson",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Extract as JSON</Button
-								>
-							{:else if data.type === "Unlockables"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract unlockables as JSON")
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractORESAsJson",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Export to JSON</Button
-								>
-							{:else if data.type === "HMLanguages"}
-								<Button
-									icon={DocumentExport}
-									on:click={async () => {
-										trackEvent("Extract HMLanguages file as JSON", { filetype })
-	
-										await event({
-											type: "editor",
-											data: {
-												type: "resourceOverview",
-												data: {
-													type: "extractAsHMLanguages",
-													data: {
-														id
-													}
-												}
-											}
-										})
-									}}>Export to JSON</Button
-								>
-							{/if}
-							<Button
-								kind="tertiary"
-								icon={DocumentExport}
-								on:click={async () => {
-									trackEvent(`Extract ${data?.type ?? "generic"} file`, { hash, filetype })
-	
-									await event({
-										type: "editor",
-										data: {
-											type: "resourceOverview",
-											data: {
-												type: "extractAsFile",
-												data: {
-													id
-												}
-											}
-										}
-									})
-								}}>Extract file</Button
-							>
+							</Tile>
 						</div>
-					</Tile>
-					</div>
-					<div class="pb-2">
-						<ExpandableTile>
-							<div slot="above">
-								<h4 class="mb-2 pb-2">History</h4>
-							</div>
-							<div slot="below">
-								<Table class="mb-7" size="medium">
+						<div
+							use:help={{
+								title: "History",
+								description: "A log of changes made to the resource in each patch, in chronological order from top to bottom."
+							}}
+						>
+							<Tile>
+								<h4 class="mb-2">History</h4>
+								<Table size="medium">
 									<TableHead>
 										<TableRow>
 											<TableHeader class="w-5"></TableHeader>
@@ -453,164 +725,154 @@
 									</TableHead>
 									<TableBody>
 										{#each changelog as event}
-										<TableRow>
-											<TableCell>
-											{#if event.operation == "Init"}
-												<AddLarge title="Added"/>
-											{:else if event.operation == "Edit"}
-												<SoftwareResource title="Edited"/>
-											{:else if event.operation == "Delete"}
-												<TrashCan title="Deleted"/>
-											{/if}
-											</TableCell>
-											<TableCell>{event.partition}</TableCell>
-											<TableCell>{event.patch}</TableCell>
-											<TableCell>{event.description}</TableCell>
-										</TableRow>
+											<TableRow>
+												<TableCell>
+													{#if event.operation == "Init"}
+														<AddLarge title="Added" />
+													{:else if event.operation == "Edit"}
+														<SoftwareResource title="Modified" />
+													{:else if event.operation == "Delete"}
+														<TrashCan title="Removed" />
+													{/if}
+												</TableCell>
+												<TableCell>{event.partition}</TableCell>
+												<TableCell>{event.patch}</TableCell>
+												<TableCell>{event.description}</TableCell>
+											</TableRow>
 										{/each}
 									</TableBody>
 								</Table>
-							</div>
-						</ExpandableTile>
+							</Tile>
+						</div>
 					</div>
-				</div>
-			</Pane>
-			<Pane size={45} class="h-full flex flex-col">
-				<ContentSwitcher class="h-10 pb-2" bind:selectedIndex={referenceTab}>
-					<Switch>
-						<div style="display: flex; align-items: left;">
-							<ColumnDependency style="margin-right: 0.5rem;" />
-							<div class="truncate">References</div>
-						</div>
-					</Switch>
-					<Switch>
-						<div style="display: flex; align-items: left;">
-							<ColumnDependency style="margin-right: 0.5rem;  transform: scaleX(-1);" />
-							<div class="truncate">Reverse references</div>
-						</div>
-					</Switch>
-				</ContentSwitcher>
-				<div class="flex-auto overflow-auto">
+				</Pane>
+				<Pane size={45} class="h-full flex flex-col">
+					<ContentSwitcher class="h-10 pb-2" bind:selectedIndex={referenceTab}>
+						<Switch>
+							<div class="flex items-center gap-2">
+								<ColumnDependency class="flex-shrink-0" />
+								<div class="truncate">References</div>
+							</div>
+						</Switch>
+						<Switch>
+							<div class="flex items-center gap-2">
+								<ColumnDependency class="flex-shrink-0 -scale-x-100" />
+								<div class="truncate">Reverse references</div>
+							</div>
+						</Switch>
+					</ContentSwitcher>
 					{#if referenceTab == 0}
-						<div class="h-full" use:help={{ title: "References", description: "Other resources that this resource depends on, listed in the order stored in the game files." }}>
-							<OrderedList class="h-full  overflow-y-auto" native>
-								{#each dependencies as [hash, type, path, flag, inGame]}
-									<ListItem class="p-1">
-										{#if type}
-											<ClickableTile
-												on:click={async (e) => {
-													trackEvent("Follow reference" + e.ctrlKey ? " in new tab " : " " + "from resource overview")
+						<div
+							class="h-full overflow-y-auto pr-2 flex flex-col gap-2"
+							use:help={{ title: "References", description: "Other resources that this resource depends on, listed in the order stored in the game files." }}
+						>
+							{#each dependencies as [hash, type, path, flag, inGame]}
+								{#if type}
+									<ClickableTile
+										style="min-height: unset"
+										on:click={async (e) => {
+											trackEvent(`Follow reference ${e.ctrlKey ? "in new tab " : "from resource overview"}`)
 
-													await event({
-														type: "editor",
-														data: {
-															type: "resourceOverview",
-															data: !e.ctrlKey
-																? {
-																		type: "followDependency",
-																		data: {
-																			id,
-																			new_hash: hash
-																		}
-																	}
-																: {
-																		type: "followDependencyInNewTab",
-																		data: {
-																			id,
-																			hash
-																		}
-																	}
-														}
-													})
-												}}
-											>
-												<div class="text-base -mt-1"
-													><span class="font-bold">{hash}.{type}</span>
-													{flag}</div
-												>
-												<div class="break-all">{path || ""}</div>
-												{#if !inGame}
-													<div class="text-base">Not present in game files</div>
-												{/if}
-											</ClickableTile>
-										{:else}
-											<div class="bg-[#303030] p-3">
-												<div class="text-base -mt-1"
-													><span class="font-bold">{hash}</span>
-													{flag}</div
-												>
-												<div class="break-all">Unknown resource</div>
-												{#if !inGame}
-													<div class="text-base">Not present in game files</div>
-												{/if}
-											</div>
+											await event({
+												type: "editor",
+												data: {
+													type: "resourceOverview",
+													data: !e.ctrlKey
+														? {
+																type: "followDependency",
+																data: {
+																	id,
+																	new_hash: hash
+																}
+															}
+														: {
+																type: "followDependencyInNewTab",
+																data: {
+																	id,
+																	hash
+																}
+															}
+												}
+											})
+										}}
+									>
+										<div class="text-base -mt-1"
+											><span class="font-bold">{hash}.{type}</span>
+											{flag}</div
+										>
+										<div class="break-all">{path || "No path"}</div>
+										{#if !inGame}
+											<div class="text-base">Not present in game files</div>
 										{/if}
-									</ListItem>
-								{/each}
-							</OrderedList>
+									</ClickableTile>
+								{:else}
+									<div class="bg-[#303030] p-3">
+										<div class="text-base -mt-1"
+											><span class="font-bold">{hash}</span>
+											{flag}</div
+										>
+										<div class="break-all">Unknown resource</div>
+										{#if !inGame}
+											<div class="text-base">Not present in game files</div>
+										{/if}
+									</div>
+								{/if}
+							{/each}
 						</div>
 					{/if}
 					{#if referenceTab == 1}
-						<div class="h-full" use:help={{ title: "Reverse references", description: "Other resources that depend upon this resource, sorted alphabetically." }}>
-							<OrderedList class="h-full overflow-y-auto" native>
-								{#each reverseDependencies as [hash, type, path]}
-									<ListItem class="p-1">
-										{#if type}
-											<ClickableTile
-												on:click={async (e) => {
-													trackEvent("Follow reverse reference" + e.ctrlKey ? " in new tab " : " " + "from resource overview")
+						<div
+							class="h-full overflow-y-auto pr-2 flex flex-col gap-2"
+							use:help={{ title: "Reverse references", description: "Other resources that depend upon this resource, sorted alphabetically." }}
+						>
+							{#each reverseDependencies as [hash, type, path]}
+								{#if type}
+									<ClickableTile
+										style="min-height: unset"
+										on:click={async (e) => {
+											trackEvent(`Follow reverse reference ${e.ctrlKey ? "in new tab " : "from resource overview"}`)
 
-													await event({
-														type: "editor",
-														data: {
-															type: "resourceOverview",
-															data: !e.ctrlKey
-																? {
-																		type: "followDependency",
-																		data: {
-																			id,
-																			new_hash: hash
-																		}
-																	}
-																: {
-																		type: "followDependencyInNewTab",
-																		data: {
-																			id,
-																			hash
-																		}
-																	}
-														}
-													})
-												}}
-											>
-												<div class="font-bold text-base -mt-1"
-													>{hash}{#if type}.{type}{/if}</div
-												>
-												<div class="break-all">{path || ""}</div>
-											</ClickableTile>
-										{:else}
-											<div class="bg-[#303030] p-3">
-												<div class="font-bold text-base -mt-1">{hash}</div>
-												<div class="break-all">Unknown resource</div>
-											</div>
-										{/if}
-									</ListItem>
-								{/each}
-							</OrderedList>
+											await event({
+												type: "editor",
+												data: {
+													type: "resourceOverview",
+													data: !e.ctrlKey
+														? {
+																type: "followDependency",
+																data: {
+																	id,
+																	new_hash: hash
+																}
+															}
+														: {
+																type: "followDependencyInNewTab",
+																data: {
+																	id,
+																	hash
+																}
+															}
+												}
+											})
+										}}
+									>
+										<div class="font-bold text-base -mt-1"
+											>{hash}{#if type}.{type}{/if}</div
+										>
+										<div class="break-all">{path || "No path"}</div>
+									</ClickableTile>
+								{:else}
+									<div class="bg-[#303030] p-3">
+										<div class="font-bold text-base -mt-1">{hash}</div>
+										<div class="break-all">Unknown resource</div>
+									</div>
+								{/if}
+							{/each}
 						</div>
 					{/if}
-				</div>
-			</Pane>
-		</Splitpanes>
+				</Pane>
+			</Splitpanes>
+		</div>
 	{:else}
 		Loading...
 	{/if}
 </div>
-
-
-<style>
-	.no-scrollbar {
-      -ms-overflow-style: none; /* IE and Edge */
-      scrollbar-width: none; /* Firefox */
-    }
-</style>
