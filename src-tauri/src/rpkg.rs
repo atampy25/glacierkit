@@ -7,16 +7,20 @@ use hitman_commons::{
 	metadata::{ExtendedResourceMetadata, ResourceType, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
+use itertools::Itertools;
 use quickentity_rs::{convert_to_qn, qn_structs::Entity};
 use rpkg_rs::resource::{
-	partition_manager::PartitionManager, resource_package::ResourceReferenceFlags, resource_partition::PatchId,
-	runtime_resource_id::RuntimeResourceID
+	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_package::ResourceReferenceFlags,
+	resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
 };
 use tryvial::try_fn;
 
-use crate::resourcelib::{
-	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
-	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
+use crate::{
+	model::{ResourceChangelogEntry, ResourceChangelogOperation},
+	resourcelib::{
+		h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
+		h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
+	}
 };
 
 /// Extract the latest copy of a resource.
@@ -77,11 +81,16 @@ pub fn extract_latest_overview_info(
 			.into_iter()
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
+			let package_name = match patchlevel {
+				PatchId::Base => partition.partition_info().id().to_string(),
+				PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
+			};
+
 			return Ok((
 				info.data_type().try_into()?,
-				match patchlevel {
-					PatchId::Base => partition.partition_info().id().to_string(),
-					PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
+				match partition.partition_info().name() {
+					Some(name) => format!("{} ({})", name, package_name),
+					None => package_name
 				},
 				info.references()
 					.iter()
@@ -175,4 +184,82 @@ pub fn extract_entity<'a>(
 	cached_entities.insert(factory_id, entity.to_owned());
 
 	cached_entities.get(&factory_id).expect("We just added it")
+}
+
+/// Get the history of the file, a changelog of events within the partitions.
+#[context("Couldn't extract changelog for resource {}", resource)]
+pub fn extract_resource_changelog(
+	game_files: &PartitionManager,
+	resource: RuntimeID
+) -> Result<Vec<ResourceChangelogEntry>> {
+	let resource_id = RuntimeResourceID::from(resource);
+
+	let mut events = vec![];
+
+	for partition in game_files.partitions() {
+		let mut last_occurence: Option<&ResourceInfo> = None;
+
+		let changes = partition.resource_patch_indices(&resource_id);
+		let deletions = partition.resource_removal_indices(&resource_id);
+
+		let occurrences = changes
+			.clone()
+			.into_iter()
+			.chain(deletions.clone().into_iter())
+			.collect::<Vec<PatchId>>();
+
+		for occurence in occurrences.iter().sorted() {
+			let partition_name = match partition.partition_info().name() {
+				Some(name) => format!("{} ({})", name, partition.partition_info().id()),
+				None => partition.partition_info().id().to_string()
+			};
+
+			let op_desc = match occurence {
+				x if deletions.contains(x) => Some((
+					ResourceChangelogOperation::Delete,
+					"Removed resource from partition".into()
+				)),
+
+				x if changes.contains(x) => match partition.resource_info_from(&resource_id, *x) {
+					Ok(info) => {
+						let op_desc = match last_occurence {
+							Some(last_info) => match info.size() as isize - last_info.size() as isize {
+								0 => (ResourceChangelogOperation::Edit, "Updated resource".into()),
+								size_diff => (
+									ResourceChangelogOperation::Edit,
+									format!("Updated resource: {:>+0.2} kB", size_diff as f32 / 1024.0)
+								)
+							},
+							None => (ResourceChangelogOperation::Init, "Added resource to partition".into())
+						};
+						last_occurence = Some(info);
+						Some(op_desc)
+					}
+					Err(_) => None
+				},
+
+				_ => None
+			};
+
+			if let Some((operation, description)) = op_desc {
+				events.push((operation, partition_name, *occurence, description));
+			}
+		}
+	}
+
+	Ok(events
+		.into_iter()
+		.sorted_by(|(op1, _, patch1, _), (op2, _, patch2, _)| patch1.cmp(patch2).then(op1.cmp(op2)))
+		.map(|(operation, partition, patch, description)| ResourceChangelogEntry {
+			operation,
+			partition,
+			patch: match patch {
+				PatchId::Base => "Base".into(),
+				PatchId::Patch(n) => {
+					format!("Patch {}", n)
+				}
+			},
+			description
+		})
+		.collect::<Vec<_>>())
 }

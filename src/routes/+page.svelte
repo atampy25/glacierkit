@@ -177,14 +177,10 @@
 					case "global":
 						switch (request.data.type) {
 							case "errorReport":
-								// Handled by +layout.svelte
-								break
-
 							case "setWindowTitle":
-								// Handled by +layout.svelte
-								break
-
 							case "computeJSONPatchAndSave":
+							case "requestLastPanicUpload":
+							case "logUploadRejected":
 								// Handled by +layout.svelte
 								break
 
@@ -218,8 +214,10 @@
 								break
 
 							case "removeTab":
-								const tabIndex = tabs.findIndex((a) => a.id === request.data.data)
-								tabs = tabs.filter((a) => a.id !== request.data.data)
+								const tabId = request.data.data
+
+								const tabIndex = tabs.findIndex((a) => a.id === tabId)
+								tabs = tabs.filter((a) => a.id !== tabId)
 
 								if (activeTab === request.data.data) {
 									activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
