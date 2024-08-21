@@ -49,10 +49,7 @@ use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{info, trace, LevelFilter};
 use model::{
-	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
-	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest,
-	EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
-	Project, ProjectSettings, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest, QuickStartEvent
+	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest, EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project, ProjectInfo, ProjectSettings, QuickStartEvent, QuickStartRequest, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
 };
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
@@ -331,11 +328,59 @@ fn event(app: AppHandle, event: Event) {
 									&app, 
 									Request::Global(GlobalRequest::CreateTab { 
 										id, 
-										name: "Project hub".to_string(), 
+										name: "Quick Start".to_string(), 
 										editor_type: EditorType::QuickStart 
 									})
 								)?;
 
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::Initialise {
+										id,
+										recent_projects: app_settings.load().recent_projects.clone()
+									}))
+								)?;
+
+							},
+							QuickStartEvent::AddRecentProject { path } => {
+								let mut settings = (*app_settings.load_full()).to_owned();
+
+								let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
+
+								if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
+									settings.recent_projects.remove(pos);
+								}
+							
+								settings.recent_projects.insert(0, project);
+							
+								if settings.recent_projects.len() > 5 {
+									settings.recent_projects.truncate(5);
+								}
+
+								fs::write(
+									app.path_resolver()
+										.app_data_dir()
+										.context("Couldn't get app data dir")?
+										.join("settings.json"),
+									to_vec(&settings)?
+								)?;
+								app_settings.store(settings.into());
+							},
+							QuickStartEvent::RemoveRecentProject { path } => {
+								let mut settings = (*app_settings.load_full()).to_owned();
+								let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
+								if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
+									settings.recent_projects.remove(pos);
+								}
+
+								fs::write(
+									app.path_resolver()
+										.app_data_dir()
+										.context("Couldn't get app data dir")?
+										.join("settings.json"),
+									to_vec(&settings)?
+								)?;
+								app_settings.store(settings.into());
 							}
 						},
 						

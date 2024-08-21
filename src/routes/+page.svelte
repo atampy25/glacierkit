@@ -263,6 +263,9 @@
 
 					case "editor":
 						switch (request.data.type) {
+							case "quickStart":
+								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								break
 							case "text":
 								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
 								break

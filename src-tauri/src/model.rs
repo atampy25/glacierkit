@@ -32,7 +32,8 @@ pub struct AppSettings {
 	pub game_install: Option<PathBuf>,
 	pub colourblind_mode: bool,
 	pub editor_connection: bool,
-	pub seen_announcements: Vec<String>
+	pub seen_announcements: Vec<String>,
+	pub recent_projects: Vec<ProjectInfo>
 }
 
 impl Default for AppSettings {
@@ -42,8 +43,34 @@ impl Default for AppSettings {
 			game_install: None,
 			colourblind_mode: false,
 			editor_connection: true,
-			seen_announcements: vec![]
+			seen_announcements: vec![],
+			recent_projects: vec![]
 		}
+	}
+}
+
+#[derive(Type, Serialize, Deserialize, PartialEq, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectInfo {
+	pub name: String,
+	pub path: PathBuf,
+	pub version: String,
+}
+
+impl ProjectInfo{
+	pub fn from_path(path: PathBuf) -> Option<Self>{
+		let manifest_path = path.join("manifest.json");
+		if !manifest_path.exists() {
+            return None;
+        }
+
+		let file = std::fs::File::open(&manifest_path).ok()?;
+        let json: serde_json::Value = serde_json::from_reader(file).ok()?;
+
+		let name = json.get("name")?.as_str()?.to_string();
+		let version = json.get("version")?.as_str()?.to_string();
+
+        Some(ProjectInfo { name, path, version })
 	}
 }
 
@@ -379,7 +406,13 @@ strike! {
 
 		Editor(pub enum EditorEvent {
 			QuickStart(pub enum QuickStartEvent {
-				Create
+				Create,
+				AddRecentProject {
+					path: PathBuf,
+				},
+				RemoveRecentProject {
+					path: PathBuf,
+				}
 			}),
 			
 			Text(pub enum TextEditorEvent {
@@ -825,7 +858,10 @@ strike! {
 
 		Editor(pub enum EditorRequest {
 			QuickStart(pub enum QuickStartRequest {
-
+				Initialise {
+					id: Uuid,
+					recent_projects: Vec<ProjectInfo>,
+				},
 			})
 			
 			Text(pub enum TextEditorRequest {
