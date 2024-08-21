@@ -52,7 +52,7 @@ use model::{
 	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
 	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest,
 	EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
-	Project, ProjectSettings, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
+	Project, ProjectSettings, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest, QuickStartEvent
 };
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
@@ -315,6 +315,30 @@ fn event(app: AppHandle, event: Event) {
 					}
 
 					Event::Editor(event) => match event {
+						EditorEvent::QuickStart(event) => match event {
+							QuickStartEvent::Create => {
+								let id = Uuid::new_v4();
+
+								app_state.editor_states.insert(
+									id.to_owned(),
+									EditorState {
+										file: None,
+										data: EditorData::Nil,
+									}
+								);
+
+								send_request(
+									&app, 
+									Request::Global(GlobalRequest::CreateTab { 
+										id, 
+										name: "Project hub".to_string(), 
+										editor_type: EditorType::QuickStart 
+									})
+								)?;
+
+							}
+						},
+						
 						EditorEvent::Text(event) => match event {
 							TextEditorEvent::Initialise { id } => {
 								let editor_state = app_state.editor_states.get(&id).context("No such editor")?;

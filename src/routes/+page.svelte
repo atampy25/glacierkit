@@ -8,7 +8,7 @@
 	import GameBrowser from "$lib/tools/GameBrowser.svelte"
 	import ToolButton from "$lib/components/ToolButton.svelte"
 	import { Button, ToastNotification } from "carbon-components-svelte"
-	import { beforeUpdate, onDestroy } from "svelte"
+	import { beforeUpdate, onDestroy, onMount } from "svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import type { Announcement, EditorType, Request } from "$lib/bindings-types"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
@@ -29,8 +29,10 @@
 	import Search from "carbon-icons-svelte/lib/Search.svelte"
 	import ContentSearch from "$lib/tools/ContentSearch.svelte"
 	import ContentSearchResultsEditor from "$lib/editors/contentsearchresults/ContentSearchResultsEditor.svelte"
+	import QuickStartEditor from "$lib/editors/quickstart/QuickStartEditor.svelte"
 	import { open, confirm } from "@tauri-apps/api/dialog"
 	import { help } from "$lib/helpray"
+	import { v4 } from "uuid"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -101,6 +103,9 @@
 			case "Nil":
 				return NilEditor
 
+			case "QuickStart":
+				return QuickStartEditor
+
 			case "Text":
 				return TextEditor
 
@@ -136,6 +141,18 @@
 	const tabComponents: Record<string, { handleRequest: (request: any) => Promise<void> }> = {}
 
 	let activeTab: string | null = null
+
+	onMount(async () => {
+		await event({
+			type: "editor",
+			data: {
+				type: "quickStart",
+				data: {
+					type: "create"
+				}
+			}
+		})
+	})
 
 	let destroyFunc = { run: () => {} }
 	onDestroy(() => {
@@ -605,7 +622,7 @@
 							{/each}
 						</SortableList>
 						{#each tabs as tab (tab.id)}
-							<div class="flex-grow" class:hidden={activeTab !== tab.id}>
+							<div class="flex-grow overflow-auto" class:hidden={activeTab !== tab.id}>
 								<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />
 							</div>
 						{/each}
@@ -620,8 +637,7 @@
 					{:else}
 						<div class="flex-grow flex items-center justify-center">
 							<div class="text-center">
-								<h1>Welcome to GlacierKit</h1>
-								<p>You can start by selecting a project on the left.</p>
+								<h1>GlacierKit</h1>
 								{#if announcements.length}
 									<div class="flex-col items-center -mb-4" use:help={{ title: "Announcements", description: "Any important announcements are displayed here." }}>
 										{#each announcements as announcement (announcement.id)}

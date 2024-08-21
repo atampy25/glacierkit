@@ -13,6 +13,7 @@
 	import { trackEvent } from "@aptabase/tauri"
 	import { readTextFile } from "@tauri-apps/api/fs"
 	import { help } from "$lib/helpray"
+	import { ArrowUpRight } from "carbon-icons-svelte"
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 	let tree: JSTree = null!
@@ -770,23 +771,24 @@
 >
 	{#if !path}
 		<div class="p-4">
-			<p class="mb-4">You don't have a project loaded. Select a folder to get started!</p>
+			<p class="mb-4">You don't have a project loaded. Select a project from the start menu to get started!</p>
 			<Button
 				on:click={async () => {
-					trackEvent("Load workspace using button")
+					trackEvent("Quickstart tab opened with button")
 
-					const path = await open({
-						title: "Select the project folder",
-						directory: true
+					await event({
+						type: "editor",
+						data: {
+							type: "quickStart",
+							data: {
+								type: "create"
+							}
+						}
 					})
-
-					if (typeof path === "string") {
-						await event({ type: "global", data: { type: "loadWorkspace", data: path } })
-					}
 				}}
-				icon={FolderAdd}
+				icon={ArrowUpRight}
 			>
-				Select a project
+				Open start menu
 			</Button>
 		</div>
 	{:else}
