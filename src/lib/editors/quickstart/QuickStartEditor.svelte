@@ -5,15 +5,38 @@
 	import { onMount } from "svelte"
 
 	import { help } from "$lib/helpray"
-	import { Button, ClickableTile, Link, OutboundLink, OverflowMenu, OverflowMenuItem, Tile } from "carbon-components-svelte"
-	import { FolderAdd, FolderOpen, LogoDiscord, LogoGithub, Time, WorshipMuslim } from "carbon-icons-svelte"
+	import { Button, ClickableTile, FluidForm, Link, Modal, OutboundLink, OverflowMenu, OverflowMenuItem, TextInput, Tile } from "carbon-components-svelte"
+	import { FolderAdd, FolderOpen, Folders, LogoDiscord, LogoGithub, Time, WorshipMuslim } from "carbon-icons-svelte"
 	import { Pane, Splitpanes } from "svelte-splitpanes"
 	import { dialog } from "@tauri-apps/api"
 	import { shell } from "@tauri-apps/api"
 
 	export let id: string
-
 	let recent_projects: ProjectInfo[] = []
+
+	let dialog_open = false
+	type NewProjectConfig = {
+		name: string
+		version: string
+		path: string | null
+		valid: boolean
+	}
+
+	let new_project_config: NewProjectConfig = {
+		name: "My amazing mod",
+		version: "1.0.0",
+		path: null,
+		valid: false
+	}
+
+	let invalid_path = false
+	$: invalid__name_empty = new_project_config.name === null || new_project_config.name === ""
+	$: invalid_semver =
+		!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/.test(
+			new_project_config.version
+		)
+
+	$: full_path = (new_project_config.path ?? "") + (new_project_config.name === null ? "" : "\\") + (new_project_config.name ?? "")
 
 	export async function handleRequest(request: QuickStartRequest) {
 		console.log(`Start menu ${id} handling request`, request)
@@ -51,14 +74,41 @@
 					<Link
 						class="flex items-center py-1"
 						on:click={async () => {
-							const selected = await dialog.open({
-								directory: true,
-								multiple: false
-							})
-							if (typeof selected === "string") {
-                                //TODO: add call to event to initialize a project
-								await event({ type: "global", data: { type: "loadWorkspace", data: selected } })
-								await event({ type: "editor", data: { type: "quickStart", data: { type: "addRecentProject", data: { path: selected } } } })
+							if (!new_project_config.valid) {
+								dialog_open = true
+
+								// Wait until new_project_config.valid becomes true
+								const checkValidity = async () => {
+  									await new Promise((resolve) => {
+    								const interval = setInterval(() => {
+      									if (new_project_config.valid) {
+        									clearInterval(interval)
+       										resolve(null)
+      									}
+    								}, 100) // Check every 100ms, adjust as needed
+  								});
+								};
+								await checkValidity();
+							}
+							if (new_project_config.valid == false) return
+							if (new_project_config.path !== null) {
+
+								await event({
+									type: "editor",
+									data: {
+										type: "quickStart",
+										data: {
+											type: "createLocalProject",
+											data: {
+												name: new_project_config.name,
+												version: new_project_config.version,
+												path: new_project_config.path
+											}
+										}
+									}
+								})
+								await event({ type: "global", data: { type: "loadWorkspace", data: full_path } })
+								await event({ type: "editor", data: { type: "quickStart", data: { type: "addRecentProject", data: { path: full_path } } } })
 							}
 						}}
 					>
@@ -92,7 +142,7 @@
 							})
 							if (typeof selected === "string") {
 								await event({ type: "global", data: { type: "loadWorkspace", data: selected } })
-                                await event({ type: "editor", data: { type: "quickStart", data: { type: "addRecentProject", data: { path: selected } } } })
+								await event({ type: "editor", data: { type: "quickStart", data: { type: "addRecentProject", data: { path: selected } } } })
 							}
 						}}
 					>
@@ -196,4 +246,65 @@
 			</div>
 		</div>
 	</div>
+
+	<Modal
+		bind:open={dialog_open}
+		preventCloseOnClickOutside
+		selectorPrimaryFocus="#proj-name"
+		modalHeading="Create project"
+		primaryButtonText="Confirm"
+		secondaryButtonText="Cancel"
+		on:click:button--secondary={() => (dialog_open = false)}
+		on:click:button--primary={() => {
+			if (invalid__name_empty) return
+			if (invalid_semver) return
+			if (new_project_config.path === null) {
+				invalid_path = true
+				return
+			}
+			new_project_config.valid = true
+			dialog_open = false
+		}}
+		on:open
+		on:close
+		on:submit
+	>
+		<FluidForm>
+			<TextInput id="proj-name" required invalid={invalid__name_empty} labelText="Project name" bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
+			<br />
+			<TextInput required invalid={invalid_semver} labelText="Project version" bind:value={new_project_config.version} invalidText="Invalid version! Please use a semver format" />
+			<br />
+			<div class="flex">
+				<TextInput
+					class="flex-grow"
+					required
+					invalid={invalid_path}
+					labelText="Project location"
+					bind:value={full_path}
+					placeholder="C:/your/path/here/{new_project_config.name ?? 'My mod'}"
+					invalidText="Project path cannot be empty"
+				/>
+				<Button
+					class="flex-none"
+					icon={Folders}
+					iconDescription="Select in explorer"
+					tooltipPosition="left"
+					tooltipAlignment="end"
+					on:click={async () => {
+						console.log("File picker")
+						const selected = await dialog.open({
+							directory: true,
+							multiple: false
+						})
+						console.log("picker closed")
+						if (typeof selected === "string") {
+							console.log("found path")
+							new_project_config.path = selected
+							invalid_path = false
+						}
+					}}
+				/>
+			</div>
+		</FluidForm>
+	</Modal>
 </div>

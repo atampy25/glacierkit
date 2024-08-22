@@ -407,6 +407,11 @@ strike! {
 		Editor(pub enum EditorEvent {
 			QuickStart(pub enum QuickStartEvent {
 				Create,
+				CreateLocalProject {
+					name: String,
+					path: PathBuf,
+					version: String,
+				}
 				AddRecentProject {
 					path: PathBuf,
 				},

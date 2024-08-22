@@ -4,7 +4,7 @@ export type Announcement = { id: string; kind: AnnouncementKind; title: string; 
 
 export type AnnouncementKind = "info" | "success" | "warning" | "error"
 
-export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; colourblindMode: boolean; editorConnection: boolean; seenAnnouncements: string[] }
+export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; colourblindMode: boolean; editorConnection: boolean; seenAnnouncements: string[]; recentProjects: ProjectInfo[] }
 
 export type ArrayPatchOperation = { RemoveItemByValue: JsonValue } | { AddItemAfter: [JsonValue, JsonValue] } | { AddItemBefore: [JsonValue, JsonValue] } | { AddItem: JsonValue }
 
@@ -342,6 +342,8 @@ toPin: string;
  */
 value?: SimpleProperty | null }
 
+export type ProjectInfo = { name: string; path: string; version: string }
+
 export type ProjectSettings = { customPaths: string[] }
 
 /**
@@ -408,9 +410,9 @@ propertyOverride: OverriddenProperty }
 
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
 
-export type QuickStartEvent = { type: "create" }
+export type QuickStartEvent = { type: "create" } | { type: "createLocalProject"; data: { name: string; path: string; version: string } } | { type: "addRecentProject"; data: { path: string } } | { type: "removeRecentProject"; data: { path: string } }
 
-export type QuickStartRequest = never
+export type QuickStartRequest = { type: "initialise"; data: { id: string; recent_projects: ProjectInfo[] } }
 
 /**
  * A reference to an entity.

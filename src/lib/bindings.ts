@@ -95,7 +95,7 @@ originalProperty: string;
  */
 originalEntity: Ref }
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
-export type QuickStartEvent = { type: "create" }
+export type QuickStartEvent = { type: "create" } | { type: "createLocalProject"; data: { name: string; path: string; version: string } } | { type: "addRecentProject"; data: { path: string } } | { type: "removeRecentProject"; data: { path: string } }
 /**
  * A reference to an entity.
  */

@@ -25,6 +25,7 @@ use std::{
 	cell::Cell,
 	fmt::Write,
 	fs,
+	io::Cursor,
 	path::{Path, PathBuf},
 	sync::Arc,
 	time::{Duration, SystemTime, UNIX_EPOCH}
@@ -36,6 +37,7 @@ use biome::format_json;
 use dashmap::DashMap;
 use editor_connection::EditorConnection;
 use entity::get_diff_info;
+use std::fs::OpenOptions;
 use event_handling::{
 	repository_patch::handle_repository_patch_event, resource_overview::handle_resource_overview_event,
 	tools::handle_tool_event, unlockables_patch::handle_unlockables_patch_event
@@ -49,7 +51,11 @@ use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{info, trace, LevelFilter};
 use model::{
-	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData, EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest, EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType, Project, ProjectInfo, ProjectSettings, QuickStartEvent, QuickStartRequest, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
+	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
+	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest,
+	EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
+	Project, ProjectInfo, ProjectSettings, QuickStartEvent, QuickStartRequest, Request, SettingsRequest,
+	TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
 };
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
@@ -62,6 +68,8 @@ use tauri::{
 	api::{dialog::blocking::FileDialogBuilder, process::Command},
 	async_runtime, AppHandle, Manager
 };
+use std::path::StripPrefixError;
+use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_log::LogTarget;
 use tryvial::try_fn;
@@ -80,6 +88,8 @@ pub const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
 
 pub const TONYTOOLS_HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/hash_list.hmla";
+
+pub const SMF_MOD_TEMPLATE_ENDPOINT: &str = "https://github.com/atampy25/smf-mod/archive/refs/heads/main.zip";
 
 pub const UPLOAD_LOG_ENDPOINT: &str = "https://hitman-resources.netlify.app/.netlify/functions/upload-gk-log";
 
@@ -320,16 +330,16 @@ fn event(app: AppHandle, event: Event) {
 									id.to_owned(),
 									EditorState {
 										file: None,
-										data: EditorData::Nil,
+										data: EditorData::Nil
 									}
 								);
 
 								send_request(
-									&app, 
-									Request::Global(GlobalRequest::CreateTab { 
-										id, 
-										name: "Quick Start".to_string(), 
-										editor_type: EditorType::QuickStart 
+									&app,
+									Request::Global(GlobalRequest::CreateTab {
+										id,
+										name: "Quick Start".to_string(),
+										editor_type: EditorType::QuickStart
 									})
 								)?;
 
@@ -340,8 +350,62 @@ fn event(app: AppHandle, event: Event) {
 										recent_projects: app_settings.load().recent_projects.clone()
 									}))
 								)?;
+							}
+							QuickStartEvent::CreateLocalProject { name, path, version } => {
+								fn replace_prefix(
+									p: impl AsRef<Path>,
+									from: impl AsRef<Path>,
+									to: impl AsRef<Path>
+								) -> Result<PathBuf, StripPrefixError> {
+									p.as_ref().strip_prefix(from).map(|p| to.as_ref().join(p))
+								}
+								let project_dir = path.join(&name);
+								if let Ok(data) = reqwest::get(SMF_MOD_TEMPLATE_ENDPOINT).await {
+									if let Ok(data) = data.bytes().await {
+										let reader = Cursor::new(data);
+										let mut archive =
+											zip::ZipArchive::new(reader).context("Failed to extract mod template")?;
 
-							},
+										for i in 0..archive.len() {
+											let mut file = archive.by_index(i).unwrap();
+											let outpath = match file.enclosed_name() {
+												Some(path) => path,
+												None => continue
+											};
+
+											if file.is_file() {
+												let file_path = replace_prefix(outpath, "smf-mod-main", &project_dir)
+													.context("Failed to move mod template files")?;
+												fs::create_dir_all(&file_path.parent().unwrap())
+													.context("Failed to create necessary project folder")?;
+												let mut outfile = fs::File::create(&file_path).unwrap();
+												std::io::copy(&mut file, &mut outfile).unwrap();
+											}
+
+											#[cfg(target_os = "linux")]
+											{
+												use std::os::unix::fs::PermissionsExt;
+
+												if let Some(mode) = file.unix_mode() {
+													fs::set_permissions(&mod_folder, fs::Permissions::from_mode(mode))
+														.unwrap();
+												}
+											}
+										}
+									}
+								}
+								let manifest_path = project_dir.join("manifest.json");
+
+								let file = std::fs::File::open(&manifest_path)?;
+								let mut json: serde_json::Value = serde_json::from_reader(file)?;
+
+								json["name"] = json!(&name);
+								json["version"] = json!(&version);
+
+								let file = OpenOptions::new().write(true).truncate(true).open(&manifest_path)?;
+
+								serde_json::to_writer_pretty(file, &json)?;
+							}
 							QuickStartEvent::AddRecentProject { path } => {
 								let mut settings = (*app_settings.load_full()).to_owned();
 
@@ -350,9 +414,9 @@ fn event(app: AppHandle, event: Event) {
 								if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
 									settings.recent_projects.remove(pos);
 								}
-							
+
 								settings.recent_projects.insert(0, project);
-							
+
 								if settings.recent_projects.len() > 5 {
 									settings.recent_projects.truncate(5);
 								}
@@ -365,7 +429,7 @@ fn event(app: AppHandle, event: Event) {
 									to_vec(&settings)?
 								)?;
 								app_settings.store(settings.into());
-							},
+							}
 							QuickStartEvent::RemoveRecentProject { path } => {
 								let mut settings = (*app_settings.load_full()).to_owned();
 								let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
@@ -383,7 +447,7 @@ fn event(app: AppHandle, event: Event) {
 								app_settings.store(settings.into());
 							}
 						},
-						
+
 						EditorEvent::Text(event) => match event {
 							TextEditorEvent::Initialise { id } => {
 								let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
