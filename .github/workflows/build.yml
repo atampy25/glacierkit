@@ -27,12 +27,11 @@ jobs:
         with:
           node-version: lts/*
 
-
       - name: Get latest tag
         id: latestTag
         uses: "WyriHaximus/github-action-get-previous-tag@v1.1.0"
         with:
-          fallback: unknown
+          fallback: "0.0.1"
 
       - name: install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
@@ -70,6 +69,13 @@ jobs:
           file: "src-tauri/tauri.conf.json"
           field: "package.version"
           value: ${{ steps.latestTag.outputs.tag }}
+
+      - name: Write env file
+        uses: DamianReeves/write-file-action@v1.0
+        with:
+          path: "./.env"
+          contents: |
+            DUMMY_ENV=dummy
 
       - uses: tauri-apps/tauri-action@v0
         env:
