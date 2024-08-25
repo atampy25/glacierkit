@@ -38,6 +38,11 @@ jobs:
         with:
           components: 'clippy, rustfmt'
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2.7.3
+        with:
+          workspaces: "src-tauri -> target"
+
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -70,6 +75,13 @@ jobs:
           field: "package.version"
           value: ${{ steps.latestTag.outputs.tag }}
 
+      - name: disable updater for one-off build
+        uses: jossef/action-set-json-field@v2
+        with:
+          file: "src-tauri/tauri.conf.json"
+          field: "tauri.updater.active"
+          value: false
+
       - name: Write env file
         uses: DamianReeves/write-file-action@v1.0
         with:
@@ -77,11 +89,11 @@ jobs:
           contents: |
             DUMMY_ENV=dummy
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: ${{ matrix.args }}
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: |
+          yarn tauri build
 
       - name: Upload artifact (Windows)
         if: matrix.platform == 'windows-latest'
