@@ -7,75 +7,56 @@ on:
     branches: [ "main" ]
 
 jobs:
-    build:
-        runs-on: windows-latest
+  test-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "ubuntu-22.04"
+            args: ""
+          - platform: "windows-latest"
+            args: ""
 
-        steps:
-            - uses: actions/checkout@v2
-              with:
-                  ref: "main"
-                  fetch-depth: 0
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Get latest tag
-              id: latestTag
-              uses: "WyriHaximus/github-action-get-previous-tag@v1.1.0"
-              with:
-                  fallback: unknown
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
 
-            - name: Prepare Rust toolchain
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: nightly
-                  target: x86_64-pc-windows-msvc
-                  default: true
-                  components: clippy, rustfmt
+      - name: install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: 'clippy, rustfmt'
 
-            - name: Rust cache
-              uses: Swatinem/rust-cache@v2.7.3
-              with:
-                workspaces: "src-tauri -> target"
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
-            - name: Install dependencies
-              run: |
-                  yarn set version 4.0.2
-                  yarn
+      - name: install frontend dependencies
+        run: yarn install
 
-            - name: Update package.json version
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "package.json"
-                  field: "version"
-                  value: ${{ steps.latestTag.outputs.tag }}
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
 
-            - name: Update Cargo.toml version
-              uses: colathro/toml-editor@1.1.1
-              with:
-                  file: "src-tauri/Cargo.toml"
-                  key: "package.version"
-                  value: ${{ steps.latestTag.outputs.tag }}
+      - name: Upload artifact (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+          with:
+            name: Windows installer
+            path: src-tauri/target/release/bundle/msi/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip
 
-            - name: Update tauri.conf.json version
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "src-tauri/tauri.conf.json"
-                  field: "package.version"
-                  value: ${{ steps.latestTag.outputs.tag }}
-
-            - name: Write env file
-              uses: DamianReeves/write-file-action@v1.0
-              with:
-                  path: "./.env"
-                  contents: |
-                      DUMMY_ENV=dummy
-
-            - name: Build
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
-              run: |
-                  yarn tauri build
-
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                name: Installer
-                path: src-tauri/target/release/bundle/msi/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip
+      - name: Upload artifact (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v4
+          with:
+            name: Linux installer
+            path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ steps.latestTag.outputs.tag }}_1.6.0_amd64.AppImage
