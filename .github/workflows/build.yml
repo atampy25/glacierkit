@@ -39,7 +39,30 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: install frontend dependencies
-        run: yarn install
+        run: |
+          yarn set version 4.0.2
+          yarn
+
+      - name: Update package.json version
+        uses: jossef/action-set-json-field@v2
+        with:
+          file: "package.json"
+          field: "version"
+          value: ${{ steps.latestTag.outputs.tag }}
+
+      - name: Update Cargo.toml version
+        uses: colathro/toml-editor@1.1.1
+        with:
+          file: "src-tauri/Cargo.toml"
+          key: "package.version"
+          value: ${{ steps.latestTag.outputs.tag }}
+
+      - name: Update tauri.conf.json version
+        uses: jossef/action-set-json-field@v2
+        with:
+          file: "src-tauri/tauri.conf.json"
+          field: "package.version"
+          value: ${{ steps.latestTag.outputs.tag }}
 
       - uses: tauri-apps/tauri-action@v0
         env:
