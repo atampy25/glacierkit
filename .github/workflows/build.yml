@@ -30,7 +30,6 @@ jobs:
       - name: install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: 'clippy, rustfmt'
 
       - name: install dependencies (ubuntu only)
