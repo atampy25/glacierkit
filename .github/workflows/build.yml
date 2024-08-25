@@ -77,7 +77,7 @@ jobs:
         uses: restackio/update-json-file-action@2.1
         with:
           file: "src-tauri/tauri.conf.json"
-          fields: "{\"tauri.updater.active\": \"false\"}"
+          fields: "{\"tauri.updater.active\": false}"
 
       - name: Write env file
         uses: DamianReeves/write-file-action@v1.0
