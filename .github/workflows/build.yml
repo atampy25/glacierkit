@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
-  
+
 jobs:
   test-tauri:
     strategy:
@@ -51,13 +51,13 @@ jobs:
       - name: Upload artifact (Windows)
         if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
-          with:
-            name: Windows installer
-            path: src-tauri/target/release/bundle/msi/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip
+        with:
+          name: Windows installer
+          path: src-tauri/target/release/bundle/msi/GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi.zip
 
       - name: Upload artifact (Linux)
         if: matrix.platform == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
-          with:
-            name: Linux installer
-            path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ steps.latestTag.outputs.tag }}_1.6.0_amd64.AppImage
+        with:
+          name: Linux installer
+          path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ steps.latestTag.outputs.tag }}_1.6.0_amd64.AppImage
