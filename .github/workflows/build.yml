@@ -27,6 +27,13 @@ jobs:
         with:
           node-version: lts/*
 
+
+      - name: Get latest tag
+        id: latestTag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1.1.0"
+        with:
+          fallback: unknown
+
       - name: install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
