@@ -58,7 +58,7 @@ jobs:
         uses: restackio/update-json-file-action@2.1
         with:
           file: "package.json"
-          fields: "{'version': `${{ steps.latestTag.outputs.tag }}`}"
+          fields: "{\"version\": \"${{ steps.latestTag.outputs.tag }}\"}"
 
       - name: Update Cargo.toml version
         uses: colathro/toml-editor@1.1.1
@@ -71,13 +71,13 @@ jobs:
         uses: restackio/update-json-file-action@2.1
         with:
           file: "src-tauri/tauri.conf.json"
-          fields: "{'package.version': `${{ steps.latestTag.outputs.tag }}`}" 
+          fields: "{\"package.version\": \"${{ steps.latestTag.outputs.tag }}\"}" 
 
       - name: disable updater for one-off build
         uses: restackio/update-json-file-action@2.1
         with:
           file: "src-tauri/tauri.conf.json"
-          fields: "{'tauri.updater.active': `false`}"
+          fields: "{\"tauri.updater.active\": \"false\"}"
 
       - name: Write env file
         uses: DamianReeves/write-file-action@v1.0
