@@ -104,4 +104,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Linux installer
-          path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ steps.latestTag.outputs.tag }}_1.6.0_amd64.AppImage
+          path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ steps.latestTag.outputs.tag }}_amd64.AppImage
