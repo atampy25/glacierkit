@@ -71,7 +71,7 @@ jobs:
             - name: Update Versions
               uses: ./.github/actions/update-versions
               with:
-                version-tag: ${{github.ref_name}}
+                version: ${{github.ref_name}}
 
             - name: Write key file
               uses: DamianReeves/write-file-action@v1.0
@@ -147,7 +147,7 @@ jobs:
         - name: Update Versions
           uses: ./.github/actions/update-versions
           with:
-            version-tag: ${{github.ref_name}}
+            version: ${{github.ref_name}}
 
         - name: Update updates.json version
           uses: jossef/action-set-json-field@v2
