@@ -93,14 +93,6 @@ jobs:
               run: |
                   yarn tauri build
 
-            - name: Remove key file
-              run: |
-                  Remove-Item "src-tauri/gk.key"
-
-            - name: Remove env file
-              run: |
-                  Remove-Item "./.env"
-
             - name: Upload release (msi)
               if: matrix.platform == 'windows-latest'
               uses: actions/upload-release-asset@v1
