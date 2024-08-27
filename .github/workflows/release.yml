@@ -192,6 +192,8 @@ jobs:
     
         - name: Format configs
           run: |
+              yarn set version 4.0.2
+              yarn
               yarn format-configs
 
         - name: Commit changes
