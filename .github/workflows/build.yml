@@ -2,21 +2,19 @@ name: Build
 
 on:
   push:
-    branches: [ "main", "linux-moment" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  test-tauri:
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: "ubuntu-22.04"
-            args: ""
           - platform: "windows-latest"
-            args: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -26,12 +24,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-
-      - name: Get latest tag
-        id: latestTag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1.1.0"
-        with:
-          fallback: "0.0.1"
 
       - name: install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
@@ -54,25 +46,6 @@ jobs:
           yarn set version 4.0.2
           yarn
 
-      - name: Update package.json version
-        uses: restackio/update-json-file-action@2.1
-        with:
-          file: "package.json"
-          fields: "{\"version\": \"${{ steps.latestTag.outputs.tag }}\"}"
-
-      - name: Update Cargo.toml version
-        uses: colathro/toml-editor@1.1.1
-        with:
-          file: "src-tauri/Cargo.toml"
-          key: "package.version"
-          value: ${{ steps.latestTag.outputs.tag }}
-
-      - name: Update tauri.conf.json version
-        uses: restackio/update-json-file-action@2.1
-        with:
-          file: "src-tauri/tauri.conf.json"
-          fields: "{\"package.version\": \"${{ steps.latestTag.outputs.tag }}\"}" 
-
       - name: disable updater for one-off build
         uses: restackio/update-json-file-action@2.1
         with:
@@ -91,16 +64,3 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           yarn tauri build
-
-      - name: Upload artifact (Windows)
-        if: matrix.platform == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows installer
-          path: src-tauri\target\release\bundle\msi\GlacierKit_${{ steps.latestTag.outputs.tag }}_x64_en-US.msi
-      - name: Upload artifact (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Linux installer
-          path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ steps.latestTag.outputs.tag }}_amd64.AppImage
