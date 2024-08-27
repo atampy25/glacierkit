@@ -79,9 +79,9 @@
 		},
 		"updater": {
 			"active": true,
-			"endpoints": ["https://raw.githubusercontent.com/atampy25/glacierkit/master/updates.json"],
+			"endpoints": ["https://raw.githubusercontent.com/dafitius/glacierkit/master/updates.json"],
 			"dialog": false,
-			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5OEYzQTUzNUZCODZBNUMKUldSY2FyaGZVenFQS2JydmlWbHhndGo2WXFEZExmVzEvQXJRYk9PekRjb0NoY01RRnBUdEMvNHgK"
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkyNkI4RTQ3RjlDMzM4QzUKUldURk9NUDVSNDVya2pPWEFhN3RiMGNCb2lPTTBxaXM4YUlBNEVSVlk2c1dmMXgyUjIzNUlORDcK"
 		},
 		"windows": [
 			{
