@@ -1,11 +1,15 @@
 {
-	"version": "1.6.0",
-	"notes": "Resource overview overhaul\n\nNote: control-click now used to open references in new tab",
-	"pub_date": "2024-08-20T16:20:28Z",
+	"version": "0.0.8",
+	"notes": "Update release.yml",
+	"pub_date": "2024-08-21T20:23:30Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2VwUVVscFZDY3l1Q3RVdm11bmdGVDNPSTZVNmZyaHdMNWhCaUtwU0VTb3pMOFBkeUwyRWt2a25DcDhmVU50Mkp6V3RFcXU4ZmdHcHFtdXNHaXBCQ2dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzI0MTcyMDY0CWZpbGU6R2xhY2llcktpdF8xLjYuMF94NjRfZW4tVVMubXNpLnppcAo4OE9kcDBqZ01LczdYZnRwQ0I3cE9VYVgzWTBMeUhpMUtHZXl0Rk1IT0ZwUlBOUkpnZlhhNXdHcjRDYUJmZlR4SG9kdnhoZ2xUOElTcWZQWE1TZ2xDdz09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.6.0/GlacierKit_1.6.0_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVURk9NUDVSNDVya2hNNXFueERkZTJ5cVJNZUNZR1R6QldncWNMeTBxRE9OQ0FUb3dRZWlqWnZ5WVA1NU8yV1F0Ly9sOXVCQTN3aTIwZkJaczRjTWhlVGhsUEdEL1oxQ3dBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzI0ODc2MjU4CWZpbGU6R2xhY2llcktpdF8wLjAuOF94NjRfZW4tVVMubXNpLnppcApSNXlJUTA2WlhMd3NsRTBvdGR3bWlqRC9RZHR3UGRQTmZYOHJWU2dkUk9xa3I0WHZyTFllc29DVE9kb291UHBEcDJZWGlqNG1rd04rdy9JaElyQXFBZz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/0.0.8/GlacierKit_0.0.8_x64_en-US.msi.zip"
+		},
+		"linux-x86_64": {
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVURk9NUDVSNDVya2lsQkZXSGJUNmtpbzBLTWhFYkhvcVRXdmlOUi9KT25SQ3FxM1NCOElJYlcwOTNEUnRsbzB6RHpRdVBUMGRnaWtyRjhVVGdxWU5EOTljMXRDRTdiblFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzI0ODc1OTE4CWZpbGU6Z2xhY2llci1raXRfMC4wLjhfYW1kNjQuQXBwSW1hZ2UudGFyLmd6Cm1pRzRxUjZidEZpeUQ0Z2F2TXNNKzlRK2Y4dndmbXhpZlRjL0g5TldtaHpKSUt4TnpyUk1KNU0rSHpBZUoxeTBoN3FKMEY4b1ZhU3ZkZmw5M1RIY0FnPT0K",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/0.0.8/GlacierKit_0.0.8_amd64.AppImage.tar.gz"
 		}
 	}
 }

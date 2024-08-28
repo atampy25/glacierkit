@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.6.0"
+version = "0.0.8"
 description = "An integrated modding tool for the HITMAN World of Assassination trilogy."
 authors = ["you"]
 license = ""
@@ -141,4 +141,3 @@ fork = "0.1.22"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
-
