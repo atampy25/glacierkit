@@ -290,6 +290,7 @@ mod detection {
 	use std::{fs, path::PathBuf};
 	use super::{GameInstall, SteamLibraryFolder};
 	use itertools::Itertools;
+	use serde_json::Value;
 	use anyhow::{bail, Context, Result};
 	use fn_error_context::context;
 	use hashbrown::HashMap;
@@ -301,11 +302,64 @@ mod detection {
 	pub fn detect_installs() -> Result<Vec<GameInstall>> {
 		let mut check_paths = vec![];
 
+		// Legendary installs
+		match home::home_dir() {
+			Some(home_dir) => {
+				let legendary_installed_path = match home_dir {
+					home if home_dir.join(".config/legendary/installed.json").exists() => {
+						Some(home.join(".config/legendary/installed.json"))
+					},
+					_ => None
+				};
+				if let Some(legendary_installed_path) = legendary_installed_path{
+					let legendary_installed_data: Value =
+					serde_json::from_slice(&fs::read(legendary_installed_path).context("Reading legendary installed")?)
+						.context("Legendary installed as JSON")?;
+
+				// H3
+				if let Some(data) = legendary_installed_data.get("Eider") {
+					check_paths.push((
+						PathBuf::from(
+							data.get("install_path")
+								.context("install_path")?
+								.as_str()
+								.context("as_str")?
+						),
+						"Epic Games"
+					));
+				}
+
+				// H1
+				if let Some(data) = legendary_installed_data.get("Barbet") {
+					check_paths.push((
+						PathBuf::from(
+							data.get("install_path")
+								.context("install_path")?
+								.as_str()
+								.context("as_str")?
+						),
+						"Epic Games"
+					));
+				}
+				}
+				
+			},
+			None => {}
+		}
+
 		// 	Steam installs
 		match home::home_dir() {
-			Some(home) => {
-				let steampath = home.join(".local/share/Steam");
-				if steampath.exists() {
+			Some(home_dir) => {
+				let steampath = match home_dir {
+					home if home_dir.join(".local/share/Steam").exists() => {
+						Some(home.join(".local/share/Steam"))
+					},
+					home if home_dir.join(".steam/steam").exists() => {
+						Some(home.join(".steam/steam"))
+					},
+					_ => None
+				};
+				if let Some(steampath) = steampath {
 					if let Ok(s) = fs::read_to_string(if steampath.join("config").join("libraryfolders.vdf").exists() {
 						steampath.join("config").join("libraryfolders.vdf")
 					} else {
