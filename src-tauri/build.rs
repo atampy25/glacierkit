@@ -38,6 +38,6 @@ fn copy_static_assets(){
     ];
 
     for file in files{
-        std::fs::copy(&static_folder.join(file), &out_path.join(file)).expect("Failed to copy dll to output directory: {}");
+        std::fs::copy(static_folder.join(file), out_path.join(file)).expect("Failed to copy dll to output directory: {}");
     }
 }

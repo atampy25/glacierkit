@@ -287,14 +287,14 @@ mod detection {
 
 #[cfg(target_os = "linux")]
 mod detection {
-	use std::{fs, path::PathBuf};
 	use super::{GameInstall, SteamLibraryFolder};
-	use itertools::Itertools;
-	use serde_json::Value;
 	use anyhow::{bail, Context, Result};
 	use fn_error_context::context;
 	use hashbrown::HashMap;
 	use hitman_commons::game::GameVersion;
+	use itertools::Itertools;
+	use serde_json::Value;
+	use std::{fs, path::PathBuf};
 	use tryvial::try_fn;
 
 	#[try_fn]
@@ -303,16 +303,16 @@ mod detection {
 		let mut check_paths = vec![];
 
 		// Legendary installs
-		match home::home_dir() {
-			Some(home_dir) => {
-				let legendary_installed_path = match home_dir {
-					home if home_dir.join(".config/legendary/installed.json").exists() => {
-						Some(home.join(".config/legendary/installed.json"))
-					},
-					_ => None
-				};
-				if let Some(legendary_installed_path) = legendary_installed_path{
-					let legendary_installed_data: Value =
+
+		if let Some(home_dir) = home::home_dir() {
+			let legendary_installed_path = match home_dir {
+				home if home_dir.join(".config/legendary/installed.json").exists() => {
+					Some(home.join(".config/legendary/installed.json"))
+				}
+				_ => None
+			};
+			if let Some(legendary_installed_path) = legendary_installed_path {
+				let legendary_installed_data: Value =
 					serde_json::from_slice(&fs::read(legendary_installed_path).context("Reading legendary installed")?)
 						.context("Legendary installed as JSON")?;
 
@@ -341,71 +341,62 @@ mod detection {
 						"Epic Games"
 					));
 				}
-				}
-				
-			},
-			None => {}
+			}
 		}
 
 		// 	Steam installs
-		match home::home_dir() {
-			Some(home_dir) => {
-				let steampath = match home_dir {
-					home if home_dir.join(".local/share/Steam").exists() => {
-						Some(home.join(".local/share/Steam"))
-					},
-					home if home_dir.join(".steam/steam").exists() => {
-						Some(home.join(".steam/steam"))
-					},
-					_ => None
-				};
-				if let Some(steampath) = steampath {
-					if let Ok(s) = fs::read_to_string(if steampath.join("config").join("libraryfolders.vdf").exists() {
-						steampath.join("config").join("libraryfolders.vdf")
-					} else {
-						steampath.join("steamapps").join("libraryfolders.vdf")
-					}) {
-						let folders: HashMap<String, SteamLibraryFolder> =
-							keyvalues_serde::from_str(&s).context("VDF parse")?;
 
-						for folder in folders.values() {
-							// H1, H1 free trial
-							if folder.apps.contains_key("236870") || folder.apps.contains_key("649780") {
-								check_paths.push((
-									PathBuf::from(&folder.path)
-										.join("steamapps")
-										.join("common")
-										.join("HITMAN™"),
-									"Steam"
-								));
-							}
+		if let Some(home_dir) = home::home_dir() {
+			let steampath = match home_dir {
+				home if home_dir.join(".local/share/Steam").exists() => Some(home.join(".local/share/Steam")),
+				home if home_dir.join(".steam/steam").exists() => Some(home.join(".steam/steam")),
+				_ => None
+			};
+			if let Some(steampath) = steampath {
+				if let Ok(s) = fs::read_to_string(if steampath.join("config").join("libraryfolders.vdf").exists() {
+					steampath.join("config").join("libraryfolders.vdf")
+				} else {
+					steampath.join("steamapps").join("libraryfolders.vdf")
+				}) {
+					let folders: HashMap<String, SteamLibraryFolder> =
+						keyvalues_serde::from_str(&s).context("VDF parse")?;
 
-							// H2
-							if folder.apps.contains_key("863550") {
-								check_paths.push((
-									PathBuf::from(&folder.path)
-										.join("steamapps")
-										.join("common")
-										.join("HITMAN2"),
-									"Steam"
-								));
-							}
-
-							// H3, H3 demo
-							if folder.apps.contains_key("1659040") || folder.apps.contains_key("1847520") {
-								check_paths.push((
-									PathBuf::from(&folder.path)
-										.join("steamapps")
-										.join("common")
-										.join("HITMAN 3"),
-									"Steam"
-								));
-							}
+					for folder in folders.values() {
+						// H1, H1 free trial
+						if folder.apps.contains_key("236870") || folder.apps.contains_key("649780") {
+							check_paths.push((
+								PathBuf::from(&folder.path)
+									.join("steamapps")
+									.join("common")
+									.join("HITMAN™"),
+								"Steam"
+							));
 						}
-					};
-				}
+
+						// H2
+						if folder.apps.contains_key("863550") {
+							check_paths.push((
+								PathBuf::from(&folder.path)
+									.join("steamapps")
+									.join("common")
+									.join("HITMAN2"),
+								"Steam"
+							));
+						}
+
+						// H3, H3 demo
+						if folder.apps.contains_key("1659040") || folder.apps.contains_key("1847520") {
+							check_paths.push((
+								PathBuf::from(&folder.path)
+									.join("steamapps")
+									.join("common")
+									.join("HITMAN 3"),
+								"Steam"
+							));
+						}
+					}
+				};
 			}
-			None => {}
 		}
 
 		let mut game_installs = vec![];
