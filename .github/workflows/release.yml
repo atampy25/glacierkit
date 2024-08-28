@@ -137,7 +137,7 @@ jobs:
         - name: Checkout code
           uses: actions/checkout@v4
           with:
-            ref: "linux-moment"
+            ref: "main"
             fetch-depth: 0
 
         - name: Update Versions
