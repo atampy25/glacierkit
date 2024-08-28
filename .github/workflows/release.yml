@@ -134,7 +134,29 @@ jobs:
       needs: build
       runs-on: 'ubuntu-22.04'
       steps:
-        - uses: actions/checkout@v4
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+
+        - name: Determine the branch from the tag
+          id: get_branch
+          run: |
+            # Get the branch associated with the tag
+            BRANCH=$(git branch --contains="${GITHUB_REF##*/}" | head -n1 | cut -c3-)
+
+            echo "Branch associated with the tag is $BRANCH"
+
+            # Output the branch name for later steps
+            echo "::set-output name=branch::$BRANCH"
+
+        - name: Checkout the branch
+          uses: actions/checkout@v4
+          with:
+            ref: ${{ steps.get_branch.outputs.branch }}
+
+        - name: Confirm branch
+          run: echo "Checked out branch ${{ steps.get_branch.outputs.branch }}"
   
         - name: Update Versions
           uses: ./.github/actions/update-versions
