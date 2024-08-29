@@ -197,7 +197,6 @@ dependencies = [
  "regex",
  "registry",
  "reqwest",
- "rfd",
  "rpkg-rs",
  "serde",
  "serde-smile",
