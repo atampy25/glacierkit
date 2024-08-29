@@ -750,7 +750,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		//Workaround for the linux filesystem.
 		//the relative_runtime_path will in most cases be runtime, while the folder is actually called Runtime
 		//Windows doesn't care about the mismatched casing, UNIX does :(
-		let relative_runtime_path = match relative_runtime_path.is_empty() {
+		let relative_runtime_path_uppercased = match relative_runtime_path.is_empty() {
 			true =>{
 				relative_runtime_path.clone()
 			},
@@ -763,11 +763,13 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			}
 		};
 
-		let runtime_path = path
+		let runtime_path = [relative_runtime_path, &relative_runtime_path_uppercased]
+		.iter()
+		.flat_map(|folder| path
 			.join(proj_path.replace('\\', "/"))
-			.join(relative_runtime_path)
-			.canonicalize()
-			.context("Failed to parse runtime path")?;
+			.join(folder)
+			.canonicalize())
+		.find(|joined_path| joined_path.exists()).context("Couldn't find valid runtime folder")?;
 
 		let mut partition_manager = PartitionManager::new(runtime_path.clone());
 

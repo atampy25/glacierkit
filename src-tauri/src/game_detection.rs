@@ -371,6 +371,22 @@ mod detection {
 									.join("HITMAN™"),
 								"Steam"
 							));
+							check_paths.push((
+								PathBuf::from(&folder.path)
+									.join("steamapps")
+									.join("common")
+									.join("Hitman™"),
+								"Steam"
+							));
+							check_paths.push((
+								PathBuf::from(&folder.path)
+									.join("steamapps")
+									.join("common")
+									.join("Hitman™")
+									.join("share")
+									.join("data"),
+								"Steam"
+							));
 						}
 
 						// H2
@@ -402,22 +418,29 @@ mod detection {
 		let mut game_installs = vec![];
 
 		for (path, platform) in check_paths {
-			// Game folder has Retail
-			let subfolder_retail = path.join("Retail").is_dir();
+			// Game folder must have Retail
 
-			if subfolder_retail {
+			let subfolder_retail = ["Retail", "retail"]
+    			.iter()
+    			.map(|folder| path.join(folder))
+    			.find(|joined_path| joined_path.exists());
+
+			if let Some(subfolder_retail) = subfolder_retail {
+				let version = 
+				if subfolder_retail.join("HITMAN3.exe").is_file() {
+					GameVersion::H3
+				} else if subfolder_retail.join("HITMAN2.exe").is_file() {
+					GameVersion::H2
+				} else if subfolder_retail.join("HITMAN.exe").is_file() || subfolder_retail.join("hitman.dll").is_file(){
+					GameVersion::H1
+				} else {
+					bail!("Unknown game added to check paths");
+				};
+
 				game_installs.push(GameInstall {
-					path: path.join("Retail"),
+					path: subfolder_retail,
 					platform: platform.into(),
-					version: if path.join("Retail").join("HITMAN3.exe").is_file() {
-						GameVersion::H3
-					} else if path.join("Retail").join("HITMAN2.exe").is_file() {
-						GameVersion::H2
-					} else if path.join("Retail").join("HITMAN.exe").is_file() {
-						GameVersion::H1
-					} else {
-						bail!("Unknown game added to check paths");
-					}
+					version
 				});
 			}
 		}

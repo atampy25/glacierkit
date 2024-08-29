@@ -15,7 +15,7 @@
 			"all": true,
 			"protocol": {
 				"all": true,
-				"assetScope": ["**/*"]
+				"assetScope": ["**/*", "$APPDATA/**"]
 			},
 			"shell": {
 				"sidecar": true,
