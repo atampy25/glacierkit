@@ -21,10 +21,13 @@
 				"sidecar": true,
 				"scope": [
 					{
-						"name": "vgmstream-cli",
+						"name": "bin/vgmstream-cli",
 						"sidecar": true
 					}
-				]
+				],
+				"execute": true,
+				"all": true,
+				"open": true
 			},
 			"fs": {
 				"all": false,
@@ -39,7 +42,7 @@
 			"deb": {
 				"depends": []
 			},
-			"externalBin": ["vgmstream-cli"],
+			"externalBin": ["bin/vgmstream-cli"],
 			"icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
 			"identifier": "app.glacierkit",
 			"longDescription": "",
