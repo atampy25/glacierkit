@@ -10,6 +10,7 @@
 	import { Pane, Splitpanes } from "svelte-splitpanes"
 	import { dialog } from "@tauri-apps/api"
 	import { shell } from "@tauri-apps/api"
+	import { convertFileSrc } from "@tauri-apps/api/tauri"
 
 	export let id: string
 	let recent_projects: ProjectInfo[] = []
@@ -46,6 +47,10 @@
 				recent_projects = request.data.recent_projects
 				break
 
+			case "refreshRecentList":
+				recent_projects = request.data.recent_projects
+				break
+
 			default:
 				request satisfies never
 				break
@@ -79,20 +84,19 @@
 
 								// Wait until new_project_config.valid becomes true
 								const checkValidity = async () => {
-  									await new Promise((resolve) => {
-    								const interval = setInterval(() => {
-      									if (new_project_config.valid) {
-        									clearInterval(interval)
-       										resolve(null)
-      									}
-    								}, 100) // Check every 100ms, adjust as needed
-  								});
-								};
-								await checkValidity();
+									await new Promise((resolve) => {
+										const interval = setInterval(() => {
+											if (new_project_config.valid) {
+												clearInterval(interval)
+												resolve(null)
+											}
+										}, 100) // Check every 100ms, adjust as needed
+									})
+								}
+								await checkValidity()
 							}
 							if (new_project_config.valid == false) return
 							if (new_project_config.path !== null) {
-
 								await event({
 									type: "editor",
 									data: {
@@ -223,9 +227,9 @@
 										>
 											<OverflowMenuItem
 												text="Show in explorer"
-												on:click={(e) => {
+												on:click={async (e) => {
 													e.stopPropagation()
-													shell.open(project.path)
+													await event({ type: "editor", data: { type: "quickStart", data: { type: "openProjectInExplorer", data: { path: project.path } } } })
 												}}
 											/>
 											<OverflowMenuItem
@@ -234,6 +238,7 @@
 												on:click={async (e) => {
 													e.stopPropagation()
 													await event({ type: "editor", data: { type: "quickStart", data: { type: "removeRecentProject", data: { path: project.path } } } })
+													await event({ type: "editor", data: { type: "quickStart", data: { type: "refreshRecentList", data: { id } } } })
 												}}
 											/>
 										</OverflowMenu>

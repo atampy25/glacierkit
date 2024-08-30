@@ -16,7 +16,7 @@
 				extractModdedFiles = request.data.settings.extractModdedFiles
 				colourblind = request.data.settings.colourblindMode
 				editorConnectionEnabled = request.data.settings.editorConnection
-				selectedGameInstall = request.data.settings.gameInstall || null
+				selectedGameInstall = request.data.settings.gameInstall || "none"
 				break
 
 			case "changeProjectSettings":
@@ -180,9 +180,9 @@
 			</RadioTile>
 		{/each}
 		<RadioTile
-			value={undefined}
+			value={"none"}
 			class="p-4 flex items-center justify-center"
-			checked={selectedGameInstall === undefined}
+			checked={selectedGameInstall === "none"}
 			on:click={async () => {
 
 				await event({

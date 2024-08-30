@@ -410,9 +410,9 @@ propertyOverride: OverriddenProperty }
 
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
 
-export type QuickStartEvent = { type: "create" } | { type: "createLocalProject"; data: { name: string; path: string; version: string } } | { type: "addRecentProject"; data: { path: string } } | { type: "removeRecentProject"; data: { path: string } }
+export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { name: string; path: string; version: string } } | { type: "addRecentProject"; data: { path: string } } | { type: "removeRecentProject"; data: { path: string } } | { type: "openProjectInExplorer"; data: { path: string } }
 
-export type QuickStartRequest = { type: "initialise"; data: { id: string; recent_projects: ProjectInfo[] } }
+export type QuickStartRequest = { type: "initialise"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "refreshRecentList"; data: { id: string; recent_projects: ProjectInfo[] } }
 
 /**
  * A reference to an entity.
