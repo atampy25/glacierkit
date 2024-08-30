@@ -40,6 +40,7 @@
 	import { Pane, Splitpanes } from "svelte-splitpanes"
 	import { ColumnDependency, IbmDataProductExchange, SoftwareResource, TrashCan } from "carbon-icons-svelte"
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
+	import { platform } from "@tauri-apps/api/os"
 
 	export let id: string
 
@@ -161,33 +162,45 @@
 											<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
 										</div>
 									{:else if data.type === "Audio"}
-										<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
+										{#await platform() then platform}
+											{#if platform === "linux"}
+												<div class="text-neutral-400">Audio preview is unavailable on Linux due to a bug in WebKit.</div>
+											{:else}
+												<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
+											{/if}
+										{/await}
 									{:else if data.type === "MultiAudio"}
-										<div class="text-neutral-400 mb-2">{data.data.name}</div>
-										{#if data.data.wav_paths.length}
-											<MultiWaveformPlayer
-												src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
-												on:download={async ({ detail }) => {
-													trackEvent("Extract specific audio from WWEV file as WAV")
+										{#await platform() then platform}
+											{#if platform === "linux"}
+												<div class="text-neutral-400">Audio preview is unavailable on Linux due to a bug in WebKit.</div>
+											{:else}
+												<div class="text-neutral-400 mb-2">{data.data.name}</div>
+												{#if data.data.wav_paths.length}
+													<MultiWaveformPlayer
+														src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
+														on:download={async ({ detail }) => {
+															trackEvent("Extract specific audio from WWEV file as WAV")
 
-													await event({
-														type: "editor",
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractSpecificMultiWav",
+															await event({
+																type: "editor",
 																data: {
-																	id,
-																	index: detail
+																	type: "resourceOverview",
+																	data: {
+																		type: "extractSpecificMultiWav",
+																		data: {
+																			id,
+																			index: detail
+																		}
+																	}
 																}
-															}
-														}
-													})
-												}}
-											/>
-										{:else}
-											<div class="-mt-1 text-lg">No linked audio</div>
-										{/if}
+															})
+														}}
+													/>
+												{:else}
+													<div class="-mt-1 text-lg">No linked audio</div>
+												{/if}
+											{/if}
+										{/await}
 									{:else if data.type === "GenericRL" || data.type === "Ores" || data.type === "Json" || data.type === "HMLanguages"}
 										<div class="h-[30vh]">
 											<Monaco id={v4()} content={data.data.json} />
