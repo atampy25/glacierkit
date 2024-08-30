@@ -747,19 +747,13 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			bail!("thumbs.dat was missing required properties");
 		};
 
-		//Workaround for the linux filesystem.
-		//the relative_runtime_path will in most cases be runtime, while the folder is actually called Runtime
-		//Windows doesn't care about the mismatched casing, UNIX does :(
-		let relative_runtime_path_uppercased = match relative_runtime_path.is_empty() {
-			true => relative_runtime_path.clone(),
-			false => {
-				let mut chars = relative_runtime_path.chars();
-				match chars.next() {
-					Some(first_char) => format!("{}{}", first_char.to_uppercase(), chars.as_str()),
-					None => String::new()
-				}
-			}
-		};
+		// Workaround for the Linux filesystem.
+		// The relative_runtime_path will in most cases be "runtime", while the folder is actually called "Runtime"
+		// Windows doesn't care about the mismatched casing, UNIX does :(
+		let relative_runtime_path_uppercased = relative_runtime_path
+			.char_indices()
+			.map(|(idx, ch)| if idx == 0 { ch.to_ascii_uppercase() } else { ch })
+			.collect::<String>();
 
 		let runtime_path = [relative_runtime_path, &relative_runtime_path_uppercased]
 			.iter()

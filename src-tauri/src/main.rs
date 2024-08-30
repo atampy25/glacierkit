@@ -964,7 +964,7 @@ fn event(app: AppHandle, event: Event) {
 													.add_filter("Repository JSON patch", &["JSON.patch.json"])
 													.save_file()
 												{
-													editor.file = Some(path.clone().into());
+													editor.file = Some(path.to_owned());
 
 													send_request(
 														&app,
@@ -1149,7 +1149,7 @@ fn event(app: AppHandle, event: Event) {
 													.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
 													.save_file()
 												{
-													editor.file = Some(path.clone().into());
+													editor.file = Some(path.to_owned());
 
 													send_request(
 														&app,
@@ -1291,7 +1291,7 @@ fn event(app: AppHandle, event: Event) {
 									)
 									.save_file()
 								{
-									editor.file = Some(path.clone().into());
+									editor.file = Some(path.to_owned());
 
 									fs::write(&path, data_to_save).context("Couldn't write file")?;
 

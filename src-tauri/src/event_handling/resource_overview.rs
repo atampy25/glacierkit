@@ -910,7 +910,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}.{}", &hash, &file_type))
-					.add_filter(&format!("{} file", &file_type), &[file_type.as_ref()])
+					.add_filter(format!("{} file", &file_type), &[file_type.as_ref()])
 					.save_file()
 				{
 					fs::write(&path, data)?;
@@ -1174,7 +1174,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}.{}.json", hash, res_meta.core_info.resource_type))
 					.add_filter(
-						&format!("{}.json file", res_meta.core_info.resource_type),
+						format!("{}.json file", res_meta.core_info.resource_type),
 						&[&format!("{}.json", res_meta.core_info.resource_type)]
 					)
 					.save_file()
@@ -1632,7 +1632,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						res_meta.core_info.resource_type.as_ref().to_lowercase()
 					))
 					.add_filter(
-						&format!("{}.json file", res_meta.core_info.resource_type.as_ref().to_lowercase()),
+						format!("{}.json file", res_meta.core_info.resource_type.as_ref().to_lowercase()),
 						&[&format!(
 							"{}.json",
 							res_meta.core_info.resource_type.as_ref().to_lowercase()

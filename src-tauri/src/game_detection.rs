@@ -27,8 +27,6 @@ pub fn detect_installs() -> Result<Vec<GameInstall>> {
 
 #[cfg(target_os = "windows")]
 mod detection {
-	use registry::{Data, Hive, Security};
-	use serde_json::Value;
 	use std::os::windows::process::CommandExt;
 	use std::{fs, path::PathBuf};
 	use std::{path::Path, process::Command};
@@ -38,6 +36,8 @@ mod detection {
 	use hashbrown::HashMap;
 	use hitman_commons::game::GameVersion;
 	use itertools::Itertools;
+	use registry::{Data, Hive, Security};
+	use serde_json::Value;
 	use tryvial::try_fn;
 
 	use super::{GameInstall, SteamLibraryFolder};
@@ -287,15 +287,17 @@ mod detection {
 
 #[cfg(target_os = "linux")]
 mod detection {
-	use super::{GameInstall, SteamLibraryFolder};
+	use std::{fs, path::PathBuf};
+
 	use anyhow::{bail, Context, Result};
 	use fn_error_context::context;
 	use hashbrown::HashMap;
 	use hitman_commons::game::GameVersion;
 	use itertools::Itertools;
 	use serde_json::Value;
-	use std::{fs, path::PathBuf};
 	use tryvial::try_fn;
+
+	use super::{GameInstall, SteamLibraryFolder};
 
 	#[try_fn]
 	#[context("Couldn't detect installed games")]
@@ -303,14 +305,12 @@ mod detection {
 		let mut check_paths = vec![];
 
 		// Legendary installs
-
 		if let Some(home_dir) = home::home_dir() {
-			let legendary_installed_path = match home_dir {
-				home if home_dir.join(".config/legendary/installed.json").exists() => {
-					Some(home.join(".config/legendary/installed.json"))
-				}
-				_ => None
-			};
+			let legendary_installed_path = home_dir
+				.join(".config/legendary/installed.json")
+				.exists()
+				.then_some(home_dir.join(".config/legendary/installed.json"));
+
 			if let Some(legendary_installed_path) = legendary_installed_path {
 				let legendary_installed_data: Value =
 					serde_json::from_slice(&fs::read(legendary_installed_path).context("Reading legendary installed")?)
@@ -344,19 +344,19 @@ mod detection {
 			}
 		}
 
-		// 	Steam installs
-
+		// Steam installs
 		if let Some(home_dir) = home::home_dir() {
-			let steampath = match home_dir {
+			let steam_path = match home_dir {
 				home if home_dir.join(".local/share/Steam").exists() => Some(home.join(".local/share/Steam")),
 				home if home_dir.join(".steam/steam").exists() => Some(home.join(".steam/steam")),
 				_ => None
 			};
-			if let Some(steampath) = steampath {
-				if let Ok(s) = fs::read_to_string(if steampath.join("config").join("libraryfolders.vdf").exists() {
-					steampath.join("config").join("libraryfolders.vdf")
+
+			if let Some(steam_path) = steam_path {
+				if let Ok(s) = fs::read_to_string(if steam_path.join("config").join("libraryfolders.vdf").exists() {
+					steam_path.join("config").join("libraryfolders.vdf")
 				} else {
-					steampath.join("steamapps").join("libraryfolders.vdf")
+					steam_path.join("steamapps").join("libraryfolders.vdf")
 				}) {
 					let folders: HashMap<String, SteamLibraryFolder> =
 						keyvalues_serde::from_str(&s).context("VDF parse")?;
@@ -418,27 +418,24 @@ mod detection {
 		let mut game_installs = vec![];
 
 		for (path, platform) in check_paths {
-			// Game folder must have Retail
-
-			let subfolder_retail = ["Retail", "retail"]
+			let retail_folder = ["Retail", "retail"]
 				.iter()
 				.map(|folder| path.join(folder))
 				.find(|joined_path| joined_path.exists());
 
-			if let Some(subfolder_retail) = subfolder_retail {
-				let version = if subfolder_retail.join("HITMAN3.exe").is_file() {
+			if let Some(retail_folder) = retail_folder {
+				let version = if retail_folder.join("HITMAN3.exe").is_file() {
 					GameVersion::H3
-				} else if subfolder_retail.join("HITMAN2.exe").is_file() {
+				} else if retail_folder.join("HITMAN2.exe").is_file() {
 					GameVersion::H2
-				} else if subfolder_retail.join("HITMAN.exe").is_file() || subfolder_retail.join("hitman.dll").is_file()
-				{
+				} else if retail_folder.join("HITMAN.exe").is_file() || retail_folder.join("hitman.dll").is_file() {
 					GameVersion::H1
 				} else {
 					bail!("Unknown game added to check paths");
 				};
 
 				game_installs.push(GameInstall {
-					path: subfolder_retail,
+					path: retail_folder,
 					platform: platform.into(),
 					version
 				});

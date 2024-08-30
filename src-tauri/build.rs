@@ -1,4 +1,8 @@
+use std::{env, path::PathBuf};
+
 fn main() {
+	let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+
 	// Windows-specific linking
 	#[cfg(target_os = "windows")]
 	{
@@ -11,8 +15,7 @@ fn main() {
 	// Linux-specific linking
 	#[cfg(target_os = "linux")]
 	{
-		let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-		let resourcelib_dir = std::path::Path::new(&dir).join("ResourceLib/ResourceLib-linux-x64");
+		let resourcelib_dir = manifest_dir.join("ResourceLib/ResourceLib-linux-x64");
 
 		println!("cargo:rustc-link-search={}", resourcelib_dir.display());
 		println!("cargo:rustc-link-arg=-Wl,-rpath={}", resourcelib_dir.display());
@@ -24,20 +27,14 @@ fn main() {
 		println!("cargo:include={}", resourcelib_dir.join("include").display());
 	}
 
-	copy_static_assets();
-	tauri_build::build();
-}
+	let static_folder = manifest_dir.join("../static");
+	let out_path = manifest_dir.join("../build/_app/immutable/assets");
 
-fn copy_static_assets() {
-	let out_path =
-		std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("../build/_app/immutable/assets");
-
-	let static_folder = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("../static");
-
-	let files = vec!["32px.png", "throbber.gif"];
+	let files = ["32px.png", "throbber.gif"];
 
 	for file in files {
-		std::fs::copy(static_folder.join(file), out_path.join(file))
-			.expect("Failed to copy dll to output directory: {}");
+		std::fs::copy(static_folder.join(file), out_path.join(file)).expect("Failed to copy asset to output directory");
 	}
+
+	tauri_build::build();
 }
