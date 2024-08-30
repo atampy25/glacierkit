@@ -35,7 +35,6 @@ indexmap = "2.1.0"
 arboard = "3.3.0"
 rand = "0.8.5"
 rpkg-rs = "1.0.0-rc.1"
-rfd = "0.10.0"
 async-recursion = "1.0.5"
 parking_lot = "0.12.1"
 rayon = "1.8.0"
@@ -61,6 +60,7 @@ biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
 os_info = "3.8.2"
 derivative = "2.2.0"
+home = "0.5.9"
 
 [dependencies.snmalloc-rs]
 version = "0.3.6"
@@ -135,7 +135,7 @@ git = "https://github.com/AnthonyFuller/tonytools-rs"
 git = "https://github.com/tauri-apps/plugins-workspace"
 branch = "v1"
 
-[target."cfg(linux)".dependencies]
+[target."cfg(unix)".dependencies]
 fork = "0.1.22"
 
 [features]

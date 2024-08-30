@@ -472,9 +472,8 @@ impl Intellisense {
 							if let Some(ty) = self.file_types.get(&factory) {
 								match ty.as_ref() {
 									"CPPT" => {
-										for (prop_name, (prop_type, default_val)) in self
-											.get_cppt_properties(game_files, hash_list, game_version, factory)?
-											.to_owned()
+										for (prop_name, (prop_type, default_val)) in
+											self.get_cppt_properties(game_files, hash_list, game_version, factory)?
 										{
 											found.push((prop_name, prop_type, default_val, false));
 										}

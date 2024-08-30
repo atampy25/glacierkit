@@ -60,11 +60,13 @@ use model::{
 use notify::Watcher;
 use quickentity_rs::{generate_patch, qn_structs::Property};
 use rand::{thread_rng, Rng};
-use rfd::AsyncFileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
-use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
+use tauri::{
+	api::{dialog::blocking::FileDialogBuilder, process::Command},
+	async_runtime, AppHandle, Manager
+};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_log::LogTarget;
 use tryvial::try_fn;
@@ -446,14 +448,14 @@ fn event(app: AppHandle, event: Event) {
 						}
 
 						GlobalEvent::SelectAndOpenFile => {
-							let mut dialog = AsyncFileDialog::new().set_title("Open file");
+							let mut dialog = FileDialogBuilder::new().set_title("Open file");
 
 							if let Some(project) = app_state.project.load().as_ref() {
 								dialog = dialog.set_directory(&project.path);
 							}
 
-							if let Some(open_handle) = dialog.pick_file().await {
-								open_file(&app, open_handle.path()).await?;
+							if let Some(path) = dialog.pick_file() {
+								open_file(&app, path).await?;
 							}
 						}
 
@@ -952,25 +954,24 @@ fn event(app: AppHandle, event: Event) {
 													})
 												)?;
 											} else {
-												let mut dialog = AsyncFileDialog::new().set_title("Save file");
+												let mut dialog = FileDialogBuilder::new().set_title("Save file");
 
 												if let Some(project) = app_state.project.load().as_ref() {
 													dialog = dialog.set_directory(&project.path);
 												}
 
-												if let Some(save_handle) = dialog
+												if let Some(path) = dialog
 													.add_filter("Repository JSON patch", &["JSON.patch.json"])
 													.save_file()
-													.await
 												{
-													editor.file = Some(save_handle.path().into());
+													editor.file = Some(path.to_owned());
 
 													send_request(
 														&app,
 														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 															base,
 															current,
-															save_path: save_handle.path().to_owned(),
+															save_path: path.to_owned(),
 															file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
 														})
 													)?;
@@ -1138,25 +1139,24 @@ fn event(app: AppHandle, event: Event) {
 													})
 												)?;
 											} else {
-												let mut dialog = AsyncFileDialog::new().set_title("Save file");
+												let mut dialog = FileDialogBuilder::new().set_title("Save file");
 
 												if let Some(project) = app_state.project.load().as_ref() {
 													dialog = dialog.set_directory(&project.path);
 												}
 
-												if let Some(save_handle) = dialog
+												if let Some(path) = dialog
 													.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
 													.save_file()
-													.await
 												{
-													editor.file = Some(save_handle.path().into());
+													editor.file = Some(path.to_owned());
 
 													send_request(
 														&app,
 														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 															base,
 															current,
-															save_path: save_handle.path().to_owned(),
+															save_path: path.to_owned(),
 															file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
 														})
 													)?;
@@ -1190,13 +1190,13 @@ fn event(app: AppHandle, event: Event) {
 									})
 								)?;
 							} else {
-								let mut dialog = AsyncFileDialog::new().set_title("Save file");
+								let mut dialog = FileDialogBuilder::new().set_title("Save file");
 
 								if let Some(project) = app_state.project.load().as_ref() {
 									dialog = dialog.set_directory(&project.path);
 								}
 
-								if let Some(save_handle) = dialog
+								if let Some(path) = dialog
 									.add_filter(
 										match &editor.data {
 											EditorData::Nil => {
@@ -1290,11 +1290,10 @@ fn event(app: AppHandle, event: Event) {
 										}]
 									)
 									.save_file()
-									.await
 								{
-									editor.file = Some(save_handle.path().into());
+									editor.file = Some(path.to_owned());
 
-									fs::write(save_handle.path(), data_to_save).context("Couldn't write file")?;
+									fs::write(&path, data_to_save).context("Couldn't write file")?;
 
 									send_request(
 										&app,

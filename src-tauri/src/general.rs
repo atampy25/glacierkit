@@ -747,32 +747,34 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			bail!("thumbs.dat was missing required properties");
 		};
 
-		let mut partition_manager = PartitionManager::new(path.join(proj_path).join(relative_runtime_path));
+		// Workaround for the Linux filesystem.
+		// The relative_runtime_path will in most cases be "runtime", while the folder is actually called "Runtime"
+		// Windows doesn't care about the mismatched casing, UNIX does :(
+		let relative_runtime_path_uppercased = relative_runtime_path
+			.char_indices()
+			.map(|(idx, ch)| if idx == 0 { ch.to_ascii_uppercase() } else { ch })
+			.collect::<String>();
+
+		let runtime_path = [relative_runtime_path, &relative_runtime_path_uppercased]
+			.iter()
+			.flat_map(|folder| path.join(proj_path.replace('\\', "/")).join(folder).canonicalize())
+			.find(|joined_path| joined_path.exists())
+			.context("Couldn't find valid runtime folder")?;
+
+		let mut partition_manager = PartitionManager::new(runtime_path.clone());
 
 		let mut partitions = match get_loaded_game_version(app, path)? {
-			GameVersion::H1 => PackageDefinitionSource::HM2016(fs::read(
-				path.join(proj_path)
-					.join(relative_runtime_path)
-					.join("packagedefinition.txt")
-			)?)
-			.read()
-			.context("Couldn't read packagedefinition")?,
+			GameVersion::H1 => PackageDefinitionSource::HM2016(fs::read(runtime_path.join("packagedefinition.txt"))?)
+				.read()
+				.context("Couldn't read packagedefinition")?,
 
-			GameVersion::H2 => PackageDefinitionSource::HM2(fs::read(
-				path.join(proj_path)
-					.join(relative_runtime_path)
-					.join("packagedefinition.txt")
-			)?)
-			.read()
-			.context("Couldn't read packagedefinition")?,
+			GameVersion::H2 => PackageDefinitionSource::HM2(fs::read(runtime_path.join("packagedefinition.txt"))?)
+				.read()
+				.context("Couldn't read packagedefinition")?,
 
-			GameVersion::H3 => PackageDefinitionSource::HM3(fs::read(
-				path.join(proj_path)
-					.join(relative_runtime_path)
-					.join("packagedefinition.txt")
-			)?)
-			.read()
-			.context("Couldn't read packagedefinition")?
+			GameVersion::H3 => PackageDefinitionSource::HM3(fs::read(runtime_path.join("packagedefinition.txt"))?)
+				.read()
+				.context("Couldn't read packagedefinition")?
 		};
 
 		if !app_settings.load().extract_modded_files {

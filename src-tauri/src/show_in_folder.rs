@@ -1,7 +1,6 @@
 #[cfg(target_os = "linux")]
 use fork::{daemon, Fork};
-#[cfg(target_os = "linux")]
-use std::path::PathBuf;
+
 use std::process::Command;
 #[cfg(target_os = "linux")]
 use std::{fs::metadata, path::PathBuf};
@@ -34,22 +33,21 @@ pub fn show_in_folder(app: AppHandle, path: String) {
 					path2.into_os_string().into_string().unwrap()
 				}
 			};
+
 			Command::new("xdg-open").arg(&new_path).spawn().unwrap();
-		} else {
-			if let Ok(Fork::Child) = daemon(false, false) {
-				Command::new("dbus-send")
-					.args([
-						"--session",
-						"--dest=org.freedesktop.FileManager1",
-						"--type=method_call",
-						"/org/freedesktop/FileManager1",
-						"org.freedesktop.FileManager1.ShowItems",
-						format!("array:string:\"file://{path}\"").as_str(),
-						"string:\"\""
-					])
-					.spawn()
-					.unwrap();
-			}
+		} else if let Ok(Fork::Child) = daemon(false, false) {
+			Command::new("dbus-send")
+				.args([
+					"--session",
+					"--dest=org.freedesktop.FileManager1",
+					"--type=method_call",
+					"/org/freedesktop/FileManager1",
+					"org.freedesktop.FileManager1.ShowItems",
+					format!("array:string:\"file://{path}\"").as_str(),
+					"string:\"\""
+				])
+				.spawn()
+				.unwrap();
 		}
 	}
 

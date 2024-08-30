@@ -1,0 +1,30 @@
+name: "Update versions"
+description: "Update all project versions"
+inputs:
+  version:
+    description: "The version to update to"
+    required: true
+    default: "unknown"
+runs:
+  using: "composite"
+  steps:
+    - name: Update package.json version
+      uses: jossef/action-set-json-field@v2
+      with:
+        file: "package.json"
+        field: "version"
+        value: ${{ inputs.version }}
+
+    - name: Update Cargo.toml version
+      uses: colathro/toml-editor@1.1.1
+      with:
+        file: "src-tauri/Cargo.toml"
+        key: "package.version"
+        value: ${{ inputs.version }}
+
+    - name: Update tauri.conf.json version
+      uses: jossef/action-set-json-field@v2
+      with:
+        file: "src-tauri/tauri.conf.json"
+        field: "package.version"
+        value: ${{ inputs.version }}

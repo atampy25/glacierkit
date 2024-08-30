@@ -1,7 +1,7 @@
 {
 	"$schema": "../node_modules/@tauri-apps/cli/schema.json",
 	"build": {
-		"beforeBuildCommand": "yarn build && cmd /c copyThings.bat",
+		"beforeBuildCommand": "yarn build",
 		"beforeDevCommand": "yarn dev",
 		"devPath": "http://localhost:5173",
 		"distDir": "../build"
@@ -15,16 +15,19 @@
 			"all": true,
 			"protocol": {
 				"all": true,
-				"assetScope": ["**/*"]
+				"assetScope": ["**/*", "$APPDATA/**"]
 			},
 			"shell": {
 				"sidecar": true,
 				"scope": [
 					{
-						"name": "vgmstream-cli",
+						"name": "bin/vgmstream-cli",
 						"sidecar": true
 					}
-				]
+				],
+				"execute": true,
+				"all": true,
+				"open": true
 			},
 			"fs": {
 				"all": false,
@@ -39,7 +42,7 @@
 			"deb": {
 				"depends": []
 			},
-			"externalBin": ["vgmstream-cli"],
+			"externalBin": ["bin/vgmstream-cli"],
 			"icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
 			"identifier": "app.glacierkit",
 			"longDescription": "",

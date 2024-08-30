@@ -12,11 +12,13 @@ use hitman_formats::{
 use image::{ImageFormat, ImageReader};
 use prim_rs::render_primitive::RenderPrimitive;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rfd::AsyncFileDialog;
 use rpkg_rs::{resource::partition_manager::PartitionManager, GlacierResource};
 use serde::Serialize;
 use serde_json::{json, to_string, to_vec, Value};
-use tauri::{api::process::Command, AppHandle, Manager, State};
+use tauri::{
+	api::{dialog::blocking::FileDialogBuilder, process::Command},
+	AppHandle, Manager, State
+};
 use tauri_plugin_aptabase::EventTracker;
 use tex_rs::texture_map::TextureMap;
 use tonytools::hmlanguages;
@@ -900,26 +902,21 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.resource_type
 					.to_owned();
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
-					.set_file_name(&format!("{}.{}", hash, file_type))
-					.add_filter(&format!("{} file", file_type), &[file_type.as_ref()])
+				if let Some(path) = dialog
+					.set_file_name(&format!("{}.{}", &hash, &file_type))
+					.add_filter(format!("{} file", &file_type), &[file_type.as_ref()])
 					.save_file()
-					.await
 				{
-					fs::write(save_handle.path(), data)?;
+					fs::write(&path, data)?;
 
 					fs::write(
-						save_handle
-							.path()
-							.parent()
-							.unwrap()
-							.join(format!("{}.{}.meta", hash, file_type)),
+						path.parent().unwrap().join(format!("{}.{}.meta", hash, file_type)),
 						metadata_file
 					)?;
 				}
@@ -950,18 +947,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					hash
 				)?)?;
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract entity");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract entity");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
-					.add_filter("QuickEntity entity", &["entity.json"])
-					.save_file()
-					.await
-				{
-					fs::write(save_handle.path(), entity_json)?;
+				if let Some(path) = dialog.add_filter("QuickEntity entity", &["entity.json"]).save_file() {
+					fs::write(path, entity_json)?;
 				}
 			}
 		}
@@ -1001,24 +994,21 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?
 				};
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!("{}.TEMP.json", hash))
 					.add_filter("TEMP.json file", &["TEMP.json"])
 					.save_file()
-					.await
 				{
-					fs::write(save_handle.path(), data)?;
+					fs::write(&path, data)?;
 
 					fs::write(
-						save_handle
-							.path()
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
 						to_string(&metadata_file).context("Couldn't serialise meta file")?
@@ -1061,24 +1051,21 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.to_binary()
 					.context("Couldn't serialise meta file")?;
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!("{}.TBLU", metadata.core_info.id))
 					.add_filter("TBLU file", &["TBLU"])
 					.save_file()
-					.await
 				{
-					fs::write(save_handle.path(), data)?;
+					fs::write(&path, data)?;
 
 					fs::write(
-						save_handle
-							.path()
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta", hash, metadata.core_info.resource_type)),
 						metadata_file
@@ -1138,24 +1125,21 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?
 				};
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!("{}.TBLU.json", metadata.core_info.id))
 					.add_filter("TBLU.json file", &["TBLU.json"])
 					.save_file()
-					.await
 				{
-					fs::write(save_handle.path(), data)?;
+					fs::write(&path, data)?;
 
 					fs::write(
-						save_handle
-							.path()
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
 						to_string(&metadata_file).context("Couldn't serialise meta file")?
@@ -1181,23 +1165,22 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!("{}.{}.json", hash, res_meta.core_info.resource_type))
 					.add_filter(
-						&format!("{}.json file", res_meta.core_info.resource_type),
+						format!("{}.json file", res_meta.core_info.resource_type),
 						&[&format!("{}.json", res_meta.core_info.resource_type)]
 					)
 					.save_file()
-					.await
 				{
 					fs::write(
-						save_handle.path(),
+						&path,
 						to_vec(&convert_generic::<Value>(
 							&res_data,
 							get_loaded_game_version(app, install)?,
@@ -1206,9 +1189,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?;
 
 					fs::write(
-						save_handle
-							.path()
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, res_meta.core_info.resource_type)),
 						to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))
@@ -1234,7 +1215,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if hash == "0057C2C3941115CA".parse()? {
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+					let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 					if let Some(project) = app_state.project.load().as_ref() {
 						dialog = dialog.set_directory(&project.path);
@@ -1242,18 +1223,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 					let res_data = parse_json_ores(&res_data)?;
 
-					if let Some(save_handle) = dialog
+					if let Some(path) = dialog
 						.set_file_name(&format!("{}.json", hash))
 						.add_filter("JSON file", &["json"])
 						.save_file()
-						.await
 					{
-						fs::write(save_handle.path(), res_data)?;
+						fs::write(path, res_data)?;
 					}
 				} else {
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+					let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 					if let Some(project) = app_state.project.load().as_ref() {
 						dialog = dialog.set_directory(&project.path);
@@ -1261,13 +1241,12 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 					let res_data = parse_hashes_ores(&res_data)?;
 
-					if let Some(save_handle) = dialog
+					if let Some(path) = dialog
 						.set_file_name(&format!("{}.json", hash))
 						.add_filter("JSON file", &["json"])
 						.save_file()
-						.await
 					{
-						fs::write(save_handle.path(), to_vec(&res_data)?)?;
+						fs::write(path, to_vec(&res_data)?)?;
 					}
 				}
 			}
@@ -1290,26 +1269,24 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!("{}.png", hash))
 					.add_filter("PNG file", &["png"])
 					.add_filter("JPEG file", &["jpg"])
 					.add_filter("TGA file", &["tga"])
 					.add_filter("DDS file", &["dds"])
 					.save_file()
-					.await
 				{
 					app.track_event(
 						"Extract image file as image format",
 						Some(json!({
-							"format": save_handle
-									.path()
+							"format": path
 									.file_name()
 									.context("No file name")?
 									.to_str()
@@ -1324,8 +1301,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						"GFXI" => {
 							let reader = ImageReader::new(Cursor::new(res_data.to_owned())).with_guessed_format()?;
 
-							if save_handle
-								.path()
+							if path
 								.file_name()
 								.context("No file name")?
 								.to_str()
@@ -1334,7 +1310,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							{
 								match reader.format().context("Couldn't get format")? {
 									ImageFormat::Dds => {
-										fs::write(save_handle.path(), res_data)?;
+										fs::write(path, res_data)?;
 									}
 
 									_ => {
@@ -1351,7 +1327,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									}
 								}
 							} else {
-								reader.decode()?.save(save_handle.path())?;
+								reader.decode()?.save(path)?;
 							}
 						}
 
@@ -1368,8 +1344,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("Couldn't process TEXD data")?;
 							}
 
-							if save_handle
-								.path()
+							if path
 								.file_name()
 								.context("No file name")?
 								.to_str()
@@ -1379,7 +1354,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								let dds_data =
 									tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
 
-								fs::write(save_handle.path(), dds_data)?;
+								fs::write(path, dds_data)?;
 							} else {
 								let tga_data =
 									tex_rs::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
@@ -1388,17 +1363,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 								reader.set_format(image::ImageFormat::Tga);
 
-								if save_handle
-									.path()
+								if path
 									.file_name()
 									.context("No file name")?
 									.to_str()
 									.context("Filename was invalid string")?
 									.ends_with(".tga")
 								{
-									fs::write(save_handle.path(), tga_data)?;
+									fs::write(path, tga_data)?;
 								} else {
-									reader.decode()?.save(save_handle.path())?;
+									reader.decode()?.save(path)?;
 								}
 							}
 						}
@@ -1422,17 +1396,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!("{}.wav", hash))
 					.add_filter("WAV file", &["wav"])
 					.save_file()
-					.await
 				{
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
@@ -1448,7 +1421,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							&format!("{}.wem", temp_file_id),
 							"-L",
 							"-o",
-							save_handle.path().to_string_lossy().as_ref()
+							path.to_string_lossy().as_ref()
 						])
 						.run()
 						.context("VGMStream command failed")?;
@@ -1469,13 +1442,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let mut dialog = AsyncFileDialog::new().set_title("Extract all WAVs to folder");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract all WAVs to folder");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog.pick_folder().await {
+				if let Some(path) = dialog.pick_folder() {
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
 					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
@@ -1497,11 +1470,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 										&format!("{}.wem", temp_file_id),
 										"-L",
 										"-o",
-										save_handle
-											.path()
-											.join(format!("{}.wav", idx))
-											.to_string_lossy()
-											.as_ref()
+										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
 									])
 									.run()
 									.context("VGMStream command failed")?;
@@ -1531,11 +1500,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 										&format!("{}.wem", temp_file_id),
 										"-L",
 										"-o",
-										save_handle
-											.path()
-											.join(format!("{}.wav", idx))
-											.to_string_lossy()
-											.as_ref()
+										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
 									])
 									.run()
 									.context("VGMStream command failed")?;
@@ -1561,17 +1526,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!("{}~{}.wav", hash, index))
 					.add_filter("WAV file", &["wav"])
 					.save_file()
-					.await
 				{
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
@@ -1594,7 +1558,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									&format!("{}.wem", temp_file_id),
 									"-L",
 									"-o",
-									save_handle.path().to_string_lossy().as_ref()
+									path.to_string_lossy().as_ref()
 								])
 								.run()
 								.context("VGMStream command failed")?;
@@ -1625,7 +1589,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									&format!("{}.wem", temp_file_id),
 									"-L",
 									"-o",
-									save_handle.path().to_string_lossy().as_ref()
+									path.to_string_lossy().as_ref()
 								])
 								.run()
 								.context("VGMStream command failed")?;
@@ -1655,30 +1619,29 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-				let mut dialog = AsyncFileDialog::new().set_title("Extract file");
+				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(save_handle) = dialog
+				if let Some(path) = dialog
 					.set_file_name(&format!(
 						"{}.{}.json",
 						hash,
 						res_meta.core_info.resource_type.as_ref().to_lowercase()
 					))
 					.add_filter(
-						&format!("{}.json file", res_meta.core_info.resource_type.as_ref().to_lowercase()),
+						format!("{}.json file", res_meta.core_info.resource_type.as_ref().to_lowercase()),
 						&[&format!(
 							"{}.json",
 							res_meta.core_info.resource_type.as_ref().to_lowercase()
 						)]
 					)
 					.save_file()
-					.await
 				{
 					fs::write(
-						save_handle.path(),
+						path,
 						match res_meta.core_info.resource_type.as_ref() {
 							"CLNG" => {
 								let clng = {
