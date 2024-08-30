@@ -15,7 +15,10 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::{resource::partition_manager::PartitionManager, GlacierResource};
 use serde::Serialize;
 use serde_json::{json, to_string, to_vec, Value};
-use tauri::{api::{dialog::blocking::FileDialogBuilder, process::Command}, AppHandle, Manager, State};
+use tauri::{
+	api::{dialog::blocking::FileDialogBuilder, process::Command},
+	AppHandle, Manager, State
+};
 use tauri_plugin_aptabase::EventTracker;
 use tex_rs::texture_map::TextureMap;
 use tonytools::hmlanguages;
@@ -906,20 +909,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-				.set_file_name(&format!("{}.{}", &hash, &file_type))
-				.add_filter(&format!("{} file", &file_type), &[file_type.as_ref()])
-				.save_file(){
+					.set_file_name(&format!("{}.{}", &hash, &file_type))
+					.add_filter(&format!("{} file", &file_type), &[file_type.as_ref()])
+					.save_file()
+				{
 					fs::write(&path, data)?;
 
 					fs::write(
-						path
-							.parent()
-							.unwrap()
-							.join(format!("{}.{}.meta", hash, file_type)),
+						path.parent().unwrap().join(format!("{}.{}.meta", hash, file_type)),
 						metadata_file
 					)?;
 				}
-				
 			}
 		}
 
@@ -953,10 +953,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(path) = dialog
-					.add_filter("QuickEntity entity", &["entity.json"])
-					.save_file()
-				{
+				if let Some(path) = dialog.add_filter("QuickEntity entity", &["entity.json"]).save_file() {
 					fs::write(path, entity_json)?;
 				}
 			}
@@ -1011,8 +1008,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(&path, data)?;
 
 					fs::write(
-						path
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
 						to_string(&metadata_file).context("Couldn't serialise meta file")?
@@ -1069,8 +1065,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(&path, data)?;
 
 					fs::write(
-						path
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta", hash, metadata.core_info.resource_type)),
 						metadata_file
@@ -1144,8 +1139,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(&path, data)?;
 
 					fs::write(
-						path
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
 						to_string(&metadata_file).context("Couldn't serialise meta file")?
@@ -1195,8 +1189,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?;
 
 					fs::write(
-						path
-							.parent()
+						path.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, res_meta.core_info.resource_type)),
 						to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))
@@ -1351,7 +1344,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("Couldn't process TEXD data")?;
 							}
 
-							if  path
+							if path
 								.file_name()
 								.context("No file name")?
 								.to_str()
@@ -1477,10 +1470,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 										&format!("{}.wem", temp_file_id),
 										"-L",
 										"-o",
-										path
-											.join(format!("{}.wav", idx))
-											.to_string_lossy()
-											.as_ref()
+										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
 									])
 									.run()
 									.context("VGMStream command failed")?;
@@ -1510,10 +1500,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 										&format!("{}.wem", temp_file_id),
 										"-L",
 										"-o",
-										path
-											.join(format!("{}.wav", idx))
-											.to_string_lossy()
-											.as_ref()
+										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
 									])
 									.run()
 									.context("VGMStream command failed")?;

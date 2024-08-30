@@ -421,17 +421,17 @@ mod detection {
 			// Game folder must have Retail
 
 			let subfolder_retail = ["Retail", "retail"]
-    			.iter()
-    			.map(|folder| path.join(folder))
-    			.find(|joined_path| joined_path.exists());
+				.iter()
+				.map(|folder| path.join(folder))
+				.find(|joined_path| joined_path.exists());
 
 			if let Some(subfolder_retail) = subfolder_retail {
-				let version = 
-				if subfolder_retail.join("HITMAN3.exe").is_file() {
+				let version = if subfolder_retail.join("HITMAN3.exe").is_file() {
 					GameVersion::H3
 				} else if subfolder_retail.join("HITMAN2.exe").is_file() {
 					GameVersion::H2
-				} else if subfolder_retail.join("HITMAN.exe").is_file() || subfolder_retail.join("hitman.dll").is_file(){
+				} else if subfolder_retail.join("HITMAN.exe").is_file() || subfolder_retail.join("hitman.dll").is_file()
+				{
 					GameVersion::H1
 				} else {
 					bail!("Unknown game added to check paths");

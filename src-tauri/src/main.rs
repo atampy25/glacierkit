@@ -63,7 +63,10 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
-use tauri::{api::{dialog::blocking::FileDialogBuilder, process::Command}, async_runtime, AppHandle, Manager};
+use tauri::{
+	api::{dialog::blocking::FileDialogBuilder, process::Command},
+	async_runtime, AppHandle, Manager
+};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_log::LogTarget;
 use tryvial::try_fn;
@@ -451,7 +454,7 @@ fn event(app: AppHandle, event: Event) {
 								dialog = dialog.set_directory(&project.path);
 							}
 
-							if let Some(path) = dialog.pick_file(){
+							if let Some(path) = dialog.pick_file() {
 								open_file(&app, path).await?;
 							}
 						}

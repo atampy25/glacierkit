@@ -1,5 +1,5 @@
-name: "Update Versions"
-description: "Update project versions based on the latest tag"
+name: "Update versions"
+description: "Update all project versions"
 inputs:
   version:
     description: "The version to update to"

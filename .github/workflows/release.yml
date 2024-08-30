@@ -42,12 +42,12 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - name: setup node
+            - name: Setup Node
               uses: actions/setup-node@v4
               with:
                 node-version: lts/*
           
-            - name: install Rust nightly
+            - name: Setup Rust
               uses: dtolnay/rust-toolchain@nightly
               with:
                 components: 'clippy, rustfmt'
@@ -57,18 +57,18 @@ jobs:
               with:
                 workspaces: "src-tauri -> target"
 
-            - name: install dependencies (ubuntu only)
+            - name: Install build dependencies (Ubuntu only)
               if: matrix.platform == 'ubuntu-22.04'
               run: |
                 sudo apt-get update
                 sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
         
-            - name: install frontend dependencies
+            - name: Install front-end dependencies
               run: |
                 yarn set version 4.0.2
                 yarn
         
-            - name: Update Versions
+            - name: Update versions
               uses: ./.github/actions/update-versions
               with:
                 version: ${{github.ref_name}}
@@ -93,7 +93,7 @@ jobs:
               run: |
                   yarn tauri build
 
-            - name: Upload release (msi)
+            - name: Upload release (MSI)
               if: matrix.platform == 'windows-latest'
               uses: actions/upload-release-asset@v1
               env:
@@ -104,14 +104,14 @@ jobs:
                 asset_path: src-tauri\target\release\bundle\msi\GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip
                 asset_content_type: application/octet-stream
     
-            - name: Read update signature
+            - name: Read update signature (Windows)
               if: matrix.platform == 'windows-latest'
               id: updateSignatureWindows
               uses: andstor/file-reader-action@v1.0.0
               with:
                   path: "src-tauri/target/release/bundle/msi/GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip.sig"
       
-            - name: Upload release (appImage)
+            - name: Upload release (AppImage)
               if: matrix.platform == 'ubuntu-22.04'
               uses: actions/upload-release-asset@v1
               env:
@@ -122,7 +122,7 @@ jobs:
                 asset_path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ github.ref_name }}_amd64.AppImage.tar.gz
                 asset_content_type: application/octet-stream
 
-            - name: Read update signature
+            - name: Read update signature (Ubuntu)
               if: matrix.platform == 'ubuntu-22.04'
               id: updateSignatureLinux
               uses: andstor/file-reader-action@v1.0.0
@@ -140,7 +140,7 @@ jobs:
             ref: "main"
             fetch-depth: 0
 
-        - name: Update Versions
+        - name: Update versions
           uses: ./.github/actions/update-versions
           with:
             version: ${{github.ref_name}}
