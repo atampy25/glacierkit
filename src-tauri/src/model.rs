@@ -244,6 +244,9 @@ pub enum ResourceOverviewData {
 	},
 	LocalisedLine {
 		languages: Vec<(String, String)>
+	},
+	Material {
+		json: String
 	}
 }
 

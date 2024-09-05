@@ -72,7 +72,7 @@ features = ["serde", "specta", "rpkg-rs", "tex-rs", "tonytools", "resourcelib", 
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
-features = ["material", "ores", "wwev"]
+features = ["material", "ores", "wwev", "serde"]
 
 [dependencies.serde_json]
 version = "1.0.110"
