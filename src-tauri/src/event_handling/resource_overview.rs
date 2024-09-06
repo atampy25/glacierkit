@@ -345,7 +345,9 @@ pub fn initialise_resource_overview(
 										&format!("{}.wav", temp_file_id)
 									])
 									.run()
-									.context("VGMStream command failed")?;
+									.with_context(|| {
+										format!("Couldn't convert non-streamed object {}", object.wem_id)
+									})?;
 
 								wav_paths.push((
 									"Embedded audio".into(),
@@ -378,7 +380,7 @@ pub fn initialise_resource_overview(
 										&format!("{}.wav", temp_file_id)
 									])
 									.run()
-									.context("VGMStream command failed")?;
+									.with_context(|| format!("Couldn't convert streamed object {wwem_hash}"))?;
 
 								wav_paths.push((
 									wwem_hash.to_string(),
