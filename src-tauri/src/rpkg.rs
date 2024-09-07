@@ -100,8 +100,8 @@ pub fn extract_latest_overview_info(
 							format!(
 								"{:02X}",
 								match flag {
-									ResourceReferenceFlags::Legacy(x) => x,
-									ResourceReferenceFlags::Standard(x) => x
+									ResourceReferenceFlags::V1(x) => x.into_bits(),
+									ResourceReferenceFlags::V2(x) => x.into_bits()
 								}
 							)
 						))

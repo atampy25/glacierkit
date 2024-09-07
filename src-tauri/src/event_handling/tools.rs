@@ -897,8 +897,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 													let rrid = RuntimeResourceID::from(hash);
 
 													let partition = game_files
-														.partitions()
-														.into_iter()
+														.partitions
+														.iter()
 														.find(|x| x.contains(&rrid))
 														.unwrap();
 
@@ -945,8 +945,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 													let rrid = RuntimeResourceID::from(hash);
 
 													let partition = game_files
-														.partitions()
-														.into_iter()
+														.partitions
+														.iter()
 														.find(|x| x.contains(&rrid))
 														.unwrap();
 

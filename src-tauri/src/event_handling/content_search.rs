@@ -54,8 +54,8 @@ pub fn start_content_search(
 		let game_version = get_loaded_game_version(app, install)?;
 
 		let resources = game_files
-			.partitions()
-			.into_iter()
+			.partitions
+			.iter()
 			.filter(|x| partitions_to_search.contains(&x.partition_info().id().to_string()))
 			.collect_vec()
 			.into_par_iter()
