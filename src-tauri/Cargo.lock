@@ -154,13 +154,13 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.86"
+version = "1.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
+checksum = "10f00e1f6e58a40e807377c75c6a7f97bf9044fab57816f2414e6f5f4499d7b8"
 
 [[package]]
 name = "app"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "anyhow",
  "arboard",
@@ -563,37 +563,13 @@ dependencies = [
 
 [[package]]
 name = "binrw"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "173901312e9850391d4d7c1318c4e099fdc037d61870fca427429830efdb4e5f"
-dependencies = [
- "array-init 2.1.0",
- "binrw_derive 0.13.3",
- "bytemuck",
-]
-
-[[package]]
-name = "binrw"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f36b7cb3ab9ff6a2858650d8dc360e783a5d14dc29594db48c56a3c233cc265"
 dependencies = [
  "array-init 2.1.0",
- "binrw_derive 0.14.0",
+ "binrw_derive",
  "bytemuck",
-]
-
-[[package]]
-name = "binrw_derive"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb515fdd6f8d3a357c8e19b8ec59ef53880807864329b1cb1cba5c53bf76557e"
-dependencies = [
- "either",
- "owo-colors",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -981,18 +957,18 @@ dependencies = [
 
 [[package]]
 name = "bpaf"
-version = "0.9.12"
+version = "0.9.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3280efcf6d66bc77c2cf9b67dc8acee47a217d9be67dd590b3230dffe663724d"
+checksum = "0eb12bae07c4142b840ff2a892d3abd94124f30672293f5b466f38624077aadb"
 dependencies = [
  "bpaf_derive",
 ]
 
 [[package]]
 name = "bpaf_derive"
-version = "0.5.10"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a8d5b11f7fa1068e5bbac8ab6c8c2c6940047f69185987446b60c995d4bf89c"
+checksum = "cf95d9c7e6aba67f8fc07761091e93254677f4db9e27197adecebc7039a58722"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1149,9 +1125,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.16"
+version = "1.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9d013ecb737093c0e86b151a7b837993cf9ec6c502946cfb44bedc392421e0b"
+checksum = "b62ac837cdb5cb22e10a256099b4fc502b1dfe560cb282963a974d7abd80e476"
 dependencies = [
  "jobserver",
  "libc",
@@ -2635,7 +2611,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 [[package]]
 name = "hitman-commons"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-commons#200dee431c61604235da744b6a1d965e4aa1856f"
+source = "git+https://github.com/atampy25/hitman-commons#71f8ba8dee81ae581a0f24d495bf2d9b61005898"
 dependencies = [
  "brotli-decompressor 4.0.1",
  "hashbrown 0.14.5",
@@ -2655,7 +2631,7 @@ dependencies = [
 [[package]]
 name = "hitman-formats"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-formats#b3ff68d6e491277b527a66a64e423798cd024e56"
+source = "git+https://github.com/atampy25/hitman-formats#ab1b7459bf008304c6544ae5ed18ae3b076ee1f5"
 dependencies = [
  "hex",
  "hitman-commons",
@@ -3383,6 +3359,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lzzzz"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac94cca0c9c2ac03c63092f1377df5b83e4c35441f9d83a53ca214c58685f7bd"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "mac"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3581,27 +3566,6 @@ dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "modular-bitfield"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a53d79ba8304ac1c4f9eb3b9d281f21f7be9d4626f72ce7df4ad8fbde4f38a74"
-dependencies = [
- "modular-bitfield-impl",
- "static_assertions",
-]
-
-[[package]]
-name = "modular-bitfield-impl"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -4250,9 +4214,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "pest"
-version = "2.7.11"
+version = "2.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd53dff83f26735fdc1ca837098ccf133605d794cdae66acfc2bfac3ec809d95"
+checksum = "9c73c26c01b8c87956cea613c907c9d6ecffd8d18a2a5908e5de0adfaa185cea"
 dependencies = [
  "memchr",
  "thiserror",
@@ -4261,9 +4225,9 @@ dependencies = [
 
 [[package]]
 name = "pest_derive"
-version = "2.7.11"
+version = "2.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a548d2beca6773b1c244554d36fcf8548a8a58e74156968211567250e48e49a"
+checksum = "664d22978e2815783adbdd2c588b455b1bd625299ce36b2a99881ac9627e6d8d"
 dependencies = [
  "pest",
  "pest_generator",
@@ -4271,9 +4235,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.7.11"
+version = "2.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c93a82e8d145725dcbaf44e5ea887c8a869efdcc28706df2d08c69e17077183"
+checksum = "a2d5487022d5d33f4c30d91c22afa240ce2a644e87fe08caad974d4eab6badbe"
 dependencies = [
  "pest",
  "pest_meta",
@@ -4284,9 +4248,9 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.7.11"
+version = "2.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a941429fea7e08bedec25e4f6785b6ffaacc6b755da98df5ef3e7dcf4a124c4f"
+checksum = "0091754bbd0ea592c4deb3a122ce8ecbb0753b738aa82bc055fcc2eccc8d8174"
 dependencies = [
  "once_cell",
  "pest",
@@ -4531,11 +4495,11 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 [[package]]
 name = "prim-rs"
 version = "0.1.1"
-source = "git+https://github.com/dafitius/GlacierFormats-rs#e4a5b89b1769a1f3927647a37be0f7e71d5834c2"
+source = "git+https://github.com/dafitius/GlacierFormats-rs#239714bc0603ed2cc94f382ec2534c34cf4e9949"
 dependencies = [
  "base64 0.22.1",
  "bincode",
- "binrw 0.14.0",
+ "binrw",
  "bitfield-struct",
  "itertools 0.13.0",
  "num-traits",
@@ -5070,19 +5034,21 @@ dependencies = [
 
 [[package]]
 name = "rpkg-rs"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ef5c2634c297e86de20ed0aef8212432428f23021236787715991439e011c9e"
+checksum = "a2ca1364ebb4bfe364c9b5e04f6f5cf6e652430c0222ecdc8186b77891a50caa"
 dependencies = [
- "binrw 0.13.3",
+ "binrw",
+ "bitfield-struct",
  "byteorder",
+ "crc32fast",
  "extended-tea",
- "itertools 0.12.1",
+ "indexmap 2.5.0",
+ "itertools 0.13.0",
  "lazy-regex",
- "lz4",
+ "lzzzz",
  "md-5",
  "memmap2",
- "modular-bitfield",
  "pathdiff",
  "rayon",
  "serde",
@@ -5281,9 +5247,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.209"
+version = "1.0.210"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99fce0ffe7310761ca6bf9faf5115afbc19688edd00171d81b1bb1b116c63e09"
+checksum = "c8e3592472072e6e22e0a54d5904d9febf8508f65fb8552499a1abc7d1078c3a"
 dependencies = [
  "serde_derive",
 ]
@@ -5323,9 +5289,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.209"
+version = "1.0.210"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5831b979fd7b5439637af1752d535ff49f4860c0f341d1baeb6faf0f4242170"
+checksum = "243902eda00fad750862fc144cea25caca5e20d615af0a81bee94ca738f1df1f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6270,9 +6236,9 @@ dependencies = [
 [[package]]
 name = "tex-rs"
 version = "0.1.1"
-source = "git+https://github.com/dafitius/GlacierFormats-rs#e4a5b89b1769a1f3927647a37be0f7e71d5834c2"
+source = "git+https://github.com/dafitius/GlacierFormats-rs#239714bc0603ed2cc94f382ec2534c34cf4e9949"
 dependencies = [
- "binrw 0.14.0",
+ "binrw",
  "bitfield-struct",
  "directxtex",
  "lz4",

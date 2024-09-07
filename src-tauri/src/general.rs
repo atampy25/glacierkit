@@ -761,8 +761,6 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			.find(|joined_path| joined_path.exists())
 			.context("Couldn't find valid runtime folder")?;
 
-		let mut partition_manager = PartitionManager::new(runtime_path.clone());
-
 		let mut partitions = match get_loaded_game_version(app, path)? {
 			GameVersion::H1 => PackageDefinitionSource::HM2016(fs::read(runtime_path.join("packagedefinition.txt"))?)
 				.read()
@@ -791,8 +789,12 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		let mut last_progress = 0;
 		let mut loading_task = start_task(app, format!("Loading {} (0%)", partition_names[last_index]))?;
 
+		let mut partition_manager =
+			PartitionManager::new(runtime_path.clone(), &PackageDefinitionSource::Custom(partitions))
+				.context("Couldn't create partition manager")?;
+
 		partition_manager
-			.mount_partitions(PackageDefinitionSource::Custom(partitions), |cur_partition, state| {
+			.mount_partitions(|cur_partition, state| {
 				if cur_partition < partition_names.len() {
 					if cur_partition != last_index {
 						last_index = cur_partition;
@@ -825,8 +827,8 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
 		let resources = partition_manager
-			.partitions()
-			.into_par_iter()
+			.partitions
+			.par_iter()
 			.rev()
 			.flat_map(|partition| {
 				partition.latest_resources().into_par_iter().map(|(resource, _)| {
@@ -864,8 +866,8 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			app,
 			Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetPartitions(
 				partition_manager
-					.partitions()
-					.into_iter()
+					.partitions
+					.iter()
 					.map(|x| {
 						(
 							x.partition_info().name().as_deref().unwrap_or("<unnamed>").to_owned(),

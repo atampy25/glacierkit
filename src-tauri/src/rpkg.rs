@@ -31,7 +31,7 @@ pub fn extract_latest_resource(
 ) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
 	let resource_id = RuntimeResourceID::from(resource);
 
-	for partition in game_files.partitions() {
+	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
 			.latest_resources()
 			.into_iter()
@@ -54,7 +54,7 @@ pub fn extract_latest_resource(
 pub fn extract_latest_metadata(game_files: &PartitionManager, resource: RuntimeID) -> Result<ExtendedResourceMetadata> {
 	let resource_id = RuntimeResourceID::from(resource);
 
-	for partition in game_files.partitions() {
+	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
 			.latest_resources()
 			.into_iter()
@@ -75,7 +75,7 @@ pub fn extract_latest_overview_info(
 ) -> Result<(ResourceType, String, Vec<(RuntimeID, String)>)> {
 	let resource_id = RuntimeResourceID::from(resource);
 
-	for partition in game_files.partitions() {
+	for partition in &game_files.partitions {
 		if let Some((info, patchlevel)) = partition
 			.latest_resources()
 			.into_iter()
@@ -196,7 +196,7 @@ pub fn extract_resource_changelog(
 
 	let mut events = vec![];
 
-	for partition in game_files.partitions() {
+	for partition in &game_files.partitions {
 		let mut last_occurence: Option<&ResourceInfo> = None;
 
 		let changes = partition.resource_patch_indices(&resource_id);
