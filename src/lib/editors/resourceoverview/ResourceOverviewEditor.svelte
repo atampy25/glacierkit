@@ -56,7 +56,7 @@
 	let previewImage: any = null
 	let referenceTab = 0
 
-	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Ores", "Json", "HMLanguages", "LocalisedLine", "Material"]
+	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Ores", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity"]
 
 	onMount(async () => {
 		await event({
@@ -201,7 +201,7 @@
 												{/if}
 											{/if}
 										{/await}
-									{:else if data.type === "GenericRL" || data.type === "Ores" || data.type === "Json" || data.type === "HMLanguages" || data.type === "Material"}
+									{:else if data.type === "GenericRL" || data.type === "Ores" || data.type === "Json" || data.type === "HMLanguages" || data.type === "MaterialInstance" || data.type === "MaterialEntity"}
 										<div class="h-[30vh]">
 											<Monaco id={v4()} content={data.data.json} />
 										</div>
@@ -695,11 +695,31 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "Material"}
+									{:else if data.type === "MaterialInstance"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
-												trackEvent("Extract material file as original")
+												trackEvent("Extract material instance file as original")
+
+												await event({
+													type: "editor",
+													data: {
+														type: "resourceOverview",
+														data: {
+															type: "extractAsFile",
+															data: {
+																id
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "MaterialEntity"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract material entity file as original")
 
 												await event({
 													type: "editor",

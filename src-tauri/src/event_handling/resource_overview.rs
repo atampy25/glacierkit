@@ -6,7 +6,7 @@ use fn_error_context::context;
 use hashbrown::HashMap;
 use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::{
-	material::Material,
+	material::{MaterialEntity, MaterialInstance},
 	ores::{parse_hashes_ores, parse_json_ores},
 	wwev::{WwiseEvent, WwiseEventData}
 };
@@ -741,12 +741,39 @@ pub fn initialise_resource_overview(
 					}
 				},
 
-				"MATI" => ResourceOverviewData::Material {
+				"MATI" => ResourceOverviewData::MaterialInstance {
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let material = Material::parse(&res_data, &res_meta.core_info.references)
-							.context("Couldn't parse material")?;
+						let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
+							.context("Couldn't parse material instance")?;
+
+						let mut buf = Vec::new();
+						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+						material.serialize(&mut ser)?;
+
+						String::from_utf8(buf)?
+					}
+				},
+
+				"MATT" => ResourceOverviewData::MaterialEntity {
+					json: {
+						let (matt_meta, matt_data) = extract_latest_resource(game_files, hash)?;
+						let (matb_meta, matb_data) = extract_latest_resource(
+							game_files,
+							matt_meta
+								.core_info
+								.references
+								.get(1)
+								.context("No MATB dependency")?
+								.resource
+						)?;
+
+						let material =
+							MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)
+								.context("Couldn't parse material entity")?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");

@@ -10,7 +10,8 @@ use hitman_commons::{
 	metadata::{ReferenceType, ResourceType, RuntimeID},
 	resourcelib::PropertyID
 };
-use hitman_formats::material::{get_material_overrides, MaterialOverride, MaterialOverrideData};
+use hitman_formats::material::{MaterialEntity, MaterialOverride};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
 	qn_structs::{Entity, Ref, RefMaybeConstantValue, RefWithConstantValue},
@@ -59,7 +60,7 @@ pub struct Intellisense {
 	/// Property type as enum -> String version
 	pub uicb_prop_types: HashMap<String, String>,
 
-	pub matt_properties: Arc<DashMap<RuntimeID, Vec<MaterialOverride>>>,
+	pub matt_properties: Arc<DashMap<RuntimeID, IndexMap<String, MaterialOverride>>>,
 
 	pub file_types: HashMap<RuntimeID, ResourceType>
 }
@@ -342,7 +343,7 @@ impl Intellisense {
 		game_files: &PartitionManager,
 		hash_list: &HashList,
 		matt: RuntimeID
-	) -> Result<Vec<MaterialOverride>> {
+	) -> Result<IndexMap<String, MaterialOverride>> {
 		{
 			if let Some(x) = self.matt_properties.get(&matt) {
 				return Ok(x.to_owned());
@@ -351,7 +352,7 @@ impl Intellisense {
 
 		let (matt_meta, matt_data) = extract_latest_resource(game_files, matt)?;
 
-		let (_, matb_data) = extract_latest_resource(
+		let (matb_meta, matb_data) = extract_latest_resource(
 			game_files,
 			matt_meta
 				.core_info
@@ -370,7 +371,7 @@ impl Intellisense {
 
 		self.matt_properties.insert(
 			matt,
-			get_material_overrides(&matt_data, &matt_meta.core_info.references, &matb_data)?
+			MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)?.overrides
 		);
 
 		self.matt_properties.get(&matt).expect("We just added it").to_owned()
@@ -546,11 +547,13 @@ impl Intellisense {
 											found.push((prop_name, prop_type, default_val, false));
 										}
 
-										for property in self.get_matt_properties(game_files, hash_list, factory)? {
-											match property.data {
-												MaterialOverrideData::Texture(texture) => {
+										for (property_name, property_data) in
+											self.get_matt_properties(game_files, hash_list, factory)?
+										{
+											match property_data {
+												MaterialOverride::Texture(texture) => {
 													found.push((
-														property.name.to_owned(),
+														property_name.to_owned(),
 														"ZRuntimeResourceID".into(),
 														texture
 															.map(|texture| {
@@ -564,133 +567,83 @@ impl Intellisense {
 													));
 
 													found.push((
-														format!("{}_enab", property.name),
+														format!("{}_enab", property_name),
 														"bool".into(),
 														json!(false),
 														false
 													));
 
 													found.push((
-														format!("{}_dest", property.name),
+														format!("{}_dest", property_name),
 														"SEntityTemplateReference".into(),
 														Value::Null,
 														false
 													));
 												}
 
-												MaterialOverrideData::ColorRGB(r, g, b) => {
+												MaterialOverride::Color(value) => {
 													found.push((
-														property.name.to_owned(),
-														"SColorRGB".into(),
-														to_value(format!(
-															"#{:0>2x}{:0>2x}{:0>2x}",
-															(r * 255.0).round() as u8,
-															(g * 255.0).round() as u8,
-															(b * 255.0).round() as u8
-														))?,
+														property_name.to_owned(),
+														if value.len() > 7 {
+															"SColorRGBA".into()
+														} else {
+															"SColorRGB".into()
+														},
+														to_value(value)?,
 														false
 													));
 
 													found.push((
-														format!("{}_op", property.name),
+														format!("{}_op", property_name),
 														"IRenderMaterialEntity.EModifierOperation".into(),
 														to_value("eLeave")?,
 														false
 													));
 												}
 
-												MaterialOverrideData::ColorRGBA(r, g, b, a) => {
+												MaterialOverride::Float(val) => {
 													found.push((
-														property.name.to_owned(),
-														"SColorRGBA".into(),
-														to_value(format!(
-															"#{:0>2x}{:0>2x}{:0>2x}{:0>2x}",
-															(r * 255.0).round() as u8,
-															(g * 255.0).round() as u8,
-															(b * 255.0).round() as u8,
-															(a * 255.0).round() as u8
-														))?,
-														false
-													));
-
-													found.push((
-														format!("{}_op", property.name),
-														"IRenderMaterialEntity.EModifierOperation".into(),
-														to_value("eLeave")?,
-														false
-													));
-												}
-
-												MaterialOverrideData::Float(val) => {
-													found.push((
-														property.name.to_owned(),
+														property_name.to_owned(),
 														"float32".into(),
 														to_value(val)?,
 														false
 													));
 
 													found.push((
-														format!("{}_op", property.name),
+														format!("{}_op", property_name),
 														"IRenderMaterialEntity.EModifierOperation".into(),
 														to_value("eLeave")?,
 														false
 													));
 												}
 
-												MaterialOverrideData::Vector2(x, y) => {
+												MaterialOverride::Vector(vec) => {
 													found.push((
-														property.name.to_owned(),
-														"SVector2".into(),
-														json!({
-															"x": x,
-															"y": y
-														}),
+														property_name.to_owned(),
+														format!("SVector{}", vec.len()),
+														match vec.len() {
+															2 => json!({
+																"x": vec[0],
+																"y": vec[1]
+															}),
+															3 => json!({
+																"x": vec[0],
+																"y": vec[1],
+																"z": vec[2]
+															}),
+															4 => json!({
+																"x": vec[0],
+																"y": vec[1],
+																"z": vec[2],
+																"w": vec[3]
+															}),
+															_ => bail!("Invalid vector length")
+														},
 														false
 													));
 
 													found.push((
-														format!("{}_op", property.name),
-														"IRenderMaterialEntity.EModifierOperation".into(),
-														to_value("eLeave")?,
-														false
-													));
-												}
-
-												MaterialOverrideData::Vector3(x, y, z) => {
-													found.push((
-														property.name.to_owned(),
-														"SVector3".into(),
-														json!({
-															"x": x,
-															"y": y,
-															"z": z
-														}),
-														false
-													));
-
-													found.push((
-														format!("{}_op", property.name),
-														"IRenderMaterialEntity.EModifierOperation".into(),
-														to_value("eLeave")?,
-														false
-													));
-												}
-
-												MaterialOverrideData::Vector4(x, y, z, w) => {
-													found.push((
-														property.name.to_owned(),
-														"SVector4".into(),
-														json!({
-															"x": x,
-															"y": y,
-															"z": z,
-															"w": w
-														}),
-														false
-													));
-
-													found.push((
-														format!("{}_op", property.name),
+														format!("{}_op", property_name),
 														"IRenderMaterialEntity.EModifierOperation".into(),
 														to_value("eLeave")?,
 														false
@@ -989,10 +942,12 @@ impl Intellisense {
 							}
 						}
 
-						for property in self.get_matt_properties(game_files, hash_list, factory)? {
-							match property.data {
-								MaterialOverrideData::Texture(texture) => {
-									if property.name == property_to_find {
+						for (property_name, property_data) in
+							self.get_matt_properties(game_files, hash_list, factory)?
+						{
+							match property_data {
+								MaterialOverride::Texture(texture) => {
+									if property_name == property_to_find {
 										return Ok(Some((
 											"ZRuntimeResourceID".into(),
 											texture
@@ -1007,54 +962,29 @@ impl Intellisense {
 										)));
 									}
 
-									if format!("{}_enab", property.name) == property_to_find {
+									if format!("{}_enab", property_name) == property_to_find {
 										return Ok(Some(("bool".into(), json!(false), false)));
 									}
 
-									if format!("{}_dest", property.name) == property_to_find {
+									if format!("{}_dest", property_name) == property_to_find {
 										return Ok(Some(("SEntityTemplateReference".into(), Value::Null, false)));
 									}
 								}
 
-								MaterialOverrideData::ColorRGB(r, g, b) => {
-									if property.name == property_to_find {
+								MaterialOverride::Color(value) => {
+									if property_name == property_to_find {
 										return Ok(Some((
-											"SColorRGB".into(),
-											to_value(format!(
-												"#{:0>2x}{:0>2x}{:0>2x}",
-												(r * 255.0).round() as u8,
-												(g * 255.0).round() as u8,
-												(b * 255.0).round() as u8
-											))?,
+											if value.len() > 7 {
+												"SColorRGBA".into()
+											} else {
+												"SColorRGB".into()
+											},
+											to_value(value)?,
 											false
 										)));
 									}
 
-									if format!("{}_op", property.name) == property_to_find {
-										return Ok(Some((
-											"IRenderMaterialEntity.EModifierOperation".into(),
-											to_value("eLeave")?,
-											false
-										)));
-									}
-								}
-
-								MaterialOverrideData::ColorRGBA(r, g, b, a) => {
-									if property.name == property_to_find {
-										return Ok(Some((
-											"SColorRGBA".into(),
-											to_value(format!(
-												"#{:0>2x}{:0>2x}{:0>2x}{:0>2x}",
-												(r * 255.0).round() as u8,
-												(g * 255.0).round() as u8,
-												(b * 255.0).round() as u8,
-												(a * 255.0).round() as u8
-											))?,
-											false
-										)));
-									}
-
-									if format!("{}_op", property.name) == property_to_find {
+									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
 											"IRenderMaterialEntity.EModifierOperation".into(),
 											to_value("eLeave")?,
@@ -1063,12 +993,12 @@ impl Intellisense {
 									}
 								}
 
-								MaterialOverrideData::Float(val) => {
-									if property.name == property_to_find {
+								MaterialOverride::Float(val) => {
+									if property_name == property_to_find {
 										return Ok(Some(("float32".into(), to_value(val)?, false)));
 									}
 
-									if format!("{}_op", property.name) == property_to_find {
+									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
 											"IRenderMaterialEntity.EModifierOperation".into(),
 											to_value("eLeave")?,
@@ -1077,64 +1007,33 @@ impl Intellisense {
 									}
 								}
 
-								MaterialOverrideData::Vector2(x, y) => {
-									if property.name == property_to_find {
+								MaterialOverride::Vector(vec) => {
+									if property_name == property_to_find {
 										return Ok(Some((
-											"SVector2".into(),
-											json!({
-												"x": x,
-												"y": y
-											}),
+											format!("SVector{}", vec.len()),
+											match vec.len() {
+												2 => json!({
+													"x": vec[0],
+													"y": vec[1]
+												}),
+												3 => json!({
+													"x": vec[0],
+													"y": vec[1],
+													"z": vec[2]
+												}),
+												4 => json!({
+													"x": vec[0],
+													"y": vec[1],
+													"z": vec[2],
+													"w": vec[3]
+												}),
+												_ => bail!("Invalid vector length")
+											},
 											false
 										)));
 									}
 
-									if format!("{}_op", property.name) == property_to_find {
-										return Ok(Some((
-											"IRenderMaterialEntity.EModifierOperation".into(),
-											to_value("eLeave")?,
-											false
-										)));
-									}
-								}
-
-								MaterialOverrideData::Vector3(x, y, z) => {
-									if property.name == property_to_find {
-										return Ok(Some((
-											"SVector3".into(),
-											json!({
-												"x": x,
-												"y": y,
-												"z": z
-											}),
-											false
-										)));
-									}
-
-									if format!("{}_op", property.name) == property_to_find {
-										return Ok(Some((
-											"IRenderMaterialEntity.EModifierOperation".into(),
-											to_value("eLeave")?,
-											false
-										)));
-									}
-								}
-
-								MaterialOverrideData::Vector4(x, y, z, w) => {
-									if property.name == property_to_find {
-										return Ok(Some((
-											"SVector4".into(),
-											json!({
-												"x": x,
-												"y": y,
-												"z": z,
-												"w": w
-											}),
-											false
-										)));
-									}
-
-									if format!("{}_op", property.name) == property_to_find {
+									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
 											"IRenderMaterialEntity.EModifierOperation".into(),
 											to_value("eLeave")?,
@@ -1156,6 +1055,7 @@ impl Intellisense {
 							}
 						}
 					}
+
 					"ECPT" => {
 						// All extended CPP entities have the properties of ZMaterialOverwriteAspect
 						for (prop_name, (prop_type, default_val)) in
@@ -1443,9 +1343,11 @@ impl Intellisense {
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-							for property in self.get_matt_properties(game_files, hash_list, factory)? {
-								if !matches!(property.data, MaterialOverrideData::Texture(_)) {
-									input.push(property.name);
+							for (property_name, property_data) in
+								self.get_matt_properties(game_files, hash_list, factory)?
+							{
+								if !matches!(property_data, MaterialOverride::Texture(_)) {
+									input.push(property_name);
 								}
 							}
 						}
