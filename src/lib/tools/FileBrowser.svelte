@@ -4,7 +4,7 @@
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
 	import { join, sep } from "@tauri-apps/api/path"
 	import type { FileBrowserRequest } from "$lib/bindings-types"
-	import { Button, Search } from "carbon-components-svelte"
+	import { Button, OverflowMenu, OverflowMenuItem, Search, Truncate } from "carbon-components-svelte"
 	import { event, showInFolder } from "$lib/utils"
 	import { open } from "@tauri-apps/api/dialog"
 	import FolderAdd from "carbon-icons-svelte/lib/FolderAdd.svelte"
@@ -13,7 +13,7 @@
 	import { trackEvent } from "@aptabase/tauri"
 	import { readTextFile } from "@tauri-apps/api/fs"
 	import { help } from "$lib/helpray"
-	import { ArrowUpRight } from "carbon-icons-svelte"
+	import { ArrowUpRight, Close } from "carbon-icons-svelte"
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 	let tree: JSTree = null!
@@ -771,7 +771,7 @@
 >
 	{#if !path}
 		<div class="p-4">
-			<p class="mb-4">You don't have a project loaded. Select a project from the start menu to get started!</p>
+			<p class="mb-4">You don't have a project loaded.</p>
 			<Button
 				on:click={async () => {
 					trackEvent("Quickstart tab opened with button")
@@ -793,23 +793,31 @@
 		</div>
 	{:else}
 		<div class="pt-2 pb-1 px-2 leading-tight text-base">
-			<div class="mb-4"><Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} /></div>
-			<span
-				class="text-neutral-400 cursor-pointer"
-				use:help={{ title: "Project path", description: "You can click this to change the loaded project." }}
-				on:click={async () => {
-					trackEvent("Load workspace using text link")
-
-					const path = await open({
-						title: "Select the project folder",
-						directory: true
-					})
-
-					if (typeof path === "string") {
-						await event({ type: "global", data: { type: "loadWorkspace", data: path } })
+			<div class="flex">
+				<div class="mb-4 flex-grow"><Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} /></div>
+				<OverflowMenu flipped>
+					<OverflowMenuItem text="Open in explorer"
+					on:click={async ()=>{
+						await event({type: "editor", data: {type: "quickStart", data: {type:"openProjectInExplorer", data:{path: path}}}})
+					}}/>
+					<OverflowMenuItem
+					  danger
+					  text="Close project"
+					  on:click={async ()=>{
+await event({ type: "global", data: { type: "clearWorkspace"} });
+					path = ""
+					if (tree.settings){
+						tree.settings.core.data = []
+						tree.refresh()
 					}
-				}}>{path}</span
-			>
+					  }}
+					/>
+				  </OverflowMenu>
+				
+			</div>
+			<Truncate class="text-neutral-400 text-sm" clamp="front">
+				{path}
+			</Truncate>
 		</div>
 	{/if}
 

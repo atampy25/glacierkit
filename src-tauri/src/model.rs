@@ -411,15 +411,10 @@ strike! {
 					id: Uuid,
 				},
 				CreateLocalProject {
+					id: Uuid,
 					name: String,
 					path: PathBuf,
 					version: String,
-				}
-				AddRecentProject {
-					path: PathBuf,
-				},
-				RemoveRecentProject {
-					path: PathBuf,
 				},
 				OpenProjectInExplorer {
 					path: PathBuf,
@@ -783,10 +778,13 @@ strike! {
 		Global(pub enum GlobalEvent {
 			SetSeenAnnouncements(Vec<String>),
 			LoadWorkspace(PathBuf),
+			ClearWorkspace,
 			SelectAndOpenFile,
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid),
+			AddRecentProject(PathBuf),
+			RemoveRecentProject(PathBuf),
 			UploadLogAndReport(String),
 			UploadLastPanic,
 			ClearLastPanic
@@ -876,6 +874,10 @@ strike! {
 				RefreshRecentList{
 					id: Uuid,
 					recent_projects: Vec<ProjectInfo>,
+				},
+				LoadLocalProject{
+					id: Uuid,
+					project: PathBuf,
 				}
 			})
 			

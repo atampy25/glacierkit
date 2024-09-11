@@ -360,7 +360,7 @@ fn event(app: AppHandle, event: Event) {
 									}))
 								)?;
 							},
-							QuickStartEvent::CreateLocalProject { name, path, version } => {
+							QuickStartEvent::CreateLocalProject { id, name, path, version } => {
 								fn replace_prefix(
 									p: impl AsRef<Path>,
 									from: impl AsRef<Path>,
@@ -369,6 +369,7 @@ fn event(app: AppHandle, event: Event) {
 									p.as_ref().strip_prefix(from).map(|p| to.as_ref().join(p))
 								}
 								let project_dir = path.join(&name);
+								fs::create_dir_all(&project_dir).context("Failed to create mod folder")?;
 								if let Ok(data) = reqwest::get(SMF_MOD_TEMPLATE_ENDPOINT).await {
 									if let Ok(data) = data.bytes().await {
 										let reader = Cursor::new(data);
@@ -396,8 +397,8 @@ fn event(app: AppHandle, event: Event) {
 												use std::os::unix::fs::PermissionsExt;
 
 												if let Some(mode) = file.unix_mode() {
-													fs::set_permissions(&mod_folder, fs::Permissions::from_mode(mode))
-														.unwrap();
+													fs::set_permissions(&project_dir, fs::Permissions::from_mode(mode))
+														.context("Failed to set the correct folder permissions")?;
 												}
 											}
 										}
@@ -414,47 +415,15 @@ fn event(app: AppHandle, event: Event) {
 								let file = OpenOptions::new().write(true).truncate(true).open(&manifest_path)?;
 
 								serde_json::to_writer_pretty(file, &json)?;
-							}
-							QuickStartEvent::AddRecentProject { path } => {
-								let mut settings = (*app_settings.load_full()).to_owned();
 
-								let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
-
-								if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
-									settings.recent_projects.remove(pos);
-								}
-
-								settings.recent_projects.insert(0, project);
-
-								if settings.recent_projects.len() > 5 {
-									settings.recent_projects.truncate(5);
-								}
-
-								fs::write(
-									app.path_resolver()
-										.app_data_dir()
-										.context("Couldn't get app data dir")?
-										.join("settings.json"),
-									to_vec(&settings)?
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::LoadLocalProject {
+										id,
+										project: project_dir
+									}))
 								)?;
-								app_settings.store(settings.into());
 							}
-							QuickStartEvent::RemoveRecentProject { path } => {
-								let mut settings = (*app_settings.load_full()).to_owned();
-								let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
-								if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
-									settings.recent_projects.remove(pos);
-								}
-
-								fs::write(
-									app.path_resolver()
-										.app_data_dir()
-										.context("Couldn't get app data dir")?
-										.join("settings.json"),
-									to_vec(&settings)?
-								)?;
-								app_settings.store(settings.into());
-							},
 							QuickStartEvent::OpenProjectInExplorer { path } => {
 								opener::reveal(path).context("Can't open in explorer")?;
 							}
@@ -872,6 +841,25 @@ fn event(app: AppHandle, event: Event) {
 
 								Arc::new(watcher)
 							}));
+
+							handle_event(&app, Event::Global(GlobalEvent::AddRecentProject(path)));
+
+							finish_task(&app, task)?;
+						}
+						GlobalEvent::ClearWorkspace => {
+							app.track_event("clearing workspace", None);
+							let task = start_task(&app, "Clearing workspace")?;
+
+							app_state.project.store(None);
+
+							send_request(
+								&app,
+								Request::Global(GlobalRequest::SetWindowTitle(
+									"".to_string()
+								))
+							)?;
+			
+							app_state.fs_watcher.store(None);
 
 							finish_task(&app, task)?;
 						}
@@ -1430,6 +1418,48 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							finish_task(&app, task)?;
+						}
+
+						GlobalEvent::AddRecentProject(path) => {
+							let mut settings = (*app_settings.load_full()).to_owned();
+
+							let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
+
+							if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
+								settings.recent_projects.remove(pos);
+							}
+
+							settings.recent_projects.insert(0, project);
+
+							if settings.recent_projects.len() > 5 {
+								settings.recent_projects.truncate(5);
+							}
+
+							fs::write(
+								app.path_resolver()
+									.app_data_dir()
+									.context("Couldn't get app data dir")?
+									.join("settings.json"),
+								to_vec(&settings)?
+							)?;
+							app_settings.store(settings.into());
+						}
+
+						GlobalEvent::RemoveRecentProject(path) => {
+							let mut settings = (*app_settings.load_full()).to_owned();
+							let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
+							if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
+								settings.recent_projects.remove(pos);
+							}
+
+							fs::write(
+								app.path_resolver()
+									.app_data_dir()
+									.context("Couldn't get app data dir")?
+									.join("settings.json"),
+								to_vec(&settings)?
+							)?;
+							app_settings.store(settings.into());
 						}
 
 						GlobalEvent::UploadLogAndReport(error) => {

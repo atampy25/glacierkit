@@ -62,7 +62,7 @@ externalScene: string | null;
  */
 exposedEntity?: string | null }
 export type GameBrowserEvent = { type: "select"; data: string } | { type: "search"; data: [string, SearchFilter] } | { type: "openInEditor"; data: string }
-export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "selectAndOpenFile" } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string } | { type: "uploadLogAndReport"; data: string } | { type: "uploadLastPanic" } | { type: "clearLastPanic" }
+export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "clearWorkspace" } | { type: "selectAndOpenFile" } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string } | { type: "addRecentProject"; data: string } | { type: "removeRecentProject"; data: string } | { type: "uploadLogAndReport"; data: string } | { type: "uploadLastPanic" } | { type: "clearLastPanic" }
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key in string]: JsonValue }
 /**
  * A property with a type and a value. Can be marked as post-init.
@@ -95,7 +95,7 @@ originalProperty: string;
  */
 originalEntity: Ref }
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
-export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { name: string; path: string; version: string } } | { type: "addRecentProject"; data: { path: string } } | { type: "removeRecentProject"; data: { path: string } } | { type: "openProjectInExplorer"; data: { path: string } }
+export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { id: string; name: string; path: string; version: string } } | { type: "openProjectInExplorer"; data: { path: string } }
 /**
  * A reference to an entity.
  */

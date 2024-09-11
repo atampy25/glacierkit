@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { event } from "$lib/utils"
 	import type { GameInstall, SettingsRequest } from "$lib/bindings-types"
-	import { Checkbox, RadioTile, TileGroup, TooltipIcon } from "carbon-components-svelte"
+	import { Checkbox, RadioTile, TileGroup, Tooltip, TooltipIcon } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
@@ -152,13 +152,11 @@
 
 	<p class="mt-1">Game</p>
 
-	<TileGroup class="mt-1 flex flex-wrap gap-2" name="Game"
-		on:select={({ detail }) => (selectedGameInstall = detail)}>
-
+	<TileGroup class="mt-1 flex flex-wrap gap-2" name="Game" on:select={({ detail }) => (selectedGameInstall = detail)}>
 		{#each gameInstalls as gameInstall}
-			<RadioTile 
-				value={ gameInstall.path }
-				class="p-4 flex items-center justify-center"
+			<RadioTile
+				value={gameInstall.path}
+				class="p-4 flex justify-center"
 				checked={selectedGameInstall === gameInstall.path}
 				on:click={async () => {
 					await event({
@@ -173,18 +171,19 @@
 					})
 				}}
 			>
-				<div>
-					<div class="font-bold mb-2">{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})</div>
-					<span class="break-all text-sm text-slate-300">{gameInstall.path}</span>
+				<div class="flex">
+					<div class="font-bold">
+						{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})
+					</div>
+					<TooltipIcon class="ml-2" direction="top" tooltipText={gameInstall.path} icon={Information} />
 				</div>
 			</RadioTile>
 		{/each}
 		<RadioTile
 			value={"none"}
-			class="p-4 flex items-center justify-center"
+			class="p-4 flex "
 			checked={selectedGameInstall === "none"}
 			on:click={async () => {
-
 				await event({
 					type: "tool",
 					data: {
@@ -197,7 +196,7 @@
 				})
 			}}
 		>
-			<p>No game</p>
+			<div class="font-bold">No game</div>
 		</RadioTile>
 	</TileGroup>
 

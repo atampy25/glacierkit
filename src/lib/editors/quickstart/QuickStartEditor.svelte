@@ -11,6 +11,7 @@
 	import { dialog } from "@tauri-apps/api"
 	import { shell } from "@tauri-apps/api"
 	import { convertFileSrc } from "@tauri-apps/api/tauri"
+	import { isEmpty } from "lodash"
 
 	export let id: string
 	let recent_projects: ProjectInfo[] = []
@@ -37,7 +38,7 @@
 			new_project_config.version
 		)
 
-	$: full_path = (new_project_config.path ?? "") + (new_project_config.name === null ? "" : "\\") + (new_project_config.name ?? "")
+	$: full_path = (new_project_config.path ?? "").replaceAll("\\", "/") + (new_project_config.name === null ? "" : "/") + (new_project_config.name ?? "")
 
 	export async function handleRequest(request: QuickStartRequest) {
 		console.log(`Start menu ${id} handling request`, request)
@@ -49,6 +50,11 @@
 
 			case "refreshRecentList":
 				recent_projects = request.data.recent_projects
+				break
+
+			case "loadLocalProject":
+				await event({ type: "global", data: { type: "loadWorkspace", data: request.data.project } })
+				await event({ type: "global", data: { type: "removeTab", data: id } })
 				break
 
 			default:
@@ -104,6 +110,7 @@
 										data: {
 											type: "createLocalProject",
 											data: {
+												id: id,
 												name: new_project_config.name,
 												version: new_project_config.version,
 												path: new_project_config.path
@@ -111,8 +118,6 @@
 										}
 									}
 								})
-								await event({ type: "global", data: { type: "loadWorkspace", data: full_path } })
-								await event({ type: "editor", data: { type: "quickStart", data: { type: "addRecentProject", data: { path: full_path } } } })
 							}
 						}}
 					>
@@ -146,7 +151,6 @@
 							})
 							if (typeof selected === "string") {
 								await event({ type: "global", data: { type: "loadWorkspace", data: selected } })
-								await event({ type: "editor", data: { type: "quickStart", data: { type: "addRecentProject", data: { path: selected } } } })
 							}
 						}}
 					>
@@ -164,7 +168,7 @@
 					<OutboundLink
 						class="flex items-center py-1"
 						on:click={async () => {
-							await shell.open("https://discord.gg/wBwDH3W6")
+							await shell.open("https://discord.gg/6UDtuYhZP6")
 						}}
 					>
 						<LogoDiscord title="Discord" class="h-5 w-5 mr-2" />
@@ -201,6 +205,10 @@
 					<h4 class="mb-1 text-base font-semibold">Recent Projects</h4>
 				</div>
 				<div class="flex flex-col">
+					{#if recent_projects.length === 0}
+    					<p class="text-sm pl-2">No recent projects found.</p>
+    					<p class="text-sm pl-2">You can open or create a project from the menu on the left.</p>
+					{/if}
 					{#each recent_projects as project}
 						<ClickableTile
 							class="mt-2"
@@ -237,7 +245,7 @@
 												text="Remove recent"
 												on:click={async (e) => {
 													e.stopPropagation()
-													await event({ type: "editor", data: { type: "quickStart", data: { type: "removeRecentProject", data: { path: project.path } } } })
+													await event({ type: "global", data: { type: "removeRecentProject", data: project.path } })
 													await event({ type: "editor", data: { type: "quickStart", data: { type: "refreshRecentList", data: { id } } } })
 												}}
 											/>

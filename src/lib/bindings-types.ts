@@ -243,7 +243,7 @@ export type GamePlatform = "steam" | "epic" | "gog" | "microsoft"
 
 export type GameVersion = "h1" | "h2" | "h3"
 
-export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "selectAndOpenFile" } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string } | { type: "uploadLogAndReport"; data: string } | { type: "uploadLastPanic" } | { type: "clearLastPanic" }
+export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "clearWorkspace" } | { type: "selectAndOpenFile" } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string } | { type: "addRecentProject"; data: string } | { type: "removeRecentProject"; data: string } | { type: "uploadLogAndReport"; data: string } | { type: "uploadLastPanic" } | { type: "clearLastPanic" }
 
 export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } } | { type: "requestLastPanicUpload" } | { type: "logUploadRejected" }
 
@@ -410,9 +410,9 @@ propertyOverride: OverriddenProperty }
 
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
 
-export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { name: string; path: string; version: string } } | { type: "addRecentProject"; data: { path: string } } | { type: "removeRecentProject"; data: { path: string } } | { type: "openProjectInExplorer"; data: { path: string } }
+export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { id: string; name: string; path: string; version: string } } | { type: "openProjectInExplorer"; data: { path: string } }
 
-export type QuickStartRequest = { type: "initialise"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "refreshRecentList"; data: { id: string; recent_projects: ProjectInfo[] } }
+export type QuickStartRequest = { type: "initialise"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "refreshRecentList"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "loadLocalProject"; data: { id: string; project: string } }
 
 /**
  * A reference to an entity.
