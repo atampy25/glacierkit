@@ -43,10 +43,10 @@ use event_handling::{
 	tools::handle_tool_event, unlockables_patch::handle_unlockables_patch_event
 };
 use fn_error_context::context;
-use hitman_commons::game_detection::detect_installs;
 use general::open_file;
 use hashbrown::HashMap;
 use hitman_commons::game::GameVersion;
+use hitman_commons::game_detection::detect_installs;
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{info, trace, LevelFilter};
@@ -1802,6 +1802,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 								.rev()
 								.collect::<Vec<_>>()
 								.join("/")
+								.trim_start_matches('/')
 						))
 						.unwrap()
 						.to_owned();
