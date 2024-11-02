@@ -237,7 +237,9 @@ export type GameBrowserEvent = { type: "select"; data: string } | { type: "searc
 
 export type GameBrowserRequest = { type: "setEnabled"; data: boolean } | { type: "newTree"; data: { game_description: string; entries: GameBrowserEntry[] } }
 
-export type GameInstall = { version: GameVersion; platform: string; path: string }
+export type GameInstall = { version: GameVersion; platform: GamePlatform; path: string }
+
+export type GamePlatform = "steam" | "epic" | "gog" | "microsoft"
 
 export type GameVersion = "h1" | "h2" | "h3"
 

@@ -148,7 +148,7 @@
 										{/if}
 
 										<img
-											class="h-[30vh] w-fit bg-[#7f7f7f] aspect-square"
+											class="h-[30vh] bg-[#7f7f7f]"
 											style="image-rendering: pixelated"
 											bind:this={previewImage}
 											on:load={() => {

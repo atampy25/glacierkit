@@ -13,7 +13,6 @@ pub mod biome;
 pub mod editor_connection;
 pub mod entity;
 pub mod event_handling;
-pub mod game_detection;
 pub mod general;
 pub mod intellisense;
 pub mod languages;
@@ -44,7 +43,7 @@ use event_handling::{
 	tools::handle_tool_event, unlockables_patch::handle_unlockables_patch_event
 };
 use fn_error_context::context;
-use game_detection::detect_installs;
+use hitman_commons::game_detection::detect_installs;
 use general::open_file;
 use hashbrown::HashMap;
 use hitman_commons::game::GameVersion;

@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use derivative::Derivative;
 use hashbrown::HashMap;
 use hitman_commons::{
+	game_detection::GameInstall,
 	hash_list::HashList,
 	metadata::{ResourceType, RuntimeID}
 };
@@ -22,7 +23,6 @@ use uuid::Uuid;
 use crate::{
 	editor_connection::{EditorConnection, QNTransform},
 	entity::{CopiedEntityData, ReverseReference},
-	game_detection::GameInstall,
 	intellisense::Intellisense,
 	ores_repo::{RepositoryItem, RepositoryItemInformation, UnlockableInformation, UnlockableItem}
 };

@@ -68,7 +68,16 @@ features = ["lto"]
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"
-features = ["serde", "specta", "rpkg-rs", "tex-rs", "tonytools", "resourcelib", "hash_list"]
+features = [
+    "serde",
+    "specta",
+    "rpkg-rs",
+    "tex-rs",
+    "tonytools",
+    "resourcelib",
+    "hash_list",
+    "game_detection",
+]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
