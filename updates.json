@@ -1,15 +1,15 @@
 {
-	"version": "1.9.0",
-	"notes": "Update hitman-formats, MATT preview",
-	"pub_date": "2024-09-07T11:15:40Z",
+	"version": "1.9.1",
+	"notes": "Fix array issue with JSON -> merge patch conversion\n\nResolves #9",
+	"pub_date": "2024-11-02T10:00:18Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1dvR3ZqcWtvbW9qYk9kQjJEM0M3SkJFb1NxSlhyczg2czFVVExkWU5URmwvSkpkVityK0VTWHRUM3l0cnNzZGhFNmdsYlREVlB3YTdlVEQvZjd6Y3dBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzI2MDMyOTgxCWZpbGU6R2xhY2llcktpdF8xLjkuMF94NjRfZW4tVVMubXNpLnppcAp3c05NTjlKS3MrekkvbFhYQWJ4ZE1KYXZzaU1WR0U3OWRqRk5WS21COFdCNUVMTnhGOXRHUGZQM1NMc3dzNkJ6WDZLVTIrNk5od1B6ajJ6LzcyWXFEQT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.9.0/GlacierKit_1.9.0_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2J4WlZoNUcxQ1ZyOFZoajBCM2pQODdBdFZzNmZvVElhYXhDVVhHVGpGVFRKVFNXbzZnNmdtRHoxQ013UDNQOWZrcXg3QkxVRUVVMFZFdUFtVGZGU2c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzMxNjAxODA3CWZpbGU6R2xhY2llcktpdF8xLjkuMV94NjRfZW4tVVMubXNpLnppcApDbC94NEtic1JPUHF6Sk1qYkUzb3hhK1lrR0h6dlBaL25tSkpwa3V4TFFUc0gzUHdnd2xTaUdISE1pTWpDZlJQaHhPNWVRTlJQY1k5VjhhaTU0Q3hDdz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.9.1/GlacierKit_1.9.1_x64_en-US.msi.zip"
 		},
 		"linux-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1RjeVFQNGZNQUM3TDZFd0VYV0tRcjdGYjhhbUpBdWVmT2E2Sk03MTgvZ0lGU3NpZmFQdmhBckVFcEkrY3ptcWV1V09CUXc1VmJ1Rkk0S2tRRC9IRmdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzI2MDMyNzIzCWZpbGU6Z2xhY2llci1raXRfMS45LjBfYW1kNjQuQXBwSW1hZ2UudGFyLmd6CmZJajh3K0RwSm4yOHBWbG1LMjBMa25yQUs0U1U2Y0I0M2JDSGI2SGFkSXNwSGUxc0ZpK2p0K2FSV29vZTZmK21malY5Nm9ocXFydEZZV2ZvTjNjWkRnPT0K",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.9.0/GlacierKit_1.9.0_amd64.AppImage.tar.gz"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1NRaklOSnB6c3BPQmFDS3hGVFNKV2FtMGVhcWI1UEVaWHlUNEFQeFVqZ3c2dUVwR090L3c4TCtOaWYwYTRsdTBqbXJreGtBMjBCVE1PYUs2NWpCTEFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzMxNjAxMzQ1CWZpbGU6Z2xhY2llci1raXRfMS45LjFfYW1kNjQuQXBwSW1hZ2UudGFyLmd6CnJzSk5sR2FKb0F1VVd6R1dDc1FvR1pRL3RoTXREU2VQdlpLbnA5UUlCL2pqSndaVHZubnVtbWFzbzNRL3d3NFczdGw1NUVDQ3p5SGxhaWFYTytxTUFBPT0K",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.9.1/GlacierKit_1.9.1_amd64.AppImage.tar.gz"
 		}
 	}
 }

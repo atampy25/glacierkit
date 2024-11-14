@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.9.0"
+version = "1.9.1"
 description = "An integrated modding tool for the HITMAN World of Assassination trilogy."
 authors = ["you"]
 license = ""
@@ -68,16 +68,7 @@ features = ["lto"]
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"
-features = [
-    "serde",
-    "specta",
-    "rpkg-rs",
-    "tex-rs",
-    "tonytools",
-    "resourcelib",
-    "hash_list",
-    "game_detection",
-]
+features = ["serde", "specta", "rpkg-rs", "tex-rs", "tonytools", "resourcelib", "hash_list", "game_detection"]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
