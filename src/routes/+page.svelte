@@ -57,7 +57,8 @@
 		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
 		"Separate multiple search terms with spaces to find only items which match all of the search terms.",
 		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit.",
-		"You can open a file from outside of your current project by pressing CTRL-O."
+		"You can open a file from outside of your current project by pressing CTRL-O.",
+		"You can hide/unhide the tool side-bar by pressing CTRL-b"
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]
@@ -305,6 +306,19 @@
 			destroyFunc.run = unlisten
 		}
 	})
+
+	var toolPaneWidth: number = 20
+	var previousPaneWidth: number = 20;
+
+	function handleSnapEase(event: any, pane_index: number, min_size: number, snap_bound: number) {
+		const newSize = event.detail[pane_index].size // Size of the first pane
+
+		if (newSize < min_size && newSize > snap_bound) {
+			toolPaneWidth = min_size
+		} else if (newSize < snap_bound) {
+			toolPaneWidth = 0
+		}
+	}
 </script>
 
 <svelte:window
@@ -481,6 +495,23 @@
 			}
 		}
 	}}
+	use:shortcut={{
+		key: "b",
+		control: true,
+		shift: false,
+		callback: async () => {
+			trackEvent("Fold/Unfold the tool pane")
+			
+			if (toolPaneWidth == 0){
+				toolPaneWidth = previousPaneWidth;
+			}
+			else {
+				previousPaneWidth = toolPaneWidth;
+				toolPaneWidth = 0;
+			}
+		}
+	}}
+
 />
 
 <div class="h-full w-full flex">
@@ -490,6 +521,9 @@
 				icon={tool.icon}
 				on:click={() => {
 					selectedTool = toolID
+					if (toolPaneWidth == 0){
+						toolPaneWidth = previousPaneWidth;
+					}
 				}}
 				selected={selectedTool === toolID}
 				tooltip={tool.name}
@@ -497,8 +531,8 @@
 		{/each}
 	</div>
 	<div style="width: calc(100vw - 3.5rem)">
-		<Splitpanes theme="">
-			<Pane size={15}>
+		<Splitpanes theme="" on:resize={(event) => {handleSnapEase(event, 0, 15, 8)}}>
+			<Pane bind:size={toolPaneWidth}>
 				<div class="w-full h-full bg-[#202020]">
 					{#each typedEntries(tools) as [toolID, tool] (toolID)}
 						<div class="w-full h-full" class:hidden={selectedTool !== toolID}>
