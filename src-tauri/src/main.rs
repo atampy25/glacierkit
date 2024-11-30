@@ -37,7 +37,6 @@ use biome::format_json;
 use dashmap::DashMap;
 use editor_connection::EditorConnection;
 use entity::get_diff_info;
-use std::fs::OpenOptions;
 use event_handling::{
 	repository_patch::handle_repository_patch_event, resource_overview::handle_resource_overview_event,
 	tools::handle_tool_event, unlockables_patch::handle_unlockables_patch_event
@@ -64,6 +63,8 @@ use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
+use std::fs::OpenOptions;
+use std::path::StripPrefixError;
 use tauri::{
 	api::{dialog::blocking::FileDialogBuilder, process::Command},
 	async_runtime, AppHandle, Manager
@@ -350,8 +351,8 @@ fn event(app: AppHandle, event: Event) {
 										recent_projects: app_settings.load().recent_projects.clone()
 									}))
 								)?;
-							},
-							QuickStartEvent::RefreshRecentList {id} => {
+							}
+							QuickStartEvent::RefreshRecentList { id } => {
 								send_request(
 									&app,
 									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::RefreshRecentList {
@@ -359,8 +360,15 @@ fn event(app: AppHandle, event: Event) {
 										recent_projects: app_settings.load().recent_projects.clone()
 									}))
 								)?;
-							},
-							QuickStartEvent::CreateLocalProject { id, project_id, name, author, path, version } => {
+							}
+							QuickStartEvent::CreateLocalProject {
+								id,
+								project_id,
+								name,
+								author,
+								path,
+								version
+							} => {
 								fn replace_prefix(
 									p: impl AsRef<Path>,
 									from: impl AsRef<Path>,
@@ -386,7 +394,7 @@ fn event(app: AppHandle, event: Event) {
 											if file.is_file() {
 												let file_path = replace_prefix(outpath, "smf-mod-main", &project_dir)
 													.context("Failed to move mod template files")?;
-												fs::create_dir_all(&file_path.parent().unwrap())
+												fs::create_dir_all(file_path.parent().unwrap())
 													.context("Failed to create necessary project folder")?;
 												let mut outfile = fs::File::create(&file_path).unwrap();
 												std::io::copy(&mut file, &mut outfile).unwrap();
@@ -854,13 +862,8 @@ fn event(app: AppHandle, event: Event) {
 
 							app_state.project.store(None);
 
-							send_request(
-								&app,
-								Request::Global(GlobalRequest::SetWindowTitle(
-									"".to_string()
-								))
-							)?;
-			
+							send_request(&app, Request::Global(GlobalRequest::SetWindowTitle("".to_string())))?;
+
 							app_state.fs_watcher.store(None);
 
 							finish_task(&app, task)?;

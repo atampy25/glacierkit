@@ -308,10 +308,10 @@
 	})
 
 	var toolPaneWidth: number = 20
-	var previousPaneWidth: number = 20;
+	var previousPaneWidth: number = 20
 
 	function handleSnapEase(event: any, pane_index: number, min_size: number, snap_bound: number) {
-		const newSize = event.detail[pane_index].size // Size of the first pane
+		const newSize = event.detail[pane_index].size
 
 		if (newSize < min_size && newSize > snap_bound) {
 			toolPaneWidth = min_size
@@ -501,17 +501,15 @@
 		shift: false,
 		callback: async () => {
 			trackEvent("Fold/Unfold the tool pane")
-			
-			if (toolPaneWidth == 0){
-				toolPaneWidth = previousPaneWidth;
-			}
-			else {
-				previousPaneWidth = toolPaneWidth;
-				toolPaneWidth = 0;
+
+			if (toolPaneWidth == 0) {
+				toolPaneWidth = previousPaneWidth
+			} else {
+				previousPaneWidth = toolPaneWidth
+				toolPaneWidth = 0
 			}
 		}
 	}}
-
 />
 
 <div class="h-full w-full flex">
@@ -521,8 +519,8 @@
 				icon={tool.icon}
 				on:click={() => {
 					selectedTool = toolID
-					if (toolPaneWidth == 0){
-						toolPaneWidth = previousPaneWidth;
+					if (toolPaneWidth == 0) {
+						toolPaneWidth = previousPaneWidth
 					}
 				}}
 				selected={selectedTool === toolID}
@@ -531,7 +529,12 @@
 		{/each}
 	</div>
 	<div style="width: calc(100vw - 3.5rem)">
-		<Splitpanes theme="" on:resize={(event) => {handleSnapEase(event, 0, 15, 8)}}>
+		<Splitpanes
+			theme=""
+			on:resize={(event) => {
+				handleSnapEase(event, 0, 15, 8)
+			}}
+		>
 			<Pane bind:size={toolPaneWidth}>
 				<div class="w-full h-full bg-[#202020]">
 					{#each typedEntries(tools) as [toolID, tool] (toolID)}

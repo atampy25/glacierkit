@@ -54,23 +54,23 @@ impl Default for AppSettings {
 pub struct ProjectInfo {
 	pub name: String,
 	pub path: PathBuf,
-	pub version: String,
+	pub version: String
 }
 
-impl ProjectInfo{
-	pub fn from_path(path: PathBuf) -> Option<Self>{
+impl ProjectInfo {
+	pub fn from_path(path: PathBuf) -> Option<Self> {
 		let manifest_path = path.join("manifest.json");
 		if !manifest_path.exists() {
-            return None;
-        }
+			return None;
+		}
 
 		let file = std::fs::File::open(&manifest_path).ok()?;
-        let json: serde_json::Value = serde_json::from_reader(file).ok()?;
+		let json: serde_json::Value = serde_json::from_reader(file).ok()?;
 
 		let name = json.get("name")?.as_str()?.to_string();
 		let version = json.get("version")?.as_str()?.to_string();
 
-        Some(ProjectInfo { name, path, version })
+		Some(ProjectInfo { name, path, version })
 	}
 }
 
@@ -422,7 +422,7 @@ strike! {
 					path: PathBuf,
 				},
 			}),
-			
+
 			Text(pub enum TextEditorEvent {
 				Initialise {
 					id: Uuid
@@ -882,7 +882,7 @@ strike! {
 					project: PathBuf,
 				}
 			})
-			
+
 			Text(pub enum TextEditorRequest {
 				ReplaceContent {
 					id: Uuid,

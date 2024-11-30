@@ -796,24 +796,25 @@
 			<div class="flex">
 				<div class="mb-4 flex-grow"><Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} /></div>
 				<OverflowMenu flipped>
-					<OverflowMenuItem text="Open in explorer"
-					on:click={async ()=>{
-						await event({type: "editor", data: {type: "quickStart", data: {type:"openProjectInExplorer", data:{path: path}}}})
-					}}/>
 					<OverflowMenuItem
-					  danger
-					  text="Close project"
-					  on:click={async ()=>{
-await event({ type: "global", data: { type: "clearWorkspace"} });
-					path = ""
-					if (tree.settings){
-						tree.settings.core.data = []
-						tree.refresh()
-					}
-					  }}
+						text="Open in explorer"
+						on:click={async () => {
+							await event({ type: "editor", data: { type: "quickStart", data: { type: "openProjectInExplorer", data: { path: path } } } })
+						}}
 					/>
-				  </OverflowMenu>
-				
+					<OverflowMenuItem
+						danger
+						text="Close project"
+						on:click={async () => {
+							await event({ type: "global", data: { type: "clearWorkspace" } })
+							path = ""
+							if (tree.settings) {
+								tree.settings.core.data = []
+								tree.refresh()
+							}
+						}}
+					/>
+				</OverflowMenu>
 			</div>
 			<Truncate class="text-neutral-400 text-sm" clamp="front">
 				{path}

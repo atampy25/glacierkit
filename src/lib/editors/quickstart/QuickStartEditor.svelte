@@ -10,10 +10,10 @@
 	import { camelCase, upperFirst } from "lodash"
 	import { valid } from "semver"
 
-	const DISCORD_URL = "https://discord.gg/6UDtuYhZP6";
-	const GITHUB_URL = "https://github.com/glacier-modding";
-	const WIKI_URL = "https://glaciermodding.org/";
-	const GITHUB_MOD_TEMPLATE_URL = "https://github.com/new?template_name=smf-mod&template_owner=atampy25";
+	const DISCORD_URL = "https://discord.gg/6UDtuYhZP6"
+	const GITHUB_URL = "https://github.com/glacier-modding"
+	const WIKI_URL = "https://glaciermodding.org/"
+	const GITHUB_MOD_TEMPLATE_URL = "https://github.com/new?template_name=smf-mod&template_owner=atampy25"
 
 	export let id: string
 	let recent_projects: ProjectInfo[] = []
@@ -39,9 +39,8 @@
 	$: invalid_name_empty = new_project_config.name === null || new_project_config.name === ""
 	$: invalid_semver = valid(new_project_config.version) === null
 
-	$: full_path = (new_project_config.path || "") + "/" + (new_project_config.name || "");	
+	$: full_path = (new_project_config.path || "") + "/" + (new_project_config.name || "")
 	$: project_id = upperFirst(camelCase(new_project_config.author)) + "." + upperFirst(camelCase(new_project_config.name))
-
 
 	export async function handleRequest(request: QuickStartRequest) {
 		console.log(`Start menu ${id} handling request`, request)
@@ -99,7 +98,7 @@
 												clearInterval(interval)
 												resolve(null)
 											}
-										}, 100) // Check every 100ms, adjust as needed
+										}, 100) // Check every 100ms
 									})
 								}
 								await checkValidity()
@@ -331,7 +330,7 @@
 					}}
 				/>
 			</div>
-			<br/>
+			<br />
 			<TextInput labelText="project id" readonly bind:value={project_id}></TextInput>
 		</FluidForm>
 	</Modal>
