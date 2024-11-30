@@ -410,7 +410,7 @@ propertyOverride: OverriddenProperty }
 
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
 
-export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { id: string; name: string; path: string; version: string } } | { type: "openProjectInExplorer"; data: { path: string } }
+export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { id: string; project_id: string; name: string; author: string; path: string; version: string } } | { type: "openProjectInExplorer"; data: { path: string } }
 
 export type QuickStartRequest = { type: "initialise"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "refreshRecentList"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "loadLocalProject"; data: { id: string; project: string } }
 

@@ -95,7 +95,7 @@ originalProperty: string;
  */
 originalEntity: Ref }
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
-export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { id: string; name: string; path: string; version: string } } | { type: "openProjectInExplorer"; data: { path: string } }
+export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { id: string; project_id: string; name: string; author: string; path: string; version: string } } | { type: "openProjectInExplorer"; data: { path: string } }
 /**
  * A reference to an entity.
  */

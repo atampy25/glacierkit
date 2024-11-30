@@ -360,7 +360,7 @@ fn event(app: AppHandle, event: Event) {
 									}))
 								)?;
 							},
-							QuickStartEvent::CreateLocalProject { id, name, path, version } => {
+							QuickStartEvent::CreateLocalProject { id, project_id, name, author, path, version } => {
 								fn replace_prefix(
 									p: impl AsRef<Path>,
 									from: impl AsRef<Path>,
@@ -409,8 +409,10 @@ fn event(app: AppHandle, event: Event) {
 								let file = std::fs::File::open(&manifest_path)?;
 								let mut json: serde_json::Value = serde_json::from_reader(file)?;
 
+								json["id"] = json!(&project_id);
 								json["name"] = json!(&name);
 								json["version"] = json!(&version);
+								json["authors"] = json!(vec![&author]);
 
 								let file = OpenOptions::new().write(true).truncate(true).open(&manifest_path)?;
 

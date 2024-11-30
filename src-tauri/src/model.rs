@@ -412,7 +412,9 @@ strike! {
 				},
 				CreateLocalProject {
 					id: Uuid,
+					project_id: String,
 					name: String,
+					author: String,
 					path: PathBuf,
 					version: String,
 				},

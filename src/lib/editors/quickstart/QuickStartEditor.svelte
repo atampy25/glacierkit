@@ -2,16 +2,18 @@
 	import type { QuickStartRequest, ProjectInfo } from "$lib/bindings-types"
 	import { event } from "$lib/utils"
 
-	import { onMount } from "svelte"
-
 	import { help } from "$lib/helpray"
-	import { Button, ClickableTile, FluidForm, Link, Modal, OutboundLink, OverflowMenu, OverflowMenuItem, TextInput, Tile } from "carbon-components-svelte"
-	import { FolderAdd, FolderOpen, Folders, LogoDiscord, LogoGithub, Time, WorshipMuslim } from "carbon-icons-svelte"
-	import { Pane, Splitpanes } from "svelte-splitpanes"
+	import { Button, ClickableTile, FluidForm, Link, Modal, OutboundLink, OverflowMenu, OverflowMenuItem, TextInput } from "carbon-components-svelte"
+	import { FolderAdd, FolderOpen, Folders, LogoDiscord, LogoGithub, Document } from "carbon-icons-svelte"
 	import { dialog } from "@tauri-apps/api"
 	import { shell } from "@tauri-apps/api"
-	import { convertFileSrc } from "@tauri-apps/api/tauri"
-	import { isEmpty } from "lodash"
+	import { camelCase, upperFirst } from "lodash"
+	import { valid } from "semver"
+
+	const DISCORD_URL = "https://discord.gg/6UDtuYhZP6";
+	const GITHUB_URL = "https://github.com/glacier-modding";
+	const WIKI_URL = "https://glaciermodding.org/";
+	const GITHUB_MOD_TEMPLATE_URL = "https://github.com/new?template_name=smf-mod&template_owner=atampy25";
 
 	export let id: string
 	let recent_projects: ProjectInfo[] = []
@@ -19,6 +21,7 @@
 	let dialog_open = false
 	type NewProjectConfig = {
 		name: string
+		author: string
 		version: string
 		path: string | null
 		valid: boolean
@@ -26,19 +29,19 @@
 
 	let new_project_config: NewProjectConfig = {
 		name: "My amazing mod",
+		author: "you",
 		version: "1.0.0",
 		path: null,
 		valid: false
 	}
 
 	let invalid_path = false
-	$: invalid__name_empty = new_project_config.name === null || new_project_config.name === ""
-	$: invalid_semver =
-		!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/.test(
-			new_project_config.version
-		)
+	$: invalid_name_empty = new_project_config.name === null || new_project_config.name === ""
+	$: invalid_semver = valid(new_project_config.version) === null
 
-	$: full_path = (new_project_config.path ?? "").replaceAll("\\", "/") + (new_project_config.name === null ? "" : "/") + (new_project_config.name ?? "")
+	$: full_path = (new_project_config.path || "") + "/" + (new_project_config.name || "");	
+	$: project_id = upperFirst(camelCase(new_project_config.author)) + "." + upperFirst(camelCase(new_project_config.name))
+
 
 	export async function handleRequest(request: QuickStartRequest) {
 		console.log(`Start menu ${id} handling request`, request)
@@ -111,7 +114,9 @@
 											type: "createLocalProject",
 											data: {
 												id: id,
+												project_id: project_id,
 												name: new_project_config.name,
+												author: new_project_config.author,
 												version: new_project_config.version,
 												path: new_project_config.path
 											}
@@ -128,7 +133,7 @@
 					<OutboundLink
 						class="flex items-center py-1"
 						on:click={async () => {
-							await shell.open("https://github.com/new?template_name=smf-mod&template_owner=atampy25")
+							await shell.open(GITHUB_MOD_TEMPLATE_URL)
 						}}
 					>
 						<LogoGithub title="Local" class="h-5 w-5 mr-2" />
@@ -168,7 +173,7 @@
 					<OutboundLink
 						class="flex items-center py-1"
 						on:click={async () => {
-							await shell.open("https://discord.gg/6UDtuYhZP6")
+							await shell.open(DISCORD_URL)
 						}}
 					>
 						<LogoDiscord title="Discord" class="h-5 w-5 mr-2" />
@@ -179,7 +184,7 @@
 					<OutboundLink
 						class="flex items-center py-1"
 						on:click={async () => {
-							await shell.open("https://github.com/glacier-modding")
+							await shell.open(GITHUB_URL)
 						}}
 					>
 						<LogoGithub title="Github" class="h-5 w-5 mr-2" />
@@ -190,10 +195,10 @@
 					<OutboundLink
 						class="flex items-center py-1"
 						on:click={async () => {
-							await shell.open("https://glaciermodding.org/")
+							await shell.open(WIKI_URL)
 						}}
 					>
-						<WorshipMuslim title="Wiki" class="h-5 w-5 mr-2" />
+						<Document title="Wiki" class="h-5 w-5 mr-2" />
 						<span class="text-sm">wiki</span>
 					</OutboundLink>
 				</div>
@@ -206,8 +211,8 @@
 				</div>
 				<div class="flex flex-col">
 					{#if recent_projects.length === 0}
-    					<p class="text-sm pl-2">No recent projects found.</p>
-    					<p class="text-sm pl-2">You can open or create a project from the menu on the left.</p>
+						<p class="text-sm pl-2">No recent projects found.</p>
+						<p class="text-sm pl-2">You can open or create a project from the menu on the left.</p>
 					{/if}
 					{#each recent_projects as project}
 						<ClickableTile
@@ -269,7 +274,7 @@
 		secondaryButtonText="Cancel"
 		on:click:button--secondary={() => (dialog_open = false)}
 		on:click:button--primary={() => {
-			if (invalid__name_empty) return
+			if (invalid_name_empty) return
 			if (invalid_semver) return
 			if (new_project_config.path === null) {
 				invalid_path = true
@@ -283,9 +288,19 @@
 		on:submit
 	>
 		<FluidForm>
-			<TextInput id="proj-name" required invalid={invalid__name_empty} labelText="Project name" bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
+			<TextInput id="proj-name" required invalid={invalid_name_empty} labelText="Project name" bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
 			<br />
-			<TextInput required invalid={invalid_semver} labelText="Project version" bind:value={new_project_config.version} invalidText="Invalid version! Please use a semver format" />
+			<div class="flex gap-4">
+				<TextInput class="flex-grow" required labelText="Project author" bind:value={new_project_config.author} invalidText="Invalid author! Please don't use special characters" />
+				<TextInput
+					class="w-32"
+					required
+					invalid={invalid_semver}
+					labelText="Project version"
+					bind:value={new_project_config.version}
+					invalidText="Invalid version! Please use a semver format"
+				/>
+			</div>
 			<br />
 			<div class="flex">
 				<TextInput
@@ -301,23 +316,23 @@
 					class="flex-none"
 					icon={Folders}
 					iconDescription="Select in explorer"
+					aria-label="Select project location"
 					tooltipPosition="left"
 					tooltipAlignment="end"
 					on:click={async () => {
-						console.log("File picker")
 						const selected = await dialog.open({
 							directory: true,
 							multiple: false
 						})
-						console.log("picker closed")
 						if (typeof selected === "string") {
-							console.log("found path")
 							new_project_config.path = selected
 							invalid_path = false
 						}
 					}}
 				/>
 			</div>
+			<br/>
+			<TextInput labelText="project id" readonly bind:value={project_id}></TextInput>
 		</FluidForm>
 	</Modal>
 </div>
