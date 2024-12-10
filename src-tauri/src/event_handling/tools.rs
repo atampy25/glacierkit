@@ -903,10 +903,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 														.unwrap();
 
 													(
-														partition.partition_info().id().to_string(),
+														partition.partition_info().id.to_string(),
 														partition
 															.partition_info()
-															.name()
+															.name
 															.to_owned()
 															.unwrap_or("<unnamed>".into())
 													)
@@ -951,10 +951,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 														.unwrap();
 
 													(
-														partition.partition_info().id().to_string(),
+														partition.partition_info().id.to_string(),
 														partition
 															.partition_info()
-															.name()
+															.name
 															.to_owned()
 															.unwrap_or("<unnamed>".into())
 													)

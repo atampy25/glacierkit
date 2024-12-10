@@ -34,7 +34,7 @@ velcro = "0.5.4"
 indexmap = "2.1.0"
 arboard = "3.3.0"
 rand = "0.8.5"
-rpkg-rs = "1.1.0"
+rpkg-rs = "1.1.2"
 async-recursion = "1.0.5"
 parking_lot = "0.12.1"
 rayon = "1.8.0"
@@ -61,6 +61,7 @@ biome_formatter = "0.5.7"
 os_info = "3.8.2"
 derivative = "2.2.0"
 home = "0.5.9"
+glacier-texture = "1.0.0"
 
 [dependencies.snmalloc-rs]
 version = "0.3.6"
@@ -68,7 +69,7 @@ features = ["lto"]
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"
-features = ["serde", "specta", "rpkg-rs", "tex-rs", "tonytools", "resourcelib", "hash_list", "game_detection"]
+features = ["serde", "specta", "rpkg-rs", "tonytools", "resourcelib", "hash_list", "game_detection"]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
@@ -117,9 +118,6 @@ features = ["serde"]
 [dependencies.dashmap]
 version = "5.5.3"
 features = ["inline", "rayon"]
-
-[dependencies.tex-rs]
-git = "https://github.com/dafitius/GlacierFormats-rs"
 
 [dependencies.prim-rs]
 git = "https://github.com/dafitius/GlacierFormats-rs"

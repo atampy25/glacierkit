@@ -783,7 +783,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		finish_task(app, task)?;
 
-		let partition_names = partitions.iter().map(|x| x.id().to_string()).collect_vec();
+		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
 
 		let mut last_index = 0;
 		let mut last_progress = 0;
@@ -870,8 +870,8 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 					.iter()
 					.map(|x| {
 						(
-							x.partition_info().name().as_deref().unwrap_or("<unnamed>").to_owned(),
-							x.partition_info().id().to_string()
+							x.partition_info().name.as_deref().unwrap_or("<unnamed>").to_owned(),
+							x.partition_info().id.to_string()
 						)
 					})
 					.collect()
