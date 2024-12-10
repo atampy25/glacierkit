@@ -82,13 +82,13 @@ pub fn extract_latest_overview_info(
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			let package_name = match patchlevel {
-				PatchId::Base => partition.partition_info().id().to_string(),
-				PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
+				PatchId::Base => partition.partition_info().id.to_string(),
+				PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id, level)
 			};
 
 			return Ok((
 				info.data_type().try_into()?,
-				match partition.partition_info().name() {
+				match &partition.partition_info().name {
 					Some(name) => format!("{} ({})", name, package_name),
 					None => package_name
 				},
@@ -209,9 +209,9 @@ pub fn extract_resource_changelog(
 			.collect::<Vec<PatchId>>();
 
 		for occurence in occurrences.iter().sorted() {
-			let partition_name = match partition.partition_info().name() {
-				Some(name) => format!("{} ({})", name, partition.partition_info().id()),
-				None => partition.partition_info().id().to_string()
+			let partition_name = match &partition.partition_info().name {
+				Some(name) => format!("{} ({})", name, partition.partition_info().id),
+				None => partition.partition_info().id.to_string()
 			};
 
 			let op_desc = match occurence {

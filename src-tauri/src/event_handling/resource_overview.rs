@@ -1,3 +1,4 @@
+
 use std::{fmt::Write, fs, io::Cursor, ops::Deref, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -21,7 +22,8 @@ use tauri::{
 	AppHandle, Manager, State
 };
 use tauri_plugin_aptabase::EventTracker;
-use tex_rs::texture_map::TextureMap;
+use glacier_texture::mipblock::MipblockData;
+use glacier_texture::texture_map::TextureMap;
 use tonytools::hmlanguages;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -271,13 +273,16 @@ pub fn initialise_resource_overview(
 
 					if let Some(texd_depend) = res_meta.core_info.references.first() {
 						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
-
-						texture
-							.set_mipblock1_data(&texd_data, game_version.into())
-							.context("Couldn't process TEXD data")?;
+						let woa_version = match game_version {
+							GameVersion::H1 => glacier_texture::WoaVersion::HM2016,
+							GameVersion::H2 => glacier_texture::WoaVersion::HM2,
+							GameVersion::H3 => glacier_texture::WoaVersion::HM3
+						};
+						let mipblock = MipblockData::from_memory(&texd_data, woa_version).context("Couldn't process TEXD data")?;
+						texture.set_mipblock1(mipblock);
 					}
 
-					let tga_data = tex_rs::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
+					let tga_data = glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
 
 					let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
 
@@ -290,28 +295,28 @@ pub fn initialise_resource_overview(
 					ResourceOverviewData::Image {
 						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
 						dds_data: Some((
-							match texture.get_header().type_ {
-								tex_rs::texture_map::TextureType::Colour => "Colour",
-								tex_rs::texture_map::TextureType::Normal => "Normal",
-								tex_rs::texture_map::TextureType::Height => "Height",
-								tex_rs::texture_map::TextureType::CompoundNormal => "Compound Normal",
-								tex_rs::texture_map::TextureType::Billboard => "Billboard",
-								tex_rs::texture_map::TextureType::Projection => "Projection",
-								tex_rs::texture_map::TextureType::Emission => "Emission",
-								tex_rs::texture_map::TextureType::UNKNOWN64 => "Unknown"
+							match texture.texture_type() {
+								glacier_texture::enums::TextureType::Colour => "Colour",
+								glacier_texture::enums::TextureType::Normal => "Normal",
+								glacier_texture::enums::TextureType::Height => "Height",
+								glacier_texture::enums::TextureType::CompoundNormal => "Compound Normal",
+								glacier_texture::enums::TextureType::Billboard => "Billboard",
+								glacier_texture::enums::TextureType::Projection => "Projection",
+								glacier_texture::enums::TextureType::Emission => "Emission",
+								_ => "Unknown"
 							}
 							.into(),
-							match texture.get_header().format {
-								tex_rs::texture_map::RenderFormat::R16G16B16A16 => "R16G16B16A16",
-								tex_rs::texture_map::RenderFormat::R8G8B8A8 => "R8G8B8A8",
-								tex_rs::texture_map::RenderFormat::R8G8 => "R8G8",
-								tex_rs::texture_map::RenderFormat::A8 => "A8",
-								tex_rs::texture_map::RenderFormat::DXT1 => "DXT1",
-								tex_rs::texture_map::RenderFormat::DXT3 => "DXT3",
-								tex_rs::texture_map::RenderFormat::DXT5 => "DXT5",
-								tex_rs::texture_map::RenderFormat::BC4 => "BC4",
-								tex_rs::texture_map::RenderFormat::BC5 => "BC5",
-								tex_rs::texture_map::RenderFormat::BC7 => "BC7"
+							match texture.format() {
+								glacier_texture::enums::RenderFormat::R16G16B16A16 => "R16G16B16A16",
+								glacier_texture::enums::RenderFormat::R8G8B8A8 => "R8G8B8A8",
+								glacier_texture::enums::RenderFormat::R8G8 => "R8G8",
+								glacier_texture::enums::RenderFormat::A8 => "A8",
+								glacier_texture::enums::RenderFormat::BC1 => "BC1",
+								glacier_texture::enums::RenderFormat::BC2 => "BC2",
+								glacier_texture::enums::RenderFormat::BC3 => "BC3",
+								glacier_texture::enums::RenderFormat::BC4 => "BC4",
+								glacier_texture::enums::RenderFormat::BC5 => "BC5",
+								glacier_texture::enums::RenderFormat::BC7 => "BC7"
 							}
 							.into()
 						))
@@ -1385,10 +1390,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
 								let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
-
-								texture
-									.set_mipblock1_data(&texd_data, get_loaded_game_version(app, install)?.into())
-									.context("Couldn't process TEXD data")?;
+								let woa_version = match get_loaded_game_version(app, install)? {
+									GameVersion::H1 => glacier_texture::WoaVersion::HM2016,
+									GameVersion::H2 => glacier_texture::WoaVersion::HM2,
+									GameVersion::H3 => glacier_texture::WoaVersion::HM3
+								};
+								let mipblock = MipblockData::from_memory(&texd_data, woa_version).context("Couldn't process TEXD data")?;
+								texture.set_mipblock1(mipblock);
 							}
 
 							if path
@@ -1399,12 +1407,12 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.ends_with(".dds")
 							{
 								let dds_data =
-									tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
+									glacier_texture::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
 
 								fs::write(path, dds_data)?;
 							} else {
 								let tga_data =
-									tex_rs::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
+									glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
 
 								let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
 
