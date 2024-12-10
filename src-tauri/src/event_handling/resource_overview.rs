@@ -1,9 +1,10 @@
-
 use std::{fmt::Write, fs, io::Cursor, ops::Deref, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use glacier_texture::mipblock::MipblockData;
+use glacier_texture::texture_map::TextureMap;
 use hashbrown::HashMap;
 use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::{
@@ -22,8 +23,6 @@ use tauri::{
 	AppHandle, Manager, State
 };
 use tauri_plugin_aptabase::EventTracker;
-use glacier_texture::mipblock::MipblockData;
-use glacier_texture::texture_map::TextureMap;
 use tonytools::hmlanguages;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -278,11 +277,13 @@ pub fn initialise_resource_overview(
 							GameVersion::H2 => glacier_texture::WoaVersion::HM2,
 							GameVersion::H3 => glacier_texture::WoaVersion::HM3
 						};
-						let mipblock = MipblockData::from_memory(&texd_data, woa_version).context("Couldn't process TEXD data")?;
+						let mipblock =
+							MipblockData::from_memory(&texd_data, woa_version).context("Couldn't process TEXD data")?;
 						texture.set_mipblock1(mipblock);
 					}
 
-					let tga_data = glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
+					let tga_data =
+						glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
 
 					let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
 
@@ -1395,7 +1396,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									GameVersion::H2 => glacier_texture::WoaVersion::HM2,
 									GameVersion::H3 => glacier_texture::WoaVersion::HM3
 								};
-								let mipblock = MipblockData::from_memory(&texd_data, woa_version).context("Couldn't process TEXD data")?;
+								let mipblock = MipblockData::from_memory(&texd_data, woa_version)
+									.context("Couldn't process TEXD data")?;
 								texture.set_mipblock1(mipblock);
 							}
 
@@ -1406,13 +1408,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.context("Filename was invalid string")?
 								.ends_with(".dds")
 							{
-								let dds_data =
-									glacier_texture::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
+								let dds_data = glacier_texture::convert::create_dds(&texture)
+									.context("Couldn't convert texture to DDS")?;
 
 								fs::write(path, dds_data)?;
 							} else {
-								let tga_data =
-									glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
+								let tga_data = glacier_texture::convert::create_tga(&texture)
+									.context("Couldn't convert texture to TGA")?;
 
 								let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
 
