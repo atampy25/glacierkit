@@ -1773,7 +1773,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					.parse::<usize>()
 					.is_err()
 				{
-					for component in path.chars().skip(1).collect::<String>().split('/') {
+					for component in path_str.chars().skip(1).collect::<String>().split('/') {
 						view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
 					}
 
