@@ -500,7 +500,7 @@ pub async fn open_factory(app: &AppHandle, factory: String) -> Result<()> {
 	{
 		let factory = RuntimeID::from_any(&factory)?;
 
-		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, factory) {
+		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, factory.into()) {
 			if filetype == "TEMP" {
 				open_in_editor(app, game_files, install, hash_list, factory).await?;
 			} else {

@@ -7,7 +7,6 @@
 #![allow(clippy::type_complexity)]
 #![feature(let_chains)]
 #![feature(async_closure)]
-#![feature(option_get_or_insert_default)]
 
 pub mod biome;
 pub mod editor_connection;
@@ -56,9 +55,10 @@ use model::{
 	EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
 	Project, ProjectSettings, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
 };
-use notify::Watcher;
+use notify::RecursiveMode;
+use notify_debouncer_full::FileIdMap;
 use quickentity_rs::{generate_patch, qn_structs::Property};
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
@@ -537,7 +537,7 @@ fn event(app: AppHandle, event: Event) {
 
 							app_state.fs_watcher.store(Some(
 								{
-									let mut watcher = notify_debouncer_full::new_debouncer(
+									let mut watcher = notify_debouncer_full::new_debouncer_opt(
 										Duration::from_secs(2),
 										None,
 										move |evts: notify_debouncer_full::DebounceEventResult| {
@@ -737,15 +737,15 @@ fn event(app: AppHandle, event: Event) {
 												)
 												.expect("Couldn't send error report to frontend");
 											}
-										}
+										},
+										FileIdMap::new(),
+										notify::Config::default(),
 									)?;
 
-									watcher.watcher().watch(&path, notify::RecursiveMode::Recursive)?;
-									watcher.cache().add_root(&path, notify::RecursiveMode::Recursive);
+									watcher.watch(&path, RecursiveMode::Recursive)?;
 
-									watcher
+									Arc::new(watcher)
 								}
-								.into()
 							));
 
 							finish_task(&app, task)?;
@@ -1367,7 +1367,7 @@ fn event(app: AppHandle, event: Event) {
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("..")
-									.join(format!("panic_{}.txt", thread_rng().gen::<u32>()))
+									.join(format!("panic_{}.txt", rng().random::<u32>()))
 							)?;
 						}
 
@@ -1382,7 +1382,7 @@ fn event(app: AppHandle, event: Event) {
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("..")
-									.join(format!("panic_{}.txt", thread_rng().gen::<u32>()))
+									.join(format!("panic_{}.txt", rng().random::<u32>()))
 							)?;
 						}
 					},

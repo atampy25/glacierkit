@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
-use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{game::GameVersion, metadata::{PathedID, RuntimeID}, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::ores::{parse_hashes_ores, parse_json_ores};
 use itertools::Itertools;
 use quickentity_rs::convert_to_qn;
@@ -56,7 +56,7 @@ pub fn start_content_search(
 		let resources = game_files
 			.partitions
 			.iter()
-			.filter(|x| partitions_to_search.contains(&x.partition_info().id().to_string()))
+			.filter(|x| partitions_to_search.contains(&x.partition_info().id.to_string()))
 			.collect_vec()
 			.into_par_iter()
 			.rev()
@@ -465,7 +465,7 @@ pub fn start_content_search(
 
 										let (locr_meta, locr_data) = extract_latest_resource(
 											game_files,
-											RuntimeID::from_str(&res_meta.hash_reference_data.first()?.hash).ok()?
+											&PathedID::from_str(&res_meta.hash_reference_data.first()?.hash).ok()?
 										)
 										.ok()?;
 

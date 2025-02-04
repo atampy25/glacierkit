@@ -4,7 +4,7 @@ use fn_error_context::context;
 use hitman_commons::{
 	game::GameVersion,
 	hash_list::HashList,
-	metadata::{ExtendedResourceMetadata, ResourceType, RuntimeID},
+	metadata::{ExtendedResourceMetadata, PathedID, ResourceType, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
 use itertools::Itertools;
@@ -27,9 +27,9 @@ use crate::{
 #[context("Couldn't extract resource {}", resource)]
 pub fn extract_latest_resource(
 	game_files: &PartitionManager,
-	resource: RuntimeID
+	resource: &PathedID
 ) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
-	let resource_id = RuntimeResourceID::from(resource);
+	let resource_id = RuntimeResourceID::from(resource.get_id());
 
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
@@ -51,8 +51,8 @@ pub fn extract_latest_resource(
 
 /// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
 #[context("Couldn't extract metadata for resource {}", resource)]
-pub fn extract_latest_metadata(game_files: &PartitionManager, resource: RuntimeID) -> Result<ExtendedResourceMetadata> {
-	let resource_id = RuntimeResourceID::from(resource);
+pub fn extract_latest_metadata(game_files: &PartitionManager, resource: PathedID) -> Result<ExtendedResourceMetadata> {
+	let resource_id = RuntimeResourceID::from(resource.get_id());
 
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
@@ -71,9 +71,9 @@ pub fn extract_latest_metadata(game_files: &PartitionManager, resource: RuntimeI
 #[context("Couldn't extract overview info for resource {}", resource)]
 pub fn extract_latest_overview_info(
 	game_files: &PartitionManager,
-	resource: RuntimeID
+	resource: PathedID
 ) -> Result<(ResourceType, String, Vec<(RuntimeID, String)>)> {
-	let resource_id = RuntimeResourceID::from(resource);
+	let resource_id = RuntimeResourceID::from(resource.get_id());
 
 	for partition in &game_files.partitions {
 		if let Some((info, patchlevel)) = partition
@@ -82,13 +82,13 @@ pub fn extract_latest_overview_info(
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			let package_name = match patchlevel {
-				PatchId::Base => partition.partition_info().id().to_string(),
-				PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id(), level)
+				PatchId::Base => partition.partition_info().id.to_string(),
+				PatchId::Patch(level) => format!("{}patch{}", partition.partition_info().id, level)
 			};
 
 			return Ok((
 				info.data_type().try_into()?,
-				match partition.partition_info().name() {
+				match &partition.partition_info().name {
 					Some(name) => format!("{} ({})", name, package_name),
 					None => package_name
 				},
@@ -122,16 +122,16 @@ pub fn extract_entity<'a>(
 	cached_entities: &'a DashMap<RuntimeID, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
-	factory_id: RuntimeID
+	factory_id: PathedID
 ) -> Result<Ref<'a, RuntimeID, Entity>> {
 	{
-		if let Some(x) = cached_entities.get(&factory_id) {
+		if let Some(x) = cached_entities.get(&factory_id.get_id()) {
 			return Ok(x);
 		}
 	}
 
 	let (temp_meta, temp_data) =
-		extract_latest_resource(resource_packages, factory_id).context("Couldn't extract TEMP")?;
+		extract_latest_resource(resource_packages, &factory_id).context("Couldn't extract TEMP")?;
 
 	if temp_meta.core_info.resource_type != "TEMP" {
 		bail!("Given factory was not a TEMP");
@@ -150,7 +150,7 @@ pub fn extract_entity<'a>(
 				.context("Couldn't convert binary data to ResourceLib factory")?
 		};
 
-	let blueprint_id = temp_meta
+	let blueprint_id = &temp_meta
 		.core_info
 		.references
 		.get(factory.blueprint_index_in_resource_header as usize)
@@ -158,7 +158,7 @@ pub fn extract_entity<'a>(
 		.resource;
 
 	let (tblu_meta, tblu_data) =
-		extract_latest_resource(resource_packages, blueprint_id).context("Couldn't extract TBLU")?;
+		extract_latest_resource(resource_packages, &blueprint_id).context("Couldn't extract TBLU")?;
 
 	let blueprint = match game_version {
 		GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)
@@ -181,18 +181,18 @@ pub fn extract_entity<'a>(
 	)
 	.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-	cached_entities.insert(factory_id, entity.to_owned());
+	cached_entities.insert(factory_id.get_id(), entity.to_owned());
 
-	cached_entities.get(&factory_id).expect("We just added it")
+	cached_entities.get(&factory_id.get_id()).expect("We just added it")
 }
 
 /// Get the history of the file, a changelog of events within the partitions.
 #[context("Couldn't extract changelog for resource {}", resource)]
 pub fn extract_resource_changelog(
 	game_files: &PartitionManager,
-	resource: RuntimeID
+	resource: PathedID
 ) -> Result<Vec<ResourceChangelogEntry>> {
-	let resource_id = RuntimeResourceID::from(resource);
+	let resource_id = RuntimeResourceID::from(resource.get_id());
 
 	let mut events = vec![];
 
@@ -209,9 +209,9 @@ pub fn extract_resource_changelog(
 			.collect::<Vec<PatchId>>();
 
 		for occurence in occurrences.iter().sorted() {
-			let partition_name = match partition.partition_info().name() {
-				Some(name) => format!("{} ({})", name, partition.partition_info().id()),
-				None => partition.partition_info().id().to_string()
+			let partition_name = match &partition.partition_info().name {
+				Some(name) => format!("{} ({})", name, partition.partition_info().id),
+				None => partition.partition_info().id.to_string()
 			};
 
 			let op_desc = match occurence {
