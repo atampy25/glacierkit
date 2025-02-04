@@ -158,7 +158,7 @@ pub fn extract_entity<'a>(
 		.resource;
 
 	let (tblu_meta, tblu_data) =
-		extract_latest_resource(resource_packages, &blueprint_id).context("Couldn't extract TBLU")?;
+		extract_latest_resource(resource_packages, blueprint_id).context("Couldn't extract TBLU")?;
 
 	let blueprint = match game_version {
 		GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)

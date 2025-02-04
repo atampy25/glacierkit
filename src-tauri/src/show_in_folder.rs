@@ -34,7 +34,7 @@ pub fn show_in_folder(app: AppHandle, path: String) {
 				}
 			};
 
-			Command::new("xdg-open").arg(&new_path).spawn().unwrap();
+			Command::new("xdg-open").arg(&new_path).spawn().unwrap().wait().unwrap();
 		} else if let Ok(Fork::Child) = daemon(false, false) {
 			Command::new("dbus-send")
 				.args([
@@ -47,6 +47,8 @@ pub fn show_in_folder(app: AppHandle, path: String) {
 					"string:\"\""
 				])
 				.spawn()
+				.unwrap()
+				.wait()
 				.unwrap();
 		}
 	}

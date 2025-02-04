@@ -1836,7 +1836,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path.clone(),
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(runtime_id),
 					};
 
 					SubEntity {
@@ -2000,7 +2000,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone().into())?
+								extract_latest_metadata(game_files, dep.resource.clone())?
 									.core_info
 									.resource_type == "MATB"
 							)
@@ -2047,7 +2047,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok({
-								let x = extract_latest_metadata(game_files, dep.resource.clone().into())?
+								let x = extract_latest_metadata(game_files, dep.resource.clone())?
 									.core_info
 									.resource_type;
 
@@ -2096,7 +2096,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone().into())?
+								extract_latest_metadata(game_files, dep.resource.clone())?
 									.core_info
 									.resource_type == "ECPB"
 							)
@@ -2143,7 +2143,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone().into())?
+								extract_latest_metadata(game_files, dep.resource.clone())?
 									.core_info
 									.resource_type == "AIBB"
 							)
@@ -2190,7 +2190,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone().into())?
+								extract_latest_metadata(game_files, dep.resource.clone())?
 									.core_info
 									.resource_type == "WSGB"
 							)

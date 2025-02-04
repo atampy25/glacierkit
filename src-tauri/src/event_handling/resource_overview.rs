@@ -1388,7 +1388,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
 								let (_, texd_data) =
-									extract_latest_resource(game_files, &texd_depend.resource.clone().into())?;
+									extract_latest_resource(game_files, &texd_depend.resource.clone())?;
 
 								let mip_block = MipblockData::from_memory(
 									&texd_data,
@@ -1544,7 +1544,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("No such WWEM dependency")?
 									.resource;
 
-								let (_, wem_data) = extract_latest_resource(game_files, &wwem_hash)?;
+								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
 								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
@@ -1633,7 +1633,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.context("No such WWEM dependency")?
 								.resource;
 
-							let (_, wem_data) = extract_latest_resource(game_files, &wwem_hash.clone().into())?;
+							let (_, wem_data) = extract_latest_resource(game_files, &wwem_hash.clone())?;
 
 							fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 

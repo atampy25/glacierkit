@@ -1143,7 +1143,7 @@ impl Intellisense {
 					}
 
 					"TEMP" => {
-						let extracted = extract_entity(game_files, cached_entities, game_version, hash_list, factory.into())?;
+						let extracted = extract_entity(game_files, cached_entities, game_version, hash_list, factory)?;
 
 						if let Some(data) = self.get_specific_property(
 							game_files,
