@@ -29,7 +29,7 @@ itertools = "0.14.0"
 serde-smile = "0.2.2"
 brotli-decompressor = "4.0.2"
 reqwest = {version = "0.12.12", features = ["json"] }
-trash = "3.1.2"
+trash = "5.2.1"
 velcro = "0.5.4"
 indexmap = "2.7.1"
 arboard = "3.3.0"
@@ -37,12 +37,12 @@ rand = "0.9.0"
 rpkg-rs = "1.2.0"
 async-recursion = "1.0.5"
 parking_lot = "0.12.1"
-rayon = "1.8.0"
+rayon = "1.10.0"
 tauri-plugin-aptabase = "0.5.1"
 image = "0.25.5"
 hex = "0.4.3"
 serde_with = "3.12.0"
-json-patch = "1.2.0"
+json-patch = "3.0.1"
 futures-util = "0.3.31"
 md5 = "0.7.0"
 measure_time = "0.9.0"
@@ -59,7 +59,6 @@ biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
 os_info = "3.9.2"
-derivative = "2.2.0" #should replace with derive_more
 derive_more = {version = "2.0.1", features = ["debug"]}
 home = "0.5.11"
 
@@ -126,7 +125,7 @@ version = "1.0.0"
 git = "https://github.com/dafitius/GlacierFormats-rs"
 
 [dependencies.hashbrown]
-version = "0.14.3"
+version = "0.14.5"
 features = ["rayon", "serde"]
 
 [dependencies.tonytools]

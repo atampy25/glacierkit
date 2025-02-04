@@ -1650,9 +1650,10 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 	for operation in &patch.0 {
 		match operation {
 			json_patch::PatchOperation::Add(json_patch::AddOperation { path, value }) => {
+				let path_str = path.to_string();
 				let mut view = &mut merge_patch;
 
-				if path
+				if path_str
 					.chars()
 					.skip(1)
 					.collect::<String>()
@@ -1662,14 +1663,14 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					.parse::<usize>()
 					.is_err()
 				{
-					for component in path.chars().skip(1).collect::<String>().split('/') {
+					for component in path_str.chars().skip(1).collect::<String>().split('/') {
 						view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
 					}
 
 					*view = value.to_owned();
 				} else {
 					// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-					for component in path
+					for component in path_str
 						.chars()
 						.skip(1)
 						.collect::<String>()
@@ -1686,7 +1687,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					*view = new
 						.pointer(&format!(
 							"/{}",
-							path.chars()
+							path_str.chars()
 								.skip(1)
 								.collect::<String>()
 								.split('/')
@@ -1704,9 +1705,10 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 			}
 
 			json_patch::PatchOperation::Remove(json_patch::RemoveOperation { path }) => {
+				let path_str = path.to_string();
 				let mut view = &mut merge_patch;
 
-				if path
+				if path_str
 					.chars()
 					.skip(1)
 					.collect::<String>()
@@ -1716,14 +1718,14 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					.parse::<usize>()
 					.is_err()
 				{
-					for component in path.chars().skip(1).collect::<String>().split('/') {
+					for component in path_str.chars().skip(1).collect::<String>().split('/') {
 						view = view.as_object_mut().unwrap().entry(component).or_insert(json!({}));
 					}
 
 					*view = Value::Null;
 				} else {
 					// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-					for component in path
+					for component in path_str
 						.chars()
 						.skip(1)
 						.collect::<String>()
@@ -1740,7 +1742,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					*view = new
 						.pointer(&format!(
 							"/{}",
-							path.chars()
+							path_str.chars()
 								.skip(1)
 								.collect::<String>()
 								.split('/')
@@ -1758,9 +1760,10 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 			}
 
 			json_patch::PatchOperation::Replace(json_patch::ReplaceOperation { path, value }) => {
+				let path_str = path.to_string();
 				let mut view = &mut merge_patch;
 
-				if path
+				if path_str
 					.chars()
 					.skip(1)
 					.collect::<String>()
@@ -1777,7 +1780,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					*view = value.to_owned();
 				} else {
 					// If the last component is a number we assume it's an array operation, so we replace the whole array with the correct data
-					for component in path
+					for component in path_str
 						.chars()
 						.skip(1)
 						.collect::<String>()
@@ -1794,7 +1797,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					*view = new
 						.pointer(&format!(
 							"/{}",
-							path.split('/')
+							path_str.split('/')
 								.collect::<Vec<_>>()
 								.into_iter()
 								.rev()
