@@ -592,7 +592,7 @@ pub fn get_ref_decoration(
 					cached_entities,
 					game_version,
 					hash_list,
-					PathedID::from_str(reference.external_scene.as_ref().expect("Not a local reference")).ok()?
+					&PathedID::from_str(reference.external_scene.as_ref().expect("Not a local reference")).ok()?
 				)
 				.ok()?
 				.entities
@@ -614,7 +614,7 @@ pub fn get_line_decoration(
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	line: RuntimeID
 ) -> Result<Option<String>> {
-	let (res_meta, res_data) = extract_latest_resource(game_files, &line.into())?;
+	let (res_meta, res_data) = extract_latest_resource(game_files, &line)?;
 
 	let (locr_meta, locr_data) = extract_latest_resource(
 		game_files,
@@ -623,7 +623,7 @@ pub fn get_line_decoration(
 			.references
 			.first()
 			.context("No LOCR dependency on LINE")?
-			.resource
+			.resource.clone()
 	)?;
 
 	let locr = {
@@ -1079,7 +1079,7 @@ pub fn get_decorations(
 		.map(|entry| entry.resource_type == "MATT")
 		.unwrap_or(false)
 	{
-		if let Some(mati) = extract_latest_metadata(game_files, PathedID::from_str(&sub_entity.factory)?)?
+		if let Some(mati) = extract_latest_metadata(game_files, &PathedID::from_str(&sub_entity.factory)?)?
 			.core_info
 			.references
 			.into_iter()
@@ -1090,7 +1090,7 @@ pub fn get_decorations(
 					.map(|entry| entry.resource_type == "MATI")
 					.unwrap_or(false)
 			}) {
-			if let Some(mate) = extract_latest_metadata(game_files, mati.resource)?
+			if let Some(mate) = extract_latest_metadata(game_files, &mati.resource)?
 				.core_info
 				.references
 				.into_iter()

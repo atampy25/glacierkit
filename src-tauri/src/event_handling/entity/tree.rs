@@ -1,4 +1,4 @@
-use std::{ops::Deref, str::FromStr};
+use std::ops::Deref;
 
 use anyhow::{anyhow, Context, Result};
 use arboard::Clipboard;
@@ -1667,7 +1667,7 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: String) -> R
 				&app_state.cached_entities,
 				game_version,
 				hash_list,
-				PathedID::from_str(&sub_entity.factory)?
+				&sub_entity.factory.parse::<PathedID>()?
 			)?;
 
 			(
@@ -1812,7 +1812,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				.as_ref()
 			{
 				"TEMP" => {
-					let (temp_meta, temp_data) = extract_latest_resource(game_files, &file.into())?;
+					let (temp_meta, temp_data) = extract_latest_resource(game_files, &file)?;
 
 					let factory = match game_version {
 						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
@@ -1846,7 +1846,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytemplate", "")
 							.replace(".entitytemplate", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -1866,7 +1866,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"CPPT" => {
-					let (cppt_meta, cppt_data) = extract_latest_resource(game_files, &file.into())?;
+					let (cppt_meta, cppt_data) = extract_latest_resource(game_files, &file)?;
 
 					let factory =
 						match game_version {
@@ -1899,7 +1899,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytype", "")
 							.replace(".class", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -1919,11 +1919,11 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"ASET" => {
-					let blueprint_hash = extract_latest_metadata(game_files, file.into())?
+					let blueprint_hash = extract_latest_metadata(game_files, &file)?
 						.core_info
 						.references
 						.into_iter()
-						.last()
+						.next_back()
 						.context("ASET had no dependencies")?
 						.resource;
 
@@ -1953,11 +1953,11 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"UICT" => {
-					let blueprint_hash = extract_latest_metadata(game_files, file.into())?
+					let blueprint_hash = extract_latest_metadata(game_files, &file)?
 						.core_info
 						.references
 						.into_iter()
-						.last()
+						.next_back()
 						.context("UICT had no dependencies")?
 						.resource;
 
@@ -1974,7 +1974,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytemplate", "")
 							.replace(".entitytemplate", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -1994,13 +1994,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"MATT" => {
-					let blueprint_hash = extract_latest_metadata(game_files, file.into())?
+					let blueprint_hash = extract_latest_metadata(game_files, &file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone())?
+								extract_latest_metadata(game_files, &dep.resource)?
 									.core_info
 									.resource_type == "MATB"
 							)
@@ -2021,7 +2021,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytemplate", "")
 							.replace(".entitytemplate", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -2041,13 +2041,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"WSWT" => {
-					let blueprint_hash = extract_latest_metadata(game_files, file.into())?
+					let blueprint_hash = extract_latest_metadata(game_files, &file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok({
-								let x = extract_latest_metadata(game_files, dep.resource.clone())?
+								let x = extract_latest_metadata(game_files, &dep.resource)?
 									.core_info
 									.resource_type;
 
@@ -2070,7 +2070,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytemplate", "")
 							.replace(".entitytemplate", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -2090,13 +2090,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"ECPT" => {
-					let blueprint_hash = extract_latest_metadata(game_files, file.into())?
+					let blueprint_hash = extract_latest_metadata(game_files, &file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone())?
+								extract_latest_metadata(game_files, &dep.resource)?
 									.core_info
 									.resource_type == "ECPB"
 							)
@@ -2117,7 +2117,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytemplate", "")
 							.replace(".entitytemplate", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -2137,13 +2137,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"AIBX" => {
-					let blueprint_hash = extract_latest_metadata(game_files, file.into())?
+					let blueprint_hash = extract_latest_metadata(game_files, &file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone())?
+								extract_latest_metadata(game_files, &dep.resource)?
 									.core_info
 									.resource_type == "AIBB"
 							)
@@ -2164,7 +2164,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytemplate", "")
 							.replace(".entitytemplate", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -2184,13 +2184,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"WSGT" => {
-					let blueprint_hash = extract_latest_metadata(game_files, file.into())?
+					let blueprint_hash = extract_latest_metadata(game_files, &file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource.clone())?
+								extract_latest_metadata(game_files, &dep.resource)?
 									.core_info
 									.resource_type == "WSGB"
 							)
@@ -2211,7 +2211,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.replace("].pc_entitytemplate", "")
 							.replace(".entitytemplate", "")
 							.split('/')
-							.last()
+							.next_back()
 							.map(|x| x.to_owned())
 							.unwrap_or(factory_path.to_owned()),
 						factory: factory_path,
@@ -2265,7 +2265,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 			.resource_type
 			== "WWEV"
 		{
-			let (_, wwev_data) = extract_latest_resource(game_files, &file.into())?;
+			let (_, wwev_data) = extract_latest_resource(game_files, &file)?;
 
 			let wwev = WwiseEvent::parse(&wwev_data)?;
 

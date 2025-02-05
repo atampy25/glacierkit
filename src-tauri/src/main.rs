@@ -6,7 +6,6 @@
 #![feature(try_find)]
 #![allow(clippy::type_complexity)]
 #![feature(let_chains)]
-#![feature(async_closure)]
 
 pub mod biome;
 pub mod editor_connection;
@@ -1658,7 +1657,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					.skip(1)
 					.collect::<String>()
 					.split('/')
-					.last()
+					.next_back()
 					.unwrap()
 					.parse::<usize>()
 					.is_err()
@@ -1713,7 +1712,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					.skip(1)
 					.collect::<String>()
 					.split('/')
-					.last()
+					.next_back()
 					.unwrap()
 					.parse::<usize>()
 					.is_err()
@@ -1768,7 +1767,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					.skip(1)
 					.collect::<String>()
 					.split('/')
-					.last()
+					.next_back()
 					.unwrap()
 					.parse::<usize>()
 					.is_err()

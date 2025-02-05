@@ -24,13 +24,13 @@ use crate::{
 };
 
 /// Extract the latest copy of a resource.
-#[context("Couldn't extract resource {}", resource)]
+#[context("Couldn't extract resource {}", resource.clone().into().get_id())]
 pub fn extract_latest_resource(
 	game_files: &PartitionManager,
-	resource: &PathedID
+	resource: &(impl Into<PathedID> + Clone)
 ) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
-	let resource_id = RuntimeResourceID::from(resource.get_id());
-
+	let pathed_id: PathedID = resource.clone().into();
+	let resource_id = RuntimeResourceID::from(pathed_id.get_id());
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
 			.latest_resources()
@@ -50,9 +50,9 @@ pub fn extract_latest_resource(
 }
 
 /// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
-#[context("Couldn't extract metadata for resource {}", resource)]
-pub fn extract_latest_metadata(game_files: &PartitionManager, resource: PathedID) -> Result<ExtendedResourceMetadata> {
-	let resource_id = RuntimeResourceID::from(resource.get_id());
+#[context("Couldn't extract metadata for resource {}", resource.clone().into().get_id())]
+pub fn extract_latest_metadata(game_files: &PartitionManager, resource: &(impl Into<PathedID> + Clone)) -> Result<ExtendedResourceMetadata> {
+	let resource_id = RuntimeResourceID::from(resource.clone().into().get_id());
 
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
@@ -68,12 +68,12 @@ pub fn extract_latest_metadata(game_files: &PartitionManager, resource: PathedID
 }
 
 /// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource.
-#[context("Couldn't extract overview info for resource {}", resource)]
+#[context("Couldn't extract overview info for resource {}", &resource.clone().into().get_id())]
 pub fn extract_latest_overview_info(
 	game_files: &PartitionManager,
-	resource: PathedID
+	resource: &(impl Into<PathedID> + Clone)
 ) -> Result<(ResourceType, String, Vec<(RuntimeID, String)>)> {
-	let resource_id = RuntimeResourceID::from(resource.get_id());
+	let resource_id = RuntimeResourceID::from(resource.clone().into().get_id());
 
 	for partition in &game_files.partitions {
 		if let Some((info, patchlevel)) = partition
@@ -116,22 +116,25 @@ pub fn extract_latest_overview_info(
 
 /// Extract an entity by its factory and put it in the cache. Returns early if the entity is already cached.
 #[try_fn]
-#[context("Couldn't extract and cache entity {}", factory_id)]
+#[context("Couldn't extract and cache entity {}", factory_id.clone().into().get_id())]
 pub fn extract_entity<'a>(
 	resource_packages: &PartitionManager,
 	cached_entities: &'a DashMap<RuntimeID, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
-	factory_id: PathedID
+	factory_id: &(impl Into<PathedID> + Clone)
 ) -> Result<Ref<'a, RuntimeID, Entity>> {
+
+	let runtime_id = factory_id.clone().into().get_id();
+
 	{
-		if let Some(x) = cached_entities.get(&factory_id.get_id()) {
+		if let Some(x) = cached_entities.get(&runtime_id) {
 			return Ok(x);
 		}
 	}
 
 	let (temp_meta, temp_data) =
-		extract_latest_resource(resource_packages, &factory_id).context("Couldn't extract TEMP")?;
+		extract_latest_resource(resource_packages, factory_id).context("Couldn't extract TEMP")?;
 
 	if temp_meta.core_info.resource_type != "TEMP" {
 		bail!("Given factory was not a TEMP");
@@ -181,18 +184,18 @@ pub fn extract_entity<'a>(
 	)
 	.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-	cached_entities.insert(factory_id.get_id(), entity.to_owned());
+	cached_entities.insert(runtime_id, entity.to_owned());
 
-	cached_entities.get(&factory_id.get_id()).expect("We just added it")
+	cached_entities.get(&runtime_id).expect("We just added it")
 }
 
 /// Get the history of the file, a changelog of events within the partitions.
-#[context("Couldn't extract changelog for resource {}", resource)]
+#[context("Couldn't extract changelog for resource {}", resource.clone().into().get_id())]
 pub fn extract_resource_changelog(
 	game_files: &PartitionManager,
-	resource: PathedID
+	resource: &(impl Into<PathedID> + Clone)
 ) -> Result<Vec<ResourceChangelogEntry>> {
-	let resource_id = RuntimeResourceID::from(resource.get_id());
+	let resource_id = RuntimeResourceID::from(resource.clone().into().get_id());
 
 	let mut events = vec![];
 

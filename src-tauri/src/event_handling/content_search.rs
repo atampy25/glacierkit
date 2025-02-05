@@ -465,7 +465,7 @@ pub fn start_content_search(
 
 										let (locr_meta, locr_data) = extract_latest_resource(
 											game_files,
-											&PathedID::from_str(&res_meta.hash_reference_data.first()?.hash).ok()?
+											&res_meta.hash_reference_data.first()?.hash.parse::<PathedID>().ok()?
 										)
 										.ok()?;
 

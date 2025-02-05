@@ -59,7 +59,7 @@ biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
 os_info = "3.9.2"
-derive_more = {version = "2.0.1", features = ["debug"]}
+derive_more = {version = "2.0.1", features = ["debug"] }
 home = "0.5.11"
 
 [dependencies.snmalloc-rs]
