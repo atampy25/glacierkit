@@ -51,7 +51,10 @@ pub fn extract_latest_resource(
 
 /// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
 #[context("Couldn't extract metadata for resource {}", resource.clone().into().get_id())]
-pub fn extract_latest_metadata(game_files: &PartitionManager, resource: &(impl Into<PathedID> + Clone)) -> Result<ExtendedResourceMetadata> {
+pub fn extract_latest_metadata(
+	game_files: &PartitionManager,
+	resource: &(impl Into<PathedID> + Clone)
+) -> Result<ExtendedResourceMetadata> {
 	let resource_id = RuntimeResourceID::from(resource.clone().into().get_id());
 
 	for partition in &game_files.partitions {
@@ -124,7 +127,6 @@ pub fn extract_entity<'a>(
 	hash_list: &HashList,
 	factory_id: &(impl Into<PathedID> + Clone)
 ) -> Result<Ref<'a, RuntimeID, Entity>> {
-
 	let runtime_id = factory_id.clone().into().get_id();
 
 	{

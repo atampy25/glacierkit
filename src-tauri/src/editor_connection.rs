@@ -616,9 +616,12 @@ impl EditorConnection {
 			});
 
 			write
-				.send(Message::Text(serde_json::to_string(&SDKEditorRequest::Hello {
-					identifier: "GlacierKit".into()
-				})?.into()))
+				.send(Message::Text(
+					serde_json::to_string(&SDKEditorRequest::Hello {
+						identifier: "GlacierKit".into()
+					})?
+					.into()
+				))
 				.await?;
 
 			*sender_guard = Some(write);
@@ -690,9 +693,9 @@ impl EditorConnection {
 				.await
 				.as_mut()
 				.context("Not connected")?
-				.send(Message::Text(serde_json::to_string(
-					&SDKEditorRequest::RebuildEntityTree { msgId: None }
-				)?.into()))
+				.send(Message::Text(
+					serde_json::to_string(&SDKEditorRequest::RebuildEntityTree { msgId: None })?.into()
+				))
 				.await?;
 
 			self.wait_for_event(|evt| matches!(evt, SDKEditorEvent::EntityTreeRebuilt))

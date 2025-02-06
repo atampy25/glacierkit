@@ -1,6 +1,7 @@
 use std::{
 	fs,
-	path::{Path, PathBuf}, str::FromStr
+	path::{Path, PathBuf},
+	str::FromStr
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -8,7 +9,11 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::{PathedID, RuntimeID}};
+use hitman_commons::{
+	game::GameVersion,
+	hash_list::HashList,
+	metadata::{PathedID, RuntimeID}
+};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -1006,8 +1011,10 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		let task = start_task(app, "Caching repository")?;
 
 		app_state.repository.store(Some(
-			from_slice::<Vec<RepositoryItem>>(&extract_latest_resource(game_files, &"00204D1AFD76AB13".parse::<RuntimeID>()?)?.1)?
-				.into()
+			from_slice::<Vec<RepositoryItem>>(
+				&extract_latest_resource(game_files, &"00204D1AFD76AB13".parse::<RuntimeID>()?)?.1
+			)?
+			.into()
 		));
 
 		finish_task(app, task)?;

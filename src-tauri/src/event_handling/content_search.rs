@@ -4,7 +4,11 @@ use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
-use hitman_commons::{game::GameVersion, metadata::{PathedID, RuntimeID}, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{
+	game::GameVersion,
+	metadata::{PathedID, RuntimeID},
+	rpkg_tool::RpkgResourceMeta
+};
 use hitman_formats::ores::{parse_hashes_ores, parse_json_ores};
 use itertools::Itertools;
 use quickentity_rs::convert_to_qn;

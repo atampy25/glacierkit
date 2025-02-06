@@ -623,7 +623,8 @@ pub fn get_line_decoration(
 			.references
 			.first()
 			.context("No LOCR dependency on LINE")?
-			.resource.clone()
+			.resource
+			.clone()
 	)?;
 
 	let locr = {

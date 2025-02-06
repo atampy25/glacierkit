@@ -5,7 +5,10 @@ use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
-use hitman_commons::{game::GameVersion, metadata::{PathedID, RuntimeID}};
+use hitman_commons::{
+	game::GameVersion,
+	metadata::{PathedID, RuntimeID}
+};
 use hitman_formats::wwev::WwiseEvent;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -1836,7 +1839,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path.clone(),
-						PathedID::Unknown(runtime_id) => hash_list.to_path(runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(runtime_id)
 					};
 
 					SubEntity {
@@ -1890,7 +1893,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path.clone(),
-						PathedID::Unknown(runtime_id) => hash_list.to_path(runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(runtime_id)
 					};
 
 					SubEntity {
@@ -1930,7 +1933,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path,
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id)
 					};
 
 					SubEntity {
@@ -1964,7 +1967,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path,
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id)
 					};
 
 					SubEntity {
@@ -2011,7 +2014,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path,
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id)
 					};
 
 					SubEntity {
@@ -2060,7 +2063,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path,
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id)
 					};
 
 					SubEntity {
@@ -2107,7 +2110,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path,
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id)
 					};
 
 					SubEntity {
@@ -2154,7 +2157,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path,
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id)
 					};
 
 					SubEntity {
@@ -2201,7 +2204,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let factory_path = hash_list.to_path(&file);
 					let blueprint_path = match blueprint_hash {
 						PathedID::Path(path) => path,
-						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id),
+						PathedID::Unknown(runtime_id) => hash_list.to_path(&runtime_id)
 					};
 
 					SubEntity {

@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use arc_swap::{ArcSwap, ArcSwapOption}; 
+use arc_swap::{ArcSwap, ArcSwapOption};
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use hitman_commons::{

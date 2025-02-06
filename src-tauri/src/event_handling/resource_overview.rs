@@ -10,7 +10,12 @@ use glacier_texture::{
 };
 
 use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::{PathedID, RuntimeID}, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{
+	game::GameVersion,
+	hash_list::HashList,
+	metadata::{PathedID, RuntimeID},
+	rpkg_tool::RpkgResourceMeta
+};
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	ores::{parse_hashes_ores, parse_json_ores},
@@ -119,7 +124,8 @@ pub fn initialise_resource_overview(
 			changelog: extract_resource_changelog(game_files, &hash)?,
 			data: match filetype.as_ref() {
 				"TEMP" => {
-					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, &hash)?;
+					let entity =
+						extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, &hash)?;
 
 					ResourceOverviewData::Entity {
 						blueprint_hash: entity.blueprint_hash.to_owned(),
@@ -276,7 +282,8 @@ pub fn initialise_resource_overview(
 
 					if let Some(texd_depend) = res_meta.core_info.references.first() {
 						let (_, texd_data) = extract_latest_resource(game_files, &texd_depend.resource)?;
-						let mipblock = MipblockData::from_memory(&texd_data, game_version.into()).context("Couldn't process TEXD data")?;
+						let mipblock = MipblockData::from_memory(&texd_data, game_version.into())
+							.context("Couldn't process TEXD data")?;
 						texture.set_mipblock1(mipblock);
 					}
 
@@ -660,7 +667,8 @@ pub fn initialise_resource_overview(
 								.references
 								.first()
 								.context("No LOCR dependency on LINE")?
-								.resource.clone()
+								.resource
+								.clone()
 						)?;
 
 						let locr = {
@@ -773,7 +781,8 @@ pub fn initialise_resource_overview(
 								.references
 								.get(1)
 								.context("No MATB dependency")?
-								.resource.clone()
+								.resource
+								.clone()
 						)?;
 
 						let material =
@@ -1087,14 +1096,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					&PathedID::from_str(&extract_entity(
-						game_files,
-						&app_state.cached_entities,
-						get_loaded_game_version(app, install)?,
-						hash_list,
-						&hash
+					&PathedID::from_str(
+						&extract_entity(
+							game_files,
+							&app_state.cached_entities,
+							get_loaded_game_version(app, install)?,
+							hash_list,
+							&hash
+						)?
+						.blueprint_hash
 					)?
-					.blueprint_hash)?
 				)?;
 
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false)
@@ -1387,8 +1398,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
-								let (_, texd_data) =
-									extract_latest_resource(game_files, &texd_depend.resource)?;
+								let (_, texd_data) = extract_latest_resource(game_files, &texd_depend.resource)?;
 
 								let mip_block = MipblockData::from_memory(
 									&texd_data,

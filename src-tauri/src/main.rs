@@ -534,50 +534,87 @@ fn event(app: AppHandle, event: Event) {
 							let notify_path = path.to_owned();
 							let notify_app = app.to_owned();
 
-							app_state.fs_watcher.store(Some(
-								{
-									let mut watcher = notify_debouncer_full::new_debouncer_opt(
-										Duration::from_secs(2),
-										None,
-										move |evts: notify_debouncer_full::DebounceEventResult| {
-											if let Err::<_, Error>(e) = try {
-												if let Ok(evts) = evts {
-													for evt in evts {
-														if evt.need_rescan() {
-															// Refresh the whole tree
+							app_state.fs_watcher.store(Some({
+								let mut watcher = notify_debouncer_full::new_debouncer_opt(
+									Duration::from_secs(2),
+									None,
+									move |evts: notify_debouncer_full::DebounceEventResult| {
+										if let Err::<_, Error>(e) = try {
+											if let Ok(evts) = evts {
+												for evt in evts {
+													if evt.need_rescan() {
+														// Refresh the whole tree
 
-															let mut files = vec![];
+														let mut files = vec![];
 
-															for entry in WalkDir::new(&notify_path)
-																.sort_by_file_name()
-																.into_iter()
-																.filter_map(|x| x.ok())
-															{
-																files.push((
-																	entry.path().into(),
-																	entry
-																		.metadata()
-																		.context("Couldn't get file metadata")?
-																		.is_dir()
-																));
-															}
-
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::NewTree {
-																		base_path: notify_path.to_owned(),
-																		files
-																	}
-																))
-															)?;
-
-															return;
+														for entry in WalkDir::new(&notify_path)
+															.sort_by_file_name()
+															.into_iter()
+															.filter_map(|x| x.ok())
+														{
+															files.push((
+																entry.path().into(),
+																entry
+																	.metadata()
+																	.context("Couldn't get file metadata")?
+																	.is_dir()
+															));
 														}
 
-														match evt.kind {
-															notify::EventKind::Create(kind) => match kind {
-																notify::event::CreateKind::File => {
+														send_request(
+															&notify_app,
+															Request::Tool(ToolRequest::FileBrowser(
+																FileBrowserRequest::NewTree {
+																	base_path: notify_path.to_owned(),
+																	files
+																}
+															))
+														)?;
+
+														return;
+													}
+
+													match evt.kind {
+														notify::EventKind::Create(kind) => match kind {
+															notify::event::CreateKind::File => {
+																send_request(
+																	&notify_app,
+																	Request::Tool(ToolRequest::FileBrowser(
+																		FileBrowserRequest::Create {
+																			path: evt
+																				.paths
+																				.first()
+																				.context("Create event had no paths")?
+																				.to_owned(),
+																			is_folder: false
+																		}
+																	))
+																)?;
+															}
+
+															notify::event::CreateKind::Folder => {
+																send_request(
+																	&notify_app,
+																	Request::Tool(ToolRequest::FileBrowser(
+																		FileBrowserRequest::Create {
+																			path: evt
+																				.paths
+																				.first()
+																				.context("Create event had no path")?
+																				.to_owned(),
+																			is_folder: true
+																		}
+																	))
+																)?;
+															}
+
+															notify::event::CreateKind::Any
+															| notify::event::CreateKind::Other => {
+																if let Ok(metadata) = fs::metadata(
+																	evt.paths
+																		.first()
+																		.context("Create event had no paths")?
+																) {
 																	send_request(
 																		&notify_app,
 																		Request::Tool(ToolRequest::FileBrowser(
@@ -589,163 +626,110 @@ fn event(app: AppHandle, event: Event) {
 																						"Create event had no paths"
 																					)?
 																					.to_owned(),
-																				is_folder: false
+																				is_folder: metadata.is_dir()
 																			}
 																		))
 																	)?;
 																}
+															}
+														},
 
-																notify::event::CreateKind::Folder => {
-																	send_request(
-																		&notify_app,
-																		Request::Tool(ToolRequest::FileBrowser(
-																			FileBrowserRequest::Create {
-																				path: evt
-																					.paths
-																					.first()
-																					.context(
-																						"Create event had no path"
-																					)?
-																					.to_owned(),
-																				is_folder: true
-																			}
-																		))
-																	)?;
-																}
+														notify::EventKind::Modify(notify::event::ModifyKind::Name(
+															notify::event::RenameMode::Both
+														)) => {
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::Rename {
+																		old_path: evt
+																			.paths
+																			.first()
+																			.context(
+																				"Rename-both event had no first path"
+																			)?
+																			.to_owned(),
+																		new_path: evt
+																			.paths
+																			.get(1)
+																			.context(
+																				"Rename-both event had no second path"
+																			)?
+																			.to_owned()
+																	}
+																))
+															)?;
+														}
 
-																notify::event::CreateKind::Any
-																| notify::event::CreateKind::Other => {
-																	if let Ok(metadata) = fs::metadata(
+														notify::EventKind::Modify(notify::event::ModifyKind::Name(
+															notify::event::RenameMode::From
+														)) => {
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::BeginRename {
+																		old_path: evt
+																			.paths
+																			.first()
+																			.context("Rename-from event had no path")?
+																			.to_owned()
+																	}
+																))
+															)?;
+														}
+
+														notify::EventKind::Modify(notify::event::ModifyKind::Name(
+															notify::event::RenameMode::To
+														)) => {
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::FinishRename {
+																		new_path: evt
+																			.paths
+																			.first()
+																			.context("Rename-to event had no path")?
+																			.to_owned()
+																	}
+																))
+															)?;
+														}
+
+														notify::EventKind::Remove(_) => {
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::Delete(
 																		evt.paths
 																			.first()
-																			.context("Create event had no paths")?
-																	) {
-																		send_request(
-																			&notify_app,
-																			Request::Tool(ToolRequest::FileBrowser(
-																				FileBrowserRequest::Create {
-																					path: evt
-																						.paths
-																						.first()
-																						.context(
-																							"Create event had no paths"
-																						)?
-																						.to_owned(),
-																					is_folder: metadata.is_dir()
-																				}
-																			))
-																		)?;
-																	}
-																}
-															},
-
-															notify::EventKind::Modify(
-																notify::event::ModifyKind::Name(
-																	notify::event::RenameMode::Both
-																)
-															) => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::Rename {
-																			old_path: evt
-																				.paths
-																				.first()
-																				.context(
-																					"Rename-both event had no first \
-																					 path"
-																				)?
-																				.to_owned(),
-																			new_path: evt
-																				.paths
-																				.get(1)
-																				.context(
-																					"Rename-both event had no second \
-																					 path"
-																				)?
-																				.to_owned()
-																		}
-																	))
-																)?;
-															}
-
-															notify::EventKind::Modify(
-																notify::event::ModifyKind::Name(
-																	notify::event::RenameMode::From
-																)
-															) => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::BeginRename {
-																			old_path: evt
-																				.paths
-																				.first()
-																				.context(
-																					"Rename-from event had no path"
-																				)?
-																				.to_owned()
-																		}
-																	))
-																)?;
-															}
-
-															notify::EventKind::Modify(
-																notify::event::ModifyKind::Name(
-																	notify::event::RenameMode::To
-																)
-															) => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::FinishRename {
-																			new_path: evt
-																				.paths
-																				.first()
-																				.context("Rename-to event had no path")?
-																				.to_owned()
-																		}
-																	))
-																)?;
-															}
-
-															notify::EventKind::Remove(_) => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::Delete(
-																			evt.paths
-																				.first()
-																				.context("Remove event had no path")?
-																				.to_owned()
-																		)
-																	))
-																)?;
-															}
-
-															_ => {}
+																			.context("Remove event had no path")?
+																			.to_owned()
+																	)
+																))
+															)?;
 														}
+
+														_ => {}
 													}
 												}
-											} {
-												send_request(
-													&notify_app,
-													Request::Global(GlobalRequest::ErrorReport {
-														error: format!("{:?}", e.context("Notifier error"))
-													})
-												)
-												.expect("Couldn't send error report to frontend");
 											}
-										},
-										FileIdMap::new(),
-										notify::Config::default(),
-									)?;
+										} {
+											send_request(
+												&notify_app,
+												Request::Global(GlobalRequest::ErrorReport {
+													error: format!("{:?}", e.context("Notifier error"))
+												})
+											)
+											.expect("Couldn't send error report to frontend");
+										}
+									},
+									FileIdMap::new(),
+									notify::Config::default()
+								)?;
 
-									watcher.watch(&path, RecursiveMode::Recursive)?;
+								watcher.watch(&path, RecursiveMode::Recursive)?;
 
-									Arc::new(watcher)
-								}
-							));
+								Arc::new(watcher)
+							}));
 
 							finish_task(&app, task)?;
 						}
@@ -1686,7 +1670,8 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					*view = new
 						.pointer(&format!(
 							"/{}",
-							path_str.chars()
+							path_str
+								.chars()
 								.skip(1)
 								.collect::<String>()
 								.split('/')
@@ -1741,7 +1726,8 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					*view = new
 						.pointer(&format!(
 							"/{}",
-							path_str.chars()
+							path_str
+								.chars()
 								.skip(1)
 								.collect::<String>()
 								.split('/')
@@ -1796,7 +1782,8 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 					*view = new
 						.pointer(&format!(
 							"/{}",
-							path_str.split('/')
+							path_str
+								.split('/')
 								.collect::<Vec<_>>()
 								.into_iter()
 								.rev()

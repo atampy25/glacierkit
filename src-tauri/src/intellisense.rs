@@ -366,7 +366,8 @@ impl Intellisense {
 						.unwrap_or(false)
 				})
 				.context("MATT has no MATB dependency")?
-				.resource.clone()
+				.resource
+				.clone()
 		)?;
 
 		self.matt_properties.insert(
@@ -473,9 +474,12 @@ impl Intellisense {
 							if let Some(ty) = self.file_types.get(&factory.get_id()) {
 								match ty.as_ref() {
 									"CPPT" => {
-										for (prop_name, (prop_type, default_val)) in
-											self.get_cppt_properties(game_files, hash_list, game_version, factory.get_id())?
-										{
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											factory.get_id()
+										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
 									}
@@ -1382,7 +1386,9 @@ impl Intellisense {
 								GameVersion::H1 => {
 									h2016_convert_dswb(&extract_latest_resource(game_files, &dswb_hash)?.1)?
 								}
-								GameVersion::H2 => h2_convert_dswb(&extract_latest_resource(game_files, &dswb_hash)?.1)?,
+								GameVersion::H2 => {
+									h2_convert_dswb(&extract_latest_resource(game_files, &dswb_hash)?.1)?
+								}
 								GameVersion::H3 => h3_convert_dswb(&extract_latest_resource(game_files, &dswb_hash)?.1)?
 							};
 
@@ -1441,7 +1447,9 @@ impl Intellisense {
 								GameVersion::H1 => {
 									h2016_convert_wsgb(&extract_latest_resource(game_files, &wsgb_hash)?.1)?
 								}
-								GameVersion::H2 => h2_convert_wsgb(&extract_latest_resource(game_files, &wsgb_hash)?.1)?,
+								GameVersion::H2 => {
+									h2_convert_wsgb(&extract_latest_resource(game_files, &wsgb_hash)?.1)?
+								}
 								GameVersion::H3 => h3_convert_wsgb(&extract_latest_resource(game_files, &wsgb_hash)?.1)?
 							};
 
