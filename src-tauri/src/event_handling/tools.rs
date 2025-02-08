@@ -330,7 +330,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
 					let (temp_meta, temp_data) =
-						extract_latest_resource(game_files, &entity.factory_hash.parse::<PathedID>()?)?;
+						extract_latest_resource(game_files, &PathedID::from_str(&entity.factory_hash)?)?;
 
 					let factory = match game_version {
 						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)

@@ -24,13 +24,13 @@ use crate::{
 };
 
 /// Extract the latest copy of a resource.
-#[context("Couldn't extract resource {}", resource.clone().into().get_id())]
+#[context("Couldn't extract resource {}", resource.clone().into())]
 pub fn extract_latest_resource(
 	game_files: &PartitionManager,
-	resource: &(impl Into<PathedID> + Clone)
+	resource: &(impl Into<RuntimeID> + Clone)
 ) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
-	let pathed_id: PathedID = resource.clone().into();
-	let resource_id = RuntimeResourceID::from(pathed_id.get_id());
+	let runtime_id: RuntimeID = resource.clone().into();
+	let resource_id = RuntimeResourceID::from(runtime_id);
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
 			.latest_resources()
@@ -119,15 +119,15 @@ pub fn extract_latest_overview_info(
 
 /// Extract an entity by its factory and put it in the cache. Returns early if the entity is already cached.
 #[try_fn]
-#[context("Couldn't extract and cache entity {}", factory_id.clone().into().get_id())]
+#[context("Couldn't extract and cache entity {}", factory_id.clone().into())]
 pub fn extract_entity<'a>(
 	resource_packages: &PartitionManager,
 	cached_entities: &'a DashMap<RuntimeID, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
-	factory_id: &(impl Into<PathedID> + Clone)
+	factory_id: &(impl Into<RuntimeID> + Clone)
 ) -> Result<Ref<'a, RuntimeID, Entity>> {
-	let runtime_id = factory_id.clone().into().get_id();
+	let runtime_id = factory_id.clone().into();
 
 	{
 		if let Some(x) = cached_entities.get(&runtime_id) {
@@ -192,12 +192,12 @@ pub fn extract_entity<'a>(
 }
 
 /// Get the history of the file, a changelog of events within the partitions.
-#[context("Couldn't extract changelog for resource {}", resource.clone().into().get_id())]
+#[context("Couldn't extract changelog for resource {}", resource.clone().into())]
 pub fn extract_resource_changelog(
 	game_files: &PartitionManager,
-	resource: &(impl Into<PathedID> + Clone)
+	resource: &(impl Into<RuntimeID> + Clone)
 ) -> Result<Vec<ResourceChangelogEntry>> {
-	let resource_id = RuntimeResourceID::from(resource.clone().into().get_id());
+	let resource_id = RuntimeResourceID::from(resource.clone().into());
 
 	let mut events = vec![];
 

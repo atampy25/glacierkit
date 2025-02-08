@@ -624,7 +624,6 @@ pub fn get_line_decoration(
 			.first()
 			.context("No LOCR dependency on LINE")?
 			.resource
-			.clone()
 	)?;
 
 	let locr = {
@@ -1080,7 +1079,7 @@ pub fn get_decorations(
 		.map(|entry| entry.resource_type == "MATT")
 		.unwrap_or(false)
 	{
-		if let Some(mati) = extract_latest_metadata(game_files, &PathedID::from_str(&sub_entity.factory)?)?
+		if let Some(mati) = extract_latest_metadata(game_files, &RuntimeID::from_any(&sub_entity.factory)?)?
 			.core_info
 			.references
 			.into_iter()

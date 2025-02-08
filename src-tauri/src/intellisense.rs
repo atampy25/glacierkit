@@ -367,7 +367,6 @@ impl Intellisense {
 				})
 				.context("MATT has no MATB dependency")?
 				.resource
-				.clone()
 		)?;
 
 		self.matt_properties.insert(
@@ -453,7 +452,7 @@ impl Intellisense {
 						if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 							&& ty == "ASET"
 						{
-							extract_latest_metadata(game_files, &PathedID::from_str(&targeted.factory)?)?
+							extract_latest_metadata(game_files, &RuntimeID::from_any(&targeted.factory)?)?
 								.core_info
 								.references
 								.into_iter()
@@ -858,7 +857,7 @@ impl Intellisense {
 		for factory in if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 			&& ty == "ASET"
 		{
-			extract_latest_metadata(game_files, &PathedID::from_str(&targeted.factory)?)?
+			extract_latest_metadata(game_files, &RuntimeID::from_any(&targeted.factory)?)?
 				.core_info
 				.references
 				.into_iter()
