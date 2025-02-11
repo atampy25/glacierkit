@@ -4,7 +4,7 @@ use fn_error_context::context;
 use hitman_commons::{
 	game::GameVersion,
 	hash_list::HashList,
-	metadata::{ExtendedResourceMetadata, PathedID, ResourceType, RuntimeID},
+	metadata::{ExtendedResourceMetadata, ResourceType, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
 use itertools::Itertools;
@@ -50,12 +50,12 @@ pub fn extract_latest_resource(
 }
 
 /// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
-#[context("Couldn't extract metadata for resource {}", resource.clone().into().get_id())]
+#[context("Couldn't extract metadata for resource {}", resource.clone().into())]
 pub fn extract_latest_metadata(
 	game_files: &PartitionManager,
-	resource: &(impl Into<PathedID> + Clone)
+	resource: &(impl Into<RuntimeID> + Clone)
 ) -> Result<ExtendedResourceMetadata> {
-	let resource_id = RuntimeResourceID::from(resource.clone().into().get_id());
+	let resource_id = RuntimeResourceID::from(resource.clone().into());
 
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
@@ -71,12 +71,12 @@ pub fn extract_latest_metadata(
 }
 
 /// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource.
-#[context("Couldn't extract overview info for resource {}", &resource.clone().into().get_id())]
+#[context("Couldn't extract overview info for resource {}", &resource.clone().into())]
 pub fn extract_latest_overview_info(
 	game_files: &PartitionManager,
-	resource: &(impl Into<PathedID> + Clone)
+	resource: &(impl Into<RuntimeID> + Clone)
 ) -> Result<(ResourceType, String, Vec<(RuntimeID, String)>)> {
-	let resource_id = RuntimeResourceID::from(resource.clone().into().get_id());
+	let resource_id = RuntimeResourceID::from(resource.clone().into());
 
 	for partition in &game_files.partitions {
 		if let Some((info, patchlevel)) = partition
