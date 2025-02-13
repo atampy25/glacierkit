@@ -106,11 +106,20 @@ pub enum EditorData {
 	}
 }
 
-#[derive(Type, Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EphemeralQNSettings {
 	pub show_reverse_parent_refs: bool,
 	pub show_changes_from_original: bool
+}
+
+impl Default for EphemeralQNSettings {
+	fn default() -> Self {
+		Self {
+			show_reverse_parent_refs: false,
+			show_changes_from_original: false
+		}
+	}
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -120,10 +129,16 @@ pub struct Project {
 	pub settings: ArcSwap<ProjectSettings>
 }
 
-#[derive(Type, Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSettings {
 	pub custom_paths: Vec<String>
+}
+
+impl Default for ProjectSettings {
+	fn default() -> Self {
+		Self { custom_paths: vec![] }
+	}
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
