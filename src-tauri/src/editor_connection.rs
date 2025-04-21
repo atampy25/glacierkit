@@ -16,7 +16,7 @@ use quickentity_rs::{
 	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn,
 	qn_structs::{FullRef, Property, Ref}
 };
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, json, Value};
 use specta::Type;
@@ -616,9 +616,12 @@ impl EditorConnection {
 			});
 
 			write
-				.send(Message::Text(serde_json::to_string(&SDKEditorRequest::Hello {
-					identifier: "GlacierKit".into()
-				})?))
+				.send(Message::Text(
+					serde_json::to_string(&SDKEditorRequest::Hello {
+						identifier: "GlacierKit".into()
+					})?
+					.into()
+				))
 				.await?;
 
 			*sender_guard = Some(write);
@@ -690,9 +693,9 @@ impl EditorConnection {
 				.await
 				.as_mut()
 				.context("Not connected")?
-				.send(Message::Text(serde_json::to_string(
-					&SDKEditorRequest::RebuildEntityTree { msgId: None }
-				)?))
+				.send(Message::Text(
+					serde_json::to_string(&SDKEditorRequest::RebuildEntityTree { msgId: None })?.into()
+				))
 				.await?;
 
 			self.wait_for_event(|evt| matches!(evt, SDKEditorEvent::EntityTreeRebuilt))
@@ -704,7 +707,7 @@ impl EditorConnection {
 			.await
 			.as_mut()
 			.context("Not connected")?
-			.send(Message::Text(serde_json::to_string(&request)?))
+			.send(Message::Text(serde_json::to_string(&request)?.into()))
 			.await?;
 	}
 
@@ -735,7 +738,7 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't get player transform")]
 	pub async fn get_player_transform(&self) -> Result<QNTransform> {
-		let msg_id: i64 = thread_rng().gen();
+		let msg_id: i64 = rng().random();
 		self.send_request(SDKEditorRequest::GetHitmanEntity { msgId: Some(msg_id) })
 			.await?;
 
@@ -774,7 +777,7 @@ impl EditorConnection {
 	#[try_fn]
 	#[context("Couldn't get camera transform")]
 	pub async fn get_camera_transform(&self) -> Result<QNTransform> {
-		let msg_id: i64 = thread_rng().gen();
+		let msg_id: i64 = rng().random();
 		self.send_request(SDKEditorRequest::GetCameraEntity { msgId: Some(msg_id) })
 			.await?;
 

@@ -3,7 +3,8 @@ use std::{fs, ops::Deref, time::Duration};
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
-use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::metadata::RuntimeID;
+use hitman_commons::{game::GameVersion, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -348,7 +349,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						.references
 						.get(factory.blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
-						.resource;
+						.resource
+						.get_id();
 
 					let (tblu_meta, tblu_data) = extract_latest_resource(game_files, blueprint_hash)?;
 
@@ -641,7 +643,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					if let Some(game_files) = app_state.game_files.load().as_ref() {
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-								&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
+								&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 							)?)?
 							.into_iter()
 							.map(|x| {
@@ -733,7 +735,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				if let Some(game_files) = app_state.game_files.load().as_ref() {
 					let mut current = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&extract_latest_resource(game_files, "0057C2C3941115CA".parse()?)?.1
+							&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -903,10 +905,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 														.unwrap();
 
 													(
-														partition.partition_info().id().to_string(),
+														partition.partition_info().id.to_string(),
 														partition
 															.partition_info()
-															.name()
+															.name
 															.to_owned()
 															.unwrap_or("<unnamed>".into())
 													)
@@ -951,10 +953,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 														.unwrap();
 
 													(
-														partition.partition_info().id().to_string(),
+														partition.partition_info().id.to_string(),
 														partition
 															.partition_info()
-															.name()
+															.name
 															.to_owned()
 															.unwrap_or("<unnamed>".into())
 													)

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use hitman_commons::{
 	game::GameVersion,
 	hash_list::HashList,
-	metadata::{ReferenceType, ResourceType, RuntimeID},
+	metadata::{PathedID, ReferenceType, ResourceType, RuntimeID},
 	resourcelib::PropertyID
 };
 use hitman_formats::material::{MaterialEntity, MaterialOverride};
@@ -128,10 +128,10 @@ impl Intellisense {
 										if reference.flags.reference_type == ReferenceType::Install
 											&& !reference.flags.acquired
 										{
-											json!(hash_list.to_path(&reference.resource))
+											json!(hash_list.to_path(&reference.resource.get_id()))
 										} else {
 											json!({
-												"resource": hash_list.to_path(&reference.resource),
+												"resource": hash_list.to_path(&reference.resource.get_id()),
 												"flag": format!("{:02X}", reference.flags.as_modern())
 											})
 										}
@@ -361,12 +361,13 @@ impl Intellisense {
 				.find(|x| {
 					hash_list
 						.entries
-						.get(&x.resource)
+						.get(&x.resource.get_id())
 						.map(|entry| entry.resource_type == "MATB")
 						.unwrap_or(false)
 				})
 				.context("MATT has no MATB dependency")?
 				.resource
+				.get_id()
 		)?;
 
 		self.matt_properties.insert(
@@ -462,7 +463,7 @@ impl Intellisense {
 								.map(|x| x.resource)
 								.collect_vec()
 						} else {
-							vec![RuntimeID::from_any(&targeted.factory)?]
+							vec![PathedID::from_str(&targeted.factory)?]
 						}
 					}
 					.into_par_iter()
@@ -470,12 +471,15 @@ impl Intellisense {
 						Ok({
 							let mut found = vec![];
 
-							if let Some(ty) = self.file_types.get(&factory) {
+							if let Some(ty) = self.file_types.get(&factory.get_id()) {
 								match ty.as_ref() {
 									"CPPT" => {
-										for (prop_name, (prop_type, default_val)) in
-											self.get_cppt_properties(game_files, hash_list, game_version, factory)?
-										{
+										for (prop_name, (prop_type, default_val)) in self.get_cppt_properties(
+											game_files,
+											hash_list,
+											game_version,
+											factory.get_id()
+										)? {
 											found.push((prop_name, prop_type, default_val, false));
 										}
 									}
@@ -501,12 +505,13 @@ impl Intellisense {
 													.find(|x| {
 														hash_list
 															.entries
-															.get(&x.resource)
+															.get(&x.resource.get_id())
 															.map(|entry| entry.resource_type == "UICB")
 															.unwrap_or(false)
 													})
 													.context("No blueprint dependency on UICT")?
 													.resource
+													.get_id()
 											)?
 											.1
 										)?
@@ -548,7 +553,7 @@ impl Intellisense {
 										}
 
 										for (property_name, property_data) in
-											self.get_matt_properties(game_files, hash_list, factory)?
+											self.get_matt_properties(game_files, hash_list, factory.get_id())?
 										{
 											match property_data {
 												MaterialOverride::Texture(texture) => {
@@ -685,12 +690,13 @@ impl Intellisense {
 												.find(|x| {
 													hash_list
 														.entries
-														.get(&x.resource)
+														.get(&x.resource.get_id())
 														.map(|entry| entry.resource_type == "ECPB")
 														.unwrap_or(false)
 												})
 												.context("No blueprint dependency on ECPT")?
 												.resource
+												.get_id()
 										)?
 										.1;
 
@@ -864,13 +870,13 @@ impl Intellisense {
 				.map(|x| x.resource)
 				.collect_vec()
 		} else {
-			vec![RuntimeID::from_any(&targeted.factory)?]
+			vec![PathedID::from_str(&targeted.factory)?]
 		} {
-			if let Some(ty) = self.file_types.get(&factory) {
+			if let Some(ty) = self.file_types.get(&factory.get_id()) {
 				match ty.as_ref() {
 					"CPPT" => {
 						for (prop_name, (prop_type, default_val)) in
-							self.get_cppt_properties(game_files, hash_list, game_version, factory)?
+							self.get_cppt_properties(game_files, hash_list, game_version, factory.get_id())?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((prop_type, default_val, false)));
@@ -898,12 +904,13 @@ impl Intellisense {
 									.find(|x| {
 										hash_list
 											.entries
-											.get(&x.resource)
+											.get(&x.resource.get_id())
 											.map(|entry| entry.resource_type == "UICB")
 											.unwrap_or(false)
 									})
 									.context("No blueprint dependency on UICT")?
 									.resource
+									.get_id()
 							)?
 							.1
 						)?
@@ -943,7 +950,7 @@ impl Intellisense {
 						}
 
 						for (property_name, property_data) in
-							self.get_matt_properties(game_files, hash_list, factory)?
+							self.get_matt_properties(game_files, hash_list, factory.into())?
 						{
 							match property_data {
 								MaterialOverride::Texture(texture) => {
@@ -1075,12 +1082,13 @@ impl Intellisense {
 								.find(|x| {
 									hash_list
 										.entries
-										.get(&x.resource)
+										.get(&x.resource.get_id())
 										.map(|entry| entry.resource_type == "ECPB")
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on ECPT")?
 								.resource
+								.get_id()
 						)?
 						.1;
 
@@ -1276,7 +1284,7 @@ impl Intellisense {
 					.map(|x| x.resource)
 					.collect_vec()
 			} else {
-				vec![RuntimeID::from_any(&targeted.factory)?]
+				vec![PathedID::from_str(&targeted.factory)?]
 			}
 		}
 		.into_par_iter()
@@ -1285,10 +1293,10 @@ impl Intellisense {
 				let mut input = vec![];
 				let mut output = vec![];
 
-				if let Some(ty) = self.file_types.get(&factory) {
+				if let Some(ty) = self.file_types.get(&factory.get_id()) {
 					match ty.as_ref() {
 						"CPPT" => {
-							let cppt_data = self.cppt_pins.get(&factory).context("No such CPPT in pins")?;
+							let cppt_data = self.cppt_pins.get(&factory.get_id()).context("No such CPPT in pins")?;
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 						}
@@ -1312,12 +1320,13 @@ impl Intellisense {
 										.find(|x| {
 											hash_list
 												.entries
-												.get(&x.resource)
+												.get(&x.resource.get_id())
 												.map(|entry| entry.resource_type == "UICB")
 												.unwrap_or(false)
 										})
 										.context("No blueprint dependency on UICT")?
 										.resource
+										.get_id()
 								)?
 								.1
 							)?
@@ -1344,7 +1353,7 @@ impl Intellisense {
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
 							for (property_name, property_data) in
-								self.get_matt_properties(game_files, hash_list, factory)?
+								self.get_matt_properties(game_files, hash_list, factory.into())?
 							{
 								if !matches!(property_data, MaterialOverride::Texture(_)) {
 									input.push(property_name);
@@ -1371,12 +1380,13 @@ impl Intellisense {
 								.find(|x| {
 									hash_list
 										.entries
-										.get(&x.resource)
+										.get(&x.resource.get_id())
 										.map(|entry| entry.resource_type == "DSWB" || entry.resource_type == "WSWB")
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on WSWT")?
-								.resource;
+								.resource
+								.get_id();
 
 							let dswb_data = match game_version {
 								GameVersion::H1 => {
@@ -1430,12 +1440,13 @@ impl Intellisense {
 								.find(|x| {
 									hash_list
 										.entries
-										.get(&x.resource)
+										.get(&x.resource.get_id())
 										.map(|entry| entry.resource_type == "WSGB")
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on WSWT")?
-								.resource;
+								.resource
+								.get_id();
 
 							let wsgb_data = match game_version {
 								GameVersion::H1 => {

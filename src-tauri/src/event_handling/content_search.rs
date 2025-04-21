@@ -56,7 +56,7 @@ pub fn start_content_search(
 		let resources = game_files
 			.partitions
 			.iter()
-			.filter(|x| partitions_to_search.contains(&x.partition_info().id().to_string()))
+			.filter(|x| partitions_to_search.contains(&x.partition_info().id.to_string()))
 			.collect_vec()
 			.into_par_iter()
 			.rev()
@@ -465,7 +465,7 @@ pub fn start_content_search(
 
 										let (locr_meta, locr_data) = extract_latest_resource(
 											game_files,
-											RuntimeID::from_str(&res_meta.hash_reference_data.first()?.hash).ok()?
+											RuntimeID::from_any(&res_meta.hash_reference_data.first()?.hash).ok()?
 										)
 										.ok()?;
 

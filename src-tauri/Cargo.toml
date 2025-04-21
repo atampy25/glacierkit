@@ -19,63 +19,63 @@ features = []
 [dependencies]
 structstruck = "0.4.1"
 tryvial = "0.2.0"
-anyhow = "1.0.79"
+anyhow = "1.0.95"
 fn-error-context = "0.2.1"
-tokio = "1.35.1"
+tokio = "1.43.0"
 walkdir = "2.4.0"
-registry = "1.2.3"
-keyvalues-serde = "0.2.1"
-itertools = "0.12.0"
-serde-smile = "0.2.0"
-brotli-decompressor = "2.5.1"
-reqwest = "0.11.23"
-trash = "3.1.2"
+registry = "1.3.0"
+keyvalues-serde = "0.2.2"
+itertools = "0.14.0"
+serde-smile = "0.2.2"
+brotli-decompressor = "4.0.2"
+reqwest = { version = "0.12.12", features = ["json"] }
+trash = "5.2.1"
 velcro = "0.5.4"
-indexmap = "2.1.0"
+indexmap = "2.7.1"
 arboard = "3.3.0"
-rand = "0.8.5"
-rpkg-rs = "1.1.0"
+rand = "0.9.0"
+rpkg-rs = "1.2.0"
 async-recursion = "1.0.5"
 parking_lot = "0.12.1"
-rayon = "1.8.0"
+rayon = "1.10.0"
 tauri-plugin-aptabase = "0.5.1"
-image = "0.25.1"
+image = "0.25.5"
 hex = "0.4.3"
-serde_with = "3.7.0"
-json-patch = "1.2.0"
-futures-util = "0.3.30"
+serde_with = "3.12.0"
+json-patch = "3.0.1"
+futures-util = "0.3.31"
 md5 = "0.7.0"
-measure_time = "0.8.2"
+measure_time = "0.9.0"
 regex = "1.10.4"
 hrtime = "0.2.0"
-async-trait = "0.1.80"
-tokio-tungstenite = "0.21.0"
+async-trait = "0.1.86"
+tokio-tungstenite = "0.26.1"
 serde_path_to_error = "0.1.16"
-debounced = "0.1.0"
-notify-debouncer-full = "0.3.1"
-tokio-stream = "0.1.15"
-log = "0.4.21"
+debounced = "0.2.0"
+notify-debouncer-full = "0.5.0"
+tokio-stream = "0.1.17"
+log = "0.4.25"
 biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
-os_info = "3.8.2"
-derivative = "2.2.0"
-home = "0.5.9"
+os_info = "3.9.2"
+derive_more = { version = "2.0.1", features = ["debug"] }
+home = "0.5.11"
 
 [dependencies.snmalloc-rs]
-version = "0.3.6"
+version = "0.3.7"
 features = ["lto"]
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"
-features = ["serde", "specta", "rpkg-rs", "tex-rs", "tonytools", "resourcelib", "hash_list", "game_detection"]
+features = ["serde", "specta", "rpkg-rs", "glacier-texture", "tonytools", "resourcelib", "hash_list", "game_detection"]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
 features = ["material", "ores", "wwev", "serde"]
 
 [dependencies.serde_json]
-version = "1.0.110"
+version = "1.0.138"
 features = ["preserve_order"]
 
 [dependencies.serde]
@@ -95,7 +95,7 @@ version = "=2.0.0-rc.4"
 features = ["typescript"]
 
 [dependencies.uuid]
-version = "1.6.1"
+version = "1.12.1"
 features = ["serde"]
 
 [dependencies.arc-swap]
@@ -103,7 +103,7 @@ version = "1.6.0"
 features = ["serde"]
 
 [dependencies.notify]
-version = "6.1.1"
+version = "8.0.0"
 default-features = false
 features = ["macos_fsevent"]
 
@@ -115,17 +115,17 @@ version = "1.1.3"
 features = ["serde"]
 
 [dependencies.dashmap]
-version = "5.5.3"
+version = "6.1.0"
 features = ["inline", "rayon"]
 
-[dependencies.tex-rs]
-git = "https://github.com/dafitius/GlacierFormats-rs"
+[dependencies.glacier-texture]
+version = "1.0.0"
 
 [dependencies.prim-rs]
 git = "https://github.com/dafitius/GlacierFormats-rs"
 
 [dependencies.hashbrown]
-version = "0.14.3"
+version = "0.14.5"
 features = ["rayon", "serde"]
 
 [dependencies.tonytools]
@@ -136,7 +136,7 @@ git = "https://github.com/tauri-apps/plugins-workspace"
 branch = "v1"
 
 [target."cfg(unix)".dependencies]
-fork = "0.1.22"
+fork = "0.2.0"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

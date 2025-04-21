@@ -3,6 +3,12 @@ use std::{fmt::Write, fs, io::Cursor, ops::Deref, sync::Arc};
 use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use glacier_texture::{
+	enums::{RenderFormat, TextureType},
+	mipblock::MipblockData,
+	texture_map::TextureMap
+};
+
 use hashbrown::HashMap;
 use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::{
@@ -21,7 +27,6 @@ use tauri::{
 	AppHandle, Manager, State
 };
 use tauri_plugin_aptabase::EventTracker;
-use tex_rs::texture_map::TextureMap;
 use tonytools::hmlanguages;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -111,7 +116,7 @@ pub fn initialise_resource_overview(
 						.collect()
 				})
 				.unwrap_or_default(),
-			changelog: extract_resource_changelog(game_files, hash)?,
+			changelog: extract_resource_changelog(game_files, hash),
 			data: match filetype.as_ref() {
 				"TEMP" => {
 					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
@@ -270,14 +275,14 @@ pub fn initialise_resource_overview(
 						.context("Couldn't process texture data")?;
 
 					if let Some(texd_depend) = res_meta.core_info.references.first() {
-						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
-
-						texture
-							.set_mipblock1_data(&texd_data, game_version.into())
+						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource.get_id())?;
+						let mipblock = MipblockData::from_memory(&texd_data, game_version.into())
 							.context("Couldn't process TEXD data")?;
+						texture.set_mipblock1(mipblock);
 					}
 
-					let tga_data = tex_rs::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
+					let tga_data =
+						glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
 
 					let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
 
@@ -290,28 +295,29 @@ pub fn initialise_resource_overview(
 					ResourceOverviewData::Image {
 						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
 						dds_data: Some((
-							match texture.get_header().type_ {
-								tex_rs::texture_map::TextureType::Colour => "Colour",
-								tex_rs::texture_map::TextureType::Normal => "Normal",
-								tex_rs::texture_map::TextureType::Height => "Height",
-								tex_rs::texture_map::TextureType::CompoundNormal => "Compound Normal",
-								tex_rs::texture_map::TextureType::Billboard => "Billboard",
-								tex_rs::texture_map::TextureType::Projection => "Projection",
-								tex_rs::texture_map::TextureType::Emission => "Emission",
-								tex_rs::texture_map::TextureType::UNKNOWN64 => "Unknown"
+							match texture.texture_type() {
+								TextureType::Colour => "Colour",
+								TextureType::Normal => "Normal",
+								TextureType::Height => "Height",
+								TextureType::CompoundNormal => "Compound Normal",
+								TextureType::Billboard => "Billboard",
+								TextureType::Projection => "Projection",
+								TextureType::Emission => "Emission",
+								TextureType::Cubemap => "Cubemap",
+								TextureType::UNKNOWN512 => "unknown"
 							}
 							.into(),
-							match texture.get_header().format {
-								tex_rs::texture_map::RenderFormat::R16G16B16A16 => "R16G16B16A16",
-								tex_rs::texture_map::RenderFormat::R8G8B8A8 => "R8G8B8A8",
-								tex_rs::texture_map::RenderFormat::R8G8 => "R8G8",
-								tex_rs::texture_map::RenderFormat::A8 => "A8",
-								tex_rs::texture_map::RenderFormat::DXT1 => "DXT1",
-								tex_rs::texture_map::RenderFormat::DXT3 => "DXT3",
-								tex_rs::texture_map::RenderFormat::DXT5 => "DXT5",
-								tex_rs::texture_map::RenderFormat::BC4 => "BC4",
-								tex_rs::texture_map::RenderFormat::BC5 => "BC5",
-								tex_rs::texture_map::RenderFormat::BC7 => "BC7"
+							match texture.format() {
+								RenderFormat::R16G16B16A16 => "R16G16B16A16",
+								RenderFormat::R8G8B8A8 => "R8G8B8A8",
+								RenderFormat::R8G8 => "R8G8",
+								RenderFormat::A8 => "A8",
+								RenderFormat::BC1 => "BC1",
+								RenderFormat::BC2 => "BC2",
+								RenderFormat::BC3 => "BC3",
+								RenderFormat::BC4 => "BC4",
+								RenderFormat::BC5 => "BC5",
+								RenderFormat::BC7 => "BC7"
 							}
 							.into()
 						))
@@ -365,7 +371,8 @@ pub fn initialise_resource_overview(
 									.references
 									.get(object.dependency_index as usize)
 									.context("No such WWEM dependency")?
-									.resource;
+									.resource
+									.get_id();
 
 								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
@@ -656,6 +663,7 @@ pub fn initialise_resource_overview(
 								.first()
 								.context("No LOCR dependency on LINE")?
 								.resource
+								.get_id()
 						)?;
 
 						let locr = {
@@ -769,6 +777,7 @@ pub fn initialise_resource_overview(
 								.get(1)
 								.context("No MATB dependency")?
 								.resource
+								.get_id()
 						)?;
 
 						let material =
@@ -1339,7 +1348,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.to_str()
 									.context("Filename was invalid string")?
 									.split('.')
-									.last()
+									.next_back()
 									.unwrap_or("None")
 						}))
 					);
@@ -1384,11 +1393,15 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
-								let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
+								let (_, texd_data) =
+									extract_latest_resource(game_files, texd_depend.resource.get_id())?;
 
-								texture
-									.set_mipblock1_data(&texd_data, get_loaded_game_version(app, install)?.into())
-									.context("Couldn't process TEXD data")?;
+								let mip_block = MipblockData::from_memory(
+									&texd_data,
+									get_loaded_game_version(app, install)?.into()
+								)
+								.context("Couldn't process TEXD data")?;
+								texture.set_mipblock1(mip_block);
 							}
 
 							if path
@@ -1398,13 +1411,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								.context("Filename was invalid string")?
 								.ends_with(".dds")
 							{
-								let dds_data =
-									tex_rs::convert::create_dds(&texture).context("Couldn't convert texture to DDS")?;
+								let dds_data = glacier_texture::convert::create_dds(&texture)
+									.context("Couldn't convert texture to DDS")?;
 
 								fs::write(path, dds_data)?;
 							} else {
-								let tga_data =
-									tex_rs::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
+								let tga_data = glacier_texture::convert::create_tga(&texture)
+									.context("Couldn't convert texture to TGA")?;
 
 								let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
 
@@ -1535,7 +1548,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.references
 									.get(object.dependency_index as usize)
 									.context("No such WWEM dependency")?
-									.resource;
+									.resource
+									.get_id();
 
 								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
@@ -1624,7 +1638,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 										.dependency_index as usize
 								)
 								.context("No such WWEM dependency")?
-								.resource;
+								.resource
+								.get_id();
 
 							let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
