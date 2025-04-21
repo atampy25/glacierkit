@@ -1,7 +1,6 @@
 use std::{
 	fs,
-	path::{Path, PathBuf},
-	str::FromStr
+	path::{Path, PathBuf}
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -9,11 +8,7 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
-use hitman_commons::{
-	game::GameVersion,
-	hash_list::HashList,
-	metadata::{PathedID, RuntimeID}
-};
+use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -145,7 +140,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
 						hash_list,
-						&PathedID::from_str(&patch.factory_hash)?
+						RuntimeID::from_any(&patch.factory_hash)?
 					)?
 					.to_owned();
 
@@ -362,7 +357,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				if let Some(game_files) = app_state.game_files.load().as_ref() {
 					let mut unlockables = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&extract_latest_resource(game_files, &"0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+							&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -385,7 +380,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					)?;
 
 					let base = from_str::<Value>(&parse_json_ores(
-						&extract_latest_resource(game_files, &"0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+						&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 					)?)?;
 
 					let patch: Value =
@@ -543,7 +538,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						if let Some(game_files) = app_state.game_files.load().as_ref() {
 							let mut unlockables = to_value(
 								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-									&extract_latest_resource(game_files, &"0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+									&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 								)?)?
 								.into_iter()
 								.map(|x| {
@@ -566,7 +561,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							)?;
 
 							let base = from_str::<Value>(&parse_json_ores(
-								&extract_latest_resource(game_files, &"0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+								&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 							)?)?;
 
 							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
@@ -1012,7 +1007,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		app_state.repository.store(Some(
 			from_slice::<Vec<RepositoryItem>>(
-				&extract_latest_resource(game_files, &"00204D1AFD76AB13".parse::<RuntimeID>()?)?.1
+				&extract_latest_resource(game_files, "00204D1AFD76AB13".parse::<RuntimeID>()?)?.1
 			)?
 			.into()
 		));
@@ -1077,7 +1072,7 @@ pub async fn open_in_editor(
 				&app_state.cached_entities,
 				get_loaded_game_version(app, install)?,
 				hash_list,
-				&hash
+				hash
 			)?
 			.to_owned();
 
@@ -1142,7 +1137,7 @@ pub async fn open_in_editor(
 			let repository: Vec<RepositoryItem> = if let Some(x) = app_state.repository.load().as_ref() {
 				x.par_iter().cloned().collect()
 			} else {
-				from_slice(&extract_latest_resource(game_files, &"00204D1AFD76AB13".parse::<RuntimeID>()?)?.1)?
+				from_slice(&extract_latest_resource(game_files, "00204D1AFD76AB13".parse::<RuntimeID>()?)?.1)?
 			};
 
 			app_state.editor_states.insert(
@@ -1177,7 +1172,7 @@ pub async fn open_in_editor(
 			let id = Uuid::new_v4();
 
 			let unlockables: Vec<UnlockableItem> = from_str(&parse_json_ores(
-				&extract_latest_resource(game_files, &"0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+				&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 			)?)?;
 
 			app_state.editor_states.insert(

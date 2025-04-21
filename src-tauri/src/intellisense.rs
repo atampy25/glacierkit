@@ -81,7 +81,7 @@ impl Intellisense {
 			}
 		}
 
-		let extracted = extract_latest_resource(game_files, &cppt)?;
+		let extracted = extract_latest_resource(game_files, cppt)?;
 
 		let cppt_data = match game_version {
 			GameVersion::H1 => h2016_convert_cppt(&extracted.1)?,
@@ -350,11 +350,11 @@ impl Intellisense {
 			}
 		}
 
-		let (matt_meta, matt_data) = extract_latest_resource(game_files, &matt)?;
+		let (matt_meta, matt_data) = extract_latest_resource(game_files, matt)?;
 
 		let (matb_meta, matb_data) = extract_latest_resource(
 			game_files,
-			&matt_meta
+			matt_meta
 				.core_info
 				.references
 				.iter()
@@ -367,6 +367,7 @@ impl Intellisense {
 				})
 				.context("MATT has no MATB dependency")?
 				.resource
+				.get_id()
 		)?;
 
 		self.matt_properties.insert(
@@ -452,7 +453,7 @@ impl Intellisense {
 						if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 							&& ty == "ASET"
 						{
-							extract_latest_metadata(game_files, &RuntimeID::from_any(&targeted.factory)?)?
+							extract_latest_metadata(game_files, RuntimeID::from_any(&targeted.factory)?)?
 								.core_info
 								.references
 								.into_iter()
@@ -497,7 +498,7 @@ impl Intellisense {
 										for entry in convert_uicb(
 											&extract_latest_resource(
 												game_files,
-												&extract_latest_metadata(game_files, &factory)?
+												extract_latest_metadata(game_files, factory)?
 													.core_info
 													.references
 													.into_iter()
@@ -510,6 +511,7 @@ impl Intellisense {
 													})
 													.context("No blueprint dependency on UICT")?
 													.resource
+													.get_id()
 											)?
 											.1
 										)?
@@ -681,7 +683,7 @@ impl Intellisense {
 
 										let ecpb_data = extract_latest_resource(
 											game_files,
-											&extract_latest_metadata(game_files, &factory)?
+											extract_latest_metadata(game_files, factory)?
 												.core_info
 												.references
 												.into_iter()
@@ -694,6 +696,7 @@ impl Intellisense {
 												})
 												.context("No blueprint dependency on ECPT")?
 												.resource
+												.get_id()
 										)?
 										.1;
 
@@ -762,7 +765,7 @@ impl Intellisense {
 											cached_entities,
 											game_version,
 											hash_list,
-											&factory
+											factory
 										)?;
 
 										found.extend(self.get_properties(
@@ -857,7 +860,7 @@ impl Intellisense {
 		for factory in if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 			&& ty == "ASET"
 		{
-			extract_latest_metadata(game_files, &RuntimeID::from_any(&targeted.factory)?)?
+			extract_latest_metadata(game_files, RuntimeID::from_any(&targeted.factory)?)?
 				.core_info
 				.references
 				.into_iter()
@@ -894,7 +897,7 @@ impl Intellisense {
 						for entry in convert_uicb(
 							&extract_latest_resource(
 								game_files,
-								&extract_latest_metadata(game_files, &factory)?
+								extract_latest_metadata(game_files, factory)?
 									.core_info
 									.references
 									.into_iter()
@@ -907,6 +910,7 @@ impl Intellisense {
 									})
 									.context("No blueprint dependency on UICT")?
 									.resource
+									.get_id()
 							)?
 							.1
 						)?
@@ -1071,7 +1075,7 @@ impl Intellisense {
 
 						let ecpb_data = extract_latest_resource(
 							game_files,
-							&extract_latest_metadata(game_files, &factory)?
+							extract_latest_metadata(game_files, factory)?
 								.core_info
 								.references
 								.into_iter()
@@ -1084,6 +1088,7 @@ impl Intellisense {
 								})
 								.context("No blueprint dependency on ECPT")?
 								.resource
+								.get_id()
 						)?
 						.1;
 
@@ -1146,7 +1151,7 @@ impl Intellisense {
 					}
 
 					"TEMP" => {
-						let extracted = extract_entity(game_files, cached_entities, game_version, hash_list, &factory)?;
+						let extracted = extract_entity(game_files, cached_entities, game_version, hash_list, factory)?;
 
 						if let Some(data) = self.get_specific_property(
 							game_files,
@@ -1269,7 +1274,7 @@ impl Intellisense {
 			if let Some(ty) = self.file_types.get(&RuntimeID::from_any(&targeted.factory)?)
 				&& ty == "ASET"
 			{
-				extract_latest_metadata(game_files, &PathedID::from_str(&targeted.factory)?)?
+				extract_latest_metadata(game_files, RuntimeID::from_any(&targeted.factory)?)?
 					.core_info
 					.references
 					.into_iter()
@@ -1308,7 +1313,7 @@ impl Intellisense {
 							for entry in convert_uicb(
 								&extract_latest_resource(
 									game_files,
-									&extract_latest_metadata(game_files, &factory)?
+									extract_latest_metadata(game_files, factory)?
 										.core_info
 										.references
 										.into_iter()
@@ -1321,6 +1326,7 @@ impl Intellisense {
 										})
 										.context("No blueprint dependency on UICT")?
 										.resource
+										.get_id()
 								)?
 								.1
 							)?
@@ -1365,7 +1371,7 @@ impl Intellisense {
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-							let wswt_meta = extract_latest_metadata(game_files, &factory)?;
+							let wswt_meta = extract_latest_metadata(game_files, factory)?;
 
 							let dswb_hash = wswt_meta
 								.core_info
@@ -1379,16 +1385,15 @@ impl Intellisense {
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on WSWT")?
-								.resource;
+								.resource
+								.get_id();
 
 							let dswb_data = match game_version {
 								GameVersion::H1 => {
-									h2016_convert_dswb(&extract_latest_resource(game_files, &dswb_hash)?.1)?
+									h2016_convert_dswb(&extract_latest_resource(game_files, dswb_hash)?.1)?
 								}
-								GameVersion::H2 => {
-									h2_convert_dswb(&extract_latest_resource(game_files, &dswb_hash)?.1)?
-								}
-								GameVersion::H3 => h3_convert_dswb(&extract_latest_resource(game_files, &dswb_hash)?.1)?
+								GameVersion::H2 => h2_convert_dswb(&extract_latest_resource(game_files, dswb_hash)?.1)?,
+								GameVersion::H3 => h3_convert_dswb(&extract_latest_resource(game_files, dswb_hash)?.1)?
 							};
 
 							input.extend(dswb_data.m_aSwitches);
@@ -1426,7 +1431,7 @@ impl Intellisense {
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
 
-							let wsgt_meta = extract_latest_metadata(game_files, &factory)?;
+							let wsgt_meta = extract_latest_metadata(game_files, factory)?;
 
 							let wsgb_hash = wsgt_meta
 								.core_info
@@ -1440,16 +1445,15 @@ impl Intellisense {
 										.unwrap_or(false)
 								})
 								.context("No blueprint dependency on WSWT")?
-								.resource;
+								.resource
+								.get_id();
 
 							let wsgb_data = match game_version {
 								GameVersion::H1 => {
-									h2016_convert_wsgb(&extract_latest_resource(game_files, &wsgb_hash)?.1)?
+									h2016_convert_wsgb(&extract_latest_resource(game_files, wsgb_hash)?.1)?
 								}
-								GameVersion::H2 => {
-									h2_convert_wsgb(&extract_latest_resource(game_files, &wsgb_hash)?.1)?
-								}
-								GameVersion::H3 => h3_convert_wsgb(&extract_latest_resource(game_files, &wsgb_hash)?.1)?
+								GameVersion::H2 => h2_convert_wsgb(&extract_latest_resource(game_files, wsgb_hash)?.1)?,
+								GameVersion::H3 => h3_convert_wsgb(&extract_latest_resource(game_files, wsgb_hash)?.1)?
 							};
 
 							input.extend(wsgb_data.m_aSwitches);
@@ -1457,7 +1461,7 @@ impl Intellisense {
 
 						"TEMP" => {
 							let extracted =
-								extract_entity(game_files, cached_entities, game_version, hash_list, &factory)?;
+								extract_entity(game_files, cached_entities, game_version, hash_list, factory)?;
 
 							let found = self.get_pins(
 								game_files,

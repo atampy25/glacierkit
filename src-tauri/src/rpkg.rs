@@ -1,6 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
 use dashmap::{mapref::one::Ref, DashMap};
-use fn_error_context::context;
 use hitman_commons::{
 	game::GameVersion,
 	hash_list::HashList,
@@ -24,12 +23,12 @@ use crate::{
 };
 
 /// Extract the latest copy of a resource.
-#[context("Couldn't extract resource {}", resource.clone().into())]
 pub fn extract_latest_resource(
 	game_files: &PartitionManager,
-	resource: &(impl Into<RuntimeID> + Clone)
+	resource: impl Into<RuntimeID>
 ) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
-	let runtime_id: RuntimeID = resource.clone().into();
+	let runtime_id: RuntimeID = resource.into();
+
 	let resource_id = RuntimeResourceID::from(runtime_id);
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
@@ -38,24 +37,24 @@ pub fn extract_latest_resource(
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
 			return Ok((
-				info.try_into()?,
+				info.try_into()
+					.with_context(|| format!("Couldn't extract resource {runtime_id}"))?,
 				partition
 					.read_resource(&resource_id)
-					.context("Couldn't extract resource using rpkg-rs")?
+					.with_context(|| format!("Couldn't extract {runtime_id} using rpkg-rs"))?
 			));
 		}
 	}
 
-	bail!("Couldn't find the resource in any partition");
+	bail!("Couldn't find {runtime_id} in any partition when extracting resource");
 }
 
 /// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
-#[context("Couldn't extract metadata for resource {}", resource.clone().into())]
 pub fn extract_latest_metadata(
 	game_files: &PartitionManager,
-	resource: &(impl Into<RuntimeID> + Clone)
+	resource: impl Into<RuntimeID>
 ) -> Result<ExtendedResourceMetadata> {
-	let resource_id = RuntimeResourceID::from(resource.clone().into());
+	let resource_id = RuntimeResourceID::from(resource.into());
 
 	for partition in &game_files.partitions {
 		if let Some((info, _)) = partition
@@ -63,20 +62,21 @@ pub fn extract_latest_metadata(
 			.into_iter()
 			.find(|(x, _)| *x.rrid() == resource_id)
 		{
-			return Ok(info.try_into()?);
+			return info
+				.try_into()
+				.with_context(|| format!("Couldn't extract metadata for resource {resource_id}"));
 		}
 	}
 
-	bail!("Couldn't find the resource in any partition");
+	bail!("Couldn't find {resource_id} in any partition when extracting metadata");
 }
 
 /// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource.
-#[context("Couldn't extract overview info for resource {}", &resource.clone().into())]
 pub fn extract_latest_overview_info(
 	game_files: &PartitionManager,
-	resource: &(impl Into<RuntimeID> + Clone)
+	resource: impl Into<RuntimeID>
 ) -> Result<(ResourceType, String, Vec<(RuntimeID, String)>)> {
-	let resource_id = RuntimeResourceID::from(resource.clone().into());
+	let resource_id = RuntimeResourceID::from(resource.into());
 
 	for partition in &game_files.partitions {
 		if let Some((info, patchlevel)) = partition
@@ -90,7 +90,9 @@ pub fn extract_latest_overview_info(
 			};
 
 			return Ok((
-				info.data_type().try_into()?,
+				info.data_type()
+					.try_into()
+					.with_context(|| format!("Couldn't extract overview info for resource {resource_id}"))?,
 				match &partition.partition_info().name {
 					Some(name) => format!("{} ({})", name, package_name),
 					None => package_name
@@ -109,25 +111,25 @@ pub fn extract_latest_overview_info(
 							)
 						))
 					})
-					.collect::<Result<_>>()?
+					.collect::<Result<_>>()
+					.with_context(|| format!("Couldn't extract overview info for resource {resource_id}"))?
 			));
 		}
 	}
 
-	bail!("Couldn't find the resource in any RPKG");
+	bail!("Couldn't find {resource_id} in any RPKG when extracting overview info");
 }
 
 /// Extract an entity by its factory and put it in the cache. Returns early if the entity is already cached.
 #[try_fn]
-#[context("Couldn't extract and cache entity {}", factory_id.clone().into())]
 pub fn extract_entity<'a>(
 	resource_packages: &PartitionManager,
 	cached_entities: &'a DashMap<RuntimeID, Entity>,
 	game_version: GameVersion,
 	hash_list: &HashList,
-	factory_id: &(impl Into<RuntimeID> + Clone)
+	factory_id: impl Into<RuntimeID>
 ) -> Result<Ref<'a, RuntimeID, Entity>> {
-	let runtime_id = factory_id.clone().into();
+	let runtime_id = factory_id.into();
 
 	{
 		if let Some(x) = cached_entities.get(&runtime_id) {
@@ -135,15 +137,15 @@ pub fn extract_entity<'a>(
 		}
 	}
 
-	let (temp_meta, temp_data) =
-		extract_latest_resource(resource_packages, factory_id).context("Couldn't extract TEMP")?;
+	let x: Result<_> = try {
+		let (temp_meta, temp_data) =
+			extract_latest_resource(resource_packages, runtime_id).context("Couldn't extract TEMP")?;
 
-	if temp_meta.core_info.resource_type != "TEMP" {
-		bail!("Given factory was not a TEMP");
-	}
+		if temp_meta.core_info.resource_type != "TEMP" {
+			bail!("Given factory was not a TEMP");
+		}
 
-	let factory =
-		match game_version {
+		let factory = match game_version {
 			GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
 				.context("Couldn't convert binary data to ResourceLib factory")?
 				.into_modern(),
@@ -155,49 +157,51 @@ pub fn extract_entity<'a>(
 				.context("Couldn't convert binary data to ResourceLib factory")?
 		};
 
-	let blueprint_id = &temp_meta
-		.core_info
-		.references
-		.get(factory.blueprint_index_in_resource_header as usize)
-		.context("Blueprint referenced in factory does not exist in dependencies")?
-		.resource;
+		let blueprint_id = &temp_meta
+			.core_info
+			.references
+			.get(factory.blueprint_index_in_resource_header as usize)
+			.context("Blueprint referenced in factory does not exist in dependencies")?
+			.resource;
 
-	let (tblu_meta, tblu_data) =
-		extract_latest_resource(resource_packages, blueprint_id).context("Couldn't extract TBLU")?;
+		let (tblu_meta, tblu_data) =
+			extract_latest_resource(resource_packages, blueprint_id.get_id()).context("Couldn't extract TBLU")?;
 
-	let blueprint = match game_version {
-		GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)
-			.context("Couldn't convert binary data to ResourceLib blueprint")?
-			.into_modern(),
+		let blueprint = match game_version {
+			GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)
+				.context("Couldn't convert binary data to ResourceLib blueprint")?
+				.into_modern(),
 
-		GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
-			.context("Couldn't convert binary data to ResourceLib blueprint")?,
+			GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
+				.context("Couldn't convert binary data to ResourceLib blueprint")?,
 
-		GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data)
-			.context("Couldn't convert binary data to ResourceLib blueprint")?
+			GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data)
+				.context("Couldn't convert binary data to ResourceLib blueprint")?
+		};
+
+		let entity = convert_to_qn(
+			&factory,
+			&RpkgResourceMeta::from_resource_metadata(temp_meta, false).with_hash_list(&hash_list.entries)?,
+			&blueprint,
+			&RpkgResourceMeta::from_resource_metadata(tblu_meta, false).with_hash_list(&hash_list.entries)?,
+			false
+		)
+		.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+		cached_entities.insert(runtime_id, entity.to_owned());
 	};
 
-	let entity = convert_to_qn(
-		&factory,
-		&RpkgResourceMeta::from_resource_metadata(temp_meta, false).with_hash_list(&hash_list.entries)?,
-		&blueprint,
-		&RpkgResourceMeta::from_resource_metadata(tblu_meta, false).with_hash_list(&hash_list.entries)?,
-		false
-	)
-	.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-
-	cached_entities.insert(runtime_id, entity.to_owned());
+	x.with_context(|| format!("Couldn't extract and cache entity {runtime_id}"))?;
 
 	cached_entities.get(&runtime_id).expect("We just added it")
 }
 
-/// Get the history of the file, a changelog of events within the partitions.
-#[context("Couldn't extract changelog for resource {}", resource.clone().into())]
+/// Get the history of the file, a changelog of events within the partitions. Will return an empty vector if the resource is not found in any partition.
 pub fn extract_resource_changelog(
 	game_files: &PartitionManager,
-	resource: &(impl Into<RuntimeID> + Clone)
-) -> Result<Vec<ResourceChangelogEntry>> {
-	let resource_id = RuntimeResourceID::from(resource.clone().into());
+	resource: impl Into<RuntimeID>
+) -> Vec<ResourceChangelogEntry> {
+	let resource_id = RuntimeResourceID::from(resource.into());
 
 	let mut events = vec![];
 
@@ -237,9 +241,12 @@ pub fn extract_resource_changelog(
 							},
 							None => (ResourceChangelogOperation::Init, "Added resource to partition".into())
 						};
+
 						last_occurence = Some(info);
+
 						Some(op_desc)
 					}
+
 					Err(_) => None
 				},
 
@@ -252,7 +259,7 @@ pub fn extract_resource_changelog(
 		}
 	}
 
-	Ok(events
+	events
 		.into_iter()
 		.sorted_by(|(op1, _, patch1, _), (op2, _, patch2, _)| patch1.cmp(patch2).then(op1.cmp(op2)))
 		.map(|(operation, partition, patch, description)| ResourceChangelogEntry {
@@ -266,5 +273,5 @@ pub fn extract_resource_changelog(
 			},
 			description
 		})
-		.collect::<Vec<_>>())
+		.collect::<Vec<_>>()
 }

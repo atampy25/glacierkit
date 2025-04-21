@@ -7,7 +7,7 @@ use fn_error_context::context;
 use hashbrown::HashMap;
 use hitman_commons::game::GameVersion;
 use hitman_commons::hash_list::HashList;
-use hitman_commons::metadata::{PathedID, ResourceType, RuntimeID};
+use hitman_commons::metadata::{ResourceType, RuntimeID};
 use hitman_commons::rpkg_tool::RpkgResourceMeta;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -592,7 +592,7 @@ pub fn get_ref_decoration(
 					cached_entities,
 					game_version,
 					hash_list,
-					&PathedID::from_str(reference.external_scene.as_ref().expect("Not a local reference")).ok()?
+					RuntimeID::from_any(reference.external_scene.as_ref().expect("Not a local reference")).ok()?
 				)
 				.ok()?
 				.entities
@@ -614,16 +614,17 @@ pub fn get_line_decoration(
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	line: RuntimeID
 ) -> Result<Option<String>> {
-	let (res_meta, res_data) = extract_latest_resource(game_files, &line)?;
+	let (res_meta, res_data) = extract_latest_resource(game_files, line)?;
 
 	let (locr_meta, locr_data) = extract_latest_resource(
 		game_files,
-		&res_meta
+		res_meta
 			.core_info
 			.references
 			.first()
 			.context("No LOCR dependency on LINE")?
 			.resource
+			.get_id()
 	)?;
 
 	let locr = {
@@ -1079,7 +1080,7 @@ pub fn get_decorations(
 		.map(|entry| entry.resource_type == "MATT")
 		.unwrap_or(false)
 	{
-		if let Some(mati) = extract_latest_metadata(game_files, &RuntimeID::from_any(&sub_entity.factory)?)?
+		if let Some(mati) = extract_latest_metadata(game_files, RuntimeID::from_any(&sub_entity.factory)?)?
 			.core_info
 			.references
 			.into_iter()
@@ -1090,7 +1091,7 @@ pub fn get_decorations(
 					.map(|entry| entry.resource_type == "MATI")
 					.unwrap_or(false)
 			}) {
-			if let Some(mate) = extract_latest_metadata(game_files, &mati.resource)?
+			if let Some(mate) = extract_latest_metadata(game_files, mati.resource.get_id())?
 				.core_info
 				.references
 				.into_iter()
@@ -1101,7 +1102,7 @@ pub fn get_decorations(
 						.map(|entry| entry.resource_type == "MATE")
 						.unwrap_or(false)
 				}) {
-				let mate_data = extract_latest_resource(game_files, &mate.resource)?.1;
+				let mate_data = extract_latest_resource(game_files, mate.resource.get_id())?.1;
 
 				let mut beginning = mate_data.len() - 1;
 				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {

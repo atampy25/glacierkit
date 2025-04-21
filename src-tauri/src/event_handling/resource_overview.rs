@@ -1,4 +1,4 @@
-use std::{fmt::Write, fs, io::Cursor, ops::Deref, str::FromStr, sync::Arc};
+use std::{fmt::Write, fs, io::Cursor, ops::Deref, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use arc_swap::ArcSwap;
@@ -10,12 +10,7 @@ use glacier_texture::{
 };
 
 use hashbrown::HashMap;
-use hitman_commons::{
-	game::GameVersion,
-	hash_list::HashList,
-	metadata::{PathedID, RuntimeID},
-	rpkg_tool::RpkgResourceMeta
-};
+use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	ores::{parse_hashes_ores, parse_json_ores},
@@ -67,7 +62,7 @@ pub fn initialise_resource_overview(
 	resource_reverse_dependencies: &Arc<HashMap<RuntimeID, Vec<RuntimeID>>>,
 	hash_list: &Arc<HashList>
 ) -> Result<()> {
-	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, &hash)?;
+	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, hash)?;
 
 	send_request(
 		app,
@@ -121,11 +116,10 @@ pub fn initialise_resource_overview(
 						.collect()
 				})
 				.unwrap_or_default(),
-			changelog: extract_resource_changelog(game_files, &hash)?,
+			changelog: extract_resource_changelog(game_files, hash),
 			data: match filetype.as_ref() {
 				"TEMP" => {
-					let entity =
-						extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, &hash)?;
+					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
 
 					ResourceOverviewData::Entity {
 						blueprint_hash: entity.blueprint_hash.to_owned(),
@@ -138,7 +132,7 @@ pub fn initialise_resource_overview(
 
 				"AIRG" | "TBLU" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "WSWB" | "DSWB" | "GFXF" | "GIDX"
 				| "WSGB" | "ECPB" | "UICB" | "ENUM" => {
-					let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					ResourceOverviewData::GenericRL {
 						json: {
@@ -170,7 +164,7 @@ pub fn initialise_resource_overview(
 
 				"ORES" => ResourceOverviewData::Ores {
 					json: {
-						let (_, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (_, res_data) = extract_latest_resource(game_files, hash)?;
 						let res_data = parse_hashes_ores(&res_data)?;
 
 						let mut buf = Vec::new();
@@ -189,7 +183,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (_, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					ImageReader::new(Cursor::new(res_data))
 						.with_guessed_format()?
@@ -203,7 +197,7 @@ pub fn initialise_resource_overview(
 				}
 
 				"PRIM" => {
-					let (_, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let model = RenderPrimitive::process_data(game_version.into(), res_data)
 						.context("Couldn't process texture data")?;
@@ -275,13 +269,13 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let mut texture = TextureMap::process_data(game_version.into(), res_data)
 						.context("Couldn't process texture data")?;
 
 					if let Some(texd_depend) = res_meta.core_info.references.first() {
-						let (_, texd_data) = extract_latest_resource(game_files, &texd_depend.resource)?;
+						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource.get_id())?;
 						let mipblock = MipblockData::from_memory(&texd_data, game_version.into())
 							.context("Couldn't process TEXD data")?;
 						texture.set_mipblock1(mipblock);
@@ -335,7 +329,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let mut wav_paths = vec![];
 
@@ -372,12 +366,13 @@ pub fn initialise_resource_overview(
 							for object in objects {
 								let temp_file_id = Uuid::new_v4();
 
-								let wwem_hash = &res_meta
+								let wwem_hash = res_meta
 									.core_info
 									.references
 									.get(object.dependency_index as usize)
 									.context("No such WWEM dependency")?
-									.resource;
+									.resource
+									.get_id();
 
 								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
@@ -414,7 +409,7 @@ pub fn initialise_resource_overview(
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
-					let (_, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
 
@@ -437,12 +432,12 @@ pub fn initialise_resource_overview(
 				"REPO" => ResourceOverviewData::Repository,
 
 				"JSON" => ResourceOverviewData::Json {
-					json: format_json(&String::from_utf8(extract_latest_resource(game_files, &hash)?.1)?)?
+					json: format_json(&String::from_utf8(extract_latest_resource(game_files, hash)?.1)?)?
 				},
 
 				"CLNG" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let clng = {
 							let mut iteration = 0;
@@ -487,7 +482,7 @@ pub fn initialise_resource_overview(
 
 				"DITL" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let ditl = hmlanguages::ditl::DITL::new(
 							app_state
@@ -520,7 +515,7 @@ pub fn initialise_resource_overview(
 
 				"DLGE" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let dlge = {
 							let mut iteration = 0;
@@ -577,7 +572,7 @@ pub fn initialise_resource_overview(
 
 				"LOCR" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let locr = {
 							let mut iteration = 0;
@@ -633,7 +628,7 @@ pub fn initialise_resource_overview(
 
 				"RTLV" => ResourceOverviewData::HMLanguages {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
 							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -658,17 +653,17 @@ pub fn initialise_resource_overview(
 
 				"LINE" => ResourceOverviewData::LocalisedLine {
 					languages: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let (locr_meta, locr_data) = extract_latest_resource(
 							game_files,
-							&res_meta
+							res_meta
 								.core_info
 								.references
 								.first()
 								.context("No LOCR dependency on LINE")?
 								.resource
-								.clone()
+								.get_id()
 						)?;
 
 						let locr = {
@@ -756,7 +751,7 @@ pub fn initialise_resource_overview(
 
 				"MATI" => ResourceOverviewData::MaterialInstance {
 					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 						let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
 							.context("Couldn't parse material instance")?;
@@ -773,16 +768,16 @@ pub fn initialise_resource_overview(
 
 				"MATT" => ResourceOverviewData::MaterialEntity {
 					json: {
-						let (matt_meta, matt_data) = extract_latest_resource(game_files, &hash)?;
+						let (matt_meta, matt_data) = extract_latest_resource(game_files, hash)?;
 						let (matb_meta, matb_data) = extract_latest_resource(
 							game_files,
-							&matt_meta
+							matt_meta
 								.core_info
 								.references
 								.get(1)
 								.context("No MATB dependency")?
 								.resource
-								.clone()
+								.get_id()
 						)?;
 
 						let material =
@@ -951,7 +946,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				let (metadata, data) = extract_latest_resource(game_files, &hash)?;
+				let (metadata, data) = extract_latest_resource(game_files, hash)?;
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false)
 					.to_binary()
 					.context("Couldn't serialise meta file")?;
@@ -1005,7 +1000,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					&app_state.cached_entities,
 					get_loaded_game_version(app, install)?,
 					hash_list,
-					&hash
+					hash
 				)?)?;
 
 				let mut dialog = FileDialogBuilder::new().set_title("Extract entity");
@@ -1035,7 +1030,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
-				let (metadata, data) = extract_latest_resource(game_files, &hash)?;
+				let (metadata, data) = extract_latest_resource(game_files, hash)?;
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false);
 
 				let data = match get_loaded_game_version(app, install)? {
@@ -1096,13 +1091,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					&PathedID::from_str(
+					RuntimeID::from_any(
 						&extract_entity(
 							game_files,
 							&app_state.cached_entities,
 							get_loaded_game_version(app, install)?,
 							hash_list,
-							&hash
+							hash
 						)?
 						.blueprint_hash
 					)?
@@ -1155,13 +1150,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					&PathedID::from_str(
+					RuntimeID::from_any(
 						&extract_entity(
 							game_files,
 							&app_state.cached_entities,
 							get_loaded_game_version(app, install)?,
 							hash_list,
-							&hash
+							hash
 						)?
 						.blueprint_hash
 					)?
@@ -1224,7 +1219,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
-				let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
@@ -1274,7 +1269,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				if hash == "0057C2C3941115CA".parse()? {
-					let (_, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
@@ -1292,7 +1287,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						fs::write(path, res_data)?;
 					}
 				} else {
-					let (_, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
@@ -1328,7 +1323,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
-				let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 
@@ -1398,7 +1393,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
-								let (_, texd_data) = extract_latest_resource(game_files, &texd_depend.resource)?;
+								let (_, texd_data) =
+									extract_latest_resource(game_files, texd_depend.resource.get_id())?;
 
 								let mip_block = MipblockData::from_memory(
 									&texd_data,
@@ -1471,7 +1467,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.add_filter("WAV file", &["wav"])
 					.save_file()
 				{
-					let (_, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
@@ -1515,7 +1511,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog.pick_folder() {
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let wwev = WwiseEvent::parse(&res_data)?;
 
@@ -1547,12 +1543,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							for object in objects {
 								let temp_file_id = Uuid::new_v4();
 
-								let wwem_hash = &res_meta
+								let wwem_hash = res_meta
 									.core_info
 									.references
 									.get(object.dependency_index as usize)
 									.context("No such WWEM dependency")?
-									.resource;
+									.resource
+									.get_id();
 
 								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
@@ -1603,7 +1600,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				{
 					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
 
-					let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let wwev = WwiseEvent::parse(&res_data)?;
 
@@ -1631,7 +1628,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						WwiseEventData::Streamed(objects) => {
 							let temp_file_id = Uuid::new_v4();
 
-							let wwem_hash = &res_meta
+							let wwem_hash = res_meta
 								.core_info
 								.references
 								.get(
@@ -1641,7 +1638,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 										.dependency_index as usize
 								)
 								.context("No such WWEM dependency")?
-								.resource;
+								.resource
+								.get_id();
 
 							let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
@@ -1681,7 +1679,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let game_version = get_loaded_game_version(app, install)?;
 
-				let (res_meta, res_data) = extract_latest_resource(game_files, &hash)?;
+				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
 

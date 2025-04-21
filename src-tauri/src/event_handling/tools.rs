@@ -1,10 +1,10 @@
-use std::{fs, ops::Deref, str::FromStr, time::Duration};
+use std::{fs, ops::Deref, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hitman_commons::metadata::RuntimeID;
-use hitman_commons::{game::GameVersion, metadata::PathedID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{game::GameVersion, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -234,7 +234,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								&app_state.cached_entities,
 								get_loaded_game_version(app, install)?,
 								hash_list,
-								&PathedID::from_str(&patch.factory_hash)?
+								RuntimeID::from_any(&patch.factory_hash)?
 							)?
 							.to_owned();
 
@@ -330,7 +330,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
 					let (temp_meta, temp_data) =
-						extract_latest_resource(game_files, &PathedID::from_str(&entity.factory_hash)?)?;
+						extract_latest_resource(game_files, RuntimeID::from_any(&entity.factory_hash)?)?;
 
 					let factory = match game_version {
 						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
@@ -344,12 +344,13 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							.context("Couldn't convert binary data to ResourceLib factory")?
 					};
 
-					let blueprint_hash = &temp_meta
+					let blueprint_hash = temp_meta
 						.core_info
 						.references
 						.get(factory.blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
-						.resource;
+						.resource
+						.get_id();
 
 					let (tblu_meta, tblu_data) = extract_latest_resource(game_files, blueprint_hash)?;
 
@@ -427,7 +428,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
 						hash_list,
-						&PathedID::from_str(&patch.factory_hash)?
+						RuntimeID::from_any(&patch.factory_hash)?
 					)?
 					.to_owned();
 
@@ -642,7 +643,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					if let Some(game_files) = app_state.game_files.load().as_ref() {
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-								&extract_latest_resource(game_files, &"0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+								&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 							)?)?
 							.into_iter()
 							.map(|x| {
@@ -734,7 +735,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				if let Some(game_files) = app_state.game_files.load().as_ref() {
 					let mut current = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&extract_latest_resource(game_files, &"0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+							&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
