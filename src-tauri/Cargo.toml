@@ -58,17 +58,29 @@ log = "0.4.25"
 biome_json_formatter = "0.5.7"
 biome_json_parser = "0.5.7"
 biome_formatter = "0.5.7"
+biome_rowan = "=0.5.7"
+biome_parser = "=0.5.7"
+biome_unicode_table = "=0.5.7"
 os_info = "3.9.2"
 derive_more = { version = "2.0.1", features = ["debug"] }
 home = "0.5.11"
 
-[dependencies.snmalloc-rs]
-version = "0.3.7"
-features = ["lto"]
+# [dependencies.snmalloc-rs]
+# version = "0.3.7"
+# features = ["lto"]
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"
-features = ["serde", "specta", "rpkg-rs", "glacier-texture", "tonytools", "resourcelib", "hash_list", "game_detection"]
+features = [
+    "serde",
+    "specta",
+    "rpkg-rs",
+    "glacier-texture",
+    "tonytools",
+    "resourcelib",
+    "hash_list",
+    "game_detection",
+]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"

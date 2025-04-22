@@ -165,6 +165,9 @@ dependencies = [
  "biome_formatter",
  "biome_json_formatter",
  "biome_json_parser",
+ "biome_parser",
+ "biome_rowan",
+ "biome_unicode_table",
  "brotli-decompressor",
  "dashmap",
  "debounced",
@@ -205,7 +208,6 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_with 3.12.0",
- "snmalloc-rs",
  "specta",
  "structstruck",
  "tauri",
@@ -759,30 +761,29 @@ dependencies = [
 
 [[package]]
 name = "biome_parser"
-version = "0.5.8"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "811bb6840896a74483426ec61b9727731d6222caa3c09a0440c20d662cd1367e"
+checksum = "955dd999f32c086371d5c0e64b4ea1a50f50c98f1f31a3b9fe17ef47198de19b"
 dependencies = [
  "biome_console",
  "biome_diagnostics",
  "biome_rowan",
- "biome_unicode_table",
+ "bitflags 2.9.0",
  "drop_bomb",
- "enumflags2",
- "unicode-bom",
 ]
 
 [[package]]
 name = "biome_rowan"
-version = "0.5.8"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ee4442bc598e3baead7453c4070b8b326f3b54287a583105d6ffd13c28b3ef0"
+checksum = "d3c2dc25a7ba6ae89526340034abed6c89fac35b79060786771e32ed4aac77e7"
 dependencies = [
  "biome_text_edit",
  "biome_text_size",
  "countme",
- "hashbrown 0.14.5",
- "rustc-hash 2.1.1",
+ "hashbrown 0.12.3",
+ "memoffset 0.8.0",
+ "rustc-hash 1.1.0",
  "tracing",
 ]
 
@@ -819,9 +820,9 @@ dependencies = [
 
 [[package]]
 name = "biome_unicode_table"
-version = "0.5.9"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb9696fda489e25051248bad5a73bdd53f8d063dc3a7f4a71d4c6aadf6fbcb18"
+checksum = "87e8604d34b02180a58af1dbdaac166f1805f27f5370934142a3246f83870952"
 
 [[package]]
 name = "bit-set"
@@ -1266,15 +1267,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15efe7a882b08f34e38556b14f2fb3daa98769d06c7f0c1b076dfd0d983bc892"
 dependencies = [
  "error-code",
-]
-
-[[package]]
-name = "cmake"
-version = "0.1.54"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -3738,6 +3730,15 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "memoffset"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
@@ -5934,24 +5935,6 @@ name = "smallvec"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
-
-[[package]]
-name = "snmalloc-rs"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb317153089fdfa4d8a2eec059d40a5a23c3bde43995ea23b19121c3f621e74a"
-dependencies = [
- "snmalloc-sys",
-]
-
-[[package]]
-name = "snmalloc-sys"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "065fea53d32bb77bc36cca466cb191f2e5216ebfd0ed360b1d64889ee6e559ea"
-dependencies = [
- "cmake",
-]
 
 [[package]]
 name = "socket2"
