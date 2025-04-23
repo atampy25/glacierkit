@@ -247,6 +247,9 @@ pub enum ResourceOverviewData {
 	},
 	MaterialEntity {
 		json: String
+	},
+	SoundDefinitions {
+		json: String
 	}
 }
 

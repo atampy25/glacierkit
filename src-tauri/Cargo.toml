@@ -84,7 +84,7 @@ features = [
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
-features = ["material", "ores", "wwev", "serde"]
+features = ["material", "ores", "wwev", "serde", "sdef"]
 
 [dependencies.serde_json]
 version = "1.0.138"

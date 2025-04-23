@@ -14,6 +14,7 @@ use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	ores::{parse_hashes_ores, parse_json_ores},
+	sdef::SoundDefinitions,
 	wwev::{WwiseEvent, WwiseEventData}
 };
 use image::{ImageFormat, ImageReader};
@@ -753,8 +754,9 @@ pub fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
-							.context("Couldn't parse material instance")?;
+						let material =
+							MaterialInstance::parse(&res_data, &res_meta.core_info.with_hash_list(&hash_list.entries))
+								.context("Couldn't parse material instance")?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -780,15 +782,40 @@ pub fn initialise_resource_overview(
 								.get_id()
 						)?;
 
-						let material =
-							MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)
-								.context("Couldn't parse material entity")?;
+						let material = MaterialEntity::parse(
+							&matt_data,
+							&matt_meta.core_info,
+							&matb_data,
+							&matb_meta.core_info.with_hash_list(&hash_list.entries)
+						)
+						.context("Couldn't parse material entity")?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
 						material.serialize(&mut ser)?;
+
+						String::from_utf8(buf)?
+					}
+				},
+
+				"SDEF" => ResourceOverviewData::SoundDefinitions {
+					json: {
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+
+						let sdef = SoundDefinitions::parse(
+							&res_data,
+							&res_meta.core_info.with_hash_list(&hash_list.entries),
+							game_version
+						)
+						.context("Couldn't parse sound definitions")?;
+
+						let mut buf = Vec::new();
+						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+						sdef.serialize(&mut ser)?;
 
 						String::from_utf8(buf)?
 					}
