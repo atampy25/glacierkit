@@ -32,7 +32,6 @@
 	import QuickStartEditor from "$lib/editors/quickstart/QuickStartEditor.svelte"
 	import { open, confirm } from "@tauri-apps/api/dialog"
 	import { help } from "$lib/helpray"
-	import { v4 } from "uuid"
 
 	const hints = [
 		"You can switch between tabs with Ctrl-PageUp and Ctrl-PageDown (or Ctrl-Tab and Ctrl-Shift-Tab).",
@@ -307,10 +306,10 @@
 		}
 	})
 
-	var toolPaneWidth: number = 20
-	var previousPaneWidth: number = 20
+	let toolPaneWidth: number = 20
+	let previousPaneWidth: number = 20
 
-	function handleSnapEase(event: any, pane_index: number, min_size: number, snap_bound: number) {
+	function handleSnapEase(event: CustomEvent<{ size: number }[]>, pane_index: number, min_size: number, snap_bound: number) {
 		const newSize = event.detail[pane_index].size
 
 		if (newSize < min_size && newSize > snap_bound) {

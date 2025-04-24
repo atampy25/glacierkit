@@ -59,17 +59,11 @@ pub struct ProjectInfo {
 
 impl ProjectInfo {
 	pub fn from_path(path: PathBuf) -> Option<Self> {
-		let manifest_path = path.join("manifest.json");
-		if !manifest_path.exists() {
-			return None;
-		}
+		#[derive(Deserialize)]
+		struct Manifest { name: String, version: String }
 
-		let file = std::fs::File::open(&manifest_path).ok()?;
-		let json: serde_json::Value = serde_json::from_reader(file).ok()?;
-
-		let name = json.get("name")?.as_str()?.to_string();
-		let version = json.get("version")?.as_str()?.to_string();
-
+		let file = std::fs::File::open(path.join("manifest.json")).ok()?;
+		let Manifest { name, version } = serde_json::from_reader::<_, Manifest>(file).ok()?;
 		Some(ProjectInfo { name, path, version })
 	}
 }

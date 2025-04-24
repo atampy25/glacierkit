@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { event } from "$lib/utils"
 	import type { GameInstall, SettingsRequest } from "$lib/bindings-types"
-	import { Checkbox, RadioTile, TileGroup, Tooltip, TooltipIcon } from "carbon-components-svelte"
+	import { Checkbox, RadioTile, TileGroup, TooltipIcon } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"

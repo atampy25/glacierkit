@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { Button, ComposedModal, ModalHeader, ModalBody, ModalFooter, TextInput, CodeSnippet } from "carbon-components-svelte"
-
 	import CloseOutline from "carbon-icons-svelte/lib/CloseOutline.svelte"
 	import AddAlt from "carbon-icons-svelte/lib/AddAlt.svelte"
-
 	import { createEventDispatcher } from "svelte"
-	import { Copy } from "carbon-icons-svelte"
 
 	const dispatch = createEventDispatcher<{ updated: string[] }>()
 
