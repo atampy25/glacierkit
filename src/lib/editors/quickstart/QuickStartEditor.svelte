@@ -3,7 +3,17 @@
 	import { event } from "$lib/utils"
 
 	import { help } from "$lib/helpray"
-	import { Button, ClickableTile, FluidForm, Link, Modal, OutboundLink, OverflowMenu, OverflowMenuItem, TextInput } from "carbon-components-svelte"
+	import {
+		Button,
+		ClickableTile,
+		FluidForm,
+		Link,
+		Modal,
+		OutboundLink,
+		OverflowMenu,
+		OverflowMenuItem,
+		TextInput
+	} from "carbon-components-svelte"
 	import { FolderAdd, FolderOpen, Folders, LogoDiscord, LogoGithub, Document } from "carbon-icons-svelte"
 	import { dialog } from "@tauri-apps/api"
 	import { shell } from "@tauri-apps/api"
@@ -85,7 +95,7 @@
 				</div>
 				<div class="flex flex-col">
 					<Link
-						class="flex items-center py-1"
+						class="flex items-center py-1 cursor-pointer"
 						on:click={async () => {
 							if (!new_project_config.valid) {
 								dialog_open = true
@@ -103,7 +113,7 @@
 								}
 								await checkValidity()
 							}
-							if (new_project_config.valid == false) return
+							if (new_project_config.valid === false) return
 							if (new_project_config.path !== null) {
 								await event({
 									type: "editor",
@@ -130,7 +140,7 @@
 					</Link>
 
 					<OutboundLink
-						class="flex items-center py-1"
+						class="flex items-center py-1 cursor-pointer"
 						on:click={async () => {
 							await shell.open(GITHUB_MOD_TEMPLATE_URL)
 						}}
@@ -147,7 +157,7 @@
 				</div>
 				<div class="flex flex-col">
 					<Link
-						class="flex items-center py-1"
+						class="flex items-center py-1 cursor-pointer"
 						on:click={async () => {
 							const selected = await dialog.open({
 								directory: true,
@@ -170,7 +180,7 @@
 				</div>
 				<div class="flex flex-col">
 					<OutboundLink
-						class="flex items-center py-1"
+						class="flex items-center py-1 cursor-pointer"
 						on:click={async () => {
 							await shell.open(DISCORD_URL)
 						}}
@@ -181,7 +191,7 @@
 				</div>
 				<div class="flex flex-col">
 					<OutboundLink
-						class="flex items-center py-1"
+						class="flex items-center py-1 cursor-pointer"
 						on:click={async () => {
 							await shell.open(GITHUB_URL)
 						}}
@@ -192,7 +202,7 @@
 				</div>
 				<div class="flex flex-col">
 					<OutboundLink
-						class="flex items-center py-1"
+						class="flex items-center py-1 cursor-pointer"
 						on:click={async () => {
 							await shell.open(WIKI_URL)
 						}}
@@ -287,10 +297,12 @@
 		on:submit
 	>
 		<FluidForm>
-			<TextInput id="proj-name" required invalid={invalid_name_empty} labelText="Project name" bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
+			<TextInput id="proj-name" required invalid={invalid_name_empty} labelText="Project name"
+					   bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
 			<br />
 			<div class="flex gap-4">
-				<TextInput class="flex-grow" required labelText="Project author" bind:value={new_project_config.author} invalidText="Invalid author! Please don't use special characters" />
+				<TextInput class="flex-grow" required labelText="Project author" bind:value={new_project_config.author}
+						   invalidText="Invalid author! Please don't use special characters" />
 				<TextInput
 					class="w-32"
 					required

@@ -121,7 +121,8 @@
 	<h4>GlacierKit settings</h4>
 	<div class="flex items-center gap-2">
 		<div class="flex-shrink">
-			<Checkbox checked={extractModdedFiles} on:change={changeExtractModdedFiles} labelText="Allow extracting modded files" />
+			<Checkbox checked={extractModdedFiles} on:change={changeExtractModdedFiles}
+					  labelText="Allow extracting modded files" />
 		</div>
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
@@ -141,7 +142,8 @@
 	</div>
 	<div class="flex items-center gap-2">
 		<div class="flex-shrink">
-			<Checkbox checked={editorConnectionEnabled} on:change={changeEditorConnectionEnabled} labelText="Enable editor connection" />
+			<Checkbox checked={editorConnectionEnabled} on:change={changeEditorConnectionEnabled}
+					  labelText="Enable editor connection" />
 		</div>
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
@@ -173,7 +175,8 @@
 			>
 				<div class="flex">
 					<div class="font-bold">
-						{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})
+						{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"}
+						({gameInstall.platform})
 					</div>
 					<TooltipIcon class="ml-2" direction="top" tooltipText={gameInstall.path} icon={Information} />
 				</div>
