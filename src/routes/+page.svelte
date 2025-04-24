@@ -8,7 +8,7 @@
 	import GameBrowser from "$lib/tools/GameBrowser.svelte"
 	import ToolButton from "$lib/components/ToolButton.svelte"
 	import { Button, ToastNotification } from "carbon-components-svelte"
-	import { beforeUpdate, onDestroy } from "svelte"
+	import { beforeUpdate, onDestroy, onMount } from "svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import type { Announcement, EditorType, Request } from "$lib/bindings-types"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
@@ -29,6 +29,7 @@
 	import Search from "carbon-icons-svelte/lib/Search.svelte"
 	import ContentSearch from "$lib/tools/ContentSearch.svelte"
 	import ContentSearchResultsEditor from "$lib/editors/contentsearchresults/ContentSearchResultsEditor.svelte"
+	import QuickStartEditor from "$lib/editors/quickstart/QuickStartEditor.svelte"
 	import { open, confirm } from "@tauri-apps/api/dialog"
 	import { help } from "$lib/helpray"
 
@@ -55,7 +56,8 @@
 		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
 		"Separate multiple search terms with spaces to find only items which match all of the search terms.",
 		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit.",
-		"You can open a file from outside of your current project by pressing CTRL-O."
+		"You can open a file from outside of your current project by pressing CTRL-O.",
+		"You can hide/unhide the tool side-bar by pressing CTRL-b"
 	]
 
 	let hint = hints[Math.floor(Math.random() * hints.length)]
@@ -101,6 +103,9 @@
 			case "Nil":
 				return NilEditor
 
+			case "QuickStart":
+				return QuickStartEditor
+
 			case "Text":
 				return TextEditor
 
@@ -136,6 +141,18 @@
 	const tabComponents: Record<string, { handleRequest: (request: any) => Promise<void> }> = {}
 
 	let activeTab: string | null = null
+
+	onMount(async () => {
+		await event({
+			type: "editor",
+			data: {
+				type: "quickStart",
+				data: {
+					type: "create"
+				}
+			}
+		})
+	})
 
 	let destroyFunc = { run: () => {} }
 	onDestroy(() => {
@@ -246,6 +263,9 @@
 
 					case "editor":
 						switch (request.data.type) {
+							case "quickStart":
+								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								break
 							case "text":
 								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
 								break
@@ -285,6 +305,19 @@
 			destroyFunc.run = unlisten
 		}
 	})
+
+	let toolPaneWidth: number = 20
+	let previousPaneWidth: number = 20
+
+	function handleSnapEase(event: CustomEvent<{ size: number }[]>, pane_index: number, min_size: number, snap_bound: number) {
+		const newSize = event.detail[pane_index].size
+
+		if (newSize < min_size && newSize > snap_bound) {
+			toolPaneWidth = min_size
+		} else if (newSize < snap_bound) {
+			toolPaneWidth = 0
+		}
+	}
 </script>
 
 <svelte:window
@@ -461,6 +494,22 @@
 			}
 		}
 	}}
+	use:shortcut={{
+		key: "b",
+		control: true,
+		shift: false,
+		callback: async (e) => {
+			e.preventDefault?.()
+			await trackEvent("Fold/Unfold the tool pane")
+
+			if (toolPaneWidth == 0) {
+				toolPaneWidth = previousPaneWidth
+			} else {
+				previousPaneWidth = toolPaneWidth
+				toolPaneWidth = 0
+			}
+		}
+	}}
 />
 
 <div class="h-full w-full flex">
@@ -470,6 +519,9 @@
 				icon={tool.icon}
 				on:click={() => {
 					selectedTool = toolID
+					if (toolPaneWidth == 0) {
+						toolPaneWidth = previousPaneWidth
+					}
 				}}
 				selected={selectedTool === toolID}
 				tooltip={tool.name}
@@ -477,8 +529,13 @@
 		{/each}
 	</div>
 	<div style="width: calc(100vw - 3.5rem)">
-		<Splitpanes theme="">
-			<Pane size={15}>
+		<Splitpanes
+			theme=""
+			on:resize={(event) => {
+				handleSnapEase(event, 0, 15, 8)
+			}}
+		>
+			<Pane bind:size={toolPaneWidth}>
 				<div class="w-full h-full bg-[#202020]">
 					{#each typedEntries(tools) as [toolID, tool] (toolID)}
 						<div class="w-full h-full" class:hidden={selectedTool !== toolID}>
@@ -605,7 +662,7 @@
 							{/each}
 						</SortableList>
 						{#each tabs as tab (tab.id)}
-							<div class="flex-grow" class:hidden={activeTab !== tab.id}>
+							<div class="flex-grow overflow-auto" class:hidden={activeTab !== tab.id}>
 								<svelte:component this={tab.editor} bind:this={tabComponents[tab.id]} id={tab.id} />
 							</div>
 						{/each}
@@ -620,8 +677,7 @@
 					{:else}
 						<div class="flex-grow flex items-center justify-center">
 							<div class="text-center">
-								<h1>Welcome to GlacierKit</h1>
-								<p>You can start by selecting a project on the left.</p>
+								<h1>GlacierKit</h1>
 								{#if announcements.length}
 									<div class="flex-col items-center -mb-4" use:help={{ title: "Announcements", description: "Any important announcements are displayed here." }}>
 										{#each announcements as announcement (announcement.id)}

@@ -1,5 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
-
+use std::path::Path;
 use arc_swap::{ArcSwap, ArcSwapOption};
 use dashmap::DashMap;
 use hashbrown::HashMap;
@@ -32,7 +32,8 @@ pub struct AppSettings {
 	pub game_install: Option<PathBuf>,
 	pub colourblind_mode: bool,
 	pub editor_connection: bool,
-	pub seen_announcements: Vec<String>
+	pub seen_announcements: Vec<String>,
+	pub recent_projects: Vec<ProjectInfo>
 }
 
 impl Default for AppSettings {
@@ -42,8 +43,28 @@ impl Default for AppSettings {
 			game_install: None,
 			colourblind_mode: false,
 			editor_connection: true,
-			seen_announcements: vec![]
+			seen_announcements: vec![],
+			recent_projects: vec![]
 		}
+	}
+}
+
+#[derive(Type, Serialize, Deserialize, PartialEq, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectInfo {
+	pub name: String,
+	pub path: PathBuf,
+	pub version: String
+}
+
+impl ProjectInfo {
+	pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
+		#[derive(Deserialize)]
+		struct Manifest { name: String, version: String }
+
+		let file = std::fs::File::open(path.as_ref().join("manifest.json")).ok()?;
+		let Manifest { name, version } = serde_json::from_reader::<_, Manifest>(file).ok()?;
+		Some(ProjectInfo { name, path: path.as_ref().into(), version })
 	}
 }
 
@@ -163,6 +184,7 @@ pub enum TextFileType {
 #[serde(tag = "type", content = "data")]
 pub enum EditorType {
 	Nil,
+	QuickStart,
 	ResourceOverview,
 	Text { file_type: TextFileType },
 	QNEntity,
@@ -377,6 +399,24 @@ strike! {
 		}),
 
 		Editor(pub enum EditorEvent {
+			QuickStart(pub enum QuickStartEvent {
+				Create,
+				RefreshRecentList{
+					id: Uuid,
+				},
+				CreateLocalProject {
+					id: Uuid,
+					project_id: String,
+					name: String,
+					author: String,
+					path: PathBuf,
+					version: String,
+				},
+				OpenProjectInExplorer {
+					path: PathBuf,
+				},
+			}),
+
 			Text(pub enum TextEditorEvent {
 				Initialise {
 					id: Uuid
@@ -734,10 +774,13 @@ strike! {
 		Global(pub enum GlobalEvent {
 			SetSeenAnnouncements(Vec<String>),
 			LoadWorkspace(PathBuf),
+			ClearWorkspace,
 			SelectAndOpenFile,
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid),
+			AddRecentProject(PathBuf),
+			RemoveRecentProject(PathBuf),
 			UploadLogAndReport(String),
 			UploadLastPanic,
 			ClearLastPanic
@@ -819,6 +862,21 @@ strike! {
 		}),
 
 		Editor(pub enum EditorRequest {
+			QuickStart(pub enum QuickStartRequest {
+				Initialise {
+					id: Uuid,
+					recent_projects: Vec<ProjectInfo>,
+				},
+				RefreshRecentList{
+					id: Uuid,
+					recent_projects: Vec<ProjectInfo>,
+				},
+				LoadLocalProject{
+					id: Uuid,
+					project: PathBuf,
+				}
+			})
+
 			Text(pub enum TextEditorRequest {
 				ReplaceContent {
 					id: Uuid,

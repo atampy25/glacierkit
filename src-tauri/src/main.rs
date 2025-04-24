@@ -25,6 +25,7 @@ use std::{
 	cell::Cell,
 	fmt::Write,
 	fs,
+	io::Cursor,
 	path::{Path, PathBuf},
 	sync::Arc,
 	time::{Duration, SystemTime, UNIX_EPOCH}
@@ -52,7 +53,8 @@ use model::{
 	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
 	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest,
 	EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
-	Project, ProjectSettings, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
+	Project, ProjectInfo, ProjectSettings, QuickStartEvent, QuickStartRequest, Request, SettingsRequest,
+	TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
 };
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
@@ -61,6 +63,8 @@ use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, json, to_value, to_vec, Value};
 use show_in_folder::show_in_folder;
+use std::fs::OpenOptions;
+use std::path::StripPrefixError;
 use tauri::{
 	api::{dialog::blocking::FileDialogBuilder, process::Command},
 	async_runtime, AppHandle, Manager
@@ -71,6 +75,9 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
+
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::PermissionsExt;
 
 pub const HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
@@ -83,6 +90,8 @@ pub const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
 
 pub const TONYTOOLS_HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/hash_list.hmla";
+
+pub const SMF_MOD_TEMPLATE_ENDPOINT: &str = "https://github.com/atampy25/smf-mod/archive/refs/heads/main.zip";
 
 pub const UPLOAD_LOG_ENDPOINT: &str = "https://hitman-resources.netlify.app/.netlify/functions/upload-gk-log";
 
@@ -315,6 +324,149 @@ fn event(app: AppHandle, event: Event) {
 					}
 
 					Event::Editor(event) => match event {
+						EditorEvent::QuickStart(event) => match event {
+							QuickStartEvent::Create => {
+								let id = Uuid::new_v4();
+
+								app_state.editor_states.insert(
+									id.to_owned(),
+									EditorState {
+										file: None,
+										data: EditorData::Nil
+									}
+								);
+
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::CreateTab {
+										id,
+										name: "Quick Start".to_string(),
+										editor_type: EditorType::QuickStart
+									})
+								)?;
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::Initialise {
+										id,
+										recent_projects: app_settings.load().recent_projects.clone()
+									}))
+								)?;
+							}
+							QuickStartEvent::RefreshRecentList { id } => {
+								for recent_project in &app_settings.load().recent_projects {
+									if !recent_project.path.exists() {
+										handle_event(
+											&app,
+											Event::Global(GlobalEvent::RemoveRecentProject(
+												recent_project.path.clone()
+											))
+										);
+									}
+								}
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::RefreshRecentList {
+										id,
+										recent_projects: app_settings.load().recent_projects.clone()
+									}))
+								)?;
+							}
+							QuickStartEvent::CreateLocalProject {
+								id,
+								project_id,
+								name,
+								author,
+								path,
+								version
+							} => {
+								fn replace_prefix(
+									p: impl AsRef<Path>,
+									from: impl AsRef<Path>,
+									to: impl AsRef<Path>
+								) -> Result<PathBuf, StripPrefixError> {
+									p.as_ref().strip_prefix(from).map(|p| to.as_ref().join(p))
+								}
+								let project_dir = path.join(&name);
+								fs::create_dir_all(&project_dir).context("Failed to create mod folder")?;
+								let data = reqwest::get(SMF_MOD_TEMPLATE_ENDPOINT)
+									.await
+									.context("Failed to download SMF mod template")?
+									.error_for_status()
+									.context("Template endpoint returned an error status")?
+									.bytes()
+									.await
+									.context("Couldn't read template data")?;
+
+								let reader = Cursor::new(data);
+								let mut archive =
+									zip::ZipArchive::new(reader).context("Failed to open mod template ZIP")?;
+
+								for i in 0..archive.len() {
+									let mut file = archive
+										.by_index(i)
+										.context(format!("Failed to grab file #{} in zip", i))?;
+									let outpath = match file.enclosed_name() {
+										Some(path) => path,
+										None => continue
+									};
+									if file.is_dir() {
+										continue;
+									}
+									if file.is_file() {
+										let file_path = replace_prefix(outpath, "smf-mod-main", &project_dir)
+											.context("Failed to move mod template files")?;
+										fs::create_dir_all(
+											file_path.parent().context(format!(
+												"Failed to read parent for {}",
+												file_path.display()
+											))?
+										)
+										.context("Failed to create necessary project folder")?;
+										let mut outfile = fs::File::create(&file_path)
+											.context(format!("Failed to create file {}", file_path.display()))?;
+										std::io::copy(&mut file, &mut outfile).context(format!(
+											"Can't copy contents of file to {}",
+											file_path.display()
+										))?;
+
+										#[cfg(target_os = "linux")]
+										{
+											if let Some(mode) = file.unix_mode() {
+												fs::set_permissions(&file_path, fs::Permissions::from_mode(mode))
+													.context("Failed to set the correct file permissions")?;
+											}
+										}
+									}
+								}
+								let manifest_path = project_dir.join("manifest.json");
+
+								let file = std::fs::File::open(&manifest_path)?;
+								let mut json: serde_json::Value = serde_json::from_reader(file)?;
+
+								json["id"] = json!(&project_id);
+								json["name"] = json!(&name);
+								json["version"] = json!(&version);
+								json["authors"] = json!(vec![&author]);
+
+								let file = OpenOptions::new().write(true).truncate(true).open(&manifest_path)?;
+
+								serde_json::to_writer_pretty(file, &json)?;
+
+								send_request(
+									&app,
+									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::LoadLocalProject {
+										id,
+										project: project_dir
+									}))
+								)?;
+							}
+							QuickStartEvent::OpenProjectInExplorer { path } => {
+								opener::reveal(path).context("Can't open in explorer")?;
+							}
+						},
+
 						EditorEvent::Text(event) => match event {
 							TextEditorEvent::Initialise { id } => {
 								let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
@@ -457,6 +609,19 @@ fn event(app: AppHandle, event: Event) {
 						GlobalEvent::LoadWorkspace(path) => {
 							app.track_event("Workspace loaded", None);
 							let task = start_task(&app, format!("Loading project {}", path.display()))?;
+
+							if !path.exists() {
+								finish_task(&app, task)?;
+								send_notification(
+									&app,
+									Notification {
+										kind: NotificationKind::Error,
+										title: "Workspace not found".into(),
+										subtitle: format!("The folder {} does not exist.", path.display())
+									}
+								)?;
+								return;
+							}
 
 							let mut files = vec![];
 
@@ -727,6 +892,20 @@ fn event(app: AppHandle, event: Event) {
 
 								Arc::new(watcher)
 							}));
+
+							handle_event(&app, Event::Global(GlobalEvent::AddRecentProject(path)));
+
+							finish_task(&app, task)?;
+						}
+						GlobalEvent::ClearWorkspace => {
+							app.track_event("clearing workspace", None);
+							let task = start_task(&app, "Clearing workspace")?;
+
+							app_state.project.store(None);
+
+							send_request(&app, Request::Global(GlobalRequest::SetWindowTitle("".to_string())))?;
+
+							app_state.fs_watcher.store(None);
 
 							finish_task(&app, task)?;
 						}
@@ -1285,6 +1464,48 @@ fn event(app: AppHandle, event: Event) {
 							}
 
 							finish_task(&app, task)?;
+						}
+
+						GlobalEvent::AddRecentProject(path) => {
+							let mut settings = (*app_settings.load_full()).to_owned();
+
+							let project = ProjectInfo::from_path(&path)
+								.context(format!("Failed to read data for project at {}", path.display()))?;
+
+							if let Some(pos) = settings.recent_projects.iter().position(|x| x.path == project.path) {
+								settings.recent_projects.remove(pos);
+							}
+
+							settings.recent_projects.insert(0, project);
+
+							if settings.recent_projects.len() > 5 {
+								settings.recent_projects.truncate(5);
+							}
+
+							fs::write(
+								app.path_resolver()
+									.app_data_dir()
+									.context("Couldn't get app data dir")?
+									.join("settings.json"),
+								to_vec(&settings)?
+							)?;
+							app_settings.store(settings.into());
+						}
+
+						GlobalEvent::RemoveRecentProject(path) => {
+							let mut settings = (*app_settings.load_full()).to_owned();
+							if let Some(pos) = settings.recent_projects.iter().position(|x| x.path == path) {
+								settings.recent_projects.remove(pos);
+							}
+
+							fs::write(
+								app.path_resolver()
+									.app_data_dir()
+									.context("Couldn't get app data dir")?
+									.join("settings.json"),
+								to_vec(&settings)?
+							)?;
+							app_settings.store(settings.into());
 						}
 
 						GlobalEvent::UploadLogAndReport(error) => {

@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { Button, ComposedModal, ModalHeader, ModalBody, ModalFooter, TextInput } from "carbon-components-svelte"
-
+	import { Button, ComposedModal, ModalHeader, ModalBody, ModalFooter, TextInput, CodeSnippet } from "carbon-components-svelte"
 	import CloseOutline from "carbon-icons-svelte/lib/CloseOutline.svelte"
 	import AddAlt from "carbon-icons-svelte/lib/AddAlt.svelte"
-
 	import { createEventDispatcher } from "svelte"
 
 	const dispatch = createEventDispatcher<{ updated: string[] }>()
@@ -19,10 +17,10 @@
 <div class="flex flex-col gap-1 mb-2">
 	{#each data as value}
 		<div class="flex items-center gap-2">
-			<div class="p-2 bg-[#393939] text-[#f4f4f4] flex-grow">
-				<code style="font-size: 0.95em" class="break-all">{value}</code>
-			</div>
-			<Button
+			<div class="w-full">
+				<div class="w-5/6 flex gap-2">
+					<CodeSnippet code={value}/>
+					<Button
 				kind="ghost"
 				size="small"
 				icon={CloseOutline}
@@ -31,7 +29,9 @@
 					data = data.filter((a) => a !== value)
 					dispatch("updated", data)
 				}}
-			/>
+				/>
+				</div>
+			</div>
 		</div>
 	{/each}
 	{#if data.length == 0}

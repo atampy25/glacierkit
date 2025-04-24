@@ -850,6 +850,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/semver@npm:^7":
+  version: 7.5.8
+  resolution: "@types/semver@npm:7.5.8"
+  checksum: 8663ff927234d1c5fcc04b33062cb2b9fcfbe0f5f351ed26c4d1e1581657deebd506b41ff7fdf89e787e3d33ce05854bc01686379b89e9c49b564c4cfa988efa
+  languageName: node
+  linkType: hard
+
 "@types/semver@npm:^7.5.0":
   version: 7.5.6
   resolution: "@types/semver@npm:7.5.6"
@@ -2787,6 +2794,7 @@ __metadata:
     "@types/lodash": "npm:^4"
     "@types/md5": "npm:^2"
     "@types/mousetrap": "npm:^1"
+    "@types/semver": "npm:^7"
     "@types/three": "npm:^0.167.1"
     "@types/uuid": "npm:^9"
     "@typescript-eslint/eslint-plugin": "npm:^6.0.0"
@@ -2810,6 +2818,7 @@ __metadata:
     prettier-plugin-svelte: "npm:^3.1.2"
     prettier-plugin-toml: "npm:^2.0.1"
     rfc6902: "npm:^5.1.1"
+    semver: "npm:^7.6.3"
     svelte: "npm:^4.2.7"
     svelte-check: "npm:^3.6.0"
     svelte-splitpanes: "npm:0.8.0"
@@ -3486,6 +3495,15 @@ __metadata:
   bin:
     semver: bin/semver.js
   checksum: 5160b06975a38b11c1ab55950cb5b8a23db78df88275d3d8a42ccf1f29e55112ac995b3a26a522c36e3b5f76b0445f1eef70d696b8c7862a2b4303d7b0e7609e
+  languageName: node
+  linkType: hard
+
+"semver@npm:^7.6.3":
+  version: 7.6.3
+  resolution: "semver@npm:7.6.3"
+  bin:
+    semver: bin/semver.js
+  checksum: 88f33e148b210c153873cb08cfe1e281d518aaa9a666d4d148add6560db5cd3c582f3a08ccb91f38d5f379ead256da9931234ed122057f40bb5766e65e58adaf
   languageName: node
   linkType: hard
 

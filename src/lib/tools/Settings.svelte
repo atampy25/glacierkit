@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { event } from "$lib/utils"
 	import type { GameInstall, SettingsRequest } from "$lib/bindings-types"
-	import { Checkbox, TooltipIcon } from "carbon-components-svelte"
+	import { Checkbox, RadioTile, TileGroup, TooltipIcon } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
@@ -16,7 +16,7 @@
 				extractModdedFiles = request.data.settings.extractModdedFiles
 				colourblind = request.data.settings.colourblindMode
 				editorConnectionEnabled = request.data.settings.editorConnection
-				selectedGameInstall = request.data.settings.gameInstall || null
+				selectedGameInstall = request.data.settings.gameInstall || "none"
 				break
 
 			case "changeProjectSettings":
@@ -121,7 +121,8 @@
 	<h4>GlacierKit settings</h4>
 	<div class="flex items-center gap-2">
 		<div class="flex-shrink">
-			<Checkbox checked={extractModdedFiles} on:change={changeExtractModdedFiles} labelText="Allow extracting modded files" />
+			<Checkbox checked={extractModdedFiles} on:change={changeExtractModdedFiles}
+					  labelText="Allow extracting modded files" />
 		</div>
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
@@ -141,7 +142,8 @@
 	</div>
 	<div class="flex items-center gap-2">
 		<div class="flex-shrink">
-			<Checkbox checked={editorConnectionEnabled} on:change={changeEditorConnectionEnabled} labelText="Enable editor connection" />
+			<Checkbox checked={editorConnectionEnabled} on:change={changeEditorConnectionEnabled}
+					  labelText="Enable editor connection" />
 		</div>
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
@@ -151,14 +153,14 @@
 	</div>
 
 	<p class="mt-1">Game</p>
-	<div class="mt-1 flex flex-wrap gap-2">
-		{#each gameInstalls as gameInstall}
-			<div
-				class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-				class:border-2={selectedGameInstall === gameInstall.path}
-				on:click={async () => {
-					selectedGameInstall = gameInstall.path
 
+	<TileGroup class="mt-1 flex flex-wrap gap-2" name="Game" on:select={({ detail }) => (selectedGameInstall = detail)}>
+		{#each gameInstalls as gameInstall}
+			<RadioTile
+				value={gameInstall.path}
+				class="p-4 flex justify-center"
+				checked={selectedGameInstall === gameInstall.path}
+				on:click={async () => {
 					await event({
 						type: "tool",
 						data: {
@@ -171,18 +173,20 @@
 					})
 				}}
 			>
-				<div>
-					<div class="font-bold mb-2">{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})</div>
-					<span class="break-all">{gameInstall.path}</span>
+				<div class="flex">
+					<div class="font-bold">
+						{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"}
+						({gameInstall.platform})
+					</div>
+					<TooltipIcon class="ml-2" direction="top" tooltipText={gameInstall.path} icon={Information} />
 				</div>
-			</div>
+			</RadioTile>
 		{/each}
-		<div
-			class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-			class:border-2={selectedGameInstall === null}
+		<RadioTile
+			value={"none"}
+			class="p-4 flex "
+			checked={selectedGameInstall === "none"}
 			on:click={async () => {
-				selectedGameInstall = null
-
 				await event({
 					type: "tool",
 					data: {
@@ -195,9 +199,9 @@
 				})
 			}}
 		>
-			<p>No game</p>
-		</div>
-	</div>
+			<div class="font-bold">No game</div>
+		</RadioTile>
+	</TileGroup>
 
 	<h4 class="mt-4">Project settings</h4>
 	{#if projectLoaded}

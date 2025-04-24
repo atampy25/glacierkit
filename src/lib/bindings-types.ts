@@ -4,7 +4,7 @@ export type Announcement = { id: string; kind: AnnouncementKind; title: string; 
 
 export type AnnouncementKind = "info" | "success" | "warning" | "error"
 
-export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; colourblindMode: boolean; editorConnection: boolean; seenAnnouncements: string[] }
+export type AppSettings = { extractModdedFiles: boolean; gameInstall: string | null; colourblindMode: boolean; editorConnection: boolean; seenAnnouncements: string[]; recentProjects: ProjectInfo[] }
 
 export type ArrayPatchOperation = { RemoveItemByValue: JsonValue } | { AddItemAfter: [JsonValue, JsonValue] } | { AddItemBefore: [JsonValue, JsonValue] } | { AddItem: JsonValue }
 
@@ -63,11 +63,11 @@ export type Dynamics = { announcements: Announcement[] }
 
 export type EditorConnectionEvent = { type: "entitySelected"; data: [string, string] } | { type: "entityTransformUpdated"; data: [string, string, QNTransform] } | { type: "entityPropertyChanged"; data: [string, string, string, string, JsonValue] }
 
-export type EditorEvent = { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorEvent } | { type: "contentSearchResults"; data: ContentSearchResultsEvent }
+export type EditorEvent = { type: "quickStart"; data: QuickStartEvent } | { type: "text"; data: TextEditorEvent } | { type: "entity"; data: EntityEditorEvent } | { type: "resourceOverview"; data: ResourceOverviewEvent } | { type: "repositoryPatch"; data: RepositoryPatchEditorEvent } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorEvent } | { type: "contentSearchResults"; data: ContentSearchResultsEvent }
 
-export type EditorRequest = { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorRequest } | { type: "contentSearchResults"; data: ContentSearchResultsRequest }
+export type EditorRequest = { type: "quickStart"; data: QuickStartRequest } | { type: "text"; data: TextEditorRequest } | { type: "entity"; data: EntityEditorRequest } | { type: "resourceOverview"; data: ResourceOverviewRequest } | { type: "repositoryPatch"; data: RepositoryPatchEditorRequest } | { type: "unlockablesPatch"; data: UnlockablesPatchEditorRequest } | { type: "contentSearchResults"; data: ContentSearchResultsRequest }
 
-export type EditorType = { type: "Nil" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" } | { type: "RepositoryPatch"; data: { patch_type: JsonPatchType } } | { type: "UnlockablesPatch"; data: { patch_type: JsonPatchType } } | { type: "ContentSearchResults" }
+export type EditorType = { type: "Nil" } | { type: "QuickStart" } | { type: "ResourceOverview" } | { type: "Text"; data: { file_type: TextFileType } } | { type: "QNEntity" } | { type: "QNPatch" } | { type: "RepositoryPatch"; data: { patch_type: JsonPatchType } } | { type: "UnlockablesPatch"; data: { patch_type: JsonPatchType } } | { type: "ContentSearchResults" }
 
 export type EditorValidity = { type: "Valid" } | { type: "Invalid"; data: string }
 
@@ -243,7 +243,7 @@ export type GamePlatform = "steam" | "epic" | "gog" | "microsoft"
 
 export type GameVersion = "h1" | "h2" | "h3"
 
-export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "selectAndOpenFile" } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string } | { type: "uploadLogAndReport"; data: string } | { type: "uploadLastPanic" } | { type: "clearLastPanic" }
+export type GlobalEvent = { type: "setSeenAnnouncements"; data: string[] } | { type: "loadWorkspace"; data: string } | { type: "clearWorkspace" } | { type: "selectAndOpenFile" } | { type: "selectTab"; data: string | null } | { type: "removeTab"; data: string } | { type: "saveTab"; data: string } | { type: "addRecentProject"; data: string } | { type: "removeRecentProject"; data: string } | { type: "uploadLogAndReport"; data: string } | { type: "uploadLastPanic" } | { type: "clearLastPanic" }
 
 export type GlobalRequest = { type: "errorReport"; data: { error: string } } | { type: "setWindowTitle"; data: string } | { type: "initialiseDynamics"; data: { dynamics: Dynamics; seen_announcements: string[] } } | { type: "createTab"; data: { id: string; name: string; editor_type: EditorType } } | { type: "renameTab"; data: { id: string; new_name: string } } | { type: "selectTab"; data: string } | { type: "setTabUnsaved"; data: { id: string; unsaved: boolean } } | { type: "removeTab"; data: string } | { type: "computeJSONPatchAndSave"; data: { base: JsonValue; current: JsonValue; save_path: string; file_and_type: [string, string] } } | { type: "requestLastPanicUpload" } | { type: "logUploadRejected" }
 
@@ -342,6 +342,8 @@ toPin: string;
  */
 value?: SimpleProperty | null }
 
+export type ProjectInfo = { name: string; path: string; version: string }
+
 export type ProjectSettings = { customPaths: string[] }
 
 /**
@@ -407,6 +409,10 @@ propertyName: string;
 propertyOverride: OverriddenProperty }
 
 export type QNTransform = { rotation: Vec3; position: Vec3; scale?: Vec3 | null }
+
+export type QuickStartEvent = { type: "create" } | { type: "refreshRecentList"; data: { id: string } } | { type: "createLocalProject"; data: { id: string; project_id: string; name: string; author: string; path: string; version: string } } | { type: "openProjectInExplorer"; data: { path: string } }
+
+export type QuickStartRequest = { type: "initialise"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "refreshRecentList"; data: { id: string; recent_projects: ProjectInfo[] } } | { type: "loadLocalProject"; data: { id: string; project: string } }
 
 /**
  * A reference to an entity.
