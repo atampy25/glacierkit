@@ -79,7 +79,6 @@ use walkdir::WalkDir;
 #[cfg(target_os = "linux")]
 use std::os::unix::fs::PermissionsExt;
 
-
 pub const HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
 
@@ -355,16 +354,17 @@ fn event(app: AppHandle, event: Event) {
 								)?;
 							}
 							QuickStartEvent::RefreshRecentList { id } => {
-
-								for recent_project in &app_settings.load().recent_projects{
-									if !recent_project.path.exists(){
+								for recent_project in &app_settings.load().recent_projects {
+									if !recent_project.path.exists() {
 										handle_event(
 											&app,
-											Event::Global(GlobalEvent::RemoveRecentProject(recent_project.path.clone()))
+											Event::Global(GlobalEvent::RemoveRecentProject(
+												recent_project.path.clone()
+											))
 										);
 									}
 								}
-								
+
 								send_request(
 									&app,
 									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::RefreshRecentList {
@@ -390,34 +390,52 @@ fn event(app: AppHandle, event: Event) {
 								}
 								let project_dir = path.join(&name);
 								fs::create_dir_all(&project_dir).context("Failed to create mod folder")?;
-								if let Ok(data) = reqwest::get(SMF_MOD_TEMPLATE_ENDPOINT).await {
-									if let Ok(data) = data.bytes().await {
-										let reader = Cursor::new(data);
-										let mut archive =
-											zip::ZipArchive::new(reader).context("Failed to extract mod template")?;
+								let data = reqwest::get(SMF_MOD_TEMPLATE_ENDPOINT)
+									.await
+									.context("Failed to download SMF mod template")?
+									.error_for_status()
+									.context("Template endpoint returned an error status")?
+									.bytes()
+									.await
+									.context("Couldn't read template data")?;
 
-										for i in 0..archive.len() {
-											let mut file = archive.by_index(i).context(format!("Failed to grab file #{} in zip", i))?;
-											let outpath = match file.enclosed_name() {
-												Some(path) => path,
-												None => continue
-											};
-											if file.is_dir() {continue;}
-											if file.is_file() {
-												let file_path = replace_prefix(outpath, "smf-mod-main", &project_dir)
-													.context("Failed to move mod template files")?;
-												fs::create_dir_all(file_path.parent().context(format!("Failed to read parent for {}", file_path.display()))?)
-													.context("Failed to create necessary project folder")?;
-												let mut outfile = fs::File::create(&file_path).context(format!("Failed to create file {}", file_path.display()))?;
-												std::io::copy(&mut file, &mut outfile).context(format!("Can't copy contents of file to {}", file_path.display()))?;
+								let reader = Cursor::new(data);
+								let mut archive =
+									zip::ZipArchive::new(reader).context("Failed to open mod template ZIP")?;
 
-												#[cfg(target_os = "linux")]
-												{
-													if let Some(mode) = file.unix_mode() {
-														fs::set_permissions(&file_path, fs::Permissions::from_mode(mode))
-															.context("Failed to set the correct file permissions")?;
-													}
-												}
+								for i in 0..archive.len() {
+									let mut file = archive
+										.by_index(i)
+										.context(format!("Failed to grab file #{} in zip", i))?;
+									let outpath = match file.enclosed_name() {
+										Some(path) => path,
+										None => continue
+									};
+									if file.is_dir() {
+										continue;
+									}
+									if file.is_file() {
+										let file_path = replace_prefix(outpath, "smf-mod-main", &project_dir)
+											.context("Failed to move mod template files")?;
+										fs::create_dir_all(
+											file_path.parent().context(format!(
+												"Failed to read parent for {}",
+												file_path.display()
+											))?
+										)
+										.context("Failed to create necessary project folder")?;
+										let mut outfile = fs::File::create(&file_path)
+											.context(format!("Failed to create file {}", file_path.display()))?;
+										std::io::copy(&mut file, &mut outfile).context(format!(
+											"Can't copy contents of file to {}",
+											file_path.display()
+										))?;
+
+										#[cfg(target_os = "linux")]
+										{
+											if let Some(mode) = file.unix_mode() {
+												fs::set_permissions(&file_path, fs::Permissions::from_mode(mode))
+													.context("Failed to set the correct file permissions")?;
 											}
 										}
 									}
@@ -594,7 +612,15 @@ fn event(app: AppHandle, event: Event) {
 
 							if !path.exists() {
 								finish_task(&app, task)?;
-								panic!("Failed to load workspace {}, path not found", path.display())
+								send_notification(
+									&app,
+									Notification {
+										kind: NotificationKind::Error,
+										title: "Workspace not found".into(),
+										subtitle: format!("The folder {} does not exist.", path.display())
+									}
+								)?;
+								return;
 							}
 
 							let mut files = vec![];
@@ -1443,7 +1469,8 @@ fn event(app: AppHandle, event: Event) {
 						GlobalEvent::AddRecentProject(path) => {
 							let mut settings = (*app_settings.load_full()).to_owned();
 
-							let project = ProjectInfo::from_path(&path).context(format!("Failed to read data for project at {}", path.display()))?;
+							let project = ProjectInfo::from_path(&path)
+								.context(format!("Failed to read data for project at {}", path.display()))?;
 
 							if let Some(pos) = settings.recent_projects.iter().position(|x| x.path == project.path) {
 								settings.recent_projects.remove(pos);
