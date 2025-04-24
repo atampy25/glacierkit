@@ -498,8 +498,9 @@
 		key: "b",
 		control: true,
 		shift: false,
-		callback: async () => {
-			trackEvent("Fold/Unfold the tool pane")
+		callback: async (e) => {
+			e.preventDefault?.()
+			await trackEvent("Fold/Unfold the tool pane")
 
 			if (toolPaneWidth == 0) {
 				toolPaneWidth = previousPaneWidth
