@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.9.1"
+version = "1.10.1"
 description = "An integrated modding tool for the HITMAN World of Assassination trilogy."
 authors = ["you"]
 license = ""
@@ -28,7 +28,6 @@ keyvalues-serde = "0.2.2"
 itertools = "0.14.0"
 serde-smile = "0.2.2"
 brotli-decompressor = "4.0.2"
-reqwest = { version = "0.12.12", features = ["json"] }
 trash = "5.2.1"
 velcro = "0.5.4"
 indexmap = "2.7.1"
@@ -62,25 +61,19 @@ biome_rowan = "=0.5.7"
 biome_parser = "=0.5.7"
 biome_unicode_table = "=0.5.7"
 os_info = "3.9.2"
-derive_more = { version = "2.0.1", features = ["debug"] }
 home = "0.5.11"
 
-# [dependencies.snmalloc-rs]
-# version = "0.3.7"
-# features = ["lto"]
+[dependencies.reqwest]
+version = "0.12.12"
+features = ["json"]
+
+[dependencies.derive_more]
+version = "2.0.1"
+features = ["debug"]
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"
-features = [
-    "serde",
-    "specta",
-    "rpkg-rs",
-    "glacier-texture",
-    "tonytools",
-    "resourcelib",
-    "hash_list",
-    "game_detection",
-]
+features = ["serde", "specta", "rpkg-rs", "glacier-texture", "tonytools", "resourcelib", "hash_list", "game_detection"]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
