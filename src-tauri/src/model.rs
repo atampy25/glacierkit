@@ -1,5 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
-
+use std::path::Path;
 use arc_swap::{ArcSwap, ArcSwapOption};
 use dashmap::DashMap;
 use hashbrown::HashMap;
@@ -58,13 +58,13 @@ pub struct ProjectInfo {
 }
 
 impl ProjectInfo {
-	pub fn from_path(path: PathBuf) -> Option<Self> {
+	pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
 		#[derive(Deserialize)]
 		struct Manifest { name: String, version: String }
 
-		let file = std::fs::File::open(path.join("manifest.json")).ok()?;
+		let file = std::fs::File::open(path.as_ref().join("manifest.json")).ok()?;
 		let Manifest { name, version } = serde_json::from_reader::<_, Manifest>(file).ok()?;
-		Some(ProjectInfo { name, path, version })
+		Some(ProjectInfo { name, path: path.as_ref().into(), version })
 	}
 }
 

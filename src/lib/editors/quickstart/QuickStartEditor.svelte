@@ -46,14 +46,13 @@
 	}
 
 	let invalid_path = false
-	$: invalid_name_empty = new_project_config.name === null || new_project_config.name === ""
+	$: invalid_name_empty = new_project_config.name.trim().length === 0
 	$: invalid_semver = valid(new_project_config.version) === null
 
 	$: full_path = (new_project_config.path || "") + "/" + (new_project_config.name || "")
 	$: project_id = upperFirst(camelCase(new_project_config.author)) + "." + upperFirst(camelCase(new_project_config.name))
 
 	export async function handleRequest(request: QuickStartRequest) {
-		console.log(`Start menu ${id} handling request`, request)
 
 		switch (request.type) {
 			case "initialise":

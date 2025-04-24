@@ -76,6 +76,10 @@ use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
 
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::PermissionsExt;
+
+
 pub const HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
 
@@ -388,7 +392,7 @@ fn event(app: AppHandle, event: Event) {
 												Some(path) => path,
 												None => continue
 											};
-
+											if file.is_dir() {continue;}
 											if file.is_file() {
 												let file_path = replace_prefix(outpath, "smf-mod-main", &project_dir)
 													.context("Failed to move mod template files")?;
@@ -396,15 +400,13 @@ fn event(app: AppHandle, event: Event) {
 													.context("Failed to create necessary project folder")?;
 												let mut outfile = fs::File::create(&file_path).unwrap();
 												std::io::copy(&mut file, &mut outfile).unwrap();
-											}
 
-											#[cfg(target_os = "linux")]
-											{
-												use std::os::unix::fs::PermissionsExt;
-
-												if let Some(mode) = file.unix_mode() {
-													fs::set_permissions(&project_dir, fs::Permissions::from_mode(mode))
-														.context("Failed to set the correct folder permissions")?;
+												#[cfg(target_os = "linux")]
+												{
+													if let Some(mode) = file.unix_mode() {
+														fs::set_permissions(&file_path, fs::Permissions::from_mode(mode))
+															.context("Failed to set the correct file permissions")?;
+													}
 												}
 											}
 										}
@@ -1426,7 +1428,7 @@ fn event(app: AppHandle, event: Event) {
 						GlobalEvent::AddRecentProject(path) => {
 							let mut settings = (*app_settings.load_full()).to_owned();
 
-							let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
+							let project = ProjectInfo::from_path(&path).context(format!("Failed to read data for project at {}", path.display()))?;
 
 							if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
 								settings.recent_projects.remove(pos);
@@ -1450,7 +1452,7 @@ fn event(app: AppHandle, event: Event) {
 
 						GlobalEvent::RemoveRecentProject(path) => {
 							let mut settings = (*app_settings.load_full()).to_owned();
-							let project = ProjectInfo::from_path(path).context("Failed to read project data")?;
+							let project = ProjectInfo::from_path(&path).context(format!("Failed to read data for project at {}", path.display()))?;
 							if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
 								settings.recent_projects.remove(pos);
 							}
