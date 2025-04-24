@@ -20,13 +20,6 @@
 <div class="flex flex-col gap-1 mb-2">
 	{#each data as value}
 		<div class="flex items-center gap-2">
-			<!-- <Button
-				kind="ghost"
-				size="small"
-				icon={Copy}
-				iconDescription="Copy value"
-			/> -->
-
 			<div class="w-full">
 				<div class="w-5/6 flex gap-2">
 					<CodeSnippet code={value}/>
@@ -41,10 +34,7 @@
 				}}
 				/>
 				</div>
-				
 			</div>
-			
-			
 		</div>
 	{/each}
 	{#if data.length == 0}

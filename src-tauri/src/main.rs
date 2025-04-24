@@ -69,8 +69,6 @@ use tauri::{
 	api::{dialog::blocking::FileDialogBuilder, process::Command},
 	async_runtime, AppHandle, Manager
 };
-use std::path::StripPrefixError;
-use tauri::{api::process::Command, async_runtime, AppHandle, Manager};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_log::LogTarget;
 use tryvial::try_fn;
