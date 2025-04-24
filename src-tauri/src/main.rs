@@ -355,6 +355,16 @@ fn event(app: AppHandle, event: Event) {
 								)?;
 							}
 							QuickStartEvent::RefreshRecentList { id } => {
+
+								for recent_project in &app_settings.load().recent_projects{
+									if !recent_project.path.exists(){
+										handle_event(
+											&app,
+											Event::Global(GlobalEvent::RemoveRecentProject(recent_project.path.clone()))
+										);
+									}
+								}
+								
 								send_request(
 									&app,
 									Request::Editor(EditorRequest::QuickStart(QuickStartRequest::RefreshRecentList {
@@ -581,6 +591,11 @@ fn event(app: AppHandle, event: Event) {
 						GlobalEvent::LoadWorkspace(path) => {
 							app.track_event("Workspace loaded", None);
 							let task = start_task(&app, format!("Loading project {}", path.display()))?;
+
+							if !path.exists() {
+								finish_task(&app, task)?;
+								panic!("Failed to load workspace {}, path not found", path.display())
+							}
 
 							let mut files = vec![];
 
@@ -1430,7 +1445,7 @@ fn event(app: AppHandle, event: Event) {
 
 							let project = ProjectInfo::from_path(&path).context(format!("Failed to read data for project at {}", path.display()))?;
 
-							if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
+							if let Some(pos) = settings.recent_projects.iter().position(|x| x.path == project.path) {
 								settings.recent_projects.remove(pos);
 							}
 
@@ -1452,8 +1467,7 @@ fn event(app: AppHandle, event: Event) {
 
 						GlobalEvent::RemoveRecentProject(path) => {
 							let mut settings = (*app_settings.load_full()).to_owned();
-							let project = ProjectInfo::from_path(&path).context(format!("Failed to read data for project at {}", path.display()))?;
-							if let Some(pos) = settings.recent_projects.iter().position(|x| *x == project) {
+							if let Some(pos) = settings.recent_projects.iter().position(|x| x.path == path) {
 								settings.recent_projects.remove(pos);
 							}
 

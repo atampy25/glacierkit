@@ -47,16 +47,21 @@
 
 	let invalid_path = false
 	$: invalid_name_empty = new_project_config.name.trim().length === 0
+	$: invalid_author_empty = new_project_config.author.trim().length === 0
 	$: invalid_semver = valid(new_project_config.version) === null
 
 	$: full_path = (new_project_config.path || "") + "/" + (new_project_config.name || "")
 	$: project_id = upperFirst(camelCase(new_project_config.author)) + "." + upperFirst(camelCase(new_project_config.name))
 
+	async function refreshRecentList(){
+		await event({ type: "editor", data: { type: "quickStart", data: { type: "refreshRecentList", data: { id } } } })
+	}
+
 	export async function handleRequest(request: QuickStartRequest) {
 
 		switch (request.type) {
 			case "initialise":
-				recent_projects = request.data.recent_projects
+				await refreshRecentList()
 				break
 
 			case "refreshRecentList":
@@ -65,6 +70,7 @@
 
 			case "loadLocalProject":
 				await event({ type: "global", data: { type: "loadWorkspace", data: request.data.project } })
+				await refreshRecentList()
 				await event({ type: "global", data: { type: "removeTab", data: id } })
 				break
 
@@ -283,6 +289,7 @@
 		on:click:button--secondary={() => (dialog_open = false)}
 		on:click:button--primary={() => {
 			if (invalid_name_empty) return
+			if (invalid_author_empty) return
 			if (invalid_semver) return
 			if (new_project_config.path === null) {
 				invalid_path = true
@@ -300,7 +307,7 @@
 					   bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
 			<br />
 			<div class="flex gap-4">
-				<TextInput class="flex-grow" required labelText="Project author" bind:value={new_project_config.author}
+				<TextInput class="flex-grow" required invalid={invalid_author_empty} labelText="Project author" bind:value={new_project_config.author}
 						   invalidText="Invalid author! Please don't use special characters" />
 				<TextInput
 					class="w-32"
