@@ -397,7 +397,7 @@ fn event(app: AppHandle, event: Event) {
 											zip::ZipArchive::new(reader).context("Failed to extract mod template")?;
 
 										for i in 0..archive.len() {
-											let mut file = archive.by_index(i).unwrap();
+											let mut file = archive.by_index(i).context(format!("Failed to grab file #{} in zip", i))?;
 											let outpath = match file.enclosed_name() {
 												Some(path) => path,
 												None => continue
@@ -406,10 +406,10 @@ fn event(app: AppHandle, event: Event) {
 											if file.is_file() {
 												let file_path = replace_prefix(outpath, "smf-mod-main", &project_dir)
 													.context("Failed to move mod template files")?;
-												fs::create_dir_all(file_path.parent().unwrap())
+												fs::create_dir_all(file_path.parent().context(format!("Failed to read parent for {}", file_path.display()))?)
 													.context("Failed to create necessary project folder")?;
-												let mut outfile = fs::File::create(&file_path).unwrap();
-												std::io::copy(&mut file, &mut outfile).unwrap();
+												let mut outfile = fs::File::create(&file_path).context(format!("Failed to create file {}", file_path.display()))?;
+												std::io::copy(&mut file, &mut outfile).context(format!("Can't copy contents of file to {}", file_path.display()))?;
 
 												#[cfg(target_os = "linux")]
 												{
