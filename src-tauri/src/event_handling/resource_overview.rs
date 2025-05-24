@@ -15,7 +15,7 @@ use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	ores::{parse_hashes_ores, parse_json_ores},
 	sdef::SoundDefinitions,
-	wwev::{WwiseEvent, WwiseEventData}
+	wwev::WwiseEvent
 };
 use image::{ImageFormat, ImageReader};
 use prim_rs::render_primitive::RenderPrimitive;
@@ -336,66 +336,60 @@ pub fn initialise_resource_overview(
 
 					let wwev = WwiseEvent::parse(&res_data)?;
 
-					match wwev.data {
-						WwiseEventData::NonStreamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+					for object in wwev.non_streamed {
+						let temp_file_id = Uuid::new_v4();
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										&format!("{}.wav", temp_file_id)
-									])
-									.run()
-									.with_context(|| {
-										format!("Couldn't convert non-streamed object {}", object.wem_id)
-									})?;
+						Command::new_sidecar("vgmstream-cli")?
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								&format!("{}.wav", temp_file_id)
+							])
+							.run()
+							.with_context(|| {
+								format!("Couldn't convert non-streamed object {}", object.wem_id)
+							})?;
 
-								wav_paths.push((
-									"Embedded audio".into(),
-									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-								))
-							}
-						}
+						wav_paths.push((
+							"Embedded audio".into(),
+							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+						))
+					}
 
-						WwiseEventData::Streamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+					for object in wwev.streamed {
+						let temp_file_id = Uuid::new_v4();
 
-								let wwem_hash = res_meta
-									.core_info
-									.references
-									.get(object.dependency_index as usize)
-									.context("No such WWEM dependency")?
-									.resource
-									.get_id();
+						let wwem_hash = res_meta
+							.core_info
+							.references
+							.get(object.dependency_index as usize)
+							.context("No such WWEM dependency")?
+							.resource
+							.get_id();
 
-								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
+						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										&format!("{}.wav", temp_file_id)
-									])
-									.run()
-									.with_context(|| format!("Couldn't convert streamed object {wwem_hash}"))?;
+						Command::new_sidecar("vgmstream-cli")?
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								&format!("{}.wav", temp_file_id)
+							])
+							.run()
+							.with_context(|| format!("Couldn't convert streamed object {wwem_hash}"))?;
 
-								wav_paths.push((
-									wwem_hash.to_string(),
-									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-								))
-							}
-						}
+						wav_paths.push((
+							wwem_hash.to_string(),
+							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+						))
 					}
 
 					ResourceOverviewData::MultiAudio {
@@ -1544,58 +1538,52 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 					let mut idx = 0;
 
-					match wwev.data {
-						WwiseEventData::NonStreamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+					for object in wwev.non_streamed {
+						let temp_file_id = Uuid::new_v4();
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
-									])
-									.run()
-									.context("VGMStream command failed")?;
+						Command::new_sidecar("vgmstream-cli")?
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
+							])
+							.run()
+							.context("VGMStream command failed")?;
 
-								idx += 1;
-							}
-						}
+						idx += 1;
+					}
+					
+					for object in wwev.streamed {
+						let temp_file_id = Uuid::new_v4();
 
-						WwiseEventData::Streamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+						let wwem_hash = res_meta
+							.core_info
+							.references
+							.get(object.dependency_index as usize)
+							.context("No such WWEM dependency")?
+							.resource
+							.get_id();
 
-								let wwem_hash = res_meta
-									.core_info
-									.references
-									.get(object.dependency_index as usize)
-									.context("No such WWEM dependency")?
-									.resource
-									.get_id();
+						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
-								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
+						Command::new_sidecar("vgmstream-cli")?
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
+							])
+							.run()
+							.context("VGMStream command failed")?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
-									])
-									.run()
-									.context("VGMStream command failed")?;
-
-								idx += 1;
-							}
-						}
+						idx += 1;
 					}
 				}
 			}
@@ -1631,58 +1619,52 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 					let wwev = WwiseEvent::parse(&res_data)?;
 
-					match wwev.data {
-						WwiseEventData::NonStreamed(objects) => {
-							let temp_file_id = Uuid::new_v4();
+					let temp_file_id = Uuid::new_v4();
 
-							fs::write(
-								data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
-								&objects.get(index as usize).context("No such audio object")?.data
-							)?;
+					if index < wwev.non_streamed.len() as u32 {
+						fs::write(
+							data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
+							&wwev.non_streamed.get(index as usize).context("No such audio object")?.data
+						)?;
 
-							Command::new_sidecar("vgmstream-cli")?
-								.current_dir(data_dir.join("temp"))
-								.args([
-									&format!("{}.wem", temp_file_id),
-									"-L",
-									"-o",
-									path.to_string_lossy().as_ref()
-								])
-								.run()
-								.context("VGMStream command failed")?;
-						}
+						Command::new_sidecar("vgmstream-cli")?
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.to_string_lossy().as_ref()
+							])
+							.run()
+							.context("VGMStream command failed")?;
+					} else {
+						let wwem_hash = res_meta
+							.core_info
+							.references
+							.get(
+								wwev.streamed
+									.get(index as usize - wwev.non_streamed.len())
+									.context("No such audio object")?
+									.dependency_index as usize
+							)
+							.context("No such WWEM dependency")?
+							.resource
+							.get_id();
 
-						WwiseEventData::Streamed(objects) => {
-							let temp_file_id = Uuid::new_v4();
+						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
-							let wwem_hash = res_meta
-								.core_info
-								.references
-								.get(
-									objects
-										.get(index as usize)
-										.context("No such audio object")?
-										.dependency_index as usize
-								)
-								.context("No such WWEM dependency")?
-								.resource
-								.get_id();
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
-							let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
-
-							fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
-
-							Command::new_sidecar("vgmstream-cli")?
-								.current_dir(data_dir.join("temp"))
-								.args([
-									&format!("{}.wem", temp_file_id),
-									"-L",
-									"-o",
-									path.to_string_lossy().as_ref()
-								])
-								.run()
-								.context("VGMStream command failed")?;
-						}
+						Command::new_sidecar("vgmstream-cli")?
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.to_string_lossy().as_ref()
+							])
+							.run()
+							.context("VGMStream command failed")?;
 					}
 				}
 			}
