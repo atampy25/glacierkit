@@ -1,15 +1,15 @@
 {
-	"version": "1.10.1",
-	"notes": "Update quickentity-rs",
-	"pub_date": "2025-04-23T13:25:50Z",
+	"version": "1.11.0",
+	"notes": "Improve WWEV parsing, add support for H1 WWEVs",
+	"pub_date": "2025-04-30T13:39:25Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2JneVhmRWtnNFhTdXlPd3FZb2dBZFBPbElKaVJTaFNqK0h4NlYvY3pwaUs1YkpLcXZFSlozS3M3aW5QUWlleEp0Y0g4emNuUldZdlBaN3NjeU44d2c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzQ1NDczMTg0CWZpbGU6R2xhY2llcktpdF8xLjEwLjFfeDY0X2VuLVVTLm1zaS56aXAKT2tFWkFDbjd6Q3FOWDhRZnl2R09aNjUrOHdkQVZhSVFPdi9iYTdSZDNCaXFSanVjQW9lOXlkZzIvY1BMU0VyaTBRN3NSYmxrT3NjYys0VkVNZkNRQ0E9PQo=",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.10.1/GlacierKit_1.10.1_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1FseVc4MmxQM2pySGJIdnRuSFhJdWFZcXMvZlpBcWZyNjZRdVBpNHdLR29UaWpRWlU2SlJrUHJUdHpDZU5rQ1J2TnQ0YWVtekwwWUtTRUVNUDlNYndrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzQ4MDc0ODcxCWZpbGU6R2xhY2llcktpdF8xLjExLjBfeDY0X2VuLVVTLm1zaS56aXAKMllZRzl4QWZUak56ZjREWnVkb3F6RTBFNDZraE15cEYwUEpkMmk5dllsTnZBNzVYK0N5ejVNK3gvSzRBZGIvbWt4dk13TUlPVXRtZXdPOHNjOCtHQ2c9PQo=",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.11.0/GlacierKit_1.11.0_x64_en-US.msi.zip"
 		},
 		"linux-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1p5MGUvL21CZ25ITTF6eE5yd2FwL0l0MTNiM082OTYrVGh6eXdBc0Rmc08yUUJXOE9UUjdMVVFzTFNsR0srQlNWWW9TZStYNFd6cmZscHUvS242T1FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzQ1NDcyNzg5CWZpbGU6Z2xhY2llci1raXRfMS4xMC4xX2FtZDY0LkFwcEltYWdlLnRhci5negpGck9nOE1rK0lwZVVaUVV5Wmt0dWIzbjIybCsxTUtXeWQ0aWhTdW1OTlJPdjNVek1sYndKbFpPb29DZ1h5U2tMamRkSDRNaTFURXJSamtndnVudFlDdz09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.10.1/GlacierKit_1.10.1_amd64.AppImage.tar.gz"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2RwUytuRXRpWlRQblNUSTJQSzZSckl6RlZKQUJBZEd1eGpvUzQ0OXJseFBIN3F2RGFTdzhFR3Jmc1hlS0s5THc1UlVqeU5PMzhUTjJaUWRKYnRyQkFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzQ4MDc0NTU1CWZpbGU6Z2xhY2llci1raXRfMS4xMS4wX2FtZDY0LkFwcEltYWdlLnRhci5negpNN09nYUNZRmU5NXhyaVlFVml3enB4OFJXMDBzTFhZVGV6WjIwWjBuY2lRLzBwMnMwK1Y1SlRnelR5ODZRdzZHeURvd051Z2VUOHpWVTg3MGwvc2dBZz09Cg==",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.11.0/GlacierKit_1.11.0_amd64.AppImage.tar.gz"
 		}
 	}
 }
