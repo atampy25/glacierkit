@@ -201,6 +201,69 @@
 
 						const colours: monaco.languages.IColorInformation[] = []
 
+						if (Array.isArray(data)) {
+							for (const item of data) {
+								if (item.properties) {
+									for (const propertyData of Object.values(item.properties) as Property[]) {
+										if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
+											const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+											const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+											const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+
+											for (const [lineNo, line] of model.getLinesContent().entries()) {
+												const char = line.indexOf(propertyData.value)
+
+												if (char !== -1) {
+													colours.push({
+														color: {
+															red: r / 255,
+															green: g / 255,
+															blue: b / 255,
+															alpha: 1
+														},
+														range: {
+															startLineNumber: lineNo + 1,
+															endLineNumber: lineNo + 1,
+															startColumn: char + 1,
+															endColumn: char + 1 + 7
+														}
+													})
+												}
+											}
+										}
+
+										if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
+											const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+											const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+											const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+											const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
+
+											for (const [lineNo, line] of model.getLinesContent().entries()) {
+												const char = line.indexOf(propertyData.value)
+
+												if (char !== -1) {
+													colours.push({
+														color: {
+															red: r / 255,
+															green: g / 255,
+															blue: b / 255,
+															alpha: a / 255
+														},
+														range: {
+															startLineNumber: lineNo + 1,
+															endLineNumber: lineNo + 1,
+															startColumn: char + 1,
+															endColumn: char + 1 + 9
+														}
+													})
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+
 						if (data.properties) {
 							for (const propertyData of Object.values(data.properties) as Property[]) {
 								if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
