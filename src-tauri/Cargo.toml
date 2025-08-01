@@ -6,14 +6,14 @@ authors = ["you"]
 license = ""
 repository = ""
 default-run = "app"
-edition = "2021"
+edition = "2024"
 
 [profile.release]
 lto = true
 codegen-units = 1
 
 [build-dependencies.tauri-build]
-version = "1.5.1"
+version = "=1.5.3"
 features = []
 
 [dependencies]
@@ -37,6 +37,7 @@ rpkg-rs = "1.2.0"
 async-recursion = "1.0.5"
 parking_lot = "0.12.1"
 rayon = "1.10.0"
+tauri = { version = "=1.7.1", features = ["api-all", "devtools", "updater"] }
 tauri-plugin-aptabase = "0.5.1"
 image = "0.25.5"
 hex = "0.4.3"
@@ -61,7 +62,7 @@ os_info = "3.8.2"
 derivative = "2.2.0"
 zip = "2.2.0"
 home = "0.5.9"
-opener = {version="0.7.2", features= ["reveal"] }
+opener = { version = "0.7.2", features = ["reveal"] }
 
 [dependencies.reqwest]
 version = "0.12.12"
@@ -73,7 +74,16 @@ features = ["debug"]
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"
-features = ["serde", "specta", "rpkg-rs", "glacier-texture", "tonytools", "resourcelib", "hash_list", "game_detection"]
+features = [
+    "serde",
+    "specta",
+    "rpkg-rs",
+    "glacier-texture",
+    "tonytools",
+    "resourcelib",
+    "hash_list",
+    "game_detection",
+]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"
@@ -87,9 +97,13 @@ features = ["preserve_order"]
 version = "1.0.194"
 features = ["derive"]
 
-[dependencies.tauri]
-version = "1.5.4"
-features = ["api-all", "devtools", "updater"]
+[patch.crates-io.tauri]
+git = "https://github.com/tauri-apps/tauri"
+branch = "feat/1.x-edition-2024"
+
+[patch.crates-io.tauri-build]
+git = "https://github.com/tauri-apps/tauri"
+branch = "feat/1.x-edition-2024"
 
 [dependencies.specta]
 version = "=2.0.0-rc.7"

@@ -1,5 +1,3 @@
-use std::{path::PathBuf, sync::Arc};
-use std::path::Path;
 use arc_swap::{ArcSwap, ArcSwapOption};
 use dashmap::DashMap;
 use hashbrown::HashMap;
@@ -15,6 +13,8 @@ use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
+use std::path::Path;
+use std::{path::PathBuf, sync::Arc};
 use structstruck::strike;
 use uuid::Uuid;
 
@@ -60,11 +60,18 @@ pub struct ProjectInfo {
 impl ProjectInfo {
 	pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
 		#[derive(Deserialize)]
-		struct Manifest { name: String, version: String }
+		struct Manifest {
+			name: String,
+			version: String
+		}
 
 		let file = std::fs::File::open(path.as_ref().join("manifest.json")).ok()?;
 		let Manifest { name, version } = serde_json::from_reader::<_, Manifest>(file).ok()?;
-		Some(ProjectInfo { name, path: path.as_ref().into(), version })
+		Some(ProjectInfo {
+			name,
+			path: path.as_ref().into(),
+			version
+		})
 	}
 }
 

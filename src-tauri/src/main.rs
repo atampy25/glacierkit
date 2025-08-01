@@ -5,7 +5,6 @@
 #![feature(try_blocks)]
 #![feature(try_find)]
 #![allow(clippy::type_complexity)]
-#![feature(let_chains)]
 
 pub mod biome;
 pub mod editor_connection;
@@ -31,7 +30,7 @@ use std::{
 	time::{Duration, SystemTime, UNIX_EPOCH}
 };
 
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, anyhow, bail};
 use arc_swap::ArcSwap;
 use biome::format_json;
 use dashmap::DashMap;
@@ -48,7 +47,7 @@ use hitman_commons::game::GameVersion;
 use hitman_commons::game_detection::detect_installs;
 use indexmap::IndexMap;
 use json_patch::Patch;
-use log::{info, trace, LevelFilter};
+use log::{LevelFilter, info, trace};
 use model::{
 	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
 	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest,
@@ -59,15 +58,16 @@ use model::{
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
 use quickentity_rs::{generate_patch, qn_structs::Property};
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, json, to_value, to_vec, Value};
+use serde_json::{Value, from_slice, json, to_value, to_vec};
 use show_in_folder::show_in_folder;
 use std::fs::OpenOptions;
 use std::path::StripPrefixError;
 use tauri::{
+	AppHandle, Manager,
 	api::{dialog::blocking::FileDialogBuilder, process::Command},
-	async_runtime, AppHandle, Manager
+	async_runtime
 };
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_log::LogTarget;

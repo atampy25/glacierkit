@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
@@ -14,22 +14,22 @@ use hitman_formats::material::{MaterialEntity, MaterialOverride};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
+	RAD2DEG,
 	qn_structs::{Entity, Ref, RefMaybeConstantValue, RefWithConstantValue},
-	util_structs::{SMatrix43PropertyValue, ZGuidPropertyValue},
-	RAD2DEG
+	util_structs::{SMatrix43PropertyValue, ZGuidPropertyValue}
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, json, to_value, Value};
+use serde_json::{Value, from_value, json, to_value};
 use tryvial::try_fn;
 
 use crate::{
 	entity::get_local_reference,
 	resourcelib::{
-		convert_uicb, h2016_convert_cppt, h2016_convert_dswb, h2016_convert_ecpb, h2016_convert_wsgb, h2_convert_cppt,
-		h2_convert_dswb, h2_convert_ecpb, h2_convert_wsgb, h3_convert_cppt, h3_convert_dswb, h3_convert_ecpb,
-		h3_convert_wsgb, EAttributeKind, EExtendedPropertyType
+		EAttributeKind, EExtendedPropertyType, convert_uicb, h2_convert_cppt, h2_convert_dswb, h2_convert_ecpb,
+		h2_convert_wsgb, h3_convert_cppt, h3_convert_dswb, h3_convert_ecpb, h3_convert_wsgb, h2016_convert_cppt,
+		h2016_convert_dswb, h2016_convert_ecpb, h2016_convert_wsgb
 	},
 	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource}
 };

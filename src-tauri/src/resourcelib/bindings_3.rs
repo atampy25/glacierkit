@@ -97,7 +97,7 @@ pub const _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES: u32 = 1;
 pub const _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_MEMORY: u32 = 0;
 pub const _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES_MEMORY: u32 = 0;
 pub type va_list = *mut ::std::os::raw::c_char;
-extern "C" {
+unsafe extern "C" {
 	pub fn __va_start(arg1: *mut va_list, ...);
 }
 #[repr(C)]
@@ -113,16 +113,16 @@ pub struct __vcrt_assert_va_start_is_not_reference {
 	pub _address: u8
 }
 pub type __vcrt_bool = bool;
-extern "C" {
+unsafe extern "C" {
 	pub fn __security_init_cookie();
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn __security_check_cookie(_StackCookie: usize);
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn __report_gsfailure(_StackCookie: usize) -> !;
 }
-extern "C" {
+unsafe extern "C" {
 	pub static mut __security_cookie: usize;
 }
 pub type int_least8_t = ::std::os::raw::c_schar;
@@ -212,13 +212,13 @@ pub type std__Const_thru_ref = std_remove_reference;
 pub type std__Remove_cvref_t = std_remove_cv_t;
 pub type std_max_align_t = f64;
 pub type __crt_bool = bool;
-extern "C" {
+unsafe extern "C" {
 	pub fn _invalid_parameter_noinfo();
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn _invalid_parameter_noinfo_noreturn() -> !;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn _invoke_watson(
 		_Expression: *const u16,
 		_FunctionName: *const u16,
@@ -366,19 +366,19 @@ fn bindgen_test_layout__Mbstatet() {
 pub type mbstate_t = _Mbstatet;
 pub type time_t = __time64_t;
 pub type rsize_t = usize;
-extern "C" {
+unsafe extern "C" {
 	pub fn _errno() -> *mut ::std::os::raw::c_int;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn _set_errno(_Value: ::std::os::raw::c_int) -> errno_t;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn _get_errno(_Value: *mut ::std::os::raw::c_int) -> errno_t;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn __threadid() -> ::std::os::raw::c_ulong;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn __threadhandle() -> usize;
 }
 #[repr(C)]
@@ -756,29 +756,29 @@ fn bindgen_test_layout_StringView() {
 		concat!("Offset of field: ", stringify!(StringView), "::", stringify!(Size))
 	);
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_GetConverterForResource(p_ResourceType: *const ::std::os::raw::c_char) -> *mut ResourceConverter;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_GetGeneratorForResource(p_ResourceType: *const ::std::os::raw::c_char) -> *mut ResourceGenerator;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_GetSupportedResourceTypes() -> *mut ResourceTypesArray;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_FreeSupportedResourceTypes(p_Array: *mut ResourceTypesArray);
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_IsResourceTypeSupported(p_ResourceType: *const ::std::os::raw::c_char) -> bool;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_GameStructToJson(
 		p_StructureType: *const ::std::os::raw::c_char,
 		p_Structure: *const ::std::os::raw::c_void,
 		p_Size: usize
 	) -> *mut JsonString;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_JsonToGameStruct(
 		p_StructureType: *const ::std::os::raw::c_char,
 		p_JsonStr: *const ::std::os::raw::c_char,
@@ -787,10 +787,10 @@ extern "C" {
 		p_TargetMemorySize: usize
 	) -> bool;
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_FreeJsonString(p_JsonString: *mut JsonString);
 }
-extern "C" {
+unsafe extern "C" {
 	pub fn HM3_GetPropertyName(p_PropertyId: u32) -> StringView;
 }
 #[repr(C)]

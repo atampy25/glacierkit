@@ -1,6 +1,6 @@
 use std::{fmt::Write, fs, io::Cursor, ops::Deref, sync::Arc};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use glacier_texture::{
@@ -20,12 +20,12 @@ use hitman_formats::{
 use image::{ImageFormat, ImageReader};
 use prim_rs::render_primitive::RenderPrimitive;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rpkg_rs::{resource::partition_manager::PartitionManager, GlacierResource};
+use rpkg_rs::{GlacierResource, resource::partition_manager::PartitionManager};
 use serde::Serialize;
-use serde_json::{json, to_string, to_vec, Value};
+use serde_json::{Value, json, to_string, to_vec};
 use tauri::{
-	api::{dialog::blocking::FileDialogBuilder, process::Command},
-	AppHandle, Manager, State
+	AppHandle, Manager, State,
+	api::{dialog::blocking::FileDialogBuilder, process::Command}
 };
 use tauri_plugin_aptabase::EventTracker;
 use tonytools::hmlanguages;
@@ -33,6 +33,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	Notification, NotificationKind, RunCommandExt,
 	biome::format_json,
 	finish_task,
 	general::open_in_editor,
@@ -43,12 +44,11 @@ use crate::{
 		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
 	},
 	resourcelib::{
-		convert_generic, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
-		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
-		h3_convert_binary_to_factory
+		convert_generic, h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
+		h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory
 	},
 	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource, extract_resource_changelog},
-	send_notification, send_request, start_task, Notification, NotificationKind, RunCommandExt
+	send_notification, send_request, start_task
 };
 
 #[try_fn]

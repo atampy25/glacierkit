@@ -1,6 +1,6 @@
 use std::fs;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use hitman_commons::metadata::RuntimeID;
 use serde_json::to_vec;
@@ -9,11 +9,12 @@ use tauri_plugin_aptabase::EventTracker;
 use tryvial::try_fn;
 
 use crate::{
+	Notification, NotificationKind,
 	model::{
 		AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
 		EntityMetadataRequest, GlobalRequest, Request, SettingsRequest, ToolRequest
 	},
-	send_notification, send_request, Notification, NotificationKind
+	send_notification, send_request
 };
 
 #[try_fn]

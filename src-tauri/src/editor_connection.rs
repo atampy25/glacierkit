@@ -1,41 +1,41 @@
 use std::{
 	sync::{
-		atomic::{AtomicBool, Ordering},
-		Arc
+		Arc,
+		atomic::{AtomicBool, Ordering}
 	},
 	time::Duration
 };
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{Context, Error, Result, anyhow};
 use debounced::debounced;
 use fn_error_context::context;
-use futures_util::{stream::SplitSink, SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use hitman_commons::metadata::RuntimeID;
 use indexmap::IndexMap;
 use quickentity_rs::{
 	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn,
 	qn_structs::{FullRef, Property, Ref}
 };
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, json, Value};
+use serde_json::{Value, from_value, json};
 use specta::Type;
-use tauri::{async_runtime::spawn, AppHandle, Manager};
+use tauri::{AppHandle, Manager, async_runtime::spawn};
 use tokio::{
 	net::TcpStream,
-	sync::{broadcast, RwLock}
+	sync::{RwLock, broadcast}
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
 use tryvial::try_fn;
 
 use crate::{
-	handle_event,
+	Notification, NotificationKind, handle_event,
 	model::{
 		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest,
 		EntityTreeRequest, Event, GlobalRequest, Request
 	},
-	send_notification, send_request, Notification, NotificationKind
+	send_notification, send_request
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

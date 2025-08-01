@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
 use arc_swap::ArcSwap;
 use fn_error_context::context;
@@ -20,17 +20,18 @@ use quickentity_rs::{
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
-use serde_json::{from_slice, from_str, from_value, json, to_string, to_value, Value};
+use serde_json::{Value, from_slice, from_str, from_value, json, to_string, to_value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	Notification, NotificationKind,
 	editor_connection::PropertyValue,
 	entity::{
-		alter_ref_according_to_changelist, calculate_reverse_references, change_reference_to_local,
-		check_local_references_exist, get_decorations, get_diff_info, get_local_reference, get_recursive_children,
-		is_valid_entity_factory, random_entity_id, CopiedEntityData, ReverseReferenceData
+		CopiedEntityData, ReverseReferenceData, alter_ref_according_to_changelist, calculate_reverse_references,
+		change_reference_to_local, check_local_references_exist, get_decorations, get_diff_info, get_local_reference,
+		get_recursive_children, is_valid_entity_factory, random_entity_id
 	},
 	finish_task, get_loaded_game_version,
 	model::{
@@ -38,11 +39,11 @@ use crate::{
 		EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, GlobalRequest, Request
 	},
 	resourcelib::{
-		h2016_convert_binary_to_factory, h2016_convert_cppt, h2_convert_binary_to_factory, h2_convert_cppt,
-		h3_convert_binary_to_factory, h3_convert_cppt
+		h2_convert_binary_to_factory, h2_convert_cppt, h3_convert_binary_to_factory, h3_convert_cppt,
+		h2016_convert_binary_to_factory, h2016_convert_cppt
 	},
 	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource},
-	send_notification, send_request, start_task, Notification, NotificationKind
+	send_notification, send_request, start_task
 };
 
 use super::monaco::SAFE_TO_SYNC;
@@ -760,9 +761,9 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> 
 								.iter()
 								.find(|x| {
 									get_local_reference(match x {
-										RefMaybeConstantValue::Ref(ref x) => x,
+										RefMaybeConstantValue::Ref(x) => x,
 										RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue {
-											ref entity_ref,
+											entity_ref,
 											..
 										}) => entity_ref
 									})
@@ -795,9 +796,9 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> 
 								.iter()
 								.find(|x| {
 									get_local_reference(match x {
-										RefMaybeConstantValue::Ref(ref x) => x,
+										RefMaybeConstantValue::Ref(x) => x,
 										RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue {
-											ref entity_ref,
+											entity_ref,
 											..
 										}) => entity_ref
 									})
@@ -830,9 +831,9 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: String) -> Result<()> 
 								.iter()
 								.find(|x| {
 									get_local_reference(match x {
-										RefMaybeConstantValue::Ref(ref x) => x,
+										RefMaybeConstantValue::Ref(x) => x,
 										RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue {
-											ref entity_ref,
+											entity_ref,
 											..
 										}) => entity_ref
 									})
@@ -1129,9 +1130,9 @@ pub async fn paste(
 						.into_iter()
 						.map(|entity_ref| {
 							if let Ref::Full(FullRef {
-								external_scene: Some(ref scene),
+								external_scene: Some(scene),
 								..
-							}) = entity_ref
+							}) = &entity_ref
 							{
 								if !entity.external_scenes.contains(scene) {
 									entity.external_scenes.push(scene.to_owned());
@@ -1231,7 +1232,7 @@ pub async fn paste(
 					};
 
 					if let Ref::Full(FullRef {
-						external_scene: Some(ref scene),
+						external_scene: Some(scene),
 						..
 					}) = underlying_ref
 					{
@@ -1285,7 +1286,7 @@ pub async fn paste(
 					};
 
 					if let Ref::Full(FullRef {
-						external_scene: Some(ref scene),
+						external_scene: Some(scene),
 						..
 					}) = underlying_ref
 					{
@@ -1339,9 +1340,9 @@ pub async fn paste(
 					};
 
 					if let Ref::Full(FullRef {
-						external_scene: Some(ref scene),
+						external_scene: Some(scene),
 						..
-					}) = underlying_ref
+					}) = &underlying_ref
 					{
 						if !entity.external_scenes.contains(scene) {
 							entity.external_scenes.push(scene.to_owned());
@@ -1416,7 +1417,7 @@ pub async fn paste(
 				*reference = alter_ref_according_to_changelist(reference, &changed_entity_ids);
 
 				if let Ref::Full(FullRef {
-					external_scene: Some(ref scene),
+					external_scene: Some(scene),
 					..
 				}) = reference
 				{

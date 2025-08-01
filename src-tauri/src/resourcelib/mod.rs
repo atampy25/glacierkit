@@ -1,6 +1,6 @@
 use std::ffi::{CStr, CString};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use fn_error_context::context;
 use hitman_commons::game::GameVersion;
 use hitman_commons::metadata::ResourceType;
@@ -16,10 +16,10 @@ mod bindings_2016;
 mod bindings_3;
 
 use self::bindings_2::{HM2_GetConverterForResource, HM2_GetGeneratorForResource, JsonString as JsonString2};
+use self::bindings_3::{HM3_GetConverterForResource, HM3_GetGeneratorForResource, JsonString as JsonString3};
 use self::bindings_2016::{
 	HM2016_GetConverterForResource, HM2016_GetGeneratorForResource, JsonString as JsonString2016
 };
-use self::bindings_3::{HM3_GetConverterForResource, HM3_GetGeneratorForResource, JsonString as JsonString3};
 
 #[try_fn]
 #[context("Couldn't convert binary data to ResourceLib TEMP")]

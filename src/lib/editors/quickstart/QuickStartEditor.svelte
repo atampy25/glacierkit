@@ -3,17 +3,7 @@
 	import { event } from "$lib/utils"
 
 	import { help } from "$lib/helpray"
-	import {
-		Button,
-		ClickableTile,
-		FluidForm,
-		Link,
-		Modal,
-		OutboundLink,
-		OverflowMenu,
-		OverflowMenuItem,
-		TextInput
-	} from "carbon-components-svelte"
+	import { Button, ClickableTile, FluidForm, Link, Modal, OutboundLink, OverflowMenu, OverflowMenuItem, TextInput } from "carbon-components-svelte"
 	import { FolderAdd, FolderOpen, Folders, LogoDiscord, LogoGithub, Document } from "carbon-icons-svelte"
 	import { dialog } from "@tauri-apps/api"
 	import { shell } from "@tauri-apps/api"
@@ -53,12 +43,11 @@
 	$: full_path = (new_project_config.path || "") + "/" + (new_project_config.name || "")
 	$: project_id = upperFirst(camelCase(new_project_config.author)) + "." + upperFirst(camelCase(new_project_config.name))
 
-	async function refreshRecentList(){
+	async function refreshRecentList() {
 		await event({ type: "editor", data: { type: "quickStart", data: { type: "refreshRecentList", data: { id } } } })
 	}
 
 	export async function handleRequest(request: QuickStartRequest) {
-
 		switch (request.type) {
 			case "initialise":
 				await refreshRecentList()
@@ -303,12 +292,17 @@
 		on:submit
 	>
 		<FluidForm>
-			<TextInput id="proj-name" required invalid={invalid_name_empty} labelText="Project name"
-					   bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
+			<TextInput id="proj-name" required invalid={invalid_name_empty} labelText="Project name" bind:value={new_project_config.name} invalidText="Project name cannot be empty" />
 			<br />
 			<div class="flex gap-4">
-				<TextInput class="flex-grow" required invalid={invalid_author_empty} labelText="Project author" bind:value={new_project_config.author}
-						   invalidText="Invalid author! Please don't use special characters" />
+				<TextInput
+					class="flex-grow"
+					required
+					invalid={invalid_author_empty}
+					labelText="Project author"
+					bind:value={new_project_config.author}
+					invalidText="Invalid author! Please don't use special characters"
+				/>
 				<TextInput
 					class="w-32"
 					required

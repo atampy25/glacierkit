@@ -1,5 +1,5 @@
-use anyhow::{anyhow, bail, Context, Result};
-use dashmap::{mapref::one::Ref, DashMap};
+use anyhow::{Context, Result, anyhow, bail};
+use dashmap::{DashMap, mapref::one::Ref};
 use hitman_commons::{
 	game::GameVersion,
 	hash_list::HashList,
@@ -17,8 +17,8 @@ use tryvial::try_fn;
 use crate::{
 	model::{ResourceChangelogEntry, ResourceChangelogOperation},
 	resourcelib::{
-		h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
-		h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
+		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
+		h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory
 	}
 };
 

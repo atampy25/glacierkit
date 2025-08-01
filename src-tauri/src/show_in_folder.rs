@@ -1,5 +1,5 @@
 #[cfg(target_os = "linux")]
-use fork::{daemon, Fork};
+use fork::{Fork, daemon};
 
 use std::process::Command;
 #[cfg(target_os = "linux")]

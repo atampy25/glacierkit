@@ -1,6 +1,6 @@
 use std::{fs, ops::Deref, time::Duration};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hitman_commons::metadata::RuntimeID;
@@ -15,8 +15,8 @@ use quickentity_rs::{
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
-use serde_json::{from_slice, from_str, from_value, json, to_string, to_value, to_vec, Value};
-use tauri::{async_runtime, AppHandle, Manager};
+use serde_json::{Value, from_slice, from_str, from_value, json, to_string, to_value, to_vec};
+use tauri::{AppHandle, Manager, async_runtime};
 use tauri_plugin_aptabase::EventTracker;
 use tokio::net::TcpStream;
 use tryvial::try_fn;
@@ -25,10 +25,11 @@ use velcro::vec;
 
 use crate::ores_repo::UnlockableItem;
 use crate::resourcelib::{
-	h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory, h2_convert_binary_to_blueprint,
-	h2_convert_binary_to_factory, h3_convert_binary_to_blueprint, h3_convert_binary_to_factory
+	h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
+	h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory
 };
 use crate::rpkg::extract_latest_resource;
+use crate::{Notification, NotificationKind, send_notification};
 use crate::{
 	convert_json_patch_to_merge_patch,
 	model::{
@@ -44,7 +45,6 @@ use crate::{
 	general::{load_game_files, open_file},
 	get_loaded_game_version
 };
-use crate::{send_notification, Notification, NotificationKind};
 
 #[try_fn]
 #[context("Couldn't handle tool event")]

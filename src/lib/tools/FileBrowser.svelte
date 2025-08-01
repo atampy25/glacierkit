@@ -59,15 +59,14 @@
 				check_callback: true,
 				force_text: true,
 				keyboard: {
-					f2: () => {
-					}
+					f2: () => {}
 				}
 			},
 			search: {
 				show_only_matches: true,
 				close_opened_onclear: false
 			},
-			sort: function(a: any, b: any) {
+			sort: function (a: any, b: any) {
 				return compareNodes(this.get_node(a), this.get_node(b))
 			},
 			contextmenu: {
@@ -77,128 +76,124 @@
 						...(!rightClickedNode.original.folder
 							? {}
 							: {
-								newfile: {
-									separator_before: false,
-									separator_after: true,
-									_disabled: false,
-									label: "New File",
-									icon: "fa fa-plus",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+									newfile: {
+										separator_before: false,
+										separator_after: true,
+										_disabled: false,
+										label: "New File",
+										icon: "fa fa-plus",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const id = v4()
+											const id = v4()
 
-										tree.create_node(
-											selected_node,
-											{
-												id,
-												parent: selected_node.id,
-												icon: "fa-regular fa-file",
-												text: "",
-												folder: false
-											},
-											getPositionOfNode(selected_node.id, "", false),
-											function(a: any) {
-												tree.edit(a, undefined, async (node, status, _c) => {
-													// Can't create patch files
-													if (!status || !node.text || node.text.endsWith(".patch.json")) {
-														tree.delete_node(id)
-														return
-													}
+											tree.create_node(
+												selected_node,
+												{
+													id,
+													parent: selected_node.id,
+													icon: "fa-regular fa-file",
+													text: "",
+													folder: false
+												},
+												getPositionOfNode(selected_node.id, "", false),
+												function (a: any) {
+													tree.edit(a, undefined, async (node, status, _c) => {
+														// Can't create patch files
+														if (!status || !node.text || node.text.endsWith(".patch.json")) {
+															tree.delete_node(id)
+															return
+														}
 
-													const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
+														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
 
-													tree.set_icon(
-														id,
-														icons.find((a) => path.split(".").at(-1)?.includes(a[0]))
-															? icons.find((a) => path.split(".").at(-1)?.includes(a[0]))![1]
-															: "fa-regular fa-file"
-													)
+														tree.set_icon(
+															id,
+															icons.find((a) => path.split(".").at(-1)?.includes(a[0]))
+																? icons.find((a) => path.split(".").at(-1)?.includes(a[0]))![1]
+																: "fa-regular fa-file"
+														)
 
-													pathToID[path] = id
+														pathToID[path] = id
 
-													await event({
-														type: "tool",
-														data: {
-															type: "fileBrowser",
+														await event({
+															type: "tool",
 															data: {
-																type: "create",
+																type: "fileBrowser",
 																data: {
-																	path,
-																	is_folder: false
+																	type: "create",
+																	data: {
+																		path,
+																		is_folder: false
+																	}
 																}
 															}
-														}
+														})
 													})
-												})
-											}
-										)
-									}
-								},
-								newfolder: {
-									separator_before: false,
-									separator_after: true,
-									_disabled: false,
-									label: "New Folder",
-									icon: "fa fa-plus",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+												}
+											)
+										}
+									},
+									newfolder: {
+										separator_before: false,
+										separator_after: true,
+										_disabled: false,
+										label: "New Folder",
+										icon: "fa fa-plus",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const id = v4()
+											const id = v4()
 
-										tree.create_node(
-											selected_node,
-											{
-												id,
-												parent: selected_node.id,
-												icon: "fa-regular fa-folder",
-												text: "",
-												folder: true
-											},
-											getPositionOfNode(selected_node.id, "", true),
-											function(a: any) {
-												tree.edit(a, undefined, async (node, status, _c) => {
-													if (!status || !node.text) {
-														tree.delete_node(id)
-														return
-													}
+											tree.create_node(
+												selected_node,
+												{
+													id,
+													parent: selected_node.id,
+													icon: "fa-regular fa-folder",
+													text: "",
+													folder: true
+												},
+												getPositionOfNode(selected_node.id, "", true),
+												function (a: any) {
+													tree.edit(a, undefined, async (node, status, _c) => {
+														if (!status || !node.text) {
+															tree.delete_node(id)
+															return
+														}
 
-													const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
+														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
 
-													pathToID[path] = id
+														pathToID[path] = id
 
-													await event({
-														type: "tool",
-														data: {
-															type: "fileBrowser",
+														await event({
+															type: "tool",
 															data: {
-																type: "create",
+																type: "fileBrowser",
 																data: {
-																	path,
-																	is_folder: true
+																	type: "create",
+																	data: {
+																		path,
+																		is_folder: true
+																	}
 																}
 															}
-														}
+														})
 													})
-												})
-											}
-										)
+												}
+											)
+										}
 									}
-								}
-							}),
+								}),
 						showinexplorer: {
 							separator_before: false,
 							separator_after: false,
 							_disabled: false,
 							label: "Show in Explorer",
 							icon: "fa-regular fa-folder",
-							action: async function(b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
 								const tree = jQuery.jstree!.reference(b.reference)
 								const selected_node = tree.get_node(b.reference)
 
@@ -213,7 +208,7 @@
 							_disabled: false,
 							label: "Rename",
 							icon: "fa-regular fa-pen-to-square",
-							action: function(b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+							action: function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
 								const tree = jQuery.jstree!.reference(b.reference)
 								const selected_node = tree.get_node(b.reference)
 
@@ -257,7 +252,7 @@
 							_disabled: false,
 							label: "Delete",
 							icon: "fa-regular fa-trash-can",
-							action: async function(b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+							action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
 								const tree = jQuery.jstree!.reference(b.reference)
 								const selected_node = tree.get_node(b.reference)
 
@@ -280,263 +275,247 @@
 						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".entity.json")
 							? {}
 							: {
-								normaliseEntity: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Normalise",
-									icon: "fa-solid fa-rotate",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Normalise entity")
+									normaliseEntity: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Normalise",
+										icon: "fa-solid fa-rotate",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Normalise entity")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "normaliseQNFile",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "normaliseQNFile",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
-									}
-								},
-								convertEntityToPatch: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Convert to Patch",
-									icon: "fa-solid fa-right-left",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Convert entity to patch")
+											})
+										}
+									},
+									convertEntityToPatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to Patch",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert entity to patch")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "convertEntityToPatch",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "convertEntityToPatch",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
+											})
+										}
 									}
-								}
-							}),
+								}),
 						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".entity.patch.json")
 							? {}
 							: {
-								normalisePatch: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Normalise",
-									icon: "fa-solid fa-rotate",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Normalise patch")
+									normalisePatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Normalise",
+										icon: "fa-solid fa-rotate",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Normalise patch")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "normaliseQNFile",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "normaliseQNFile",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
-									}
-								},
-								convertPatchToEntity: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Convert to Entity",
-									icon: "fa-solid fa-right-left",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Convert patch to entity")
+											})
+										}
+									},
+									convertPatchToEntity: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to Entity",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert patch to entity")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "convertPatchToEntity",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "convertPatchToEntity",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
+											})
+										}
 									}
-								}
-							}),
+								}),
 						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".repository.json")
 							? {}
 							: {
-								convertRepoPatchToJsonPatch: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Convert to JSON.patch.json",
-									icon: "fa-solid fa-right-left",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Convert repository merge patch to JSON patch")
+									convertRepoPatchToJsonPatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to JSON.patch.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert repository merge patch to JSON patch")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "convertRepoPatchToJsonPatch",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "convertRepoPatchToJsonPatch",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
+											})
+										}
 									}
-								}
-							}),
+								}),
 						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".unlockables.json")
 							? {}
 							: {
-								convertUnlockablesPatchToJsonPatch: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Convert to JSON.patch.json",
-									icon: "fa-solid fa-right-left",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Convert unlockables merge patch to JSON patch")
+									convertUnlockablesPatchToJsonPatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to JSON.patch.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert unlockables merge patch to JSON patch")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "convertUnlockablesPatchToJsonPatch",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "convertUnlockablesPatchToJsonPatch",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
+											})
+										}
 									}
-								}
-							}),
+								}),
 						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".JSON.patch.json")
 							? {}
 							: {
-								convertRepoPatchToMergePatch: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Convert to repository.json",
-									icon: "fa-solid fa-right-left",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Convert repository JSON patch to merge patch")
+									convertRepoPatchToMergePatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to repository.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert repository JSON patch to merge patch")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "convertRepoPatchToMergePatch",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "convertRepoPatchToMergePatch",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
-									}
-								},
-								convertUnlockablesPatchToMergePatch: {
-									separator_before: false,
-									separator_after: false,
-									_disabled: false,
-									label: "Convert to unlockables.json",
-									icon: "fa-solid fa-right-left",
-									action: async function(b: {
-										reference: string | HTMLElement | JQuery<HTMLElement>
-									}) {
-										trackEvent("Convert unlockables JSON patch to merge patch")
+											})
+										}
+									},
+									convertUnlockablesPatchToMergePatch: {
+										separator_before: false,
+										separator_after: false,
+										_disabled: false,
+										label: "Convert to unlockables.json",
+										icon: "fa-solid fa-right-left",
+										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+											trackEvent("Convert unlockables JSON patch to merge patch")
 
-										const tree = jQuery.jstree!.reference(b.reference)
-										const selected_node = tree.get_node(b.reference)
+											const tree = jQuery.jstree!.reference(b.reference)
+											const selected_node = tree.get_node(b.reference)
 
-										const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
+											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
 
-										await event({
-											type: "tool",
-											data: {
-												type: "fileBrowser",
+											await event({
+												type: "tool",
 												data: {
-													type: "convertUnlockablesPatchToMergePatch",
+													type: "fileBrowser",
 													data: {
-														path
+														type: "convertUnlockablesPatchToMergePatch",
+														data: {
+															path
+														}
 													}
 												}
-											}
-										})
+											})
+										}
 									}
-								}
-							})
+								})
 					}
 				}
 			},
@@ -572,37 +551,47 @@
 			}
 		})
 
-		jQuery("#" + elemID).on("move_node.jstree", async (_, { node, parent, old_parent }: {
-			node: any;
-			parent: string;
-			old_parent: string
-		}) => {
-			if (parent !== old_parent && tree.get_node(old_parent).original?.folder) {
-				if (tree.get_node(parent).original?.folder) {
-					tree.move_node(node, parent, getPositionOfNode(parent, node.text, node.original.folder))
+		jQuery("#" + elemID).on(
+			"move_node.jstree",
+			async (
+				_,
+				{
+					node,
+					parent,
+					old_parent
+				}: {
+					node: any
+					parent: string
+					old_parent: string
+				}
+			) => {
+				if (parent !== old_parent && tree.get_node(old_parent).original?.folder) {
+					if (tree.get_node(parent).original?.folder) {
+						tree.move_node(node, parent, getPositionOfNode(parent, node.text, node.original.folder))
 
-					const oldPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[old_parent], node.text)
-					const newPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[parent], node.text)
+						const oldPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[old_parent], node.text)
+						const newPath = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[parent], node.text)
 
-					delete pathToID[oldPath]
-					pathToID[newPath] = node.id
+						delete pathToID[oldPath]
+						pathToID[newPath] = node.id
 
-					await event({
-						type: "tool",
-						data: {
-							type: "fileBrowser",
+						await event({
+							type: "tool",
 							data: {
-								type: "rename",
-								data: { old_path: oldPath, new_path: newPath }
+								type: "fileBrowser",
+								data: {
+									type: "rename",
+									data: { old_path: oldPath, new_path: newPath }
+								}
 							}
-						}
-					})
-				} else {
-					// Invalid move, reset the node
-					tree.move_node(node, old_parent, getPositionOfNode(old_parent, node.text, node.original.folder))
+						})
+					} else {
+						// Invalid move, reset the node
+						tree.move_node(node, old_parent, getPositionOfNode(old_parent, node.text, node.original.folder))
+					}
 				}
 			}
-		})
+		)
 	})
 
 	let inProgressRename: string | null = null
@@ -845,7 +834,6 @@
 					{path}
 				</Truncate>
 			</div>
-
 		</div>
 	{/if}
 

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::HashSet;
@@ -13,6 +13,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	Notification, NotificationKind,
 	editor_connection::PropertyValue,
 	entity::{
 		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
@@ -26,7 +27,7 @@ use crate::{
 		EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
 	},
 	rpkg::extract_latest_overview_info,
-	send_notification, send_request, start_task, Notification, NotificationKind
+	send_notification, send_request, start_task
 };
 
 pub const SAFE_TO_SYNC: [&str; 43] = [

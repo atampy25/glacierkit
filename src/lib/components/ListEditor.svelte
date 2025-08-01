@@ -19,17 +19,17 @@
 		<div class="flex items-center gap-2">
 			<div class="w-full">
 				<div class="w-5/6 flex gap-2">
-					<CodeSnippet code={value}/>
+					<CodeSnippet code={value} />
 					<Button
-				kind="ghost"
-				size="small"
-				icon={CloseOutline}
-				iconDescription="Remove value"
-				on:click={() => {
-					data = data.filter((a) => a !== value)
-					dispatch("updated", data)
-				}}
-				/>
+						kind="ghost"
+						size="small"
+						icon={CloseOutline}
+						iconDescription="Remove value"
+						on:click={() => {
+							data = data.filter((a) => a !== value)
+							dispatch("updated", data)
+						}}
+					/>
 				</div>
 			</div>
 		</div>
