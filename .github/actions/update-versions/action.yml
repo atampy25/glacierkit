@@ -26,5 +26,5 @@ runs:
       uses: jossef/action-set-json-field@v2
       with:
         file: "src-tauri/tauri.conf.json"
-        field: "package.version"
+        field: "version"
         value: ${{ inputs.version }}
