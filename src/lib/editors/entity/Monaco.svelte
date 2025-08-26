@@ -12,7 +12,7 @@
 	import { listen } from "@tauri-apps/api/event"
 	import { Modal } from "carbon-components-svelte"
 	import GraphRenderer from "./GraphRenderer.svelte"
-	import { trackEvent } from "@aptabase/tauri"
+	import { trackEvent } from "$lib/utils"
 
 	let el: HTMLDivElement = null!
 	let editor: monaco.editor.IStandaloneCodeEditor = null!

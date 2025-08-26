@@ -3,7 +3,7 @@ use std::{
 	path::{Path, PathBuf}
 };
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use fn_error_context::context;
@@ -24,7 +24,7 @@ use rpkg_rs::{
 	misc::ini_file_system::IniFileSystem, resource::partition_manager::PartitionManager,
 	resource::pdefs::PackageDefinitionSource
 };
-use serde_json::{from_slice, from_str, from_value, to_value, Value};
+use serde_json::{Value, from_slice, from_str, from_value, to_value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -32,11 +32,11 @@ use velcro::vec;
 
 use crate::ores_repo::RepositoryItem;
 use crate::rpkg::extract_latest_resource;
-use crate::{event_handling::resource_overview::initialise_resource_overview, get_loaded_game_version};
 use crate::{
-	finish_task, send_notification, send_request, start_task, Notification, NotificationKind, HASH_LIST_ENDPOINT,
-	HASH_LIST_VERSION_ENDPOINT, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT
+	HASH_LIST_ENDPOINT, HASH_LIST_VERSION_ENDPOINT, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT,
+	TONYTOOLS_HASH_LIST_VERSION_ENDPOINT, finish_task, send_notification, send_request, start_task
 };
+use crate::{event_handling::resource_overview::initialise_resource_overview, get_loaded_game_version};
 use crate::{intellisense::Intellisense, ores_repo::UnlockableItem};
 use crate::{
 	model::{
@@ -913,7 +913,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 						let hash_list = HashList::from_compressed(&data)?;
 
 						fs::write(
-							app.path_resolver()
+							app.path()
 								.app_data_dir()
 								.context("Couldn't get app data dir")?
 								.join("hash_list.sml"),
@@ -950,7 +950,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 						fs::write(
-							app.path_resolver()
+							app.path()
 								.app_data_dir()
 								.context("Couldn't get app data dir")?
 								.join("tonytools_hash_list.hmla"),
@@ -1035,7 +1035,8 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
 					hash_list
-				)?;
+				)
+				.await?;
 
 				finish_task(app, task)?;
 			}

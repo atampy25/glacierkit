@@ -1,5 +1,6 @@
 import { type Event, commands } from "$lib/bindings"
 import { trace } from "tauri-plugin-log"
+import { invoke } from '@tauri-apps/api/core';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type ObjectEntry<T extends {}> = T extends object
@@ -20,6 +21,10 @@ export function typedEntries<T extends {}>(object: T): ReadonlyArray<ObjectEntry
 export async function event(event: Event) {
 	trace(`Sending event ${JSON.stringify(event, undefined, "\t")}`)
 	await commands.event(event)
+}
+
+export function trackEvent(name: string, props?: Record<string, unknown>) {
+	void invoke<string>('plugin:aptabase|track_event', { name, props })
 }
 
 export const showInFolder = commands.showInFolder

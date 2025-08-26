@@ -3,89 +3,74 @@
 	"build": {
 		"beforeBuildCommand": "yarn build",
 		"beforeDevCommand": "yarn dev",
-		"devPath": "http://localhost:5173",
-		"distDir": "../build"
+		"frontendDist": "../build",
+		"devUrl": "http://localhost:5173"
 	},
-	"package": {
-		"productName": "GlacierKit",
-		"version": "1.12.0"
-	},
-	"tauri": {
-		"allowlist": {
-			"all": true,
-			"protocol": {
-				"all": true,
-				"assetScope": ["**/*", "$APPDATA/**"]
-			},
-			"shell": {
-				"sidecar": true,
-				"scope": [
-					{
-						"name": "bin/vgmstream-cli",
-						"sidecar": true
-					}
-				],
-				"execute": true,
-				"all": true,
-				"open": true
-			},
-			"fs": {
-				"all": false,
-				"writeFile": true,
-				"scope": ["**/*"]
-			}
+	"bundle": {
+		"active": true,
+		"category": "DeveloperTool",
+		"copyright": "",
+		"targets": "all",
+		"externalBin": [
+			"bin/vgmstream-cli"
+		],
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		],
+		"windows": {
+			"certificateThumbprint": null,
+			"digestAlgorithm": "sha256",
+			"timestampUrl": ""
 		},
-		"bundle": {
-			"active": true,
-			"category": "DeveloperTool",
-			"copyright": "",
+		"longDescription": "",
+		"macOS": {
+			"entitlements": null,
+			"exceptionDomain": "",
+			"frameworks": [],
+			"providerShortName": null,
+			"signingIdentity": null
+		},
+		"resources": [
+			"ResourceLib_HM2016.dll",
+			"ResourceLib_HM2.dll",
+			"ResourceLib_HM3.dll",
+			"swresample-vgmstream-4.dll",
+			"avcodec-vgmstream-59.dll",
+			"avformat-vgmstream-59.dll",
+			"avutil-vgmstream-57.dll",
+			"libatrac9.dll",
+			"libcelt-0061.dll",
+			"libcelt-0110.dll",
+			"libg719_decode.dll",
+			"libmpg123-0.dll",
+			"libspeex-1.dll",
+			"libvorbis.dll"
+		],
+		"shortDescription": "",
+		"linux": {
 			"deb": {
 				"depends": []
-			},
-			"externalBin": ["bin/vgmstream-cli"],
-			"icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-			"identifier": "app.glacierkit",
-			"longDescription": "",
-			"macOS": {
-				"entitlements": null,
-				"exceptionDomain": "",
-				"frameworks": [],
-				"providerShortName": null,
-				"signingIdentity": null
-			},
-			"resources": [
-				"ResourceLib_HM2016.dll",
-				"ResourceLib_HM2.dll",
-				"ResourceLib_HM3.dll",
-				"swresample-vgmstream-4.dll",
-				"avcodec-vgmstream-59.dll",
-				"avformat-vgmstream-59.dll",
-				"avutil-vgmstream-57.dll",
-				"libatrac9.dll",
-				"libcelt-0061.dll",
-				"libcelt-0110.dll",
-				"libg719_decode.dll",
-				"libmpg123-0.dll",
-				"libspeex-1.dll",
-				"libvorbis.dll"
-			],
-			"shortDescription": "",
-			"targets": "all",
-			"windows": {
-				"certificateThumbprint": null,
-				"digestAlgorithm": "sha256",
-				"timestampUrl": ""
 			}
 		},
-		"security": {
-			"csp": null
-		},
+		"createUpdaterArtifacts": "v1Compatible"
+	},
+	"productName": "GlacierKit",
+	"mainBinaryName": "GlacierKit",
+	"version": "1.12.0",
+	"identifier": "app.glacierkit",
+	"plugins": {
 		"updater": {
-			"active": true,
-			"endpoints": ["https://raw.githubusercontent.com/atampy25/glacierkit/master/updates.json"],
-			"dialog": false,
-			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5OEYzQTUzNUZCODZBNUMKUldSY2FyaGZVenFQS2JydmlWbHhndGo2WXFEZExmVzEvQXJRYk9PekRjb0NoY01RRnBUdEMvNHgK"
-		},
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5OEYzQTUzNUZCODZBNUMKUldSY2FyaGZVenFQS2JydmlWbHhndGo2WXFEZExmVzEvQXJRYk9PekRjb0NoY01RRnBUdEMvNHgK",
+			"endpoints": [
+				"https://raw.githubusercontent.com/atampy25/glacierkit/master/updates.json"
+			]
+		}
+	},
+	"app": {
 		"windows": [
 			{
 				"fullscreen": false,
@@ -94,8 +79,18 @@
 				"title": "GlacierKit",
 				"width": 1280,
 				"decorations": false,
-				"visible": false
+				"visible": false,
+				"useHttpsScheme": true
 			}
-		]
+		],
+		"security": {
+			"assetProtocol": {
+				"scope": [
+					"**/*",
+					"$APPDATA/**"
+				]
+			},
+			"csp": null
+		}
 	}
 }

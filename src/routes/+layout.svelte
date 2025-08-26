@@ -6,8 +6,8 @@
 	import "@fontsource/fira-code"
 	import "$lib/crc32"
 
-	import { appWindow } from "@tauri-apps/api/window"
-	import { ComposedModal, HeaderNavItem, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
+	import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
+	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import { beforeUpdate, onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
@@ -17,14 +17,14 @@
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import * as monaco from "monaco-editor"
 	import { createPatch } from "rfc6902"
-	import { writeTextFile } from "@tauri-apps/api/fs"
+	import { writeTextFile } from "@tauri-apps/plugin-fs"
 	import { attachConsole, info } from "tauri-plugin-log"
 	import { help } from "$lib/helpray"
 	import HelpRay from "$lib/components/HelpRay.svelte"
-	import { trackEvent } from "@aptabase/tauri"
-	import { checkUpdate, installUpdate, type UpdateManifest } from "@tauri-apps/api/updater"
+	import { trackEvent } from "$lib/utils"
+	import { check, Update } from "@tauri-apps/plugin-updater"
 	import { getVersion } from "@tauri-apps/api/app"
-	import { relaunch } from "@tauri-apps/api/process"
+	import { relaunch } from "@tauri-apps/plugin-process"
 	import { event } from "$lib/utils"
 
 	let tasks: [string, string][] = []
@@ -72,7 +72,7 @@
 				if (request.type === "global" && request.data.type === "setWindowTitle") {
 					console.log("Layout handling request", request)
 
-					appWindow.setTitle(`GlacierKit - ${request.data.data}`)
+					getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
 					windowTitle = request.data.data
 				}
 
@@ -122,6 +122,8 @@
 				unlistenRequest()
 				detachConsole()
 			}
+
+			getCurrentWebviewWindow().show()
 
 			self.MonacoEnvironment = {
 				getWorker: function (_moduleId: any, label: string) {
@@ -403,14 +405,10 @@
 				}
 			})
 
-			appWindow.show()
-
 			try {
-				const { shouldUpdate, manifest } = await checkUpdate()
+				updateManifest = await check()
 
-				if (shouldUpdate) {
-					updateManifest = manifest!
-
+				if (updateManifest) {
 					const currentVersion = await getVersion()
 
 					const commits = await (
@@ -453,7 +451,7 @@
 	let helpRayActive = false
 
 	let updateModalOpen = false
-	let updateManifest: UpdateManifest = { version: "", date: "", body: "" }
+	let updateManifest: Update | null = null
 	let commitsSinceLastVersion: string[] = []
 
 	let lastPanicModalOpen = false
@@ -543,11 +541,11 @@
 	on:submit={async () => {
 		updateModalOpen = false
 
-		await installUpdate()
+		await updateManifest?.downloadAndInstall()
 		await relaunch()
 	}}
 >
-	<ModalHeader title="Update available to version {updateManifest.version}" />
+	<ModalHeader title="Update available to version {updateManifest?.version}" />
 	<ModalBody>
 		Changes made since the currently installed version:
 		<ul class="changelog mt-1">
@@ -593,12 +591,20 @@
 				/>
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.minimize} use:help={{ title: "Minimise", description: "Minimise the application." }}>
+		<div
+			class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600"
+			on:click={() => getCurrentWebviewWindow().minimize()}
+			use:help={{ title: "Minimise", description: "Minimise the application." }}
+		>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.toggleMaximize} use:help={{ title: "Maximise", description: "Maximise the application." }}>
+		<div
+			class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600"
+			on:click={() => getCurrentWebviewWindow().toggleMaximize()}
+			use:help={{ title: "Maximise", description: "Maximise the application." }}
+		>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path
 					stroke-linecap="round"
@@ -607,7 +613,7 @@
 				/>
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" on:click={appWindow.close} use:help={{ title: "Close", description: "Close the application." }}>
+		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" on:click={() => getCurrentWebviewWindow().close()} use:help={{ title: "Close", description: "Close the application." }}>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 			</svg>

@@ -1,6 +1,6 @@
 use std::{ops::Deref, str::FromStr, time::Instant};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
@@ -23,9 +23,9 @@ use crate::{
 	languages::get_language_map,
 	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
 	resourcelib::{
-		convert_generic_str, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory,
-		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
-		h3_convert_binary_to_factory
+		convert_generic_str, h2_convert_binary_to_blueprint, h2_convert_binary_to_factory,
+		h3_convert_binary_to_blueprint, h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint,
+		h2016_convert_binary_to_factory
 	},
 	rpkg::extract_latest_resource,
 	send_request, start_task
@@ -168,11 +168,7 @@ pub fn start_content_search(
 										}
 									};
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"AIRG" | "ATMD" | "VIDB" | "UICB" | "CPPT" | "CRMD" | "DSWB" | "WSWB" | "GFXF"
@@ -200,11 +196,7 @@ pub fn start_content_search(
 								"JSON" | "REPO" => {
 									let s: Option<_> = try { partition.read_resource(resource_id).ok()? };
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"ORES" => {
@@ -218,11 +210,7 @@ pub fn start_content_search(
 										}
 									};
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"CLNG" => {
@@ -269,11 +257,7 @@ pub fn start_content_search(
 										buf
 									};
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"DITL" => {
@@ -300,11 +284,7 @@ pub fn start_content_search(
 										buf
 									};
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"DLGE" => {
@@ -360,11 +340,7 @@ pub fn start_content_search(
 										buf
 									};
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"LOCR" => {
@@ -419,11 +395,7 @@ pub fn start_content_search(
 										buf
 									};
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"RTLV" => {
@@ -449,11 +421,7 @@ pub fn start_content_search(
 										buf
 									};
 
-									if let Some(s) = s {
-										query.is_match(&s)
-									} else {
-										false
-									}
+									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"LINE" => {

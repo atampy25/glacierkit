@@ -5,7 +5,6 @@
 #![feature(try_blocks)]
 #![feature(try_find)]
 #![allow(clippy::type_complexity)]
-#![feature(let_chains)]
 
 pub mod biome;
 pub mod editor_connection;
@@ -30,7 +29,7 @@ use std::{
 	time::{Duration, SystemTime, UNIX_EPOCH}
 };
 
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, anyhow, bail};
 use arc_swap::ArcSwap;
 use biome::format_json;
 use dashmap::DashMap;
@@ -47,7 +46,7 @@ use hitman_commons::game::GameVersion;
 use hitman_commons::game_detection::detect_installs;
 use indexmap::IndexMap;
 use json_patch::Patch;
-use log::{info, trace, LevelFilter};
+use log::{LevelFilter, info, trace};
 use model::{
 	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
 	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest,
@@ -57,16 +56,13 @@ use model::{
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
 use quickentity_rs::{generate_patch, qn_structs::Property};
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, json, to_value, to_vec, Value};
+use serde_json::{Value, from_slice, json, to_value, to_vec};
 use show_in_folder::show_in_folder;
-use tauri::{
-	api::{dialog::blocking::FileDialogBuilder, process::Command},
-	async_runtime, AppHandle, Manager
-};
+use tauri::{AppHandle, Emitter, Manager, async_runtime};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
-use tauri_plugin_log::LogTarget;
+use tauri_plugin_dialog::DialogExt;
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
@@ -91,46 +87,57 @@ thread_local!(static LOG_DIR: Cell<PathBuf> = Cell::new(Default::default()));
 
 pub trait RunCommandExt {
 	/// Run the command, returning its stdout. If the command fails (status code non-zero), an error is returned with the stderr output.
-	fn run(self) -> Result<String>;
+	#[allow(async_fn_in_trait)]
+	async fn run(self) -> Result<String>;
 }
 
-impl RunCommandExt for Command {
+impl RunCommandExt for tauri_plugin_shell::process::Command {
 	#[try_fn]
 	#[context("Couldn't run command")]
-	fn run(self) -> Result<String> {
-		let output = self.output()?;
+	async fn run(self) -> Result<String> {
+		let output = self.output().await?;
 
 		if output.status.success() {
-			output.stdout
+			String::from_utf8_lossy(&output.stdout).into()
 		} else {
-			bail!("Command failed: {}", output.stderr);
+			bail!(
+				"Command failed: {}",
+				String::from_utf8_lossy(&output.stderr).to_string()
+			);
 		}
 	}
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	IS_MAIN_THREAD.set(true);
 
-	let specta = {
-		let specta_builder =
-			tauri_specta::ts::builder().commands(tauri_specta::collect_commands![event, show_in_folder]);
+	tauri::async_runtime::set(tokio::runtime::Handle::current());
 
-		#[cfg(debug_assertions)]
-		let specta_builder = if Path::new("../src/lib").is_dir() {
-			specta_builder.path("../src/lib/bindings.ts")
-		} else {
-			specta_builder
-		};
+	let specta =
+		tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![event, show_in_folder]);
 
-		#[cfg(debug_assertions)]
-		if Path::new("../src/lib").is_dir() {
-			specta::export::ts("../src/lib/bindings-types.ts").expect("Failed to export types");
-		}
-
-		specta_builder.into_plugin()
-	};
+	#[cfg(debug_assertions)]
+	if Path::new("../src/lib").is_dir() {
+		specta
+			.export(
+				specta_typescript::Typescript::default()
+					.formatter(specta_typescript::formatter::prettier)
+					.header("/* eslint-disable */"),
+				"../src/lib/bindings.ts"
+			)
+			.expect("Failed to export bindings");
+	}
 
 	tauri::Builder::default()
+		.plugin(tauri_plugin_process::init())
+		.plugin(tauri_plugin_dialog::init())
+		.plugin(tauri_plugin_shell::init())
+		.plugin(tauri_plugin_updater::Builder::new().build())
+		.plugin(tauri_plugin_clipboard_manager::init())
+		.plugin(tauri_plugin_http::init())
+		.plugin(tauri_plugin_fs::init())
+		.plugin(tauri_plugin_os::init())
 		.plugin(
 			tauri_plugin_aptabase::Builder::new("A-SH-1393169212")
 				.with_options(InitOptions {
@@ -144,12 +151,14 @@ fn main() {
 							.map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
 							.unwrap_or_default();
 
-						client.track_event(
-							"Panic",
-							Some(json!({
-							  "info": format!("{} - {}", location, msg),
-							}))
-						);
+						client
+							.track_event(
+								"Panic",
+								Some(json!({
+								  "info": format!("{} - {}", location, msg),
+								}))
+							)
+							.unwrap();
 
 						let mut panic_report = String::new();
 
@@ -197,20 +206,26 @@ fn main() {
 		)
 		.plugin(
 			tauri_plugin_log::Builder::default()
-				.targets([LogTarget::LogDir, LogTarget::Stdout, LogTarget::Webview])
+				.targets([
+					tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+						file_name: Some("logs".to_string())
+					}),
+					tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+					tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview)
+				])
 				.level_for("tauri_plugin_aptabase", LevelFilter::Off)
 				.level_for("quickentity_rs", LevelFilter::Off)
 				.build()
 		)
-		.plugin(specta)
+		.invoke_handler(specta.invoke_handler())
 		.setup(|app| {
-			LOG_DIR.set(app.path_resolver().app_log_dir().expect("Couldn't get log dir"));
+			LOG_DIR.set(app.path().app_log_dir().expect("Couldn't get log dir"));
 
-			app.track_event("App started", None);
+			app.track_event("App started", None).unwrap();
 
 			info!("Starting app");
 
-			let app_data_path = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+			let app_data_path = app.path().app_data_dir().expect("Couldn't get data dir");
 
 			let mut invalid = true;
 			if let Ok(read) = fs::read(app_data_path.join("settings.json")) {
@@ -275,7 +290,7 @@ fn main() {
 				cached_entities: DashMap::new().into(),
 				repository: None.into(),
 				intellisense: None.into(),
-				editor_connection: EditorConnection::new(app.handle())
+				editor_connection: EditorConnection::new(app.handle().clone())
 			});
 
 			info!("Managed state");
@@ -286,7 +301,7 @@ fn main() {
 		.expect("error while building tauri application")
 		.run(|handler, event| {
 			if let tauri::RunEvent::Exit = event {
-				handler.track_event("App exited", None);
+				handler.track_event("App exited", None).unwrap();
 				handler.flush_events_blocking();
 			}
 		});
@@ -433,7 +448,7 @@ fn event(app: AppHandle, event: Event) {
 							let mut settings = (*app_settings.load_full()).to_owned();
 							settings.seen_announcements = seen_announcements;
 							fs::write(
-								app.path_resolver()
+								app.path()
 									.app_data_dir()
 									.context("Couldn't get app data dir")?
 									.join("settings.json"),
@@ -443,19 +458,19 @@ fn event(app: AppHandle, event: Event) {
 						}
 
 						GlobalEvent::SelectAndOpenFile => {
-							let mut dialog = FileDialogBuilder::new().set_title("Open file");
+							let mut dialog = app.dialog().file().set_title("Open file");
 
 							if let Some(project) = app_state.project.load().as_ref() {
 								dialog = dialog.set_directory(&project.path);
 							}
 
-							if let Some(path) = dialog.pick_file() {
-								open_file(&app, path).await?;
+							if let Some(path) = dialog.blocking_pick_file() {
+								open_file(&app, path.into_path()?).await?;
 							}
 						}
 
 						GlobalEvent::LoadWorkspace(path) => {
-							app.track_event("Workspace loaded", None);
+							app.track_event("Workspace loaded", None).unwrap();
 							let task = start_task(&app, format!("Loading project {}", path.display()))?;
 
 							let mut files = vec![];
@@ -806,7 +821,8 @@ fn event(app: AppHandle, event: Event) {
 										Some(json!({
 											"file_type": file_type
 										}))
-									);
+									)
+									.unwrap();
 
 									content.as_bytes().to_owned()
 								}
@@ -818,7 +834,8 @@ fn event(app: AppHandle, event: Event) {
 											"file_type": "QNEntity",
 											"show_reverse_parent_refs": settings.show_reverse_parent_refs
 										}))
-									);
+									)
+									.unwrap();
 
 									let unformatted = serde_json::to_string(&entity).context("Entity is invalid")?;
 
@@ -840,7 +857,8 @@ fn event(app: AppHandle, event: Event) {
 											"file_type": "QNPatch",
 											"show_reverse_parent_refs": settings.show_reverse_parent_refs
 										}))
-									);
+									)
+									.unwrap();
 
 									// Once a patch has been saved you can no longer modify the hashes without manually converting to entity.json
 									send_request(
@@ -878,7 +896,8 @@ fn event(app: AppHandle, event: Event) {
 											"file_type": "RepositoryPatch",
 											"json_patch_type": patch_type
 										}))
-									);
+									)
+									.unwrap();
 
 									match patch_type {
 										JsonPatchType::MergePatch => {
@@ -933,7 +952,7 @@ fn event(app: AppHandle, event: Event) {
 													})
 												)?;
 											} else {
-												let mut dialog = FileDialogBuilder::new().set_title("Save file");
+												let mut dialog = app.dialog().file().set_title("Save file");
 
 												if let Some(project) = app_state.project.load().as_ref() {
 													dialog = dialog.set_directory(&project.path);
@@ -941,16 +960,20 @@ fn event(app: AppHandle, event: Event) {
 
 												if let Some(path) = dialog
 													.add_filter("Repository JSON patch", &["JSON.patch.json"])
-													.save_file()
+													.blocking_save_file()
 												{
-													editor.file = Some(path.to_owned());
+													editor.file =
+														Some(path.as_path().context("Invalid path")?.to_owned());
 
 													send_request(
 														&app,
 														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 															base,
 															current,
-															save_path: path.to_owned(),
+															save_path: path
+																.as_path()
+																.context("Invalid path")?
+																.to_owned(),
 															file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
 														})
 													)?;
@@ -983,7 +1006,8 @@ fn event(app: AppHandle, event: Event) {
 											"file_type": "UnlockablesPatch",
 											"json_patch_type": patch_type
 										}))
-									);
+									)
+									.unwrap();
 
 									match patch_type {
 										JsonPatchType::MergePatch => {
@@ -1118,7 +1142,7 @@ fn event(app: AppHandle, event: Event) {
 													})
 												)?;
 											} else {
-												let mut dialog = FileDialogBuilder::new().set_title("Save file");
+												let mut dialog = app.dialog().file().set_title("Save file");
 
 												if let Some(project) = app_state.project.load().as_ref() {
 													dialog = dialog.set_directory(&project.path);
@@ -1126,16 +1150,20 @@ fn event(app: AppHandle, event: Event) {
 
 												if let Some(path) = dialog
 													.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
-													.save_file()
+													.blocking_save_file()
 												{
-													editor.file = Some(path.to_owned());
+													editor.file =
+														Some(path.as_path().context("Invalid path")?.to_owned());
 
 													send_request(
 														&app,
 														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 															base,
 															current,
-															save_path: path.to_owned(),
+															save_path: path
+																.as_path()
+																.context("Invalid path")?
+																.to_owned(),
 															file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
 														})
 													)?;
@@ -1169,7 +1197,7 @@ fn event(app: AppHandle, event: Event) {
 									})
 								)?;
 							} else {
-								let mut dialog = FileDialogBuilder::new().set_title("Save file");
+								let mut dialog = app.dialog().file().set_title("Save file");
 
 								if let Some(project) = app_state.project.load().as_ref() {
 									dialog = dialog.set_directory(&project.path);
@@ -1268,11 +1296,12 @@ fn event(app: AppHandle, event: Event) {
 											}
 										}]
 									)
-									.save_file()
+									.blocking_save_file()
 								{
-									editor.file = Some(path.to_owned());
+									editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
 
-									fs::write(&path, data_to_save).context("Couldn't write file")?;
+									fs::write(&path.as_path().context("Invalid path")?, data_to_save)
+										.context("Couldn't write file")?;
 
 									send_request(
 										&app,
@@ -1289,7 +1318,7 @@ fn event(app: AppHandle, event: Event) {
 
 						GlobalEvent::UploadLogAndReport(error) => {
 							let log_contents = fs::read_to_string(
-								app.path_resolver()
+								app.path()
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("GlacierKit.log")
@@ -1306,7 +1335,8 @@ fn event(app: AppHandle, event: Event) {
 								.and_then(|x| x.error_for_status())
 							{
 								let log_url = res.text().await.context("Couldn't decode log upload response")?;
-								app.track_event("Error with log", Some(json!({ "error": error, "log": log_url })));
+								app.track_event("Error with log", Some(json!({ "error": error, "log": log_url })))
+									.unwrap();
 							} else {
 								send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
 							}
@@ -1314,7 +1344,7 @@ fn event(app: AppHandle, event: Event) {
 
 						GlobalEvent::UploadLastPanic => {
 							let last_panic = fs::read_to_string(
-								app.path_resolver()
+								app.path()
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("..")
@@ -1332,18 +1362,19 @@ fn event(app: AppHandle, event: Event) {
 								.and_then(|x| x.error_for_status())
 							{
 								let report_url = res.text().await.context("Couldn't decode report upload response")?;
-								app.track_event("Panic report", Some(json!({ "report": report_url })));
+								app.track_event("Panic report", Some(json!({ "report": report_url })))
+									.unwrap();
 							} else {
 								send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
 							}
 
 							fs::rename(
-								app.path_resolver()
+								app.path()
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("..")
 									.join("last_panic.txt"),
-								app.path_resolver()
+								app.path()
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("..")
@@ -1353,12 +1384,12 @@ fn event(app: AppHandle, event: Event) {
 
 						GlobalEvent::ClearLastPanic => {
 							fs::rename(
-								app.path_resolver()
+								app.path()
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("..")
 									.join("last_panic.txt"),
-								app.path_resolver()
+								app.path()
 									.app_log_dir()
 									.context("Couldn't get log dir")?
 									.join("..")
@@ -1817,7 +1848,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 pub fn start_task(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 	let task_id = Uuid::new_v4();
 	trace!("Starting task {}: {}", task_id, name.as_ref());
-	app.emit_all("start-task", (&task_id, name.as_ref()))?;
+	app.emit("start-task", (&task_id, name.as_ref()))?;
 	task_id
 }
 
@@ -1825,7 +1856,7 @@ pub fn start_task(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 #[context("Couldn't send task finish event for {:?} to frontend", task)]
 pub fn finish_task(app: &AppHandle, task: Uuid) -> Result<()> {
 	trace!("Ending task {}", task);
-	app.emit_all("finish-task", &task)?;
+	app.emit("finish-task", &task)?;
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1848,12 +1879,12 @@ pub struct Notification {
 #[context("Couldn't send notification {:?} to frontend", notification)]
 pub fn send_notification(app: &AppHandle, notification: Notification) -> Result<()> {
 	trace!("Sending notification: {:?}", notification);
-	app.emit_all("send-notification", (Uuid::new_v4(), &notification))?;
+	app.emit("send-notification", (Uuid::new_v4(), &notification))?;
 }
 
 #[try_fn]
 #[context("Couldn't send request {:?} to frontend", request)]
 pub fn send_request(app: &AppHandle, request: Request) -> Result<()> {
 	trace!("Sending request: {:?}", request);
-	app.emit_all("request", &request)?;
+	app.emit("request", &request)?;
 }

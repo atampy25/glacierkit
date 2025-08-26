@@ -1,6 +1,6 @@
 use std::fs;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use hitman_commons::metadata::RuntimeID;
 use serde_json::to_vec;
@@ -9,11 +9,12 @@ use tauri_plugin_aptabase::EventTracker;
 use tryvial::try_fn;
 
 use crate::{
+	Notification, NotificationKind,
 	model::{
 		AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
 		EntityMetadataRequest, GlobalRequest, Request, SettingsRequest, ToolRequest
 	},
-	send_notification, send_request, Notification, NotificationKind
+	send_notification, send_request
 };
 
 #[try_fn]
@@ -86,7 +87,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(factory_hash.to_owned());
 
-					app.track_event("Save custom path by factory input", None);
+					app.track_event("Save custom path by factory input", None).unwrap();
 
 					send_request(
 						app,
@@ -195,7 +196,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(blueprint_hash.to_owned());
 
-					app.track_event("Save custom path by blueprint input", None);
+					app.track_event("Save custom path by blueprint input", None).unwrap();
 
 					send_request(
 						app,

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail};
 use anyhow::{Context, Result};
+use anyhow::{anyhow, bail};
 use dashmap::DashMap;
 use fn_error_context::context;
 use hashbrown::HashMap;
@@ -18,7 +18,7 @@ use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, to_string, Value};
+use serde_json::{Value, from_value, to_string};
 use specta::Type;
 use tonytools::hmlanguages;
 use tryvial::try_fn;
@@ -80,9 +80,9 @@ pub enum ReverseReferenceData {
 /// Get the local reference contained within a Ref, or None if it's an external or null reference.
 pub fn get_local_reference(reference: &Ref) -> Option<String> {
 	match reference {
-		Ref::Short(Some(ref ent)) => Some(ent.to_owned()),
+		Ref::Short(Some(ent)) => Some(ent.to_owned()),
 
-		Ref::Full(ref reference) => {
+		Ref::Full(reference) => {
 			if reference.external_scene.is_none() {
 				Some(reference.entity_ref.to_owned())
 			} else {
@@ -356,7 +356,7 @@ pub fn change_reference_to_local(reference: &Ref, local: String) -> Ref {
 	match reference {
 		Ref::Short(_) => Ref::Short(Some(local)),
 
-		Ref::Full(ref reference) => {
+		Ref::Full(reference) => {
 			if let Some(exposed) = reference.exposed_entity.as_ref() {
 				Ref::Full(FullRef {
 					entity_ref: local,
@@ -383,7 +383,7 @@ pub fn alter_ref_according_to_changelist(reference: &Ref, changelist: &HashMap<S
 			}
 		}
 
-		Ref::Full(ref full_ref) => {
+		Ref::Full(full_ref) => {
 			if let Some(changed) = changelist.get(&full_ref.entity_ref) {
 				change_reference_to_local(reference, changed.to_owned())
 			} else {
@@ -1210,11 +1210,7 @@ pub fn get_diff_info(
 		.par_iter()
 		.filter_map(|(id, modif)| {
 			if let Some(orig) = original.entities.get(id) {
-				if modif != orig {
-					Some(("changed", id))
-				} else {
-					None
-				}
+				if modif != orig { Some(("changed", id)) } else { None }
 			} else {
 				Some(("new", id))
 			}

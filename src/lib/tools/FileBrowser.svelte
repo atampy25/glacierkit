@@ -6,12 +6,12 @@
 	import type { FileBrowserRequest } from "$lib/bindings-types"
 	import { Button, Search } from "carbon-components-svelte"
 	import { event, showInFolder } from "$lib/utils"
-	import { open } from "@tauri-apps/api/dialog"
+	import { open } from "@tauri-apps/plugin-dialog"
 	import FolderAdd from "carbon-icons-svelte/lib/FolderAdd.svelte"
 	import { v4 } from "uuid"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
-	import { trackEvent } from "@aptabase/tauri"
-	import { readTextFile } from "@tauri-apps/api/fs"
+	import { trackEvent } from "$lib/utils"
+	import { readTextFile } from "@tauri-apps/plugin-fs"
 	import { help } from "$lib/helpray"
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")

@@ -23,13 +23,13 @@
 	import { SortableList } from "@jhubbardsf/svelte-sortablejs"
 	import Idea from "carbon-icons-svelte/lib/Idea.svelte"
 	import ResourceOverviewEditor from "$lib/editors/resourceoverview/ResourceOverviewEditor.svelte"
-	import { trackEvent } from "@aptabase/tauri"
+	import { trackEvent } from "$lib/utils"
 	import RepositoryPatchEditor from "$lib/editors/repositorypatch/RepositoryPatchEditor.svelte"
 	import UnlockablesPatchEditor from "$lib/editors/unlockablespatch/UnlockablesPatchEditor.svelte"
 	import Search from "carbon-icons-svelte/lib/Search.svelte"
 	import ContentSearch from "$lib/tools/ContentSearch.svelte"
 	import ContentSearchResultsEditor from "$lib/editors/contentsearchresults/ContentSearchResultsEditor.svelte"
-	import { open, confirm } from "@tauri-apps/api/dialog"
+	import { open, confirm } from "@tauri-apps/plugin-dialog"
 	import { help } from "$lib/helpray"
 
 	const hints = [
