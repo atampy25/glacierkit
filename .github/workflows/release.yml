@@ -85,14 +85,15 @@ jobs:
               with:
                   path: "./.env"
                   contents: |
-                      TAURI_PRIVATE_KEY=gk.key
-                      TAURI_KEY_PASSWORD=${{ secrets.KEYPASS }}
+                      TAURI_SIGNING_PRIVATE_KEY=gk.key
+                      TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.KEYPASS }}
 
             - name: Build
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: |
                   yarn tauri build
+                  rm src-tauri/gk.key
 
             - name: Upload release (MSI)
               if: matrix.platform == 'windows-latest'
