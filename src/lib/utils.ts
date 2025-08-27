@@ -1,6 +1,6 @@
 import { type Event, commands } from "$lib/bindings"
 import { trace } from "tauri-plugin-log"
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from "@tauri-apps/api/core"
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type ObjectEntry<T extends {}> = T extends object
@@ -24,7 +24,7 @@ export async function event(event: Event) {
 }
 
 export function trackEvent(name: string, props?: Record<string, unknown>) {
-	void invoke<string>('plugin:aptabase|track_event', { name, props })
+	void invoke<string>("plugin:aptabase|track_event", { name, props })
 }
 
 export const showInFolder = commands.showInFolder
