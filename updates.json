@@ -1,15 +1,15 @@
 {
-	"version": "1.12.0",
-	"notes": "Colour decorators for overrides",
-	"pub_date": "2025-05-24T09:23:03Z",
+	"version": "1.12.3",
+	"notes": "Fix Linux bundle",
+	"pub_date": "2025-08-26T23:58:47Z",
 	"platforms": {
 		"windows-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1hxWjA5S0ZSUVFFOHA1OFFjQzdiTDlHOWVWOGl1MDlYM1NVUzBndlFtellwUjZUTnBHREpkODJuTVV1cjBJN2NFTENwcTJkVEk5RVd0TlA2b3N5T0FrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzQ4NDk2MjU1CWZpbGU6R2xhY2llcktpdF8xLjEyLjBfeDY0X2VuLVVTLm1zaS56aXAKWFVYV0dTdUdCNDZrYWlTVWNZaGUvczBKS3VCWUlKMEN0NURXcmJnREZCOTZXb3hrOXkvRjV3Q3lxM3lFcUJpVmd6U1VqNnlFS210cXZXK1VaUlRBRGc9PQo=",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.12.0/GlacierKit_1.12.0_x64_en-US.msi.zip"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS1NuL3BGd0tMMWlKTHVxUGI4bzdKb3h6dkViV1h1R0w1ZXlIVHlaNVMra3BRZ2pwVUYxWnZ4d2JjUk9QV0VxbFdFU2RnQkd1Z1NZSnZHaStPSVM4Y0FrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzU2MjU4MTA5CWZpbGU6R2xhY2llcktpdF8xLjEyLjNfeDY0X2VuLVVTLm1zaS56aXAKZENPVlVTaXBkUXRJSk5YdE0vdVB0T2xUSVB5cDZJS3QxTDM5NjI2ZDBxZ05wYVA4WEJnZ2pmeEVJT1d3bjVjNUpxSnFGY1pDaittZHZNMFZjQnhrQ0E9PQo=",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.12.3/GlacierKit_1.12.3_x64_en-US.msi.zip"
 		},
 		"linux-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2VoNFpwcEc1MEFZaENPNFBhVXM3T3Z0eVBDZDgrS0J6NThUalN2OVZpazAzT0haa1doWXJhNnYvajBJdCtFYnlmNU5MMElUanNWeWVWMng4VVY4UmdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzQ4NDk2MDMzCWZpbGU6Z2xhY2llci1raXRfMS4xMi4wX2FtZDY0LkFwcEltYWdlLnRhci5nego2NTBLb00yZWdSM3lXelRXaEdFdE93WEJQQ1pCOG41eTF5VkticmdzNU5jV1BQVDdQKzBwTUd1OXBNQ3ozd3dUMmpnWTR0MDRUa3BTcDBTTmhzTmNBQT09Cg==",
-			"url": "https://github.com/atampy25/glacierkit/releases/download/1.12.0/GlacierKit_1.12.0_amd64.AppImage.tar.gz"
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY2FyaGZVenFQS2RpcWgvQS9uSHdkSktDMU9GRzNkZUpnMmRqZVFjWmlQMndMSGFhNlh4Yk5DVGtFZm5uUndhemN5cjJLSk5ENWZMUHFTb0huOG1EcGNlaURkMmhEZ1EwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzU2MjU3ODMwCWZpbGU6R2xhY2llcktpdF8xLjEyLjNfYW1kNjQuQXBwSW1hZ2UudGFyLmd6CmhUWktwTm4wbC84UXB4eHN4ZUJodlRyTW9XT0tuRGx6aG1Rcm1oRU5xM2RGSk5BVDR1clBJYmNEdnJVTEFsNmtwdTlyRFdtc3l2OFJJODVyU2l3N0RBPT0K",
+			"url": "https://github.com/atampy25/glacierkit/releases/download/1.12.3/GlacierKit_1.12.3_amd64.AppImage.tar.gz"
 		}
 	}
 }

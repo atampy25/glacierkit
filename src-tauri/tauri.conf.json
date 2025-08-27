@@ -11,16 +11,8 @@
 		"category": "DeveloperTool",
 		"copyright": "",
 		"targets": "all",
-		"externalBin": [
-			"bin/vgmstream-cli"
-		],
-		"icon": [
-			"icons/32x32.png",
-			"icons/128x128.png",
-			"icons/128x128@2x.png",
-			"icons/icon.icns",
-			"icons/icon.ico"
-		],
+		"externalBin": ["bin/vgmstream-cli"],
+		"icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
 		"windows": {
 			"certificateThumbprint": null,
 			"digestAlgorithm": "sha256",
@@ -60,14 +52,12 @@
 	},
 	"productName": "GlacierKit",
 	"mainBinaryName": "GlacierKit",
-	"version": "1.12.0",
+	"version": "1.12.3",
 	"identifier": "app.glacierkit",
 	"plugins": {
 		"updater": {
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5OEYzQTUzNUZCODZBNUMKUldSY2FyaGZVenFQS2JydmlWbHhndGo2WXFEZExmVzEvQXJRYk9PekRjb0NoY01RRnBUdEMvNHgK",
-			"endpoints": [
-				"https://raw.githubusercontent.com/atampy25/glacierkit/master/updates.json"
-			]
+			"endpoints": ["https://raw.githubusercontent.com/atampy25/glacierkit/master/updates.json"]
 		}
 	},
 	"app": {
@@ -85,10 +75,7 @@
 		],
 		"security": {
 			"assetProtocol": {
-				"scope": [
-					"**/*",
-					"$APPDATA/**"
-				]
+				"scope": ["**/*", "$APPDATA/**"]
 			},
 			"csp": null
 		}
