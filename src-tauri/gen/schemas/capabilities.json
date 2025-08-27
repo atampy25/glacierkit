@@ -78,7 +78,8 @@
 			"shell:default",
 			"dialog:default",
 			"process:default",
-			"log:default"
+			"log:default",
+			"aptabase:allow-track-event"
 		]
 	}
 }

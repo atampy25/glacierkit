@@ -2,7 +2,7 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
-	import { join, sep } from "@tauri-apps/api/path"
+	import { join, sep as getSep } from "@tauri-apps/api/path"
 	import type { FileBrowserRequest } from "$lib/bindings-types"
 	import { Button, Search } from "carbon-components-svelte"
 	import { event, showInFolder } from "$lib/utils"
@@ -13,6 +13,8 @@
 	import { trackEvent } from "$lib/utils"
 	import { readTextFile } from "@tauri-apps/plugin-fs"
 	import { help } from "$lib/helpray"
+
+	const sep = getSep()
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 	let tree: JSTree = null!
