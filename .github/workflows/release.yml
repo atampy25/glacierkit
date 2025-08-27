@@ -121,7 +121,7 @@ jobs:
               with:
                 upload_url: ${{ needs.create_release.outputs.upload_url }}
                 asset_name: GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz
-                asset_path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ github.ref_name }}_amd64.AppImage.tar.gz
+                asset_path: src-tauri/target/release/bundle/appimage/GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz
                 asset_content_type: application/octet-stream
 
             - name: Read update signature (Ubuntu)
@@ -129,7 +129,7 @@ jobs:
               id: updateSignatureLinux
               uses: andstor/file-reader-action@v1.0.0
               with:
-                  path: "src-tauri/target/release/bundle/appimage/glacier-kit_${{ github.ref_name }}_amd64.AppImage.tar.gz.sig"
+                  path: "src-tauri/target/release/bundle/appimage/GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz.sig"
         
     post_release:
       name: Post release
