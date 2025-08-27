@@ -52,7 +52,7 @@
 	},
 	"productName": "GlacierKit",
 	"mainBinaryName": "GlacierKit",
-	"version": "1.12.3",
+	"version": "1.12.4",
 	"identifier": "app.glacierkit",
 	"plugins": {
 		"updater": {
