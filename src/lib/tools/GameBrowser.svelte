@@ -5,9 +5,9 @@
 	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter } from "$lib/bindings-types"
 	import { Checkbox, Dropdown, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
-	import { trackEvent } from "$lib/utils"
+	import { clipboard } from "@tauri-apps/api"
+	import { trackEvent } from "@aptabase/tauri"
 	import { help } from "$lib/helpray"
-	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
 
 	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 

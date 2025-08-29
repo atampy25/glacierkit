@@ -913,7 +913,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 						let hash_list = HashList::from_compressed(&data)?;
 
 						fs::write(
-							app.path()
+							app.path_resolver()
 								.app_data_dir()
 								.context("Couldn't get app data dir")?
 								.join("hash_list.sml"),
@@ -950,7 +950,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 						fs::write(
-							app.path()
+							app.path_resolver()
 								.app_data_dir()
 								.context("Couldn't get app data dir")?
 								.join("tonytools_hash_list.hmla"),
@@ -1035,8 +1035,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
 					hash_list
-				)
-				.await?;
+				)?;
 
 				finish_task(app, task)?;
 			}

@@ -3,7 +3,7 @@
 	import { v4 } from "uuid"
 	import md5 from "md5"
 	import { Decimal } from "decimal.js"
-	import { trackEvent } from "$lib/utils"
+	import { trackEvent } from "@aptabase/tauri"
 	import { help } from "$lib/helpray"
 
 	export async function handleRequest(request: any) {

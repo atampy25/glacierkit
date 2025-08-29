@@ -29,8 +29,8 @@
 	import { onMount } from "svelte"
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
-	import { trackEvent } from "$lib/utils"
-	import { convertFileSrc } from "@tauri-apps/api/core"
+	import { trackEvent } from "@aptabase/tauri"
+	import { convertFileSrc } from "@tauri-apps/api/tauri"
 	import WaveformPlayer from "$lib/components/WaveformPlayer.svelte"
 	import MultiWaveformPlayer from "$lib/components/MultiWaveformPlayer.svelte"
 	import Monaco from "./Monaco.svelte"
@@ -40,7 +40,7 @@
 	import { Pane, Splitpanes } from "svelte-splitpanes"
 	import { ColumnDependency, IbmDataProductExchange, SoftwareResource, TrashCan } from "carbon-icons-svelte"
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
-	import { platform } from "@tauri-apps/plugin-os"
+	import { platform } from "@tauri-apps/api/os"
 
 	export let id: string
 

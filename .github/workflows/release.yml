@@ -7,72 +7,72 @@ on:
 
 jobs:
     create_release:
-        name: Create release
-        runs-on: ubuntu-latest
-        # Note this. We are going to use that in further jobs.
-        outputs:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-        steps:
-            - name: Create release
-              id: create_release
-              uses: actions/create-release@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  tag_name: ${{ github.ref_name }}
-                  release_name: ${{ github.ref_name }}
-                  body: |
-                      Last commit: ${{ github.event.head_commit.message || format('v{0}', github.ref_name) }}
-                  draft: false
-                  prerelease: false
-
+      name: Create release
+      runs-on: ubuntu-latest
+      # Note this. We are going to use that in further jobs.
+      outputs:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+      steps:
+        - name: Create release
+          id: create_release
+          uses: actions/create-release@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: ${{ github.ref_name }}
+            release_name: ${{ github.ref_name }}
+            body: |
+              Last commit: ${{ github.event.head_commit.message || format('v{0}', github.ref_name) }}
+            draft: false
+            prerelease: false
+            
     build:
         name: Build binaries
         needs: create_release
         runs-on: ${{ matrix.platform }}
         strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - platform: "ubuntu-24.04"
-                    - platform: "windows-latest"
+          fail-fast: false
+          matrix:
+            include:
+              - platform: "ubuntu-22.04"
+              - platform: "windows-latest"
         outputs:
-            windows-signature: ${{steps.updateSignatureWindows.outputs.contents}}
-            linux-signature: ${{steps.updateSignatureLinux.outputs.contents}}
+          windows-signature: ${{steps.updateSignatureWindows.outputs.contents}}
+          linux-signature: ${{steps.updateSignatureLinux.outputs.contents}}
         steps:
             - uses: actions/checkout@v4
 
             - name: Setup Node
               uses: actions/setup-node@v4
               with:
-                  node-version: lts/*
-
+                node-version: lts/*
+          
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@nightly
               with:
-                  components: "clippy, rustfmt"
-
+                components: 'clippy, rustfmt'
+          
             - name: Rust cache
               uses: Swatinem/rust-cache@v2.7.3
               with:
-                  prefix-key: v0-rust-${{ matrix.platform }}
-                  workspaces: "src-tauri -> target"
+                prefix-key: v0-rust-${{ matrix.platform }}
+                workspaces: "src-tauri -> target"
 
             - name: Install build dependencies (Ubuntu only)
-              if: matrix.platform == 'ubuntu-24.04'
+              if: matrix.platform == 'ubuntu-22.04'
               run: |
-                  sudo apt-get update
-                  sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
+                sudo apt-get update
+                sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+        
             - name: Install front-end dependencies
               run: |
-                  yarn set version 4.0.2
-                  yarn
-
+                yarn set version 4.0.2
+                yarn
+        
             - name: Update versions
               uses: ./.github/actions/update-versions
               with:
-                  version: ${{github.ref_name}}
+                version: ${{github.ref_name}}
 
             - name: Write key file
               uses: DamianReeves/write-file-action@v1.0
@@ -85,125 +85,124 @@ jobs:
               with:
                   path: "./.env"
                   contents: |
-                      TAURI_SIGNING_PRIVATE_KEY=gk.key
-                      TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.KEYPASS }}
+                      TAURI_PRIVATE_KEY=gk.key
+                      TAURI_KEY_PASSWORD=${{ secrets.KEYPASS }}
 
             - name: Build
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: |
                   yarn tauri build
-                  rm src-tauri/gk.key
 
             - name: Upload release (MSI)
               if: matrix.platform == 'windows-latest'
               uses: actions/upload-release-asset@v1
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ needs.create_release.outputs.upload_url }}
-                  asset_name: GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip
-                  asset_path: src-tauri\target\release\bundle\msi\GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip
-                  asset_content_type: application/octet-stream
-
+                upload_url: ${{ needs.create_release.outputs.upload_url }}
+                asset_name: GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip
+                asset_path: src-tauri\target\release\bundle\msi\GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip
+                asset_content_type: application/octet-stream
+    
             - name: Read update signature (Windows)
               if: matrix.platform == 'windows-latest'
               id: updateSignatureWindows
               uses: andstor/file-reader-action@v1.0.0
               with:
                   path: "src-tauri/target/release/bundle/msi/GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip.sig"
-
+      
             - name: Upload release (AppImage)
-              if: matrix.platform == 'ubuntu-24.04'
+              if: matrix.platform == 'ubuntu-22.04'
               uses: actions/upload-release-asset@v1
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ needs.create_release.outputs.upload_url }}
-                  asset_name: GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz
-                  asset_path: src-tauri/target/release/bundle/appimage/GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz
-                  asset_content_type: application/octet-stream
+                upload_url: ${{ needs.create_release.outputs.upload_url }}
+                asset_name: GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz
+                asset_path: src-tauri/target/release/bundle/appimage/glacier-kit_${{ github.ref_name }}_amd64.AppImage.tar.gz
+                asset_content_type: application/octet-stream
 
             - name: Read update signature (Ubuntu)
-              if: matrix.platform == 'ubuntu-24.04'
+              if: matrix.platform == 'ubuntu-22.04'
               id: updateSignatureLinux
               uses: andstor/file-reader-action@v1.0.0
               with:
-                  path: "src-tauri/target/release/bundle/appimage/GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz.sig"
-
+                  path: "src-tauri/target/release/bundle/appimage/glacier-kit_${{ github.ref_name }}_amd64.AppImage.tar.gz.sig"
+        
     post_release:
-        name: Post release
-        needs: build
-        runs-on: "ubuntu-24.04"
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-              with:
-                  ref: "main"
-                  fetch-depth: 0
+      name: Post release
+      needs: build
+      runs-on: 'ubuntu-22.04'
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            ref: "main"
+            fetch-depth: 0
 
-            - name: Update versions
-              uses: ./.github/actions/update-versions
-              with:
-                  version: ${{github.ref_name}}
+        - name: Update versions
+          uses: ./.github/actions/update-versions
+          with:
+            version: ${{github.ref_name}}
 
-            - name: Update updates.json version
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "updates.json"
-                  field: "version"
-                  value: ${{ github.ref_name }}
+        - name: Update updates.json version
+          uses: jossef/action-set-json-field@v2
+          with:
+              file: "updates.json"
+              field: "version"
+              value: ${{ github.ref_name }}
+  
+        - name: Update updates.json notes
+          uses: jossef/action-set-json-field@v2
+          with:
+              file: "updates.json"
+              field: "notes"
+              value: "${{ github.event.head_commit.message || format('v{0}', github.ref_name) }}"
+  
+        - name: Update updates.json pub_date
+          uses: jossef/action-set-json-field@v2
+          with:
+              file: "updates.json"
+              field: "pub_date"
+              value: ${{ github.event.repository.updated_at}}
+  
+        - name: Update updates.json signature
+          uses: jossef/action-set-json-field@v2
+          with:
+              file: "updates.json"
+              field: "platforms.windows-x86_64.signature"
+              value: ${{ needs.build.outputs.windows-signature }}
 
-            - name: Update updates.json notes
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "updates.json"
-                  field: "notes"
-                  value: "${{ github.event.head_commit.message || format('v{0}', github.ref_name) }}"
+        - name: Update updates.json URL
+          uses: jossef/action-set-json-field@v2
+          with:
+              file: "updates.json"
+              field: "platforms.windows-x86_64.url"
+              value: "https://github.com/atampy25/glacierkit/releases/download/${{ github.ref_name }}/GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip"
 
-            - name: Update updates.json pub_date
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "updates.json"
-                  field: "pub_date"
-                  value: ${{ github.event.repository.updated_at}}
+        - name: Update updates.json signature
+          uses: jossef/action-set-json-field@v2
+          with:
+              file: "updates.json"
+              field: "platforms.linux-x86_64.signature"
+              value: ${{ needs.build.outputs.linux-signature }}
+    
+        - name: Update updates.json URL
+          uses: jossef/action-set-json-field@v2
+          with:
+              file: "updates.json"
+              field: "platforms.linux-x86_64.url"
+              value: "https://github.com/atampy25/glacierkit/releases/download/${{ github.ref_name }}/GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz"
+    
+        - name: Format configs
+          run: |
+              yarn set version 4.0.2
+              yarn
+              yarn format-configs
 
-            - name: Update updates.json signature
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "updates.json"
-                  field: "platforms.windows-x86_64.signature"
-                  value: ${{ needs.build.outputs.windows-signature }}
-
-            - name: Update updates.json URL
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "updates.json"
-                  field: "platforms.windows-x86_64.url"
-                  value: "https://github.com/atampy25/glacierkit/releases/download/${{ github.ref_name }}/GlacierKit_${{ github.ref_name }}_x64_en-US.msi.zip"
-
-            - name: Update updates.json signature
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "updates.json"
-                  field: "platforms.linux-x86_64.signature"
-                  value: ${{ needs.build.outputs.linux-signature }}
-
-            - name: Update updates.json URL
-              uses: jossef/action-set-json-field@v2
-              with:
-                  file: "updates.json"
-                  field: "platforms.linux-x86_64.url"
-                  value: "https://github.com/atampy25/glacierkit/releases/download/${{ github.ref_name }}/GlacierKit_${{ github.ref_name }}_amd64.AppImage.tar.gz"
-
-            - name: Format configs
-              run: |
-                  yarn set version 4.0.2
-                  yarn
-                  yarn format-configs
-
-            - name: Commit changes
-              uses: EndBug/add-and-commit@v9.1.0
-              with:
-                  default_author: github_actions
-                  message: "Post-update"
+        - name: Commit changes
+          uses: EndBug/add-and-commit@v9.1.0
+          with:
+              default_author: github_actions
+              message: "Post-update"

@@ -1,9 +1,10 @@
 ---
 name: Idea
 about: Not the IntelliJ software, the thing your brain comes up with
-title: ""
+title: ''
 labels: idea
-assignees: ""
+assignees: ''
+
 ---
 
 **Is your feature request related to a problem? Please describe.**

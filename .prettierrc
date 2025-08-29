@@ -9,5 +9,5 @@
 	"tabWidth": 4,
 	"semi": false,
 	"htmlWhitespaceSensitivity": "strict",
-	"plugins": ["prettier-plugin-toml", "prettier-plugin-svelte"]
+	"plugins": ["prettier-plugin-toml"]
 }

@@ -2,7 +2,7 @@
 	import type { ContentSearchRequest } from "$lib/bindings-types"
 	import { help } from "$lib/helpray"
 	import { event } from "$lib/utils"
-	import { trackEvent } from "$lib/utils"
+	import { trackEvent } from "@aptabase/tauri"
 	import { Button, Checkbox, Search } from "carbon-components-svelte"
 	import SearchIcon from "carbon-icons-svelte/lib/Search.svelte"
 	import CheckboxIcon from "carbon-icons-svelte/lib/Checkbox.svelte"

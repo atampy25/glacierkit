@@ -3,24 +3,14 @@
 	import "jstree"
 	import { onMount } from "svelte"
 	import { join, sep } from "@tauri-apps/api/path"
-	import { createEventDispatcher, onDestroy, onMount } from "svelte"
-	import { join, sep as getSep } from "@tauri-apps/api/path"
 	import type { FileBrowserRequest } from "$lib/bindings-types"
 	import { Button, OverflowMenu, OverflowMenuItem, Search, Truncate } from "carbon-components-svelte"
 	import { event, showInFolder } from "$lib/utils"
 	import { v4 } from "uuid"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { trackEvent } from "@aptabase/tauri"
-	import { open } from "@tauri-apps/plugin-dialog"
-	import FolderAdd from "carbon-icons-svelte/lib/FolderAdd.svelte"
-	import { v4 } from "uuid"
-	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
-	import { trackEvent } from "$lib/utils"
-	import { readTextFile } from "@tauri-apps/plugin-fs"
 	import { help } from "$lib/helpray"
 	import { ArrowUpRight } from "carbon-icons-svelte"
-
-	const sep = getSep()
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 	let tree: JSTree = null!

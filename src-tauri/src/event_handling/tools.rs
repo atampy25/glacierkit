@@ -1018,8 +1018,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						"editor_connection": app_settings.load().editor_connection,
 						"selected_install": selected_install_info
 					}))
-				)
-				.unwrap();
+				);
 
 				send_request(
 					app,
@@ -1030,7 +1029,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				)?;
 
 				if app
-					.path()
+					.path_resolver()
 					.app_log_dir()
 					.context("Couldn't get log dir")?
 					.join("..")
@@ -1067,7 +1066,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				if path != settings.game_install {
 					settings.game_install = path;
 					fs::write(
-						app.path()
+						app.path_resolver()
 							.app_data_dir()
 							.context("Couldn't get app data dir")?
 							.join("settings.json"),
@@ -1083,7 +1082,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				let mut settings = (*app_settings.load_full()).to_owned();
 				settings.extract_modded_files = value;
 				fs::write(
-					app.path()
+					app.path_resolver()
 						.app_data_dir()
 						.context("Couldn't get app data dir")?
 						.join("settings.json"),
@@ -1096,7 +1095,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				let mut settings = (*app_settings.load_full()).to_owned();
 				settings.colourblind_mode = value;
 				fs::write(
-					app.path()
+					app.path_resolver()
 						.app_data_dir()
 						.context("Couldn't get app data dir")?
 						.join("settings.json"),
@@ -1114,7 +1113,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				}
 
 				fs::write(
-					app.path()
+					app.path_resolver()
 						.app_data_dir()
 						.context("Couldn't get app data dir")?
 						.join("settings.json"),
@@ -1125,7 +1124,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 			SettingsEvent::ChangeCustomPaths(value) => {
 				if let Some(project) = app_state.project.load().as_ref() {
-					app.track_event("Edit custom paths list manually", None).unwrap();
+					app.track_event("Edit custom paths list manually", None);
 
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths = value;
