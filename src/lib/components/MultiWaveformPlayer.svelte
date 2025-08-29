@@ -18,6 +18,7 @@
 	let isPlaying = false
 
 	let playerIdx = 0
+	let displayedIndex: string
 
 	let current = 0
 	let duration = 0
@@ -70,6 +71,40 @@
 	onDestroy(() => {
 		clearFunc.run()
 	})
+
+	function commitIndexChange() {
+		const newIndex = parseInt(displayedIndex, 10)
+
+		if (isNaN(newIndex) || newIndex < 1 || newIndex > src.length) {
+			// Invalid input, revert
+			displayedIndex = (playerIdx + 1).toString()
+		} else {
+			// Valid input
+			playerIdx = newIndex - 1
+			wavesurfer.load(src[playerIdx][1])
+			isPlaying = false
+		}
+	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		const target = e.target as HTMLSpanElement
+		if (e.key === "Enter") {
+			e.preventDefault()
+			commitIndexChange()
+			target.blur()
+		} else if (e.key === "Escape") {
+			e.preventDefault()
+			displayedIndex = (playerIdx + 1).toString() // Revert
+			target.blur()
+		}
+	}
+
+	function handleBlur() {
+		commitIndexChange()
+	}
+
+	// Ensure displayedIndexString is updated if playerIdx changes or on initialization
+	$: displayedIndex = (playerIdx + 1).toString()
 </script>
 
 <div class="mb-2" bind:this={container}></div>
@@ -122,8 +157,19 @@
 				dispatch("download", playerIdx)
 			}}
 		/>
-		<span class="text-neutral-400">{playerIdx + 1} / {src.length}</span>
+		<span class="text-neutral-400">
+			<span contenteditable="true" id="editable-audio-index" bind:textContent={displayedIndex} on:keydown={handleKeyDown} on:blur={handleBlur}></span> / {src.length}
+		</span>
 		<span class="text-neutral-400">{src[playerIdx][0]}</span>
 		<span class="text-neutral-400">{secsToTime(current)} / {secsToTime(duration)}</span>
 	</div>
 {/if}
+
+<style>
+	#editable-audio-index:focus {
+		background-color: #444;
+		outline: none;
+		padding: 2px 4px;
+		border-radius: 3px;
+	}
+</style>

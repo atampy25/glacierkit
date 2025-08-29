@@ -2,7 +2,7 @@
 	import type { ContentSearchResultsRequest } from "$lib/bindings-types"
 	import { event } from "$lib/utils"
 	import { onMount } from "svelte"
-	import { trackEvent } from "@aptabase/tauri"
+	import { trackEvent } from "$lib/utils"
 	import { help } from "$lib/helpray"
 
 	export let id: string

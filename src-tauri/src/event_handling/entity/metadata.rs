@@ -87,7 +87,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(factory_hash.to_owned());
 
-					app.track_event("Save custom path by factory input", None);
+					app.track_event("Save custom path by factory input", None).unwrap();
 
 					send_request(
 						app,
@@ -196,7 +196,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					let mut settings = (*project.settings.load_full()).to_owned();
 					settings.custom_paths.push(blueprint_hash.to_owned());
 
-					app.track_event("Save custom path by blueprint input", None);
+					app.track_event("Save custom path by blueprint input", None).unwrap();
 
 					send_request(
 						app,

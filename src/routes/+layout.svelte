@@ -6,8 +6,8 @@
 	import "@fontsource/fira-code"
 	import "$lib/crc32"
 
-	import { appWindow } from "@tauri-apps/api/window"
-	import { ComposedModal, HeaderNavItem, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
+	import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
+	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import { beforeUpdate, onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
@@ -17,14 +17,14 @@
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import * as monaco from "monaco-editor"
 	import { createPatch } from "rfc6902"
-	import { writeTextFile } from "@tauri-apps/api/fs"
+	import { writeTextFile } from "@tauri-apps/plugin-fs"
 	import { attachConsole, info } from "tauri-plugin-log"
 	import { help } from "$lib/helpray"
 	import HelpRay from "$lib/components/HelpRay.svelte"
-	import { trackEvent } from "@aptabase/tauri"
-	import { checkUpdate, installUpdate, type UpdateManifest } from "@tauri-apps/api/updater"
+	import { trackEvent } from "$lib/utils"
+	import { check, Update } from "@tauri-apps/plugin-updater"
 	import { getVersion } from "@tauri-apps/api/app"
-	import { relaunch } from "@tauri-apps/api/process"
+	import { relaunch } from "@tauri-apps/plugin-process"
 	import { event } from "$lib/utils"
 
 	let tasks: [string, string][] = []
@@ -72,7 +72,7 @@
 				if (request.type === "global" && request.data.type === "setWindowTitle") {
 					console.log("Layout handling request", request)
 
-					appWindow.setTitle(`GlacierKit - ${request.data.data}`)
+					getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
 					windowTitle = request.data.data
 				}
 
@@ -122,6 +122,8 @@
 				unlistenRequest()
 				detachConsole()
 			}
+
+			getCurrentWebviewWindow().show()
 
 			self.MonacoEnvironment = {
 				getWorker: function (_moduleId: any, label: string) {
@@ -200,6 +202,69 @@
 						const data = JSON.parse(model.getValue())
 
 						const colours: monaco.languages.IColorInformation[] = []
+
+						if (Array.isArray(data)) {
+							for (const item of data) {
+								if (item.properties) {
+									for (const propertyData of Object.values(item.properties) as Property[]) {
+										if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
+											const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+											const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+											const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+
+											for (const [lineNo, line] of model.getLinesContent().entries()) {
+												const char = line.indexOf(propertyData.value)
+
+												if (char !== -1) {
+													colours.push({
+														color: {
+															red: r / 255,
+															green: g / 255,
+															blue: b / 255,
+															alpha: 1
+														},
+														range: {
+															startLineNumber: lineNo + 1,
+															endLineNumber: lineNo + 1,
+															startColumn: char + 1,
+															endColumn: char + 1 + 7
+														}
+													})
+												}
+											}
+										}
+
+										if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
+											const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+											const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+											const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+											const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
+
+											for (const [lineNo, line] of model.getLinesContent().entries()) {
+												const char = line.indexOf(propertyData.value)
+
+												if (char !== -1) {
+													colours.push({
+														color: {
+															red: r / 255,
+															green: g / 255,
+															blue: b / 255,
+															alpha: a / 255
+														},
+														range: {
+															startLineNumber: lineNo + 1,
+															endLineNumber: lineNo + 1,
+															startColumn: char + 1,
+															endColumn: char + 1 + 9
+														}
+													})
+												}
+											}
+										}
+									}
+								}
+							}
+						}
 
 						if (data.properties) {
 							for (const propertyData of Object.values(data.properties) as Property[]) {
@@ -340,14 +405,10 @@
 				}
 			})
 
-			appWindow.show()
-
 			try {
-				const { shouldUpdate, manifest } = await checkUpdate()
+				updateManifest = await check()
 
-				if (shouldUpdate) {
-					updateManifest = manifest!
-
+				if (updateManifest) {
 					const currentVersion = await getVersion()
 
 					const commits = await (
@@ -390,7 +451,7 @@
 	let helpRayActive = false
 
 	let updateModalOpen = false
-	let updateManifest: UpdateManifest = { version: "", date: "", body: "" }
+	let updateManifest: Update | null = null
 	let commitsSinceLastVersion: string[] = []
 
 	let lastPanicModalOpen = false
@@ -480,11 +541,11 @@
 	on:submit={async () => {
 		updateModalOpen = false
 
-		await installUpdate()
+		await updateManifest?.downloadAndInstall()
 		await relaunch()
 	}}
 >
-	<ModalHeader title="Update available to version {updateManifest.version}" />
+	<ModalHeader title="Update available to version {updateManifest?.version}" />
 	<ModalBody>
 		Changes made since the currently installed version:
 		<ul class="changelog mt-1">
@@ -530,12 +591,20 @@
 				/>
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.minimize} use:help={{ title: "Minimise", description: "Minimise the application." }}>
+		<div
+			class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600"
+			on:click={() => getCurrentWebviewWindow().minimize()}
+			use:help={{ title: "Minimise", description: "Minimise the application." }}
+		>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600" on:click={appWindow.toggleMaximize} use:help={{ title: "Maximise", description: "Maximise the application." }}>
+		<div
+			class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600"
+			on:click={() => getCurrentWebviewWindow().toggleMaximize()}
+			use:help={{ title: "Maximise", description: "Maximise the application." }}
+		>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path
 					stroke-linecap="round"
@@ -544,7 +613,7 @@
 				/>
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" on:click={appWindow.close} use:help={{ title: "Close", description: "Close the application." }}>
+		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" on:click={() => getCurrentWebviewWindow().close()} use:help={{ title: "Close", description: "Close the application." }}>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 			</svg>

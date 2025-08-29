@@ -7,11 +7,11 @@
 	import { event } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { changeReferenceToLocalEntity, genRandHex, getReferencedLocalEntity } from "./utils"
-	import { clipboard } from "@tauri-apps/api"
-	import { trackEvent } from "@aptabase/tauri"
+	import { trackEvent } from "$lib/utils"
 	import HighlightMonaco from "./HighlightMonaco.svelte"
 	import { v4 } from "uuid"
 	import { help } from "$lib/helpray"
+	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
 
 	export let editorID: string
 

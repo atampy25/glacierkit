@@ -3,7 +3,7 @@
 	import { event } from "$lib/utils"
 	import { ClickableTile, TextArea } from "carbon-components-svelte"
 	import { debounce } from "lodash"
-	import { trackEvent } from "@aptabase/tauri"
+	import { trackEvent } from "$lib/utils"
 	import { help } from "$lib/helpray"
 
 	export let editorID: string

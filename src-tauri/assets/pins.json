@@ -10879,7 +10879,7 @@
 		"_comment": "[modules:/zguidconverter.class].pc_entitytype",
 		"in": [
 			{
-				"pin": "2338152588",
+				"pin": "Guid",
 				"description": ""
 			}
 		],
@@ -26640,5 +26640,33 @@
 			}
 		],
 		"out": []
+	},
+	"006BD3709D460844": {
+		"_comment": "[modules:/zformattedtextlineentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0010E73461C2E8B9": {
+		"_comment": "[modules:/zpairvalueentity_zstring_zvariant.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "Get",
+				"description": ""
+			},
+			{
+				"pin": "SetLeft",
+				"description": "Sets the string value."
+			},
+			{
+				"pin": "SetRight",
+				"description": "Sets the variant value"
+			}
+		],
+		"out": [
+			{
+				"pin": "Value",
+				"description": ""
+			}
+		]
 	}
 }

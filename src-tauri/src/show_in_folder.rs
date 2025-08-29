@@ -12,7 +12,7 @@ use tauri_plugin_aptabase::EventTracker;
 #[tauri::command]
 #[specta::specta]
 pub fn show_in_folder(app: AppHandle, path: String) {
-	app.track_event("Show in folder", None);
+	app.track_event("Show in folder", None).unwrap();
 
 	#[cfg(target_os = "windows")]
 	{

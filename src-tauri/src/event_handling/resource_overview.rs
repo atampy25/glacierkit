@@ -15,7 +15,7 @@ use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	ores::{parse_hashes_ores, parse_json_ores},
 	sdef::SoundDefinitions,
-	wwev::{WwiseEvent, WwiseEventData}
+	wwev::WwiseEvent
 };
 use image::{ImageFormat, ImageReader};
 use prim_rs::render_primitive::RenderPrimitive;
@@ -27,7 +27,10 @@ use tauri::{
 	AppHandle, Manager, State,
 	api::{dialog::blocking::FileDialogBuilder, process::Command}
 };
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_aptabase::EventTracker;
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_shell::ShellExt;
 use tonytools::hmlanguages;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -53,9 +56,9 @@ use crate::{
 
 #[try_fn]
 #[context("Couldn't initialise resource overview {id}")]
-pub fn initialise_resource_overview(
+pub async fn initialise_resource_overview(
 	app: &AppHandle,
-	app_state: &State<AppState>,
+	app_state: &State<'_, AppState>,
 	id: Uuid,
 	hash: RuntimeID,
 	game_files: &PartitionManager,
@@ -179,7 +182,7 @@ pub fn initialise_resource_overview(
 				},
 
 				"GFXI" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
 					let temp_file_id = Uuid::new_v4();
 
 					fs::create_dir_all(data_dir.join("temp"))?;
@@ -265,7 +268,7 @@ pub fn initialise_resource_overview(
 				}
 
 				"TEXT" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
 					let temp_file_id = Uuid::new_v4();
 
 					fs::create_dir_all(data_dir.join("temp"))?;
@@ -326,7 +329,7 @@ pub fn initialise_resource_overview(
 				}
 
 				"WWEV" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
 
 					fs::create_dir_all(data_dir.join("temp"))?;
 
@@ -336,66 +339,64 @@ pub fn initialise_resource_overview(
 
 					let wwev = WwiseEvent::parse(&res_data)?;
 
-					match wwev.data {
-						WwiseEventData::NonStreamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+					for object in wwev.non_streamed {
+						let temp_file_id = Uuid::new_v4();
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										&format!("{}.wav", temp_file_id)
-									])
-									.run()
-									.with_context(|| {
-										format!("Couldn't convert non-streamed object {}", object.wem_id)
-									})?;
+						app.shell()
+							.sidecar("vgmstream-cli")
+							.unwrap()
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								&format!("{}.wav", temp_file_id)
+							])
+							.run()
+							.await
+							.with_context(|| format!("Couldn't convert non-streamed object {}", object.wem_id))?;
 
-								wav_paths.push((
-									"Embedded audio".into(),
-									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-								))
-							}
-						}
+						wav_paths.push((
+							"Embedded audio".into(),
+							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+						))
+					}
 
-						WwiseEventData::Streamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+					for object in wwev.streamed {
+						let temp_file_id = Uuid::new_v4();
 
-								let wwem_hash = res_meta
-									.core_info
-									.references
-									.get(object.dependency_index as usize)
-									.context("No such WWEM dependency")?
-									.resource
-									.get_id();
+						let wwem_hash = res_meta
+							.core_info
+							.references
+							.get(object.dependency_index as usize)
+							.context("No such WWEM dependency")?
+							.resource
+							.get_id();
 
-								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
+						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										&format!("{}.wav", temp_file_id)
-									])
-									.run()
-									.with_context(|| format!("Couldn't convert streamed object {wwem_hash}"))?;
+						app.shell()
+							.sidecar("vgmstream-cli")
+							.unwrap()
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								&format!("{}.wav", temp_file_id)
+							])
+							.run()
+							.await
+							.with_context(|| format!("Couldn't convert streamed object {wwem_hash}"))?;
 
-								wav_paths.push((
-									wwem_hash.to_string(),
-									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-								))
-							}
-						}
+						wav_paths.push((
+							wwem_hash.to_string(),
+							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+						))
 					}
 
 					ResourceOverviewData::MultiAudio {
@@ -405,7 +406,7 @@ pub fn initialise_resource_overview(
 				}
 
 				"WWES" | "WWEM" => {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
 					let temp_file_id = Uuid::new_v4();
 
 					fs::create_dir_all(data_dir.join("temp"))?;
@@ -414,7 +415,9 @@ pub fn initialise_resource_overview(
 
 					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
 
-					Command::new_sidecar("vgmstream-cli")?
+					app.shell()
+						.sidecar("vgmstream-cli")
+						.unwrap()
 						.current_dir(data_dir.join("temp"))
 						.args([
 							&format!("{}.wem", temp_file_id),
@@ -423,6 +426,7 @@ pub fn initialise_resource_overview(
 							&format!("{}.wav", temp_file_id)
 						])
 						.run()
+						.await
 						.context("VGMStream command failed")?;
 
 					ResourceOverviewData::Audio {
@@ -862,7 +866,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
 					hash_list
-				)?;
+				)
+				.await?;
 			}
 
 			finish_task(app, task)?;
@@ -898,7 +903,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
 					hash_list
-				)?;
+				)
+				.await?;
 
 				send_request(
 					app,
@@ -985,7 +991,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.resource_type
 					.to_owned();
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -994,12 +1000,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}.{}", &hash, &file_type))
 					.add_filter(format!("{} file", &file_type), &[file_type.as_ref()])
-					.save_file()
+					.blocking_save_file()
 				{
-					fs::write(&path, data)?;
+					fs::write(path.as_path().context("Invalid path")?, data)?;
 
 					fs::write(
-						path.parent().unwrap().join(format!("{}.{}.meta", hash, file_type)),
+						path.as_path()
+							.context("Invalid path")?
+							.parent()
+							.unwrap()
+							.join(format!("{}.{}.meta", hash, file_type)),
 						metadata_file
 					)?;
 				}
@@ -1030,14 +1040,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					hash
 				)?)?;
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract entity");
+				let mut dialog = app.dialog().file().set_title("Extract entity");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(path) = dialog.add_filter("QuickEntity entity", &["entity.json"]).save_file() {
-					fs::write(path, entity_json)?;
+				if let Some(path) = dialog
+					.add_filter("QuickEntity entity", &["entity.json"])
+					.blocking_save_file()
+				{
+					fs::write(path.as_path().context("Invalid path")?, entity_json)?;
 				}
 			}
 		}
@@ -1077,7 +1090,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?
 				};
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1086,13 +1099,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}.TEMP.json", hash))
 					.add_filter("TEMP.json file", &["TEMP.json"])
-					.save_file()
+					.blocking_save_file()
 				{
-					fs::write(&path, data)?;
+					fs::write(path.as_path().context("Invalid path")?, data)?;
 
 					fs::write(
-						path.parent()
-							.unwrap()
+						path.as_path()
+							.context("Invalid path")?
 							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
 						to_string(&metadata_file).context("Couldn't serialise meta file")?
 					)?;
@@ -1134,7 +1147,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.to_binary()
 					.context("Couldn't serialise meta file")?;
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1143,12 +1156,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}.TBLU", metadata.core_info.id))
 					.add_filter("TBLU file", &["TBLU"])
-					.save_file()
+					.blocking_save_file()
 				{
-					fs::write(&path, data)?;
+					fs::write(path.as_path().context("Invalid path")?, data)?;
 
 					fs::write(
-						path.parent()
+						path.as_path()
+							.context("Invalid path")?
+							.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta", hash, metadata.core_info.resource_type)),
 						metadata_file
@@ -1208,7 +1223,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?
 				};
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1217,12 +1232,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}.TBLU.json", metadata.core_info.id))
 					.add_filter("TBLU.json file", &["TBLU.json"])
-					.save_file()
+					.blocking_save_file()
 				{
-					fs::write(&path, data)?;
+					fs::write(path.as_path().context("Invalid path")?, data)?;
 
 					fs::write(
-						path.parent()
+						path.as_path()
+							.context("Invalid path")?
+							.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
 						to_string(&metadata_file).context("Couldn't serialise meta file")?
@@ -1248,7 +1265,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1260,10 +1277,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 						format!("{}.json file", res_meta.core_info.resource_type),
 						&[&format!("{}.json", res_meta.core_info.resource_type)]
 					)
-					.save_file()
+					.blocking_save_file()
 				{
 					fs::write(
-						&path,
+						path.as_path().context("Invalid path")?,
 						to_vec(&convert_generic::<Value>(
 							&res_data,
 							get_loaded_game_version(app, install)?,
@@ -1272,7 +1289,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					)?;
 
 					fs::write(
-						path.parent()
+						path.as_path()
+							.context("Invalid path")?
+							.parent()
 							.unwrap()
 							.join(format!("{}.{}.meta.json", hash, res_meta.core_info.resource_type)),
 						to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))
@@ -1298,7 +1317,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if hash == "0057C2C3941115CA".parse()? {
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+					let mut dialog = app.dialog().file().set_title("Extract file");
 
 					if let Some(project) = app_state.project.load().as_ref() {
 						dialog = dialog.set_directory(&project.path);
@@ -1309,14 +1328,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					if let Some(path) = dialog
 						.set_file_name(&format!("{}.json", hash))
 						.add_filter("JSON file", &["json"])
-						.save_file()
+						.blocking_save_file()
 					{
-						fs::write(path, res_data)?;
+						fs::write(path.as_path().context("Invalid path")?, res_data)?;
 					}
 				} else {
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+					let mut dialog = app.dialog().file().set_title("Extract file");
 
 					if let Some(project) = app_state.project.load().as_ref() {
 						dialog = dialog.set_directory(&project.path);
@@ -1327,9 +1346,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					if let Some(path) = dialog
 						.set_file_name(&format!("{}.json", hash))
 						.add_filter("JSON file", &["json"])
-						.save_file()
+						.blocking_save_file()
 					{
-						fs::write(path, to_vec(&res_data)?)?;
+						fs::write(path.as_path().context("Invalid path")?, to_vec(&res_data)?)?;
 					}
 				}
 			}
@@ -1352,7 +1371,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			{
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1364,12 +1383,12 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.add_filter("JPEG file", &["jpg"])
 					.add_filter("TGA file", &["tga"])
 					.add_filter("DDS file", &["dds"])
-					.save_file()
+					.blocking_save_file()
 				{
 					app.track_event(
 						"Extract image file as image format",
 						Some(json!({
-							"format": path
+							"format": path.as_path().context("Invalid path")?
 									.file_name()
 									.context("No file name")?
 									.to_str()
@@ -1378,13 +1397,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.next_back()
 									.unwrap_or("None")
 						}))
-					);
+					)
+					.unwrap();
 
 					match res_meta.core_info.resource_type.as_ref() {
 						"GFXI" => {
 							let reader = ImageReader::new(Cursor::new(res_data.to_owned())).with_guessed_format()?;
 
 							if path
+								.as_path()
+								.context("Invalid path")?
 								.file_name()
 								.context("No file name")?
 								.to_str()
@@ -1393,7 +1415,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							{
 								match reader.format().context("Couldn't get format")? {
 									ImageFormat::Dds => {
-										fs::write(path, res_data)?;
+										fs::write(path.as_path().context("Invalid path")?, res_data)?;
 									}
 
 									_ => {
@@ -1410,7 +1432,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									}
 								}
 							} else {
-								reader.decode()?.save(path)?;
+								reader.decode()?.save(path.as_path().context("Invalid path")?)?;
 							}
 						}
 
@@ -1432,6 +1454,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							}
 
 							if path
+								.as_path()
+								.context("Invalid path")?
 								.file_name()
 								.context("No file name")?
 								.to_str()
@@ -1441,7 +1465,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								let dds_data = glacier_texture::convert::create_dds(&texture)
 									.context("Couldn't convert texture to DDS")?;
 
-								fs::write(path, dds_data)?;
+								fs::write(path.as_path().context("Invalid path")?, dds_data)?;
 							} else {
 								let tga_data = glacier_texture::convert::create_tga(&texture)
 									.context("Couldn't convert texture to TGA")?;
@@ -1451,15 +1475,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								reader.set_format(image::ImageFormat::Tga);
 
 								if path
+									.as_path()
+									.context("Invalid path")?
 									.file_name()
 									.context("No file name")?
 									.to_str()
 									.context("Filename was invalid string")?
 									.ends_with(".tga")
 								{
-									fs::write(path, tga_data)?;
+									fs::write(path.as_path().context("Invalid path")?, tga_data)?;
 								} else {
-									reader.decode()?.save(path)?;
+									reader.decode()?.save(path.as_path().context("Invalid path")?)?;
 								}
 							}
 						}
@@ -1483,7 +1509,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1492,25 +1518,28 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}.wav", hash))
 					.add_filter("WAV file", &["wav"])
-					.save_file()
+					.blocking_save_file()
 				{
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
 
 					let temp_file_id = Uuid::new_v4();
 
 					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
 
-					Command::new_sidecar("vgmstream-cli")?
+					app.shell()
+						.sidecar("vgmstream-cli")
+						.unwrap()
 						.current_dir(data_dir.join("temp"))
 						.args([
 							&format!("{}.wem", temp_file_id),
 							"-L",
 							"-o",
-							path.to_string_lossy().as_ref()
+							path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
 						])
 						.run()
+						.await
 						.context("VGMStream command failed")?;
 				}
 			}
@@ -1529,14 +1558,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let mut dialog = FileDialogBuilder::new().set_title("Extract all WAVs to folder");
+				let mut dialog = app.dialog().file().set_title("Extract all WAVs to folder");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(path) = dialog.pick_folder() {
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+				if let Some(path) = dialog.blocking_pick_folder() {
+					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
 
 					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
@@ -1544,58 +1573,66 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 					let mut idx = 0;
 
-					match wwev.data {
-						WwiseEventData::NonStreamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+					for object in wwev.non_streamed {
+						let temp_file_id = Uuid::new_v4();
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
-									])
-									.run()
-									.context("VGMStream command failed")?;
+						app.shell()
+							.sidecar("vgmstream-cli")
+							.unwrap()
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.as_path()
+									.context("Invalid path")?
+									.join(format!("{}.wav", idx))
+									.to_string_lossy()
+									.as_ref()
+							])
+							.run()
+							.await
+							.context("VGMStream command failed")?;
 
-								idx += 1;
-							}
-						}
+						idx += 1;
+					}
 
-						WwiseEventData::Streamed(objects) => {
-							for object in objects {
-								let temp_file_id = Uuid::new_v4();
+					for object in wwev.streamed {
+						let temp_file_id = Uuid::new_v4();
 
-								let wwem_hash = res_meta
-									.core_info
-									.references
-									.get(object.dependency_index as usize)
-									.context("No such WWEM dependency")?
-									.resource
-									.get_id();
+						let wwem_hash = res_meta
+							.core_info
+							.references
+							.get(object.dependency_index as usize)
+							.context("No such WWEM dependency")?
+							.resource
+							.get_id();
 
-								let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
+						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
-								fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
-								Command::new_sidecar("vgmstream-cli")?
-									.current_dir(data_dir.join("temp"))
-									.args([
-										&format!("{}.wem", temp_file_id),
-										"-L",
-										"-o",
-										path.join(format!("{}.wav", idx)).to_string_lossy().as_ref()
-									])
-									.run()
-									.context("VGMStream command failed")?;
+						app.shell()
+							.sidecar("vgmstream-cli")
+							.unwrap()
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.as_path()
+									.context("Invalid path")?
+									.join(format!("{}.wav", idx))
+									.to_string_lossy()
+									.as_ref()
+							])
+							.run()
+							.await
+							.context("VGMStream command failed")?;
 
-								idx += 1;
-							}
-						}
+						idx += 1;
 					}
 				}
 			}
@@ -1614,7 +1651,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			};
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1623,66 +1660,70 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(&format!("{}~{}.wav", hash, index))
 					.add_filter("WAV file", &["wav"])
-					.save_file()
+					.blocking_save_file()
 				{
-					let data_dir = app.path_resolver().app_data_dir().expect("Couldn't get data dir");
+					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
 
 					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					let wwev = WwiseEvent::parse(&res_data)?;
 
-					match wwev.data {
-						WwiseEventData::NonStreamed(objects) => {
-							let temp_file_id = Uuid::new_v4();
+					let temp_file_id = Uuid::new_v4();
 
-							fs::write(
-								data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
-								&objects.get(index as usize).context("No such audio object")?.data
-							)?;
+					if index < wwev.non_streamed.len() as u32 {
+						fs::write(
+							data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
+							&wwev
+								.non_streamed
+								.get(index as usize)
+								.context("No such audio object")?
+								.data
+						)?;
 
-							Command::new_sidecar("vgmstream-cli")?
-								.current_dir(data_dir.join("temp"))
-								.args([
-									&format!("{}.wem", temp_file_id),
-									"-L",
-									"-o",
-									path.to_string_lossy().as_ref()
-								])
-								.run()
-								.context("VGMStream command failed")?;
-						}
+						app.shell()
+							.sidecar("vgmstream-cli")
+							.unwrap()
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
+							])
+							.run()
+							.await
+							.context("VGMStream command failed")?;
+					} else {
+						let wwem_hash = res_meta
+							.core_info
+							.references
+							.get(
+								wwev.streamed
+									.get(index as usize - wwev.non_streamed.len())
+									.context("No such audio object")?
+									.dependency_index as usize
+							)
+							.context("No such WWEM dependency")?
+							.resource
+							.get_id();
 
-						WwiseEventData::Streamed(objects) => {
-							let temp_file_id = Uuid::new_v4();
+						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
-							let wwem_hash = res_meta
-								.core_info
-								.references
-								.get(
-									objects
-										.get(index as usize)
-										.context("No such audio object")?
-										.dependency_index as usize
-								)
-								.context("No such WWEM dependency")?
-								.resource
-								.get_id();
+						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
 
-							let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
-
-							fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
-
-							Command::new_sidecar("vgmstream-cli")?
-								.current_dir(data_dir.join("temp"))
-								.args([
-									&format!("{}.wem", temp_file_id),
-									"-L",
-									"-o",
-									path.to_string_lossy().as_ref()
-								])
-								.run()
-								.context("VGMStream command failed")?;
-						}
+						app.shell()
+							.sidecar("vgmstream-cli")
+							.unwrap()
+							.current_dir(data_dir.join("temp"))
+							.args([
+								&format!("{}.wem", temp_file_id),
+								"-L",
+								"-o",
+								path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
+							])
+							.run()
+							.await
+							.context("VGMStream command failed")?;
 					}
 				}
 			}
@@ -1708,7 +1749,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-				let mut dialog = FileDialogBuilder::new().set_title("Extract file");
+				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
@@ -1727,10 +1768,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 							res_meta.core_info.resource_type.as_ref().to_lowercase()
 						)]
 					)
-					.save_file()
+					.blocking_save_file()
 				{
 					fs::write(
-						path,
+						path.as_path().context("Invalid path")?,
 						match res_meta.core_info.resource_type.as_ref() {
 							"CLNG" => {
 								let clng = {
