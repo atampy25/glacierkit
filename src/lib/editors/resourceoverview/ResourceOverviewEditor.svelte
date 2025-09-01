@@ -54,7 +54,7 @@
 	let data: ResourceOverviewData | null = null
 
 	let previewImage: any = null
-	let referenceTab = 0
+	let referenceTab = dependencies.length ? 0 : 1
 
 	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Ores", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
 
@@ -122,7 +122,7 @@
 			</div>
 		</div>
 
-		<div style="height: calc(100vh - 18rem)">
+		<div style="height: calc(100vh - 16rem)">
 			<Splitpanes theme="">
 				<Pane minSize={50} class="h-full">
 					<div class="h-full overflow-y-auto pr-2">
@@ -821,20 +821,20 @@
 				</Pane>
 				<Pane size={45} class="h-full flex flex-col">
 					<ContentSwitcher class="h-10 pb-2" bind:selectedIndex={referenceTab}>
-						<Switch>
+						<Switch disabled={dependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0" />
-								<div class="truncate">References</div>
+								<div class="truncate">References ({dependencies.length})</div>
 							</div>
 						</Switch>
-						<Switch>
+						<Switch disabled={reverseDependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0 -scale-x-100" />
-								<div class="truncate">Reverse references</div>
+								<div class="truncate">Reverse references ({reverseDependencies.length})</div>
 							</div>
 						</Switch>
 					</ContentSwitcher>
-					{#if referenceTab == 0}
+					{#if referenceTab === 0}
 						<div
 							class="h-full overflow-y-auto pr-2 flex flex-col gap-2"
 							use:help={{ title: "References", description: "Other resources that this resource depends on, listed in the order stored in the game files." }}
@@ -893,7 +893,7 @@
 							{/each}
 						</div>
 					{/if}
-					{#if referenceTab == 1}
+					{#if referenceTab === 1}
 						<div
 							class="h-full overflow-y-auto pr-2 flex flex-col gap-2"
 							use:help={{ title: "Reverse references", description: "Other resources that depend upon this resource, sorted alphabetically." }}
