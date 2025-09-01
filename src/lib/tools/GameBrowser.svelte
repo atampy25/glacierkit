@@ -560,7 +560,7 @@
 			<div>{searchFeedback}</div>
 			<div class="flex items-center">
 				<span class="text-neutral-400">{gameDescription}</span>
-				<Button iconDescription="Collapse" size="small" kind="ghost" icon={Reset} on:click={async () => {
+				<Button class="text-neutral-400" iconDescription="Collapse" size="small" kind="ghost" icon={Reset} on:click={async () => {
 					collapseTree();
 				}}/>
 			</div>
