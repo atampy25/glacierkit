@@ -1,7 +1,7 @@
 <script lang="ts">
 	import "../app.css"
 	import "../treeview.css"
-	import "carbon-components-svelte/css/g90.css"
+	import "carbon-components-svelte/css/all.css";
 	import "@fortawesome/fontawesome-free/css/all.min.css"
 	import "@fontsource-variable/fira-code/wght.css"
 	import "@fontsource/ibm-plex-sans/100.css"
@@ -20,7 +20,15 @@
 	import "@fontsource/ibm-plex-sans/700-italic.css"
 
 	import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
-	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
+	import {
+		ComposedModal,
+		ModalBody,
+		ModalFooter,
+		ModalHeader,
+		SkipToContent,
+		Theme,
+		ToastNotification
+	} from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import { onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
@@ -484,6 +492,15 @@
 	let logUploadRejectedModalOpen = $state(false)
 </script>
 
+<Theme
+	theme="g90"
+	tokens={{
+    "interactive-01": "#0E8C75",
+    "hover-primary": "#11A78B",
+    "active-primary": "#0D826C",
+  }}
+/>
+
 <ComposedModal
 	open={errorModalOpen}
 	on:click:button--primary={async () => {
@@ -673,7 +690,7 @@
 <HelpRay bind:enabled={helpRayActive} />
 
 <style>
-	:global(.bx--header) {
+	:global(header.bx--header) {
 		position: initial;
 		display: flex;
 		height: 3rem;
