@@ -202,8 +202,7 @@
 								const selected_node = tree.get_node(b.reference)
 
 								const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-								await showInFolder(path)
+								await event({ type: "global", data: { type: "openInExplorer", data: path } })
 							}
 						},
 						rename: {
