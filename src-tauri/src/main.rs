@@ -1395,6 +1395,9 @@ fn event(app: AppHandle, event: Event) {
 									.join("..")
 									.join(format!("panic_{}.txt", rng().random::<u32>()))
 							)?;
+						},
+						GlobalEvent::OpenInExplorer(path) => {
+							opener::reveal(path).context("Couldn't open file or folder")?;
 						}
 					},
 

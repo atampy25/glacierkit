@@ -740,7 +740,8 @@ strike! {
 			SaveTab(Uuid),
 			UploadLogAndReport(String),
 			UploadLastPanic,
-			ClearLastPanic
+			ClearLastPanic,
+			OpenInExplorer(PathBuf),
 		}),
 
 		EditorConnection(pub enum EditorConnectionEvent {
