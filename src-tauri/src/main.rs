@@ -1539,6 +1539,235 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 								})
 							)?;
 						}
+
+						GlobalEvent::ClearLastPanic => {
+							fs::rename(
+								app.path()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("..")
+									.join("last_panic.txt"),
+								app.path()
+									.app_log_dir()
+									.context("Couldn't get log dir")?
+									.join("..")
+									.join(format!("panic_{}.txt", rng().random::<u32>()))
+							)?;
+						},
+						GlobalEvent::OpenInExplorer(path) => {
+							opener::reveal(path).context("Couldn't open file or folder")?;
+						}
+					},
+
+					Event::EditorConnection(event) => match event {
+						EditorConnectionEvent::EntitySelected(id, tblu) => {
+							for editor in app.state::<AppState>().editor_states.iter() {
+								let entity = match editor.data {
+									EditorData::QNEntity { ref entity, .. } => entity,
+									EditorData::QNPatch { ref current, .. } => current,
+
+									_ => continue
+								};
+
+								if entity.blueprint_hash == tblu {
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+											EntityTreeRequest::Select {
+												editor_id: editor.key().to_owned(),
+												id: entity.entities.contains_key(&id).then_some(id.to_owned())
+											}
+										)))
+									)?;
+								}
+							}
+						}
+
+						EditorConnectionEvent::EntityTransformUpdated(id, tblu, transform) => {
+							let mut qn_editors = vec![];
+							for editor in app_state.editor_states.iter() {
+								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+									qn_editors.push(editor.key().to_owned());
+								}
+							}
+
+							for editor_id in qn_editors {
+								let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => continue
+								};
+
+								if entity.blueprint_hash == tblu
+									&& let Some(sub_entity) = entity.entities.get_mut(&id)
+								{
+									sub_entity.properties.get_or_insert_default().insert(
+										"m_mTransform".into(),
+										Property {
+											property_type: "SMatrix43".into(),
+											value: to_value(&transform)?,
+											post_init: None
+										}
+									);
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id.to_owned(),
+											unsaved: true
+										})
+									)?;
+
+									let mut buf = Vec::new();
+									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+									entity
+										.entities
+										.get(&id)
+										.context("No such entity")?
+										.serialize(&mut ser)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::ReplaceContentIfSameEntityID {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												content: String::from_utf8(buf)?
+											}
+										)))
+									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
+								}
+							}
+						}
+
+						EditorConnectionEvent::EntityPropertyChanged(
+							id,
+							tblu,
+							property_name,
+							property_type,
+							property_value
+						) => {
+							let mut qn_editors = vec![];
+							for editor in app_state.editor_states.iter() {
+								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+									qn_editors.push(editor.key().to_owned());
+								}
+							}
+
+							for editor_id in qn_editors {
+								let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+								let entity = match editor_state.data {
+									EditorData::QNEntity { ref mut entity, .. } => entity,
+									EditorData::QNPatch { ref mut current, .. } => current,
+
+									_ => continue
+								};
+
+								if entity.blueprint_hash == tblu && entity.entities.contains_key(&id) {
+									let post_init = if let Some(intellisense) = app_state.intellisense.load().as_ref()
+										&& let Some(game_files) = app_state.game_files.load().as_ref()
+										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
+										&& let Some(install) = app_settings.load().game_install.as_ref()
+									{
+										if let Some((_, _, _, post_init)) = intellisense
+											.get_properties(
+												game_files,
+												&app_state.cached_entities,
+												hash_list,
+												get_loaded_game_version(&app, install)?,
+												entity,
+												&id,
+												true
+											)?
+											.into_iter()
+											.find(|(name, _, _, _)| *name == property_name)
+										{
+											post_init.then_some(true)
+										} else {
+											None
+										}
+									} else {
+										None
+									};
+
+									let Some(sub_entity) = entity.entities.get_mut(&id) else {
+										unreachable!();
+									};
+
+									sub_entity.properties.get_or_insert_default().insert(
+										property_name.to_owned(),
+										Property {
+											property_type: property_type.to_owned(),
+											value: property_value.to_owned(),
+											post_init
+										}
+									);
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: editor_id.to_owned(),
+											unsaved: true
+										})
+									)?;
+
+									let mut buf = Vec::new();
+									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+									entity
+										.entities
+										.get(&id)
+										.context("No such entity")?
+										.serialize(&mut ser)?;
+
+									send_request(
+										&app,
+										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+											EntityMonacoRequest::ReplaceContentIfSameEntityID {
+												editor_id: editor_id.to_owned(),
+												entity_id: id.to_owned(),
+												content: String::from_utf8(buf)?
+											}
+										)))
+									)?;
+
+									if let EditorData::QNPatch {
+										ref base, ref current, ..
+									} = editor_state.data
+									{
+										send_request(
+											&app,
+											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+												EntityTreeRequest::SetDiffInfo {
+													editor_id,
+													diff_info: get_diff_info(base, current)
+												}
+											)))
+										)?;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
