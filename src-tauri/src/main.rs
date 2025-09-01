@@ -1404,7 +1404,8 @@ fn event(app: AppHandle, event: Event) {
 						},
 						GlobalEvent::OpenInExplorer(path) => {
 							opener::reveal(path).context("Couldn't open file or folder")?;
-						}
+						},
+
 					},
 
 					Event::EditorConnection(event) => match event {
