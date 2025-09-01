@@ -197,7 +197,7 @@
 									icon={ArrowUpRight}
 									on:click={async (e) => {
           								e.stopPropagation();
-										  await event({ type: "global", data: { type: "openInExplorer", data: gameInstall.path } })
+									 	await event({ type: "global", data: { type: "openInExplorer", data: gameInstall.path } })
         							}}
 								/>
 							</div>
