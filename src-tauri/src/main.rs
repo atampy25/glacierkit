@@ -1556,7 +1556,8 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						},
 						GlobalEvent::OpenInExplorer(path) => {
 							opener::reveal(path).context("Couldn't open file or folder")?;
-						}
+						},
+
 					},
 
 					Event::EditorConnection(event) => match event {
