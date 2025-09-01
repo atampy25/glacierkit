@@ -30,7 +30,7 @@
 	let data: ResourceOverviewData | null = $state(null)
 
 	let previewImage: HTMLImageElement | null = $state(null)
-	let referenceTab = $state(0)
+	let referenceTab = $state(dependencies.length ? 0 : 1)
 
 	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
 
@@ -100,7 +100,7 @@
 			</div>
 		</div>
 
-		<div style="height: calc(100vh - 18rem)">
+		<div style="height: calc(100vh - 16rem)">
 			<Splitpanes theme="">
 				<Pane minSize={50} class="h-full">
 					<div class="h-full overflow-y-auto pr-2">
@@ -762,13 +762,13 @@
 				</Pane>
 				<Pane size={45} class="h-full flex flex-col">
 					<Tabs autoWidth class="mb-2" bind:selected={referenceTab}>
-						<Tab>
+						<Tab disabled={dependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0" />
 								<div>References</div>
 							</div>
 						</Tab>
-						<Tab>
+						<Tab disabled={reverseDependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0 -scale-x-100" />
 								<div>Reverse references</div>
