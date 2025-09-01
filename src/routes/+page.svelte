@@ -44,11 +44,11 @@
 		"The Help menu shows the default property values of a template or module, as well as the input and output pins it accepts. You can access it by right-clicking any entity in the tree.",
 		"Changes that you make externally to your project folder are automatically synced to the Files panel in GlacierKit.",
 		"Press Ctrl-Space to trigger intellisense in JSON editors - this can show you what properties are available and what their default values are.",
-		'Right-click an entity\'s "factory" field and press "Open factory in new tab", or click on it and press F12, to quickly inspect its underlying template.',
-		'You can visualise a ZCurve by right-clicking the property\'s name and pressing "Visualise curve".',
-		'You can follow entity references by right-clicking the entity ID and pressing "Follow reference", or by pressing F12.',
+		"Right-click an entity's \"factory\" field and press \"Open factory in new tab\" or click on it and press F12 to quickly inspect its underlying template.",
+		"You can visualise a ZCurve by right-clicking the property's name and pressing \"Visualise curve\".",
+		"You can follow entity references by right-clicking the entity ID and pressing \"Follow reference\", or by pressing F12.",
 		"Press F1 in any JSON editor to access the Command Palette, which lets you perform common operations like transforming text to lowercase/uppercase, or deleting duplicate lines.",
-		'You can use Find and Replace in any JSON editor with Ctrl-H, or by pressing F1 and typing "replace".',
+		"You can use Find and Replace in any JSON editor with Ctrl-H, or by pressing F1 and typing \"replace\".",
 		"Right-click an entry in the Game Content panel to copy its hash or path.",
 		"You can middle-click on a dependency in a Resource Overview to open it in a new tab.",
 		"Convert between repository.json/unlockables.json files and JSON.patch.json files easily by right-clicking them in the Files panel.",
@@ -56,7 +56,8 @@
 		"Separate multiple search terms with spaces to find only items which match all of the search terms.",
 		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit.",
 		"You can open a file from outside of your current project by pressing CTRL-O.",
-		"Select the help icon at the top right of the window and hover over any UI element to see a tooltip explaining what it does."
+		"Select the help icon at the top right of the window and hover over any UI element to see a tooltip explaining what it does.",
+		"You can hide/unhide the sidebar by pressing CTRL-B."
 	]
 
 	let hint = $state(hints[Math.floor(Math.random() * hints.length)])
@@ -100,7 +101,9 @@
 
 	let selectedTool: keyof typeof tools = $state("FileBrowser")
 
-	const toolComponents: Record<keyof typeof tools, { handleRequest: (request: any) => Promise<void> }> = $state(({} as unknown as null)!)
+	const toolComponents: Record<keyof typeof tools, {
+		handleRequest: (request: any) => Promise<void>
+	}> = ({} as unknown as null)!
 
 	function getEditor(editorType: EditorType) {
 		switch (editorType.type) {
@@ -143,7 +146,10 @@
 
 	let activeTab: string | null = $state(null)
 
-	let destroyFunc = { run: () => {} }
+	let destroyFunc = {
+		run: () => {
+		}
+	}
 	onDestroy(() => {
 		destroyFunc.run()
 	})
@@ -304,6 +310,22 @@
 			})()
 		}
 	})
+
+	let toolPaneWidth = 20
+	let previousPaneWidth = 20
+
+	function handleSnapEase(event: CustomEvent<{
+		size: number
+	}[]>, paneIndex: number, minSize: number, snapBound: number) {
+		const newSize = event.detail[paneIndex].size
+
+		if (newSize < minSize && newSize > snapBound) {
+			toolPaneWidth = minSize
+		} else if (newSize < snapBound) {
+			toolPaneWidth = 0
+		}
+	}
+
 </script>
 
 <svelte:window
@@ -480,15 +502,35 @@
 			}
 		}
 	}}
+	use:shortcut={{
+		key: "b",
+		control: true,
+		shift: false,
+		callback: async (e) => {
+			e.preventDefault?.()
+			await trackEvent("Fold/Unfold the tool pane")
+
+			if (toolPaneWidth == 0) {
+				toolPaneWidth = previousPaneWidth
+			} else {
+				previousPaneWidth = toolPaneWidth
+				toolPaneWidth = 0
+			}
+		}
+	}}
 />
 
 <div class="h-full w-full flex">
-	<div class="w-14 bg-neutral-900 flex flex-col" use:help={{ title: "Tools", description: "The left pane contains tools, which you can select here." }}>
+	<div class="w-14 bg-neutral-900 flex flex-col"
+		 use:help={{ title: "Tools", description: "The left pane contains tools, which you can select here." }}>
 		{#each typedEntries(tools) as [toolID, tool] (toolID)}
 			<ToolButton
 				icon={tool.icon}
 				on:click={() => {
 					selectedTool = toolID
+					if (toolPaneWidth === 0) {
+						toolPaneWidth = previousPaneWidth
+					}
 				}}
 				selected={selectedTool === toolID}
 				tooltip={tool.name}
@@ -497,8 +539,13 @@
 		{/each}
 	</div>
 	<div style="width: calc(100vw - 3.5rem)">
-		<Splitpanes theme="">
-			<Pane size={15}>
+		<Splitpanes
+			theme=""
+			on:resize={(event) => {
+				handleSnapEase(event, 0, 15, 8)
+			}}
+		>
+			<Pane bind:size={toolPaneWidth}>
 				<div class="w-full h-full bg-[#202020]">
 					{#each typedEntries(tools) as [toolID, tool] (toolID)}
 						<div class="w-full h-full" class:hidden={selectedTool !== toolID}>
@@ -645,7 +692,8 @@
 								<h1>Welcome to GlacierKit</h1>
 								<p>You can start by selecting a project on the left.</p>
 								{#if announcements.length}
-									<div class="flex-col items-center -mb-4" use:help={{ title: "Announcements", description: "Any important announcements are displayed here." }}>
+									<div class="flex-col items-center -mb-4"
+										 use:help={{ title: "Announcements", description: "Any important announcements are displayed here." }}>
 										{#each announcements as announcement (announcement.id)}
 											{#if new Date().getTime() < (announcement.until || Number.MAX_VALUE) && !seenAnnouncements.includes(announcement.id)}
 												<div class="text-left -mb-2 flex items-center justify-center -mr-4">
@@ -678,7 +726,8 @@
 									onclick={() => {
 										hint = hints[(hints.indexOf(hint) + 1) % hints.length]
 									}}
-									use:help={{ title: "Hint", description: "A (hopefully) helpful hint." }}><Idea size={20} />{hint}</div
+									use:help={{ title: "Hint", description: "A (hopefully) helpful hint." }}>
+									<Idea size={20} />{hint}</div
 								>
 							</div>
 						</div>
