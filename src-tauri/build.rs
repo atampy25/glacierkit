@@ -23,12 +23,12 @@ fn main() {
 		println!("cargo:rustc-link-lib=dylib:+verbatim=ResourceLib_HM2016.so");
 		println!("cargo:rustc-link-lib=dylib:+verbatim=ResourceLib_HM2.so");
 		println!("cargo:rustc-link-lib=dylib:+verbatim=ResourceLib_HM3.so");
-
-		println!("cargo:include={}", resourcelib_dir.join("include").display());
 	}
 
 	let static_folder = manifest_dir.join("../static");
 	let out_path = manifest_dir.join("../build/_app/immutable/assets");
+
+	std::fs::create_dir_all(&out_path).expect("failed to create output assets directory");
 
 	let files = ["32px.png", "throbber.gif"];
 
