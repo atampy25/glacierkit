@@ -735,7 +735,11 @@
 		@apply text-emerald-200 !important;
 	}
 
-	:global(.colourblind-mode .jstree-default .item-new > a) {
+    :global(.jstree-default .jstree-node) {
+        @apply ml-3;
+    }
+
+    :global(.colourblind-mode .jstree-default .item-new > a) {
 		@apply font-bold !important;
 	}
 
