@@ -1433,7 +1433,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 							let mut meta = json!({
 								"$schema": "https://tonytools.win/schemas/texture-meta.schema.json",
-								"text": hash
+								"text":  app_state.hash_list.load().as_ref().map(|list| list.entries.get(&hash)
+								.and_then(|entry| entry.path.to_owned()))
+								.flatten()
+								.unwrap_or(hash.to_string())
 							});
 
 							let mut texture =
@@ -1448,9 +1451,18 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("Couldn't process TEXD data")?;
 								texture.set_mipblock1(mip_block);
 
+								let texd_path = texd_depend.resource.get_path()
+									.map(|s| s.to_owned())
+									.or_else(|| {
+										app_state.hash_list.load().as_ref()
+											.and_then(|list| list.entries.get(&texd_depend.resource.get_id()))
+											.and_then(|entry| entry.path.to_owned())
+									})
+									.unwrap_or_else(|| texd_depend.resource.to_string());
+
 								meta.as_object_mut()
 									.unwrap()
-									.insert("texd".to_owned(), Value::String(texd_depend.resource.get_id().to_string()));
+									.insert("texd".to_owned(), Value::String(texd_path));
 							}
 
 							let ext = path_ref.extension()
