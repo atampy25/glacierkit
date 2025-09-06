@@ -162,45 +162,33 @@
 											<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
 										</div>
 									{:else if data.type === "Audio"}
-										{#await platform() then platform}
-											{#if platform === "linux"}
-												<div class="text-neutral-400">Audio preview is unavailable on Linux due to a bug in WebKit.</div>
-											{:else}
-												<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
-											{/if}
-										{/await}
+										<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
 									{:else if data.type === "MultiAudio"}
-										{#await platform() then platform}
-											{#if platform === "linux"}
-												<div class="text-neutral-400">Audio preview is unavailable on Linux due to a bug in WebKit.</div>
-											{:else}
-												<div class="text-neutral-400 mb-2">{data.data.name}</div>
-												{#if data.data.wav_paths.length}
-													<MultiWaveformPlayer
-														src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
-														on:download={async ({ detail }) => {
-															trackEvent("Extract specific audio from WWEV file as WAV")
+										<div class="text-neutral-400 mb-2">{data.data.name}</div>
+										{#if data.data.wav_paths.length}
+											<MultiWaveformPlayer
+												src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
+												on:download={async ({ detail }) => {
+													trackEvent("Extract specific audio from WWEV file as WAV")
 
-															await event({
-																type: "editor",
+													await event({
+														type: "editor",
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractSpecificMultiWav",
 																data: {
-																	type: "resourceOverview",
-																	data: {
-																		type: "extractSpecificMultiWav",
-																		data: {
-																			id,
-																			index: detail
-																		}
-																	}
+																	id,
+																	index: detail
 																}
-															})
-														}}
-													/>
-												{:else}
-													<div class="-mt-1 text-lg">No linked audio</div>
-												{/if}
-											{/if}
-										{/await}
+															}
+														}
+													})
+												}}
+											/>
+										{:else}
+											<div class="-mt-1 text-lg">No linked audio</div>
+										{/if}
 									{:else if data.type === "GenericRL" || data.type === "Ores" || data.type === "Json" || data.type === "HMLanguages" || data.type === "MaterialInstance" || data.type === "MaterialEntity" || data.type === "SoundDefinitions"}
 										<div class="h-[30vh]">
 											<Monaco id={v4()} content={data.data.json} />
