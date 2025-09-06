@@ -1495,14 +1495,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 								}
 							}
 
-							let file_stem = path_ref.file_name()
-								.and_then(|f| f.to_str())
-								.map(|s| s.split('.').next().unwrap_or(s))
-								.context("Invalid path: missing file name")?;
-
-							let meta_path = path_ref.with_file_name(format!("{}.texture.json", file_stem));
+							let meta_path = path_ref.with_extension("texture.json");
 							let meta_bytes = serde_json::to_vec(&meta).context("Couldn't serialize metadata")?;
-
 							fs::write(&meta_path, meta_bytes).context("Failed to write metadata file")?;
 						}
 
