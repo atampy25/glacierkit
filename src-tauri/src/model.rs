@@ -219,7 +219,7 @@ pub enum ResourceOverviewData {
 		json: String
 	},
 	Image {
-		image_path: PathBuf,
+		preview_image_path: PathBuf,
 		dds_data: Option<(String, String)>
 	},
 	Audio {
