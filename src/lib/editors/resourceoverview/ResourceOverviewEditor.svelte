@@ -154,7 +154,7 @@
 											on:load={() => {
 												previewImage = previewImage
 											}}
-											src={convertFileSrc(data.data.image_path)}
+											src={convertFileSrc(data.data.preview_image_path)}
 											alt="Resource preview"
 										/>
 									{:else if data.type === "Mesh"}

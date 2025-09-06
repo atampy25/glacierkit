@@ -679,7 +679,7 @@ export type ResourceOverviewData =
 	| { type: "GenericRL"; data: { json: string } }
 	| { type: "Json"; data: { json: string } }
 	| { type: "Ores"; data: { json: string } }
-	| { type: "Image"; data: { image_path: string; dds_data: [string, string] | null } }
+	| { type: "Image"; data: { preview_image_path: string; dds_data: [string, string] | null } }
 	| { type: "Audio"; data: { wav_path: string } }
 	| { type: "Mesh"; data: { obj: string; bounding_box: [number, number, number, number, number, number] } }
 	| { type: "MultiAudio"; data: { name: string; wav_paths: [string, string][] } }
