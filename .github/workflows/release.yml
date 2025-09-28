@@ -91,6 +91,7 @@ jobs:
             - name: Build
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
+                  NO_STRIP: true
               run: |
                   yarn tauri build
                   rm src-tauri/gk.key
