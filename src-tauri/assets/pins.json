@@ -3733,6 +3733,22 @@
 			{
 				"pin": "Stadia",
 				"description": ""
+			},
+			{
+				"pin": "Durango",
+				"description": ""
+			},
+			{
+				"pin": "Unknown",
+				"description": ""
+			},
+			{
+				"pin": "PS5",
+				"description": ""
+			},
+			{
+				"pin": "Scarlett",
+				"description": ""
 			}
 		]
 	},
@@ -26668,5 +26684,914 @@
 				"description": ""
 			}
 		]
+	},
+	"002BF757A4CCADFA": {
+		"_comment": "[modules:/zaccidentsituation.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00A8C8B25789C0F5": {
+		"_comment": "[modules:/zactoraistateiconsentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00450A87F7F52F8E": {
+		"_comment": "[modules:/zanimlayerreload.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"005FCE1562C6AA56": {
+		"_comment": "[modules:/zaudiodistancecullingaspect.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00374E0B56D879F2": {
+		"_comment": "[modules:/zaudioeventsaveaspect.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0018644A73453C67": {
+		"_comment": "[modules:/zaudioruntimeevent.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00CD333C5C016E8C": {
+		"_comment": "[modules:/zaudiovolumetricgeomspline.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"007CB00A925BF12E": {
+		"_comment": "[modules:/zaudiovolumetricgeomsplinepoint.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0097F6C43394A0A4": {
+		"_comment": "[modules:/zboneentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"004B634445A406D2": {
+		"_comment": "[modules:/zcharactersubcontrollerinventorymanager.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0012931D6CA1DB82": {
+		"_comment": "[modules:/zcharactersubcontrollerpickup.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0096DF94A1264460": {
+		"_comment": "[modules:/zclosecombatdef.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00414F697889F911": {
+		"_comment": "[modules:/zdebuggamecontrollerentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00DDA251A66851B8": {
+		"_comment": "[modules:/zdialogtext.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"001DA3B5DA5F640B": {
+		"_comment": "[modules:/zdifficultyhubentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00261182C1177CFE": {
+		"_comment": "[modules:/zdifficultylevelentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00DAE04BB92CAE8B": {
+		"_comment": "[modules:/zentityrefcompare.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0010A0D7766B8E98": {
+		"_comment": "[modules:/zfocusconfig.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00FBA26172853106": {
+		"_comment": "[modules:/zgamechatcontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00595A7C925581E1": {
+		"_comment": "[modules:/zheroreloadcontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0033815867DB89CD": {
+		"_comment": "[modules:/zhm5doorevent.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"009E606F1F55B748": {
+		"_comment": "[modules:/zhm5hitmanfocusmodifier.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00BB80D58C1247EF": {
+		"_comment": "[modules:/zhm5osd.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00CDB24C611BF2C5": {
+		"_comment": "[modules:/zhm5osddisguiseheat.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D57143BED489AF": {
+		"_comment": "[modules:/zhm5osdhitindicator.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0003C5341BB1612B": {
+		"_comment": "[modules:/zhm5osdshootingballet.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"002E78AC8BC19C98": {
+		"_comment": "[modules:/zhm5osdthreat.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"007C8161E2476CFC": {
+		"_comment": "[modules:/zhm5sbcamhitmanprofile.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0038302E5274D55B": {
+		"_comment": "[modules:/zhm5sbcamprofiles.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"003D1769CF811B92": {
+		"_comment": "[modules:/zhm5sbcamtargetprofile.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0077B3F8001313B7": {
+		"_comment": "[modules:/zhm5sbconfiguration.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00B9142F55BEA3B9": {
+		"_comment": "[modules:/zhm5sbsoundcontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00E77690D07E5ADF": {
+		"_comment": "[modules:/zhm5soundglobalentities.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D16BE208055B7B": {
+		"_comment": "[modules:/zhm5soundphysicsimpactmatrix.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"008FA1D2A5A414BB": {
+		"_comment": "[modules:/zhm5soundphysicsimpactmatrixcell.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D082A055F883FE": {
+		"_comment": "[modules:/zhudplayernamescontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0097E25455B97E23": {
+		"_comment": "[modules:/zhumanikentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"002385820EAB4BE1": {
+		"_comment": "[modules:/zingameinventorycontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00A53B4335C2185E": {
+		"_comment": "[modules:/zingameinventorypagecontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00037F00D4D27FEE": {
+		"_comment": "[modules:/zinventorycontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00CB080C0159719E": {
+		"_comment": "[modules:/zinvestigatecurioussituation.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"006289F949EA3BB3": {
+		"_comment": "[modules:/zinvestigatestandingsituation.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00C3968DD2EE32A0": {
+		"_comment": "[modules:/zitemcontainerentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00C234FAF69329C3": {
+		"_comment": "[modules:/zlistenerdistancemeasurer.class].pc_entitytype",
+		"in": [],
+		"out": [
+			{
+				"pin": "Distance",
+				"description": ""
+			},
+			{
+				"pin": "AngleLookAt",
+				"description": ""
+			}
+		]
+	},
+	"00C1A0A016355A05": {
+		"_comment": "[modules:/zminimapnavdirectionprovider.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"006FAB1AD15B0A2D": {
+		"_comment": "[modules:/zmusicevent.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "Break",
+				"description": ""
+			},
+			{
+				"pin": "Send",
+				"description": ""
+			},
+			{
+				"pin": "Stop",
+				"description": ""
+			},
+			{
+				"pin": "Enable",
+				"description": ""
+			}
+		],
+		"out": [
+			{
+				"pin": "SyncExit",
+				"description": ""
+			},
+			{
+				"pin": "SyncEntry",
+				"description": ""
+			},
+			{
+				"pin": "MainEventEnded",
+				"description": ""
+			},
+			{
+				"pin": "MusicStarted",
+				"description": ""
+			},
+			{
+				"pin": "SyncBar",
+				"description": ""
+			},
+			{
+				"pin": "SyncUserCue",
+				"description": ""
+			},
+			{
+				"pin": "SyncBeat",
+				"description": ""
+			}
+		]
+	},
+	"0004954930F7E749": {
+		"_comment": "[modules:/zmusictrigger.class].pc_entitytype",
+		"in": [
+			{
+				"pin": "Send",
+				"description": ""
+			},
+			{
+				"pin": "SetTriggerName",
+				"description": ""
+			}
+		],
+		"out": []
+	},
+	"00F0B0DDC449C658": {
+		"_comment": "[modules:/zrazerchromaentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00C7AEC83F2C92BB": {
+		"_comment": "[modules:/zsharedsoundsensordef.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00EADEB0DEE60D1B": {
+		"_comment": "[modules:/zshattersystem.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00AC2BCE0246392C": {
+		"_comment": "[modules:/zsocialsensordef.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D78FA89C45B479": {
+		"_comment": "[modules:/zsoundambiencetransition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00AAF1756BF768CD": {
+		"_comment": "[modules:/zsoundgateentitytemp.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00CE2776653354E4": {
+		"_comment": "[modules:/zspeakentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00189FB0C183A4DE": {
+		"_comment": "[modules:/zsubactioninfo.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00454E5FA724BA7C": {
+		"_comment": "[modules:/zsurveypagecontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D945C282485543": {
+		"_comment": "[modules:/ztriggersphereentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00E89169947A0ED0": {
+		"_comment": "[modules:/zuiactoriconaspect.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00BF1BA705095F1A": {
+		"_comment": "[modules:/zuicontrolsmainmovieentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"008ED0C9A2A5E9A2": {
+		"_comment": "[modules:/zuiversusmodeherotracker.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00464DC4D617D7A7": {
+		"_comment": "[modules:/zvault.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"003A61CB3DD953F0": {
+		"_comment": "[modules:/zvaultaction.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"000D977315DD2E23": {
+		"_comment": "[modules:/zvaultactionattachdata.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00FCDAF1A149C072": {
+		"_comment": "[modules:/zvaultactionentitydata.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00852110A6B07D04": {
+		"_comment": "[modules:/zvaultactionspawnitemdata.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"009ABC3F08C66B37": {
+		"_comment": "[modules:/zvaultcapacitydata.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00A73F1E25345A30": {
+		"_comment": "[modules:/zvaultcollector.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00514877D5374A2B": {
+		"_comment": "[modules:/zvaultcommand.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00226DC63CD2C5CF": {
+		"_comment": "[modules:/zvaultentitydata.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00400B94CB44F1FA": {
+		"_comment": "[modules:/zvaultevent.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"005F9497459F33CE": {
+		"_comment": "[modules:/zvaultitemgetrepositoryid.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00C9C61C712EC976": {
+		"_comment": "[modules:/zvaultkeywordholderdata.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"006AECF186197D10": {
+		"_comment": "[modules:/zvaultquantity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0023B41B4A463E82": {
+		"_comment": "[modules:/zvaultquery.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"007F909BA57F7D79": {
+		"_comment": "[modules:/zvaultrepositoryiddata.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0035F9BCC38E5B33": {
+		"_comment": "[modules:/zvaultslot.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0044EC7EAFA47F77": {
+		"_comment": "[modules:/zvaultvalue.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00A0470E684ED8BA": {
+		"_comment": "[modules:/zaudiosubtitlesaspect.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"004EC3BEF0DE77BF": {
+		"_comment": "[modules:/zheroreachablecondition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00A4B44A43C40459": {
+		"_comment": "[modules:/zleadescortbehaviorentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00E15561962C78DF": {
+		"_comment": "[modules:/zsubtitleplayerentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00BC3C82FF380E68": {
+		"_comment": "[modules:/zoutputsignaldataentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"004CAE55C1F56A57": {
+		"_comment": "[modules:/zupdateablefloatadapter.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"008486FB355E090B": {
+		"_comment": "[modules:/zvrhandposeentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D755D33AADDA8B": {
+		"_comment": "[modules:/zuivrlaserpointercontroller.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00F2E1293770F104": {
+		"_comment": "[modules:/zheroisiteminhandcondition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00593FDB6B18E4F8": {
+		"_comment": "[modules:/zvrinterpolatedalignproximitylistener.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0038706908F9CFED": {
+		"_comment": "[modules:/zvrhandinholster.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0090551F2C98B119": {
+		"_comment": "[modules:/zinputcancoverentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"000552563B359148": {
+		"_comment": "[modules:/zvrfadeblackentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0016F53890B545CF": {
+		"_comment": "[modules:/zvrfademanagerentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"005690D5364CA0FC": {
+		"_comment": "[modules:/zvrsinglehandthrow.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"000F9EF68353A946": {
+		"_comment": "[modules:/zvrhandalignpose.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"006D51B6360DED4C": {
+		"_comment": "[modules:/zinputcontrollertypecondition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00CFF577E7F33E42": {
+		"_comment": "[modules:/zmanualreloadsettings.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00FC0C3BDD95CC53": {
+		"_comment": "[modules:/zsignalbranchconditionalboolentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00EE9D18F67D3B21": {
+		"_comment": "[modules:/zfiberwirecondition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00335AD3A69F974E": {
+		"_comment": "[modules:/zevergreengearpersistencehelper.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00CC857730091486": {
+		"_comment": "[modules:/zinputcanthrowentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00AEFC2E1363A1A0": {
+		"_comment": "[modules:/zvrprimehandentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"004EF135D678696A": {
+		"_comment": "[modules:/zoverlaycontrollergamerunanaloginputentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00185F50BD152972": {
+		"_comment": "[modules:/zinputcanstartclosecombatentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00DA1C634AD949E0": {
+		"_comment": "[modules:/zoverlaycontrollerinputanalogentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00E0227434DDAFAA": {
+		"_comment": "[modules:/zvrinterpolatedalign.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"004099BABF8AA1F1": {
+		"_comment": "[modules:/zispsvr1condition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"003DB816A8725C30": {
+		"_comment": "[modules:/zoverlaycontrollerinputdigitalentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0046445D1CB61430": {
+		"_comment": "[modules:/zphysicsmodifierentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"008CC9F07831CB6F": {
+		"_comment": "[modules:/ztraceentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00775D98545AD954": {
+		"_comment": "[modules:/zhm5reload.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00A60BEA631F09E6": {
+		"_comment": "[modules:/zinputcanaimentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"005B4367429445DF": {
+		"_comment": "[modules:/zhudinputgamestateentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0086D199858194CB": {
+		"_comment": "[modules:/zvrdoorinteractionfork.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"007696C3183117E1": {
+		"_comment": "[modules:/zinputcanswapcamerashoulderentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"004C2AA54C76A23E": {
+		"_comment": "[modules:/zoverlaycontrollergameinputentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0088ABEDD1DB265C": {
+		"_comment": "[modules:/zinputcansneakentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"009533F8DEA514A1": {
+		"_comment": "[modules:/zhm5vrthirdpersonlimitentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00250E32380F702F": {
+		"_comment": "[modules:/zcheckinputflag.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00ED0BF58659C2AC": {
+		"_comment": "[modules:/zvrmotionspeedthreshold.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00C0200B1762C6E3": {
+		"_comment": "[modules:/zsignalforkentity_entityref.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00169F1D14D09E49": {
+		"_comment": "[modules:/zvrinputaxisentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"000355B74DF594EE": {
+		"_comment": "[modules:/zinputcanmovefocusedinteractionentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"000198A1FE15B43E": {
+		"_comment": "[modules:/zvrfxeventreceiverentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00C2D041AF850E39": {
+		"_comment": "[modules:/zinputcaninstinctentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00DF701AED303E96": {
+		"_comment": "[modules:/zvrconfigbyagilityledgeinfo.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00DA39AE37E8E4C7": {
+		"_comment": "[modules:/zoverlaycontrollergameinputpromptsentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00BA1CF3B535282C": {
+		"_comment": "[modules:/zlocaltoglobaltransformentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00126B9217BB6F8F": {
+		"_comment": "[modules:/zmirrorspatialentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00E4914F041B5E18": {
+		"_comment": "[modules:/zhandattacher.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0097CBDD03200F60": {
+		"_comment": "[modules:/zoverlaycontrollertextlabelentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00DF446608430D18": {
+		"_comment": "[modules:/zinputcanmoveentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0070D6EDAA8CF31D": {
+		"_comment": "[modules:/zhm5vrclosecombatconfigentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0056AADD4AFDB84A": {
+		"_comment": "[modules:/zdelayitemdroppedevententity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00519AD76BCBDF7A": {
+		"_comment": "[modules:/zdebughm5gametimemultiplierfadeentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"004F802761F1AA6B": {
+		"_comment": "[modules:/zinputcantriggerphotomodeactionentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0017E43EA2C26ED3": {
+		"_comment": "[modules:/zitemphysicssleepingcondition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00B58742545C9F07": {
+		"_comment": "[modules:/zinputcanpausemenuentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"002247716AC122C5": {
+		"_comment": "[modules:/zinputcanshootentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00A84D97606E8BF8": {
+		"_comment": "[modules:/zvrmotionmovebetweenboxes.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00517395A945750D": {
+		"_comment": "[modules:/zvrtakedisguise.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0022E747D6721247": {
+		"_comment": "[modules:/zvrmotioninputregistry.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0071B10B348547F7": {
+		"_comment": "[modules:/zinputcanplaceitementity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"003A256567031782": {
+		"_comment": "[modules:/zhm5crippleboxcondition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00DF67FE8847C45E": {
+		"_comment": "[modules:/zinputcanexitphotomodeentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"008F5105E796F7E8": {
+		"_comment": "[modules:/zthirdpersoncondition.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"001AAC666ED0F2D1": {
+		"_comment": "[modules:/zinputcanreloadentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"002CCADEDD33CC00": {
+		"_comment": "[modules:/zoverlaycontrollerhudpromptentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"000D22B6EF2DA335": {
+		"_comment": "[modules:/ztrajectorytrackvroverride.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00BCE719C57E2DD1": {
+		"_comment": "[modules:/zvrmotioninputledgekillentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00ED0DE4098AE0EA": {
+		"_comment": "[modules:/zoverlaycontrollersuppressorentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0057C84D702F0B66": {
+		"_comment": "[modules:/zvrmotiondumpbody.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0074993A266E66FF": {
+		"_comment": "[modules:/zvrquickgrab.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"008818F1968F1D7B": {
+		"_comment": "[modules:/zhm5vritemgripstategetrtcpentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00FD45AA1CE60950": {
+		"_comment": "[modules:/zvrtwohandweaponwielding.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00FA529C0701753B": {
+		"_comment": "[modules:/zinputcannotebookmenuentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D4F24D42B4C3D3": {
+		"_comment": "[modules:/zvrholsterattacher.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00C8FF31817E451C": {
+		"_comment": "[modules:/zdooractionentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"005258622E8ADDD4": {
+		"_comment": "[modules:/zinputcanzoomentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00963E30CC4D6CE5": {
+		"_comment": "[modules:/zoverlaycontrollerentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D35358E4526B06": {
+		"_comment": "[modules:/zinputcanholsteritementity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0054F409400C1EB0": {
+		"_comment": "[modules:/zvrdragbody.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00D4369D6664B47A": {
+		"_comment": "[modules:/zvrquestitemdrophandler.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00573E80483B890F": {
+		"_comment": "[modules:/zinputcanprecisionshootentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"008E0349D945502B": {
+		"_comment": "[modules:/zglobaltolocaltransformentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00683BABB1951464": {
+		"_comment": "[modules:/zinputcanskipsequenceentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00F089F4F38F411B": {
+		"_comment": "[modules:/zoverlaycontrollerhudpromptsentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00B497A84E72605D": {
+		"_comment": "[modules:/zvrmotiondropitem.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"00826396A59D6844": {
+		"_comment": "[modules:/zvrcameraroot.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"009601AD20932254": {
+		"_comment": "[modules:/zvrhmdrumbleentity.class].pc_entitytype",
+		"in": [],
+		"out": []
+	},
+	"0010333DB536B996": {
+		"_comment": "[modules:/zmultimenucondition.class].pc_entitytype",
+		"in": [],
+		"out": []
 	}
 }
