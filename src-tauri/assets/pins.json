@@ -27281,7 +27281,12 @@
 	},
 	"0046445D1CB61430": {
 		"_comment": "[modules:/zphysicsmodifierentity.class].pc_entitytype",
-		"in": [],
+		"in": [
+			{
+				"pin": "SetPhysics",
+				"description": ""
+			}
+		],
 		"out": []
 	},
 	"008CC9F07831CB6F": {
@@ -27552,7 +27557,12 @@
 	"00D4369D6664B47A": {
 		"_comment": "[modules:/zvrquestitemdrophandler.class].pc_entitytype",
 		"in": [],
-		"out": []
+		"out": [
+			{
+				"pin": "ItemDropped",
+				"description": ""
+			}
+		]
 	},
 	"00573E80483B890F": {
 		"_comment": "[modules:/zinputcanprecisionshootentity.class].pc_entitytype",
