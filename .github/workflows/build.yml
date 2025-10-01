@@ -65,4 +65,4 @@ jobs:
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: |
-                  cargo tauri build
+                  cargo tauri build --verbose
