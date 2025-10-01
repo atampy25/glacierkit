@@ -46,6 +46,7 @@ jobs:
               run: |
                   yarn set version 4.0.2
                   yarn
+                  cargo install tauri-cli --git https://github.com/tauri-apps/tauri --branch temp/linuxdeploy --force --locked
 
             - name: Disable updater
               uses: restackio/update-json-file-action@2.1
@@ -63,6 +64,5 @@ jobs:
             - name: Build
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
-                  NO_STRIP: true
               run: |
-                  yarn tauri build
+                  tauri build

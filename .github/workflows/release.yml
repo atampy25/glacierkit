@@ -68,6 +68,7 @@ jobs:
               run: |
                   yarn set version 4.0.2
                   yarn
+                  cargo install tauri-cli --git https://github.com/tauri-apps/tauri --branch temp/linuxdeploy --force --locked
 
             - name: Update versions
               uses: ./.github/actions/update-versions
@@ -91,9 +92,8 @@ jobs:
             - name: Build
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
-                  NO_STRIP: true
               run: |
-                  yarn tauri build
+                  tauri build
                   rm src-tauri/gk.key
 
             - name: Upload release (MSI)
