@@ -93,7 +93,7 @@ jobs:
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: |
-                  tauri build
+                  cargo tauri build
                   rm src-tauri/gk.key
 
             - name: Upload release (MSI)
