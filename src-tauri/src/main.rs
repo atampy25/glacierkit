@@ -746,6 +746,12 @@ fn event(app: AppHandle, event: Event) {
 							finish_task(&app, task)?;
 						}
 
+						GlobalEvent::CloseWorkspace => {
+							app_state.project.store(None);
+							send_request(&app, Request::Global(GlobalRequest::SetWindowTitle("".to_string())))?;
+							app_state.fs_watcher.store(None);
+						}
+
 						GlobalEvent::SelectTab(tab) => {
 							if let Some(tab) = tab {
 								if let Some(file) = app_state
@@ -1395,7 +1401,11 @@ fn event(app: AppHandle, event: Event) {
 									.join("..")
 									.join(format!("panic_{}.txt", rng().random::<u32>()))
 							)?;
-						}
+						},
+						GlobalEvent::OpenInExplorer(path) => {
+							opener::reveal(path).context("Couldn't open file or folder")?;
+						},
+
 					},
 
 					Event::EditorConnection(event) => match event {
