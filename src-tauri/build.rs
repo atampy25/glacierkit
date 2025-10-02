@@ -20,9 +20,9 @@ fn main() {
 		println!("cargo:rustc-link-search={}", resourcelib_dir.display());
 		println!("cargo:rustc-link-arg=-Wl,-rpath={}", resourcelib_dir.display());
 
-		println!("cargo:rustc-link-lib=dylib:+verbatim=ResourceLib_HM2016.so");
-		println!("cargo:rustc-link-lib=dylib:+verbatim=ResourceLib_HM2.so");
-		println!("cargo:rustc-link-lib=dylib:+verbatim=ResourceLib_HM3.so");
+		println!("cargo:rustc-link-lib=dylib:+verbatim=libResourceLib_HM2016.so");
+		println!("cargo:rustc-link-lib=dylib:+verbatim=libResourceLib_HM2.so");
+		println!("cargo:rustc-link-lib=dylib:+verbatim=libResourceLib_HM3.so");
 	}
 
 	let static_folder = manifest_dir.join("../static");
