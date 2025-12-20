@@ -4,7 +4,7 @@
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
 	import { join, sep as getSep } from "@tauri-apps/api/path"
 	import type { FileBrowserRequest } from "$lib/bindings-types"
-	import { Button, Search } from "carbon-components-svelte"
+	import { Button, OverflowMenu, OverflowMenuItem, Search, Truncate } from "carbon-components-svelte"
 	import { event, showInFolder } from "$lib/utils"
 	import { open } from "@tauri-apps/plugin-dialog"
 	import FolderAdd from "carbon-icons-svelte/lib/FolderAdd.svelte"
@@ -202,8 +202,7 @@
 								const selected_node = tree.get_node(b.reference)
 
 								const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-								await showInFolder(path)
+								await event({ type: "global", data: { type: "openInExplorer", data: path } })
 							}
 						},
 						rename: {
@@ -793,23 +792,36 @@
 		</div>
 	{:else}
 		<div class="pt-2 pb-1 px-2 leading-tight text-base">
-			<div class="mb-4"><Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} /></div>
-			<span
-				class="text-neutral-400 cursor-pointer"
-				use:help={{ title: "Project path", description: "You can click this to change the loaded project." }}
-				on:click={async () => {
-					trackEvent("Load workspace using text link")
-
-					const path = await open({
-						title: "Select the project folder",
-						directory: true
-					})
-
-					if (typeof path === "string") {
-						await event({ type: "global", data: { type: "loadWorkspace", data: path } })
-					}
-				}}>{path}</span
-			>
+			<div class="flex">
+				<div class="mb-4 flex-grow">
+					<Search placeholder="Filter..." icon={Filter} size="lg" on:input={searchInput} />
+				</div>
+				<OverflowMenu flipped>
+					<OverflowMenuItem
+						text="Open in explorer"
+						on:click={async () => {
+							await event({ type: "global", data: { type: "openInExplorer", data: path } })
+						}}
+					/>
+					<OverflowMenuItem
+						danger
+						text="Close project"
+						on:click={async () => {
+							await event({ type: "global", data: { type: "closeWorkspace" } })
+							path = ""
+							if (tree.settings) {
+								tree.settings.core.data = []
+								tree.refresh()
+							}
+						}}
+					/>
+				</OverflowMenu>
+			</div>
+			<div>
+				<Truncate class="text-neutral-400 text-sm" clamp="front">
+					{path}
+				</Truncate>
+			</div>
 		</div>
 	{/if}
 

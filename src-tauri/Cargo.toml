@@ -150,6 +150,10 @@ git = "https://github.com/AnthonyFuller/tonytools-rs"
 [dependencies.tauri-plugin-log]
 version = "2"
 
+[dependencies.opener]
+version = "0.8.2"
+features = ["reveal"]
+
 [target."cfg(unix)".dependencies]
 fork = "0.2.0"
 
