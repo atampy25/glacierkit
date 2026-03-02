@@ -734,13 +734,15 @@ strike! {
 		Global(pub enum GlobalEvent {
 			SetSeenAnnouncements(Vec<String>),
 			LoadWorkspace(PathBuf),
+			CloseWorkspace,
 			SelectAndOpenFile,
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid),
 			UploadLogAndReport(String),
 			UploadLastPanic,
-			ClearLastPanic
+			ClearLastPanic,
+			OpenInExplorer(PathBuf),
 		}),
 
 		EditorConnection(pub enum EditorConnectionEvent {

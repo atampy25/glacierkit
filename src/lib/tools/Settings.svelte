@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { event } from "$lib/utils"
+	import { capitalize } from "lodash"
 	import type { GameInstall, SettingsRequest } from "$lib/bindings-types"
-	import { Checkbox, TooltipIcon } from "carbon-components-svelte"
+	import { Checkbox, RadioTile, TileGroup, TooltipIcon } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
 	import { help } from "$lib/helpray"
+	import { ArrowUpRight } from "carbon-icons-svelte"
 
 	export async function handleRequest(request: SettingsRequest) {
 		console.log("Settings tool handling request", request)
@@ -16,7 +18,7 @@
 				extractModdedFiles = request.data.settings.extractModdedFiles
 				colourblind = request.data.settings.colourblindMode
 				editorConnectionEnabled = request.data.settings.editorConnection
-				selectedGameInstall = request.data.settings.gameInstall || null
+				selectedGameInstall = request.data.settings.gameInstall
 				break
 
 			case "changeProjectSettings":
@@ -115,50 +117,64 @@
 </script>
 
 <div
-	class="w-full h-full p-6 overflow-x-hidden overflow-y-auto"
+	class="w-full h-full p-6 overflow-x-hidden"
 	use:help={{ title: "Settings", description: "This panel lets you modify GlacierKit's settings. Some settings are GlacierKit-wide, while others are project-specific." }}
 >
-	<h4>GlacierKit settings</h4>
-	<div class="flex items-center gap-2">
-		<div class="flex-shrink">
-			<Checkbox checked={extractModdedFiles} on:change={changeExtractModdedFiles} labelText="Allow extracting modded files" />
-		</div>
-		<TooltipIcon icon={Information}>
+
+	<h4 class="py-4">GlacierKit settings</h4>
+	<div class="py-4">
+		<p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+			Global options
+		</p>
+		<div class="flex items-center gap-2">
+			<div class="flex-shrink">
+				<Checkbox checked={extractModdedFiles} on:change={changeExtractModdedFiles}
+						  labelText="Allow extracting modded files" />
+			</div>
+			<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
 				GlacierKit usually ignores modded copies of files (files past chunk0patch9) when reading game files.
 			</span>
-		</TooltipIcon>
-	</div>
-	<div class="flex items-center gap-2">
-		<div class="flex-shrink">
-			<Checkbox checked={colourblind} on:change={changeColourblind} labelText="Use non-colour contrast" />
+			</TooltipIcon>
 		</div>
-		<TooltipIcon icon={Information}>
+		<div class="flex items-center gap-2">
+			<div class="flex-shrink">
+				<Checkbox checked={colourblind} on:change={changeColourblind} labelText="Use non-colour contrast" />
+			</div>
+			<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
 				Will use text features like italics and strikethrough in addition to colour to mark contrast.
 			</span>
-		</TooltipIcon>
-	</div>
-	<div class="flex items-center gap-2">
-		<div class="flex-shrink">
-			<Checkbox checked={editorConnectionEnabled} on:change={changeEditorConnectionEnabled} labelText="Enable editor connection" />
+			</TooltipIcon>
 		</div>
-		<TooltipIcon icon={Information}>
+		<div class="flex items-center gap-2">
+			<div class="flex-shrink">
+				<Checkbox checked={editorConnectionEnabled} on:change={changeEditorConnectionEnabled}
+						  labelText="Enable editor connection" />
+			</div>
+			<TooltipIcon class="z-1000" icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
 				By default, GlacierKit connects automatically to the SDK editor and syncs any changes you make. If you don't want this, you can disable the editor connection.
 			</span>
-		</TooltipIcon>
+			</TooltipIcon>
+		</div>
 	</div>
+	<div class="py-4">
+		<div class="flex  mb-2">
+			<p class="text-sm font-medium text-gray-500 dark:text-gray-400">
+				Game
+			</p>
+		</div>
 
-	<p class="mt-1">Game</p>
-	<div class="mt-1 flex flex-wrap gap-2">
-		{#each gameInstalls as gameInstall}
-			<div
-				class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-				class:border-2={selectedGameInstall === gameInstall.path}
-				on:click={async () => {
-					selectedGameInstall = gameInstall.path
 
+		<TileGroup class="w-2/3" name="Game"
+				   on:select={({ detail }) => (selectedGameInstall = detail)}>
+			{#each gameInstalls as gameInstall}
+				<RadioTile
+					value={gameInstall.path}
+					class="p-4"
+					checked={selectedGameInstall === gameInstall.path}
+					on:click={async () => {
 					await event({
 						type: "tool",
 						data: {
@@ -170,19 +186,36 @@
 						}
 					})
 				}}
-			>
-				<div>
-					<div class="font-bold mb-2">{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})</div>
-					<span class="break-all">{gameInstall.path}</span>
-				</div>
-			</div>
-		{/each}
-		<div
-			class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-			class:border-2={selectedGameInstall === null}
-			on:click={async () => {
-				selectedGameInstall = null
+				>
+					<div class="flex">
+						<div>
+							<div class="absolute top-2 right-2 z-10 w-1 h-1 flex items-center justify-center">
+								<TooltipIcon
+									class="cursor-pointer"
+									direction="top"
+									tooltipText={gameInstall.path}
+									icon={ArrowUpRight}
+									on:click={async (e) => {
+          								e.stopPropagation();
+									 	await event({ type: "global", data: { type: "openInExplorer", data: gameInstall.path } })
+        							}}
+								/>
+							</div>
+							<div class="font-bold">
+								{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"}
+							</div>
+							<div class="text-xs">
+								{capitalize(gameInstall.platform)}
+							</div>
 
+						</div>
+				</RadioTile>
+			{/each}
+			<RadioTile
+				value={null}
+				class="p-4 flex"
+				checked={selectedGameInstall === null}
+				on:click={async () => {
 				await event({
 					type: "tool",
 					data: {
@@ -194,17 +227,19 @@
 					}
 				})
 			}}
-		>
-			<p>No game</p>
-		</div>
+			>
+				<div class="font-bold">No game</div>
+			</RadioTile>
+		</TileGroup>
 	</div>
+	<div class="py-4">
+		<h4 class="py-4">Project settings</h4>
 
-	<h4 class="mt-4">Project settings</h4>
-	{#if projectLoaded}
-		<p class="mt-1 mb-1">Custom paths</p>
-		<ListEditor
-			bind:data={customPaths}
-			on:updated={async ({ detail }) => {
+		{#if projectLoaded}
+			<p class="mt-1 mb-1">Custom paths</p>
+			<ListEditor
+				bind:data={customPaths}
+				on:updated={async ({ detail }) => {
 				await event({
 					type: "tool",
 					data: {
@@ -216,8 +251,12 @@
 					}
 				})
 			}}
-		/>
-	{:else}
-		<p>No project loaded</p>
-	{/if}
+			/>
+		{:else}
+			<div class="flex flex-col items-start gap-2">
+				<p class="text-sm text-gray-500 dark:text-gray-400">No project loaded</p>
+			</div>
+		{/if}
+
+	</div>
 </div>
