@@ -251,8 +251,8 @@ pub enum SDKEditorEvent {
 		entity: EntityDetails
 	},
 
-	EntityDestroyed {
-		entity: EntitySelector
+	EntityDestroying {
+		entityId: String
 	},
 
 	EntityPropertyChanged {

@@ -48,8 +48,9 @@ jobs:
                   node-version: lts/*
 
             - name: Setup Rust
-              uses: dtolnay/rust-toolchain@nightly
+              uses: dtolnay/rust-toolchain@latest
               with:
+                  toolchain: nightly-2025-09-01
                   components: "clippy, rustfmt"
 
             - name: Rust cache
