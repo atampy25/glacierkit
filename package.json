@@ -1,6 +1,6 @@
 {
 	"name": "mod-studio",
-	"version": "1.12.14",
+	"version": "1.12.15",
 	"private": true,
 	"license": "LGPL-3.0-only",
 	"scripts": {

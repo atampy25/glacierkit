@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.12.14"
+version = "1.12.15"
 description = "An integrated modding tool for the HITMAN World of Assassination trilogy."
 authors = ["you"]
 license = ""
