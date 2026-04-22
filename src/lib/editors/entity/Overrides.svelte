@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EntityOverridesRequest } from "$lib/bindings-types"
+	import type { EntityOverridesRequest } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import { onMount } from "svelte"
 	import OverrideMonaco from "./OverrideMonaco.svelte"

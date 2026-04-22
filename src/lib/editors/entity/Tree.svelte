@@ -2,7 +2,7 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { EntityTreeRequest, PastableTemplateCategory, Ref } from "$lib/bindings-types"
+	import type { EntityTreeRequest, PastableTemplateCategory, RefProxy } from "$lib/bindings"
 	import { Modal, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
@@ -53,7 +53,7 @@
 	let editorConnectionAvailable = false
 
 	let addedEntities: string[] = []
-	let removedEntities: [string, string, Ref, string, boolean][] = []
+	let removedEntities: [string, RefProxy | null, string, string, boolean][] = []
 	let changedEntities: string[] = []
 
 	let showDiff = false
@@ -814,7 +814,9 @@
 				break
 
 			case "setDiffInfo":
-				;[addedEntities, changedEntities, removedEntities] = request.data.diff_info
+				addedEntities = request.data.new
+				changedEntities = request.data.modified
+				removedEntities = request.data.removed
 
 				// May be called before tree is loaded
 				try {
@@ -871,7 +873,7 @@
 		"modules:/": "fa fa-project-diagram" // Paths
 	})
 
-	function replaceTree(nodes: [string, Ref, string, string, boolean][]) {
+	function replaceTree(nodes: [string, RefProxy | null, string, string, boolean][]) {
 		tree.settings!.core.data = []
 
 		for (const [entityID, parent, name, factory, hasReverseParentRefs] of nodes) {
@@ -897,7 +899,7 @@
 		updateDiffing()
 	}
 
-	function newItems(nodes: [string, Ref, string, string, boolean][]) {
+	function newItems(nodes: [string, RefProxy | null, string, string, boolean][]) {
 		let added = 0
 		while (added < nodes.length) {
 			for (const [entityID, parent, name, factory, hasReverseParentRefs] of nodes) {
@@ -1044,7 +1046,7 @@
 
 			let added = 0
 			while (added < removedEntities.length) {
-				for (const [entityID, name, parent, factory, hasReverseParentRefs] of removedEntities) {
+				for (const [entityID, parent, name, factory, hasReverseParentRefs] of removedEntities) {
 					// We have to add the top-level entities first to ensure the tree responds appropriately
 					if (!tree.get_node(entityID)) {
 						if (!getReferencedLocalEntity(parent) || tree.get_node(getReferencedLocalEntity(parent) || "#")) {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { event } from "$lib/utils"
-	import type { GameInstall, SettingsRequest } from "$lib/bindings-types"
+	import type { GameInstall, SettingsRequest } from "$lib/bindings"
 	import { Checkbox, TooltipIcon } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"

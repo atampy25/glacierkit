@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ResourceChangelogEntry, ResourceOverviewData, ResourceOverviewRequest } from "$lib/bindings-types"
+	import type { ReferenceFlags, ResourceChangelogEntry, ResourceOverviewData, ResourceOverviewRequest } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import {
 		Accordion,
@@ -48,7 +48,7 @@
 	let filetype = ""
 	let partition = ""
 	let pathOrHint: string | null = null
-	let dependencies: [string, string, string | null, string, boolean][] = []
+	let dependencies: [string, string, string | null, ReferenceFlags, boolean][] = []
 	let reverseDependencies: [string, string, string | null][] = []
 	let changelog: ResourceChangelogEntry[] = []
 	let data: ResourceOverviewData | null = null
@@ -839,7 +839,7 @@
 							class="h-full overflow-y-auto pr-2 flex flex-col gap-2"
 							use:help={{ title: "References", description: "Other resources that this resource depends on, listed in the order stored in the game files." }}
 						>
-							{#each dependencies as [hash, type, path, flag, inGame]}
+							{#each dependencies as [hash, type, path, flags, inGame]}
 								{#if type}
 									<ClickableTile
 										style="min-height: unset"
@@ -871,7 +871,9 @@
 									>
 										<div class="text-base -mt-1"
 											><span class="font-bold">{hash}.{type}</span>
-											{flag}</div
+											{flags.type ? flags.type[0].toUpperCase() + flags.type.slice(1) : "Install"}{flags.acquired ? ", acquired" : ""}{flags.languageCode
+												? `, language ${flags.languageCode}`
+												: ""}</div
 										>
 										<div class="break-all">{path || "No path"}</div>
 										{#if !inGame}
@@ -882,7 +884,9 @@
 									<div class="bg-[#303030] p-3">
 										<div class="text-base -mt-1"
 											><span class="font-bold">{hash}</span>
-											{flag}</div
+											{flags.type ? flags.type[0].toUpperCase() + flags.type.slice(1) : "Install"}{flags.acquired ? ", acquired" : ""}{flags.languageCode
+												? `, language ${flags.languageCode}`
+												: ""}</div
 										>
 										<div class="break-all">Unknown resource</div>
 										{#if !inGame}

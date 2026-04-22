@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ContentSearchRequest } from "$lib/bindings-types"
+	import type { ContentSearchRequest } from "$lib/bindings"
 	import { help } from "$lib/helpray"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"

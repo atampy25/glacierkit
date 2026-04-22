@@ -42,8 +42,8 @@ use event_handling::{
 use fn_error_context::context;
 use general::open_file;
 use hashbrown::HashMap;
-use hitman_commons::game::GameVersion;
 use hitman_commons::game_detection::detect_installs;
+use hitman_commons::{game::GameVersion, hash_list::HASH_LIST};
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{LevelFilter, info, trace};
@@ -55,8 +55,7 @@ use model::{
 };
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
-use quickentity_rs::{generate_patch, qn_structs::Property};
-use rand::{Rng, rng};
+use quickentity_rs::{entity::Property, generate_patch, variant::Variant};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_slice, json, to_value, to_vec};
 use show_in_folder::show_in_folder;
@@ -100,10 +99,7 @@ impl RunCommandExt for tauri_plugin_shell::process::Command {
 		if output.status.success() {
 			String::from_utf8_lossy(&output.stdout).into()
 		} else {
-			bail!(
-				"Command failed: {}",
-				String::from_utf8_lossy(&output.stderr).to_string()
-			);
+			bail!("Command failed: {}", String::from_utf8_lossy(&output.stderr));
 		}
 	}
 }
@@ -114,8 +110,9 @@ async fn main() {
 
 	tauri::async_runtime::set(tokio::runtime::Handle::current());
 
-	let specta =
-		tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![event, show_in_folder]);
+	let specta = tauri_specta::Builder::<tauri::Wry>::new()
+		.commands(tauri_specta::collect_commands![event, show_in_folder])
+		.typ::<Request>();
 
 	#[cfg(debug_assertions)]
 	if Path::new("../src/lib").is_dir() {
@@ -127,6 +124,13 @@ async fn main() {
 				"../src/lib/bindings.ts"
 			)
 			.expect("Failed to export bindings");
+
+		fs::write(
+			"../src/lib/editors/entity/schema.json",
+			serde_json::to_vec(&schemars::schema_for!(quickentity_rs::entity::Entity))
+				.expect("Failed to serialize entity schema")
+		)
+		.expect("Failed to write entity schema");
 	}
 
 	tauri::Builder::default()
@@ -228,11 +232,11 @@ async fn main() {
 			let app_data_path = app.path().app_data_dir().expect("Couldn't get data dir");
 
 			let mut invalid = true;
-			if let Ok(read) = fs::read(app_data_path.join("settings.json")) {
-				if let Ok(settings) = from_slice::<AppSettings>(&read) {
-					invalid = false;
-					app.manage(ArcSwap::new(settings.into()));
-				}
+			if let Ok(read) = fs::read(app_data_path.join("settings.json"))
+				&& let Ok(settings) = from_slice::<AppSettings>(&read)
+			{
+				invalid = false;
+				app.manage(ArcSwap::new(settings.into()));
 			}
 
 			let game_installs = detect_installs().expect("Couldn't detect game installs");
@@ -254,8 +258,7 @@ async fn main() {
 				.load()
 				.game_install
 				.as_ref()
-				.map(|x| !game_installs.iter().any(|y| y.path == *x))
-				.unwrap_or(false)
+				.is_some_and(|x| !game_installs.iter().any(|y| y.path == *x))
 			{
 				let mut settings = (*app.state::<ArcSwap<AppSettings>>().load_full()).to_owned();
 
@@ -272,13 +275,13 @@ async fn main() {
 
 			info!("Removed temp folder");
 
+			let _ = fs::read(app_data_path.join("hash_list.sml"))
+				.ok()
+				.and_then(|x| HASH_LIST.load_compressed(&x).ok());
+
 			app.manage(AppState {
 				game_installs,
 				project: None.into(),
-				hash_list: fs::read(app_data_path.join("hash_list.sml"))
-					.ok()
-					.and_then(|x| serde_smile::from_slice(&x).ok())
-					.into(),
 				tonytools_hash_list: fs::read(app_data_path.join("tonytools_hash_list.hmla"))
 					.ok()
 					.and_then(|x| tonytools::hashlist::HashList::load(&x).ok().map(|x| x.into()))
@@ -287,6 +290,7 @@ async fn main() {
 				editor_states: DashMap::new().into(),
 				game_files: None.into(),
 				resource_reverse_dependencies: None.into(),
+				file_types: None.into(),
 				cached_entities: DashMap::new().into(),
 				repository: None.into(),
 				intellisense: None.into(),
@@ -311,495 +315,872 @@ pub fn handle_event(app: &AppHandle, evt: Event) {
 	event(app.clone(), evt);
 }
 
-#[tauri::command]
-#[specta::specta]
-fn event(app: AppHandle, event: Event) {
-	async_runtime::spawn(async move {
-		trace!("Handling event: {:?}", event);
+#[try_fn]
+async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
+	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_state = app.state::<AppState>();
 
-		let cloned_app = app.clone();
+	match event {
+		Event::Tool(event) => {
+			handle_tool_event(&app, event).await?;
+		}
 
-		if let Err(e) = async_runtime::spawn(async move {
-			let app_settings = app.state::<ArcSwap<AppSettings>>();
-			let app_state = app.state::<AppState>();
+		Event::Editor(event) => match event {
+			EditorEvent::Text(event) => match event {
+				TextEditorEvent::Initialise { id } => {
+					let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
-			if let Err::<_, Error>(e) = try {
-				match event {
-					Event::Tool(event) => {
-						handle_tool_event(&app, event).await?;
+					let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
+						Err(anyhow!("Editor {} is not a text editor", id))?;
+						panic!();
+					};
+
+					send_request(
+						&app,
+						Request::Editor(EditorRequest::Text(TextEditorRequest::ReplaceContent {
+							id: id.to_owned(),
+							content
+						}))
+					)?;
+
+					send_request(
+						&app,
+						Request::Editor(EditorRequest::Text(TextEditorRequest::SetFileType {
+							id: id.to_owned(),
+							file_type
+						}))
+					)?;
+				}
+
+				TextEditorEvent::UpdateContent { id, content } => {
+					let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+
+					let EditorData::Text {
+						file_type,
+						content: old_content
+					} = editor_state.data.to_owned()
+					else {
+						Err(anyhow!("Editor {} is not a text editor", id))?;
+						panic!();
+					};
+
+					if content != old_content {
+						editor_state.data = EditorData::Text { content, file_type };
+
+						send_request(
+							&app,
+							Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true })
+						)?;
 					}
+				}
+			},
 
-					Event::Editor(event) => match event {
-						EditorEvent::Text(event) => match event {
-							TextEditorEvent::Initialise { id } => {
-								let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+			EditorEvent::Entity(event) => {
+				event_handling::entity::handle(&app, event).await?;
+			}
 
-								let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
-									Err(anyhow!("Editor {} is not a text editor", id))?;
-									panic!();
-								};
+			EditorEvent::ResourceOverview(event) => {
+				handle_resource_overview_event(&app, event).await?;
+			}
 
-								send_request(
-									&app,
-									Request::Editor(EditorRequest::Text(TextEditorRequest::ReplaceContent {
-										id: id.to_owned(),
-										content
-									}))
-								)?;
+			EditorEvent::RepositoryPatch(event) => {
+				handle_repository_patch_event(&app, event).await?;
+			}
 
-								send_request(
-									&app,
-									Request::Editor(EditorRequest::Text(TextEditorRequest::SetFileType {
-										id: id.to_owned(),
-										file_type
-									}))
-								)?;
+			EditorEvent::UnlockablesPatch(event) => {
+				handle_unlockables_patch_event(&app, event).await?;
+			}
+
+			EditorEvent::ContentSearchResults(event) => match event {
+				ContentSearchResultsEvent::Initialise { id } => {
+					let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+
+					let results = match editor_state.data {
+						EditorData::ContentSearchResults { ref results, .. } => results,
+
+						_ => {
+							Err(anyhow!("Editor {} is not a content search results page", id))?;
+							panic!();
+						}
+					};
+
+					send_request(
+						&app,
+						Request::Editor(EditorRequest::ContentSearchResults(
+							ContentSearchResultsRequest::Initialise {
+								id,
+								results: results.to_owned()
 							}
+						))
+					)?;
+				}
 
-							TextEditorEvent::UpdateContent { id, content } => {
-								let mut editor_state =
-									app_state.editor_states.get_mut(&id).context("No such editor")?;
+				ContentSearchResultsEvent::OpenResourceOverview { hash, .. } => {
+					let id = Uuid::new_v4();
 
-								let EditorData::Text {
-									file_type,
-									content: old_content
-								} = editor_state.data.to_owned()
-								else {
-									Err(anyhow!("Editor {} is not a text editor", id))?;
-									panic!();
-								};
+					app_state.editor_states.insert(
+						id.to_owned(),
+						EditorState {
+							file: None,
+							data: EditorData::ResourceOverview { hash: hash.0 }
+						}
+					);
 
-								if content != old_content {
-									editor_state.data = EditorData::Text { content, file_type };
+					send_request(
+						&app,
+						Request::Global(GlobalRequest::CreateTab {
+							id,
+							name: format!("Resource overview ({})", hash.0),
+							editor_type: EditorType::ResourceOverview
+						})
+					)?;
+				}
+			}
+		},
 
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true })
-									)?;
+		Event::Global(event) => match event {
+			GlobalEvent::SetSeenAnnouncements(seen_announcements) => {
+				let mut settings = (*app_settings.load_full()).to_owned();
+				settings.seen_announcements = seen_announcements;
+				fs::write(
+					app.path()
+						.app_data_dir()
+						.context("Couldn't get app data dir")?
+						.join("settings.json"),
+					to_vec(&settings).unwrap()
+				)?;
+				app_settings.store(settings.into());
+			}
+
+			GlobalEvent::SelectAndOpenFile => {
+				let mut dialog = app.dialog().file().set_title("Open file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog.blocking_pick_file() {
+					open_file(&app, path.into_path()?).await?;
+				}
+			}
+
+			GlobalEvent::LoadWorkspace(path) => {
+				app.track_event("Workspace loaded", None).unwrap();
+				let task = start_task(&app, format!("Loading project {}", path.display()))?;
+
+				let mut files = vec![];
+
+				for entry in WalkDir::new(&path)
+					.sort_by_file_name()
+					.into_iter()
+					.filter_map(|x| x.ok())
+				{
+					files.push((
+						entry.path().into(),
+						entry.metadata().context("Couldn't get file metadata")?.is_dir()
+					));
+				}
+
+				let settings;
+				if let Ok(read) = fs::read(path.join("project.json")) {
+					if let Ok(read_settings) = from_slice::<ProjectSettings>(&read) {
+						settings = read_settings;
+					} else {
+						settings = ProjectSettings::default();
+						fs::write(path.join("project.json"), to_vec(&settings)?)?;
+					}
+				} else {
+					settings = ProjectSettings::default();
+					fs::write(path.join("project.json"), to_vec(&settings)?)?;
+				}
+
+				for editor in app.state::<AppState>().editor_states.iter() {
+					if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
+						send_request(
+							&app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+								EntityMetadataRequest::UpdateCustomPaths {
+									editor_id: editor.key().to_owned(),
+									custom_paths: settings.custom_paths.to_owned()
 								}
-							}
-						},
+							)))
+						)?;
+					}
+				}
 
-						EditorEvent::Entity(event) => {
-							event_handling::entity::handle(&app, event).await?;
-						}
+				app_state.project.store(Some(
+					Project {
+						path: path.to_owned(),
+						settings: Arc::new(settings.to_owned()).into()
+					}
+					.into()
+				));
 
-						EditorEvent::ResourceOverview(event) => {
-							handle_resource_overview_event(&app, event).await?;
-						}
+				send_request(
+					&app,
+					Request::Global(GlobalRequest::SetWindowTitle(
+						path.file_name().unwrap().to_string_lossy().into()
+					))
+				)?;
 
-						EditorEvent::RepositoryPatch(event) => {
-							handle_repository_patch_event(&app, event).await?;
-						}
+				send_request(
+					&app,
+					Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings(
+						settings.to_owned()
+					)))
+				)?;
 
-						EditorEvent::UnlockablesPatch(event) => {
-							handle_unlockables_patch_event(&app, event).await?;
-						}
+				send_request(
+					&app,
+					Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::NewTree {
+						base_path: path.to_owned(),
+						files
+					}))
+				)?;
 
-						EditorEvent::ContentSearchResults(event) => match event {
-							ContentSearchResultsEvent::Initialise { id } => {
-								let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+				let notify_path = path.to_owned();
+				let notify_app = app.to_owned();
 
-								let results = match editor_state.data {
-									EditorData::ContentSearchResults { ref results, .. } => results,
+				app_state.fs_watcher.store(Some({
+					let mut watcher = notify_debouncer_full::new_debouncer_opt(
+						Duration::from_secs(2),
+						None,
+						move |evts: notify_debouncer_full::DebounceEventResult| {
+							let res: Result<()> = try {
+								if let Ok(evts) = evts {
+									for evt in evts {
+										if evt.need_rescan() {
+											// Refresh the whole tree
 
-									_ => {
-										Err(anyhow!("Editor {} is not a content search results page", id))?;
-										panic!();
-									}
-								};
+											let mut files = vec![];
 
-								send_request(
-									&app,
-									Request::Editor(EditorRequest::ContentSearchResults(
-										ContentSearchResultsRequest::Initialise {
-											id,
-											results: results.to_owned()
-										}
-									))
-								)?;
-							}
-
-							ContentSearchResultsEvent::OpenResourceOverview { hash, .. } => {
-								let id = Uuid::new_v4();
-
-								app_state.editor_states.insert(
-									id.to_owned(),
-									EditorState {
-										file: None,
-										data: EditorData::ResourceOverview { hash }
-									}
-								);
-
-								send_request(
-									&app,
-									Request::Global(GlobalRequest::CreateTab {
-										id,
-										name: format!("Resource overview ({hash})"),
-										editor_type: EditorType::ResourceOverview
-									})
-								)?;
-							}
-						}
-					},
-
-					Event::Global(event) => match event {
-						GlobalEvent::SetSeenAnnouncements(seen_announcements) => {
-							let mut settings = (*app_settings.load_full()).to_owned();
-							settings.seen_announcements = seen_announcements;
-							fs::write(
-								app.path()
-									.app_data_dir()
-									.context("Couldn't get app data dir")?
-									.join("settings.json"),
-								to_vec(&settings).unwrap()
-							)?;
-							app_settings.store(settings.into());
-						}
-
-						GlobalEvent::SelectAndOpenFile => {
-							let mut dialog = app.dialog().file().set_title("Open file");
-
-							if let Some(project) = app_state.project.load().as_ref() {
-								dialog = dialog.set_directory(&project.path);
-							}
-
-							if let Some(path) = dialog.blocking_pick_file() {
-								open_file(&app, path.into_path()?).await?;
-							}
-						}
-
-						GlobalEvent::LoadWorkspace(path) => {
-							app.track_event("Workspace loaded", None).unwrap();
-							let task = start_task(&app, format!("Loading project {}", path.display()))?;
-
-							let mut files = vec![];
-
-							for entry in WalkDir::new(&path)
-								.sort_by_file_name()
-								.into_iter()
-								.filter_map(|x| x.ok())
-							{
-								files.push((
-									entry.path().into(),
-									entry.metadata().context("Couldn't get file metadata")?.is_dir()
-								));
-							}
-
-							let settings;
-							if let Ok(read) = fs::read(path.join("project.json")) {
-								if let Ok(read_settings) = from_slice::<ProjectSettings>(&read) {
-									settings = read_settings;
-								} else {
-									settings = ProjectSettings::default();
-									fs::write(path.join("project.json"), to_vec(&settings)?)?;
-								}
-							} else {
-								settings = ProjectSettings::default();
-								fs::write(path.join("project.json"), to_vec(&settings)?)?;
-							}
-
-							for editor in app.state::<AppState>().editor_states.iter() {
-								if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-											EntityMetadataRequest::UpdateCustomPaths {
-												editor_id: editor.key().to_owned(),
-												custom_paths: settings.custom_paths.to_owned()
+											for entry in WalkDir::new(&notify_path)
+												.sort_by_file_name()
+												.into_iter()
+												.filter_map(|x| x.ok())
+											{
+												files.push((
+													entry.path().into(),
+													entry.metadata().context("Couldn't get file metadata")?.is_dir()
+												));
 											}
-										)))
-									)?;
-								}
-							}
 
-							app_state.project.store(Some(
-								Project {
-									path: path.to_owned(),
-									settings: Arc::new(settings.to_owned()).into()
-								}
-								.into()
-							));
+											send_request(
+												&notify_app,
+												Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::NewTree {
+													base_path: notify_path.to_owned(),
+													files
+												}))
+											)?;
 
-							send_request(
-								&app,
-								Request::Global(GlobalRequest::SetWindowTitle(
-									path.file_name().unwrap().to_string_lossy().into()
-								))
-							)?;
+											return;
+										}
 
-							send_request(
-								&app,
-								Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings(
-									settings.to_owned()
-								)))
-							)?;
+										match evt.kind {
+											notify::EventKind::Create(kind) => match kind {
+												notify::event::CreateKind::File => {
+													send_request(
+														&notify_app,
+														Request::Tool(ToolRequest::FileBrowser(
+															FileBrowserRequest::Create {
+																path: evt
+																	.paths
+																	.first()
+																	.context("Create event had no paths")?
+																	.to_owned(),
+																is_folder: false
+															}
+														))
+													)?;
+												}
 
-							send_request(
-								&app,
-								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::NewTree {
-									base_path: path.to_owned(),
-									files
-								}))
-							)?;
+												notify::event::CreateKind::Folder => {
+													send_request(
+														&notify_app,
+														Request::Tool(ToolRequest::FileBrowser(
+															FileBrowserRequest::Create {
+																path: evt
+																	.paths
+																	.first()
+																	.context("Create event had no path")?
+																	.to_owned(),
+																is_folder: true
+															}
+														))
+													)?;
+												}
 
-							let notify_path = path.to_owned();
-							let notify_app = app.to_owned();
-
-							app_state.fs_watcher.store(Some({
-								let mut watcher = notify_debouncer_full::new_debouncer_opt(
-									Duration::from_secs(2),
-									None,
-									move |evts: notify_debouncer_full::DebounceEventResult| {
-										if let Err::<_, Error>(e) = try {
-											if let Ok(evts) = evts {
-												for evt in evts {
-													if evt.need_rescan() {
-														// Refresh the whole tree
-
-														let mut files = vec![];
-
-														for entry in WalkDir::new(&notify_path)
-															.sort_by_file_name()
-															.into_iter()
-															.filter_map(|x| x.ok())
-														{
-															files.push((
-																entry.path().into(),
-																entry
-																	.metadata()
-																	.context("Couldn't get file metadata")?
-																	.is_dir()
-															));
-														}
-
+												notify::event::CreateKind::Any | notify::event::CreateKind::Other => {
+													if let Ok(metadata) = fs::metadata(
+														evt.paths.first().context("Create event had no paths")?
+													) {
 														send_request(
 															&notify_app,
 															Request::Tool(ToolRequest::FileBrowser(
-																FileBrowserRequest::NewTree {
-																	base_path: notify_path.to_owned(),
-																	files
+																FileBrowserRequest::Create {
+																	path: evt
+																		.paths
+																		.first()
+																		.context("Create event had no paths")?
+																		.to_owned(),
+																	is_folder: metadata.is_dir()
 																}
 															))
 														)?;
-
-														return;
-													}
-
-													match evt.kind {
-														notify::EventKind::Create(kind) => match kind {
-															notify::event::CreateKind::File => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::Create {
-																			path: evt
-																				.paths
-																				.first()
-																				.context("Create event had no paths")?
-																				.to_owned(),
-																			is_folder: false
-																		}
-																	))
-																)?;
-															}
-
-															notify::event::CreateKind::Folder => {
-																send_request(
-																	&notify_app,
-																	Request::Tool(ToolRequest::FileBrowser(
-																		FileBrowserRequest::Create {
-																			path: evt
-																				.paths
-																				.first()
-																				.context("Create event had no path")?
-																				.to_owned(),
-																			is_folder: true
-																		}
-																	))
-																)?;
-															}
-
-															notify::event::CreateKind::Any
-															| notify::event::CreateKind::Other => {
-																if let Ok(metadata) = fs::metadata(
-																	evt.paths
-																		.first()
-																		.context("Create event had no paths")?
-																) {
-																	send_request(
-																		&notify_app,
-																		Request::Tool(ToolRequest::FileBrowser(
-																			FileBrowserRequest::Create {
-																				path: evt
-																					.paths
-																					.first()
-																					.context(
-																						"Create event had no paths"
-																					)?
-																					.to_owned(),
-																				is_folder: metadata.is_dir()
-																			}
-																		))
-																	)?;
-																}
-															}
-														},
-
-														notify::EventKind::Modify(notify::event::ModifyKind::Name(
-															notify::event::RenameMode::Both
-														)) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::Rename {
-																		old_path: evt
-																			.paths
-																			.first()
-																			.context(
-																				"Rename-both event had no first path"
-																			)?
-																			.to_owned(),
-																		new_path: evt
-																			.paths
-																			.get(1)
-																			.context(
-																				"Rename-both event had no second path"
-																			)?
-																			.to_owned()
-																	}
-																))
-															)?;
-														}
-
-														notify::EventKind::Modify(notify::event::ModifyKind::Name(
-															notify::event::RenameMode::From
-														)) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::BeginRename {
-																		old_path: evt
-																			.paths
-																			.first()
-																			.context("Rename-from event had no path")?
-																			.to_owned()
-																	}
-																))
-															)?;
-														}
-
-														notify::EventKind::Modify(notify::event::ModifyKind::Name(
-															notify::event::RenameMode::To
-														)) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::FinishRename {
-																		new_path: evt
-																			.paths
-																			.first()
-																			.context("Rename-to event had no path")?
-																			.to_owned()
-																	}
-																))
-															)?;
-														}
-
-														notify::EventKind::Remove(_) => {
-															send_request(
-																&notify_app,
-																Request::Tool(ToolRequest::FileBrowser(
-																	FileBrowserRequest::Delete(
-																		evt.paths
-																			.first()
-																			.context("Remove event had no path")?
-																			.to_owned()
-																	)
-																))
-															)?;
-														}
-
-														_ => {}
 													}
 												}
+											},
+
+											notify::EventKind::Modify(notify::event::ModifyKind::Name(
+												notify::event::RenameMode::Both
+											)) => {
+												send_request(
+													&notify_app,
+													Request::Tool(ToolRequest::FileBrowser(
+														FileBrowserRequest::Rename {
+															old_path: evt
+																.paths
+																.first()
+																.context("Rename-both event had no first path")?
+																.to_owned(),
+															new_path: evt
+																.paths
+																.get(1)
+																.context("Rename-both event had no second path")?
+																.to_owned()
+														}
+													))
+												)?;
 											}
-										} {
-											send_request(
-												&notify_app,
-												Request::Global(GlobalRequest::ErrorReport {
-													error: format!("{:?}", e.context("Notifier error"))
-												})
-											)
-											.expect("Couldn't send error report to frontend");
+
+											notify::EventKind::Modify(notify::event::ModifyKind::Name(
+												notify::event::RenameMode::From
+											)) => {
+												send_request(
+													&notify_app,
+													Request::Tool(ToolRequest::FileBrowser(
+														FileBrowserRequest::BeginRename {
+															old_path: evt
+																.paths
+																.first()
+																.context("Rename-from event had no path")?
+																.to_owned()
+														}
+													))
+												)?;
+											}
+
+											notify::EventKind::Modify(notify::event::ModifyKind::Name(
+												notify::event::RenameMode::To
+											)) => {
+												send_request(
+													&notify_app,
+													Request::Tool(ToolRequest::FileBrowser(
+														FileBrowserRequest::FinishRename {
+															new_path: evt
+																.paths
+																.first()
+																.context("Rename-to event had no path")?
+																.to_owned()
+														}
+													))
+												)?;
+											}
+
+											notify::EventKind::Remove(_) => {
+												send_request(
+													&notify_app,
+													Request::Tool(ToolRequest::FileBrowser(
+														FileBrowserRequest::Delete(
+															evt.paths
+																.first()
+																.context("Remove event had no path")?
+																.to_owned()
+														)
+													))
+												)?;
+											}
+
+											_ => {}
 										}
-									},
-									FileIdMap::new(),
-									notify::Config::default()
+									}
+								}
+							};
+
+							if let Err::<_, Error>(e) = res {
+								send_request(
+									&notify_app,
+									Request::Global(GlobalRequest::ErrorReport {
+										error: format!("{:?}", e.context("Notifier error"))
+									})
+								)
+								.expect("Couldn't send error report to frontend");
+							}
+						},
+						FileIdMap::new(),
+						notify::Config::default()
+					)?;
+
+					watcher.watch(&path, RecursiveMode::Recursive)?;
+
+					Arc::new(watcher)
+				}));
+
+				finish_task(&app, task)?;
+			}
+
+			GlobalEvent::SelectTab(tab) => {
+				if let Some(tab) = tab {
+					if let Some(file) = app_state
+						.editor_states
+						.get(&tab)
+						.context("No such editor")?
+						.file
+						.as_ref()
+					{
+						send_request(
+							&app,
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(Some(
+								file.to_owned()
+							))))
+						)?;
+					}
+				} else {
+					send_request(
+						&app,
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+					)?;
+				}
+			}
+
+			GlobalEvent::RemoveTab(tab) => {
+				let (_, old) = app_state.editor_states.remove(&tab).context("No such editor")?;
+
+				if old.file.is_some() {
+					send_request(
+						&app,
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+					)?;
+				}
+
+				send_request(&app, Request::Global(GlobalRequest::RemoveTab(tab)))?;
+			}
+
+			GlobalEvent::SaveTab(tab) => {
+				let mut editor = app_state.editor_states.get_mut(&tab).context("No such editor")?;
+
+				let task = start_task(
+					&app,
+					format!(
+						"Saving {}",
+						editor
+							.file
+							.as_ref()
+							.and_then(|x| x.file_name())
+							.map(|x| x.to_string_lossy().to_string())
+							.unwrap_or("tab".into())
+					)
+				)?;
+
+				let data_to_save = match &editor.data {
+					EditorData::Nil => {
+						Err(anyhow!("Editor is a nil editor"))?;
+						panic!();
+					}
+
+					EditorData::ResourceOverview { .. } => {
+						Err(anyhow!("Editor is a resource overview"))?;
+						panic!();
+					}
+
+					EditorData::ContentSearchResults { .. } => {
+						Err(anyhow!("Editor is a content search results page"))?;
+						panic!();
+					}
+
+					EditorData::Text { content, file_type } => {
+						app.track_event(
+							"Editor saved",
+							Some(json!({
+								"file_type": file_type
+							}))
+						)
+						.unwrap();
+
+						content.as_bytes().to_owned()
+					}
+
+					EditorData::QNEntity { entity, settings } => {
+						app.track_event(
+							"Editor saved",
+							Some(json!({
+								"file_type": "QNEntity",
+								"show_reverse_parent_refs": settings.show_reverse_parent_refs
+							}))
+						)
+						.unwrap();
+
+						let unformatted = serde_json::to_string(&entity).context("Entity is invalid")?;
+
+						if unformatted.len() < 1024 * 1024 {
+							format_json(&unformatted)?.into_bytes()
+						} else {
+							unformatted.into_bytes()
+						}
+					}
+
+					EditorData::QNPatch {
+						base,
+						current,
+						settings
+					} => {
+						app.track_event(
+							"Editor saved",
+							Some(json!({
+								"file_type": "QNPatch",
+								"show_reverse_parent_refs": settings.show_reverse_parent_refs
+							}))
+						)
+						.unwrap();
+
+						// Once a patch has been saved you can no longer modify the hashes without manually converting to entity.json
+						send_request(
+							&app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
+								EntityMetadataRequest::SetHashModificationAllowed {
+									editor_id: tab.to_owned(),
+									hash_modification_allowed: false
+								}
+							)))
+						)?;
+
+						let unformatted = serde_json::to_string(
+							&generate_patch(base, current)
+								.map_err(|x| anyhow!(x))
+								.context("Couldn't generate patch")?
+						)
+						.context("Entity is invalid")?;
+
+						if unformatted.len() < 1024 * 1024 {
+							format_json(&unformatted)?.into_bytes()
+						} else {
+							unformatted.into_bytes()
+						}
+					}
+
+					EditorData::RepositoryPatch {
+						base,
+						current,
+						patch_type
+					} => {
+						app.track_event(
+							"Editor saved",
+							Some(json!({
+								"file_type": "RepositoryPatch",
+								"json_patch_type": patch_type
+							}))
+						)
+						.unwrap();
+
+						match patch_type {
+							JsonPatchType::MergePatch => {
+								let base = to_value(
+									base.iter()
+										.map(|x| (x.id.to_owned(), x.data.to_owned()))
+										.collect::<HashMap<_, _>>()
 								)?;
 
-								watcher.watch(&path, RecursiveMode::Recursive)?;
+								let current = to_value(
+									current
+										.iter()
+										.map(|x| (x.id.to_owned(), x.data.to_owned()))
+										.collect::<HashMap<_, _>>()
+								)?;
 
-								Arc::new(watcher)
-							}));
+								let patch = json_patch::diff(&base, &current);
 
-							finish_task(&app, task)?;
-						}
+								serde_json::to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
+							}
 
-						GlobalEvent::SelectTab(tab) => {
-							if let Some(tab) = tab {
-								if let Some(file) = app_state
-									.editor_states
-									.get(&tab)
-									.context("No such editor")?
-									.file
-									.as_ref()
-								{
+							JsonPatchType::JsonPatch => {
+								let base = to_value(
+									base.iter()
+										.map(|x| (x.id.to_owned(), x.to_owned()))
+										.collect::<HashMap<_, _>>()
+								)?;
+
+								let current = to_value(
+									current
+										.iter()
+										.map(|x| (x.id.to_owned(), x.to_owned()))
+										.collect::<HashMap<_, _>>()
+								)?;
+
+								if let Some(file) = editor.file.as_ref() {
 									send_request(
 										&app,
-										Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(Some(
-											file.to_owned()
-										))))
+										Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+											base,
+											current,
+											save_path: file.to_owned(),
+											file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
+										})
 									)?;
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: tab,
+											unsaved: false
+										})
+									)?;
+								} else {
+									let mut dialog = app.dialog().file().set_title("Save file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(path) = dialog
+										.add_filter("Repository JSON patch", &["JSON.patch.json"])
+										.blocking_save_file()
+									{
+										editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
+
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+												base,
+												current,
+												save_path: path.as_path().context("Invalid path")?.to_owned(),
+												file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
+											})
+										)?;
+
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::SetTabUnsaved {
+												id: tab,
+												unsaved: false
+											})
+										)?;
+									}
 								}
-							} else {
-								send_request(
-									&app,
-									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
-								)?;
+
+								finish_task(&app, task)?;
+
+								return Ok(());
 							}
 						}
+					}
 
-						GlobalEvent::RemoveTab(tab) => {
-							let (_, old) = app_state.editor_states.remove(&tab).context("No such editor")?;
+					EditorData::UnlockablesPatch {
+						base,
+						current,
+						patch_type
+					} => {
+						app.track_event(
+							"Editor saved",
+							Some(json!({
+								"file_type": "UnlockablesPatch",
+								"json_patch_type": patch_type
+							}))
+						)
+						.unwrap();
 
-							if old.file.is_some() {
-								send_request(
-									&app,
-									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+						match patch_type {
+							JsonPatchType::MergePatch => {
+								let base = to_value(
+									base.iter()
+										.map(|x| {
+											(
+												x.data
+													.get("Id")
+													.expect("Unlockable did not have Id")
+													.as_str()
+													.expect("Id was not string")
+													.to_owned(),
+												{
+													let mut y = IndexMap::new();
+													y.insert("Guid".into(), to_value(x.id).unwrap());
+													y.extend(
+														x.data
+															.iter()
+															.filter(|(key, _)| *key != "Id")
+															.map(|(x, y)| (x.to_owned(), y.to_owned()))
+													);
+													y
+												}
+											)
+										})
+										.collect::<IndexMap<String, IndexMap<String, Value>>>()
 								)?;
+
+								let current = to_value(
+									current
+										.iter()
+										.map(|x| {
+											(
+												x.data
+													.get("Id")
+													.expect("Unlockable did not have Id")
+													.as_str()
+													.expect("Id was not string")
+													.to_owned(),
+												{
+													let mut y = IndexMap::new();
+													y.insert("Guid".into(), to_value(x.id).unwrap());
+													y.extend(
+														x.data
+															.iter()
+															.filter(|(key, _)| *key != "Id")
+															.map(|(x, y)| (x.to_owned(), y.to_owned()))
+													);
+													y
+												}
+											)
+										})
+										.collect::<IndexMap<String, IndexMap<String, Value>>>()
+								)?;
+
+								let patch = json_patch::diff(&base, &current);
+
+								serde_json::to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
 							}
 
-							send_request(&app, Request::Global(GlobalRequest::RemoveTab(tab)))?;
+							JsonPatchType::JsonPatch => {
+								let base = to_value(
+									base.iter()
+										.map(|x| {
+											(
+												x.data
+													.get("Id")
+													.expect("Unlockable did not have Id")
+													.as_str()
+													.expect("Id was not string")
+													.to_owned(),
+												{
+													let mut y = IndexMap::new();
+													y.insert("Guid".into(), to_value(x.id).unwrap());
+													y.extend(
+														x.data
+															.iter()
+															.filter(|(key, _)| *key != "Id")
+															.map(|(x, y)| (x.to_owned(), y.to_owned()))
+													);
+													y
+												}
+											)
+										})
+										.collect::<IndexMap<String, IndexMap<String, Value>>>()
+								)?;
+
+								let current = to_value(
+									current
+										.iter()
+										.map(|x| {
+											(
+												x.data
+													.get("Id")
+													.expect("Unlockable did not have Id")
+													.as_str()
+													.expect("Id was not string")
+													.to_owned(),
+												{
+													let mut y = IndexMap::new();
+													y.insert("Guid".into(), to_value(x.id).unwrap());
+													y.extend(
+														x.data
+															.iter()
+															.filter(|(key, _)| *key != "Id")
+															.map(|(x, y)| (x.to_owned(), y.to_owned()))
+													);
+													y
+												}
+											)
+										})
+										.collect::<IndexMap<String, IndexMap<String, Value>>>()
+								)?;
+
+								if let Some(file) = editor.file.as_ref() {
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+											base,
+											current,
+											save_path: file.to_owned(),
+											file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
+										})
+									)?;
+
+									send_request(
+										&app,
+										Request::Global(GlobalRequest::SetTabUnsaved {
+											id: tab,
+											unsaved: false
+										})
+									)?;
+								} else {
+									let mut dialog = app.dialog().file().set_title("Save file");
+
+									if let Some(project) = app_state.project.load().as_ref() {
+										dialog = dialog.set_directory(&project.path);
+									}
+
+									if let Some(path) = dialog
+										.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
+										.blocking_save_file()
+									{
+										editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
+
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+												base,
+												current,
+												save_path: path.as_path().context("Invalid path")?.to_owned(),
+												file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
+											})
+										)?;
+
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::SetTabUnsaved {
+												id: tab,
+												unsaved: false
+											})
+										)?;
+									}
+								}
+
+								finish_task(&app, task)?;
+
+								return Ok(());
+							}
 						}
+					}
+				};
 
-						GlobalEvent::SaveTab(tab) => {
-							let mut editor = app_state.editor_states.get_mut(&tab).context("No such editor")?;
+				if let Some(file) = editor.file.as_ref() {
+					fs::write(file, data_to_save).context("Couldn't write file")?;
 
-							let task = start_task(
-								&app,
-								format!(
-									"Saving {}",
-									editor
-										.file
-										.as_ref()
-										.and_then(|x| x.file_name())
-										.map(|x| x.to_string_lossy().to_string())
-										.unwrap_or("tab".into())
-								)
-							)?;
+					send_request(
+						&app,
+						Request::Global(GlobalRequest::SetTabUnsaved {
+							id: tab,
+							unsaved: false
+						})
+					)?;
+				} else {
+					let mut dialog = app.dialog().file().set_title("Save file");
 
-							let data_to_save = match &editor.data {
+					if let Some(project) = app_state.project.load().as_ref() {
+						dialog = dialog.set_directory(&project.path);
+					}
+
+					if let Some(path) = dialog
+						.add_filter(
+							match &editor.data {
 								EditorData::Nil => {
 									Err(anyhow!("Editor is a nil editor"))?;
 									panic!();
@@ -815,801 +1196,402 @@ fn event(app: AppHandle, event: Event) {
 									panic!();
 								}
 
-								EditorData::Text { content, file_type } => {
-									app.track_event(
-										"Editor saved",
-										Some(json!({
-											"file_type": file_type
-										}))
-									)
-									.unwrap();
+								EditorData::Text {
+									file_type: TextFileType::PlainText,
+									..
+								} => "Text file",
 
-									content.as_bytes().to_owned()
+								EditorData::Text {
+									file_type: TextFileType::Markdown,
+									..
+								} => "Markdown file",
+
+								EditorData::Text {
+									file_type: TextFileType::Json | TextFileType::ManifestJson,
+									..
+								} => "JSON file",
+
+								EditorData::QNEntity { .. } => "QuickEntity entity",
+
+								EditorData::QNPatch { .. } => "QuickEntity patch",
+
+								EditorData::RepositoryPatch { patch_type, .. } => match patch_type {
+									JsonPatchType::MergePatch => "Repository merge patch",
+									JsonPatchType::JsonPatch => "Repository JSON patch"
+								},
+
+								EditorData::UnlockablesPatch { patch_type, .. } => match patch_type {
+									JsonPatchType::MergePatch => "Unlockables merge patch",
+									JsonPatchType::JsonPatch => "Unlockables JSON patch"
+								}
+							},
+							&[match &editor.data {
+								EditorData::Nil => {
+									Err(anyhow!("Editor is a nil editor"))?;
+									panic!();
 								}
 
-								EditorData::QNEntity { entity, settings } => {
-									app.track_event(
-										"Editor saved",
-										Some(json!({
-											"file_type": "QNEntity",
-											"show_reverse_parent_refs": settings.show_reverse_parent_refs
-										}))
-									)
-									.unwrap();
-
-									let unformatted = serde_json::to_string(&entity).context("Entity is invalid")?;
-
-									if unformatted.len() < 1024 * 1024 {
-										format_json(&unformatted)?.into_bytes()
-									} else {
-										unformatted.into_bytes()
-									}
+								EditorData::ResourceOverview { .. } => {
+									Err(anyhow!("Editor is a resource overview"))?;
+									panic!();
 								}
 
-								EditorData::QNPatch {
-									base,
-									current,
-									settings
-								} => {
-									app.track_event(
-										"Editor saved",
-										Some(json!({
-											"file_type": "QNPatch",
-											"show_reverse_parent_refs": settings.show_reverse_parent_refs
-										}))
-									)
-									.unwrap();
-
-									// Once a patch has been saved you can no longer modify the hashes without manually converting to entity.json
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-											EntityMetadataRequest::SetHashModificationAllowed {
-												editor_id: tab.to_owned(),
-												hash_modification_allowed: false
-											}
-										)))
-									)?;
-
-									let unformatted = serde_json::to_string(
-										&generate_patch(base, current)
-											.map_err(|x| anyhow!(x))
-											.context("Couldn't generate patch")?
-									)
-									.context("Entity is invalid")?;
-
-									if unformatted.len() < 1024 * 1024 {
-										format_json(&unformatted)?.into_bytes()
-									} else {
-										unformatted.into_bytes()
-									}
+								EditorData::ContentSearchResults { .. } => {
+									Err(anyhow!("Editor is a content search results page"))?;
+									panic!();
 								}
 
-								EditorData::RepositoryPatch {
-									base,
-									current,
-									patch_type
-								} => {
-									app.track_event(
-										"Editor saved",
-										Some(json!({
-											"file_type": "RepositoryPatch",
-											"json_patch_type": patch_type
-										}))
-									)
-									.unwrap();
+								EditorData::Text {
+									file_type: TextFileType::PlainText,
+									..
+								} => "txt",
 
-									match patch_type {
-										JsonPatchType::MergePatch => {
-											let base = to_value(
-												base.iter()
-													.map(|x| (x.id.to_owned(), x.data.to_owned()))
-													.collect::<HashMap<_, _>>()
-											)?;
+								EditorData::Text {
+									file_type: TextFileType::Markdown,
+									..
+								} => "md",
 
-											let current = to_value(
-												current
-													.iter()
-													.map(|x| (x.id.to_owned(), x.data.to_owned()))
-													.collect::<HashMap<_, _>>()
-											)?;
+								EditorData::Text {
+									file_type: TextFileType::Json | TextFileType::ManifestJson,
+									..
+								} => "json",
 
-											let patch = json_patch::diff(&base, &current);
+								EditorData::QNEntity { .. } => "entity.json",
 
-											serde_json::to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
-										}
+								EditorData::QNPatch { .. } => "entity.patch.json",
 
-										JsonPatchType::JsonPatch => {
-											let base = to_value(
-												base.iter()
-													.map(|x| (x.id.to_owned(), x.to_owned()))
-													.collect::<HashMap<_, _>>()
-											)?;
+								EditorData::RepositoryPatch { patch_type, .. } => match patch_type {
+									JsonPatchType::MergePatch => "repository.json",
+									JsonPatchType::JsonPatch => "JSON.patch.json"
+								},
 
-											let current = to_value(
-												current
-													.iter()
-													.map(|x| (x.id.to_owned(), x.to_owned()))
-													.collect::<HashMap<_, _>>()
-											)?;
-
-											if let Some(file) = editor.file.as_ref() {
-												send_request(
-													&app,
-													Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-														base,
-														current,
-														save_path: file.to_owned(),
-														file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
-													})
-												)?;
-
-												send_request(
-													&app,
-													Request::Global(GlobalRequest::SetTabUnsaved {
-														id: tab,
-														unsaved: false
-													})
-												)?;
-											} else {
-												let mut dialog = app.dialog().file().set_title("Save file");
-
-												if let Some(project) = app_state.project.load().as_ref() {
-													dialog = dialog.set_directory(&project.path);
-												}
-
-												if let Some(path) = dialog
-													.add_filter("Repository JSON patch", &["JSON.patch.json"])
-													.blocking_save_file()
-												{
-													editor.file =
-														Some(path.as_path().context("Invalid path")?.to_owned());
-
-													send_request(
-														&app,
-														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-															base,
-															current,
-															save_path: path
-																.as_path()
-																.context("Invalid path")?
-																.to_owned(),
-															file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
-														})
-													)?;
-
-													send_request(
-														&app,
-														Request::Global(GlobalRequest::SetTabUnsaved {
-															id: tab,
-															unsaved: false
-														})
-													)?;
-												}
-											}
-
-											finish_task(&app, task)?;
-
-											return;
-										}
-									}
+								EditorData::UnlockablesPatch { patch_type, .. } => match patch_type {
+									JsonPatchType::MergePatch => "unlockables.json",
+									JsonPatchType::JsonPatch => "JSON.patch.json"
 								}
+							}]
+						)
+						.blocking_save_file()
+					{
+						editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
 
-								EditorData::UnlockablesPatch {
-									base,
-									current,
-									patch_type
-								} => {
-									app.track_event(
-										"Editor saved",
-										Some(json!({
-											"file_type": "UnlockablesPatch",
-											"json_patch_type": patch_type
-										}))
-									)
-									.unwrap();
+						fs::write(path.as_path().context("Invalid path")?, data_to_save)
+							.context("Couldn't write file")?;
 
-									match patch_type {
-										JsonPatchType::MergePatch => {
-											let base = to_value(
-												base.iter()
-													.map(|x| {
-														(
-															x.data
-																.get("Id")
-																.expect("Unlockable did not have Id")
-																.as_str()
-																.expect("Id was not string")
-																.to_owned(),
-															{
-																let mut y = IndexMap::new();
-																y.insert("Guid".into(), to_value(x.id).unwrap());
-																y.extend(
-																	x.data
-																		.iter()
-																		.filter(|(key, _)| *key != "Id")
-																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
-																);
-																y
-															}
-														)
-													})
-													.collect::<IndexMap<String, IndexMap<String, Value>>>()
-											)?;
+						send_request(
+							&app,
+							Request::Global(GlobalRequest::SetTabUnsaved {
+								id: tab,
+								unsaved: false
+							})
+						)?;
+					}
+				}
 
-											let current = to_value(
-												current
-													.iter()
-													.map(|x| {
-														(
-															x.data
-																.get("Id")
-																.expect("Unlockable did not have Id")
-																.as_str()
-																.expect("Id was not string")
-																.to_owned(),
-															{
-																let mut y = IndexMap::new();
-																y.insert("Guid".into(), to_value(x.id).unwrap());
-																y.extend(
-																	x.data
-																		.iter()
-																		.filter(|(key, _)| *key != "Id")
-																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
-																);
-																y
-															}
-														)
-													})
-													.collect::<IndexMap<String, IndexMap<String, Value>>>()
-											)?;
+				finish_task(&app, task)?;
+			}
 
-											let patch = json_patch::diff(&base, &current);
+			GlobalEvent::UploadLogAndReport(error) => {
+				let log_contents = fs::read_to_string(
+					app.path()
+						.app_log_dir()
+						.context("Couldn't get log dir")?
+						.join("GlacierKit.log")
+				)
+				.context("Couldn't read log file")?;
 
-											serde_json::to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
-										}
+				if let Ok(res) = reqwest::Client::new()
+					.post(UPLOAD_LOG_ENDPOINT)
+					.json(&json!({
+						"content": log_contents
+					}))
+					.send()
+					.await
+					.and_then(|x| x.error_for_status())
+				{
+					let log_url = res.text().await.context("Couldn't decode log upload response")?;
+					app.track_event("Error with log", Some(json!({ "error": error, "log": log_url })))
+						.unwrap();
+				} else {
+					send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
+				}
+			}
 
-										JsonPatchType::JsonPatch => {
-											let base = to_value(
-												base.iter()
-													.map(|x| {
-														(
-															x.data
-																.get("Id")
-																.expect("Unlockable did not have Id")
-																.as_str()
-																.expect("Id was not string")
-																.to_owned(),
-															{
-																let mut y = IndexMap::new();
-																y.insert("Guid".into(), to_value(x.id).unwrap());
-																y.extend(
-																	x.data
-																		.iter()
-																		.filter(|(key, _)| *key != "Id")
-																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
-																);
-																y
-															}
-														)
-													})
-													.collect::<IndexMap<String, IndexMap<String, Value>>>()
-											)?;
+			GlobalEvent::UploadLastPanic => {
+				let last_panic = fs::read_to_string(
+					app.path()
+						.app_log_dir()
+						.context("Couldn't get log dir")?
+						.join("..")
+						.join("last_panic.txt")
+				)
+				.context("Couldn't read panic report")?;
 
-											let current = to_value(
-												current
-													.iter()
-													.map(|x| {
-														(
-															x.data
-																.get("Id")
-																.expect("Unlockable did not have Id")
-																.as_str()
-																.expect("Id was not string")
-																.to_owned(),
-															{
-																let mut y = IndexMap::new();
-																y.insert("Guid".into(), to_value(x.id).unwrap());
-																y.extend(
-																	x.data
-																		.iter()
-																		.filter(|(key, _)| *key != "Id")
-																		.map(|(x, y)| (x.to_owned(), y.to_owned()))
-																);
-																y
-															}
-														)
-													})
-													.collect::<IndexMap<String, IndexMap<String, Value>>>()
-											)?;
+				if let Ok(res) = reqwest::Client::new()
+					.post(UPLOAD_LOG_ENDPOINT)
+					.json(&json!({
+						"content": last_panic
+					}))
+					.send()
+					.await
+					.and_then(|x| x.error_for_status())
+				{
+					let report_url = res.text().await.context("Couldn't decode report upload response")?;
+					app.track_event("Panic report", Some(json!({ "report": report_url })))
+						.unwrap();
+				} else {
+					send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
+				}
 
-											if let Some(file) = editor.file.as_ref() {
-												send_request(
-													&app,
-													Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-														base,
-														current,
-														save_path: file.to_owned(),
-														file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
-													})
-												)?;
+				fs::rename(
+					app.path()
+						.app_log_dir()
+						.context("Couldn't get log dir")?
+						.join("..")
+						.join("last_panic.txt"),
+					app.path()
+						.app_log_dir()
+						.context("Couldn't get log dir")?
+						.join("..")
+						.join(format!("panic_{}.txt", rand::random::<u32>()))
+				)?;
+			}
 
-												send_request(
-													&app,
-													Request::Global(GlobalRequest::SetTabUnsaved {
-														id: tab,
-														unsaved: false
-													})
-												)?;
-											} else {
-												let mut dialog = app.dialog().file().set_title("Save file");
+			GlobalEvent::ClearLastPanic => {
+				fs::rename(
+					app.path()
+						.app_log_dir()
+						.context("Couldn't get log dir")?
+						.join("..")
+						.join("last_panic.txt"),
+					app.path()
+						.app_log_dir()
+						.context("Couldn't get log dir")?
+						.join("..")
+						.join(format!("panic_{}.txt", rand::random::<u32>()))
+				)?;
+			}
+		},
 
-												if let Some(project) = app_state.project.load().as_ref() {
-													dialog = dialog.set_directory(&project.path);
-												}
+		Event::EditorConnection(event) => match event {
+			EditorConnectionEvent::EntitySelected(id, tblu) => {
+				for editor in app.state::<AppState>().editor_states.iter() {
+					let entity = match editor.data {
+						EditorData::QNEntity { ref entity, .. } => entity,
+						EditorData::QNPatch { ref current, .. } => current,
 
-												if let Some(path) = dialog
-													.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
-													.blocking_save_file()
-												{
-													editor.file =
-														Some(path.as_path().context("Invalid path")?.to_owned());
+						_ => continue
+					};
 
-													send_request(
-														&app,
-														Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-															base,
-															current,
-															save_path: path
-																.as_path()
-																.context("Invalid path")?
-																.to_owned(),
-															file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
-														})
-													)?;
-
-													send_request(
-														&app,
-														Request::Global(GlobalRequest::SetTabUnsaved {
-															id: tab,
-															unsaved: false
-														})
-													)?;
-												}
-											}
-
-											finish_task(&app, task)?;
-
-											return;
-										}
-									}
+					if entity.blueprint == tblu.0 {
+						send_request(
+							&app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+								EntityTreeRequest::Select {
+									editor_id: editor.key().to_owned(),
+									id: entity.entities.contains_key(&id).then_some(id.to_owned())
 								}
-							};
+							)))
+						)?;
+					}
+				}
+			}
 
-							if let Some(file) = editor.file.as_ref() {
-								fs::write(file, data_to_save).context("Couldn't write file")?;
+			EditorConnectionEvent::EntityTransformUpdated(id, tblu, transform) => {
+				let mut qn_editors = vec![];
+				for editor in app_state.editor_states.iter() {
+					if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+						qn_editors.push(editor.key().to_owned());
+					}
+				}
 
-								send_request(
-									&app,
-									Request::Global(GlobalRequest::SetTabUnsaved {
-										id: tab,
-										unsaved: false
-									})
-								)?;
-							} else {
-								let mut dialog = app.dialog().file().set_title("Save file");
+				for editor_id in qn_editors {
+					let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+					let entity = match editor_state.data {
+						EditorData::QNEntity { ref mut entity, .. } => entity,
+						EditorData::QNPatch { ref mut current, .. } => current,
 
-								if let Some(project) = app_state.project.load().as_ref() {
-									dialog = dialog.set_directory(&project.path);
-								}
+						_ => continue
+					};
 
-								if let Some(path) = dialog
-									.add_filter(
-										match &editor.data {
-											EditorData::Nil => {
-												Err(anyhow!("Editor is a nil editor"))?;
-												panic!();
-											}
-
-											EditorData::ResourceOverview { .. } => {
-												Err(anyhow!("Editor is a resource overview"))?;
-												panic!();
-											}
-
-											EditorData::ContentSearchResults { .. } => {
-												Err(anyhow!("Editor is a content search results page"))?;
-												panic!();
-											}
-
-											EditorData::Text {
-												file_type: TextFileType::PlainText,
-												..
-											} => "Text file",
-
-											EditorData::Text {
-												file_type: TextFileType::Markdown,
-												..
-											} => "Markdown file",
-
-											EditorData::Text {
-												file_type: TextFileType::Json | TextFileType::ManifestJson,
-												..
-											} => "JSON file",
-
-											EditorData::QNEntity { .. } => "QuickEntity entity",
-
-											EditorData::QNPatch { .. } => "QuickEntity patch",
-
-											EditorData::RepositoryPatch { patch_type, .. } => match patch_type {
-												JsonPatchType::MergePatch => "Repository merge patch",
-												JsonPatchType::JsonPatch => "Repository JSON patch"
-											},
-
-											EditorData::UnlockablesPatch { patch_type, .. } => match patch_type {
-												JsonPatchType::MergePatch => "Unlockables merge patch",
-												JsonPatchType::JsonPatch => "Unlockables JSON patch"
-											}
-										},
-										&[match &editor.data {
-											EditorData::Nil => {
-												Err(anyhow!("Editor is a nil editor"))?;
-												panic!();
-											}
-
-											EditorData::ResourceOverview { .. } => {
-												Err(anyhow!("Editor is a resource overview"))?;
-												panic!();
-											}
-
-											EditorData::ContentSearchResults { .. } => {
-												Err(anyhow!("Editor is a content search results page"))?;
-												panic!();
-											}
-
-											EditorData::Text {
-												file_type: TextFileType::PlainText,
-												..
-											} => "txt",
-
-											EditorData::Text {
-												file_type: TextFileType::Markdown,
-												..
-											} => "md",
-
-											EditorData::Text {
-												file_type: TextFileType::Json | TextFileType::ManifestJson,
-												..
-											} => "json",
-
-											EditorData::QNEntity { .. } => "entity.json",
-
-											EditorData::QNPatch { .. } => "entity.patch.json",
-
-											EditorData::RepositoryPatch { patch_type, .. } => match patch_type {
-												JsonPatchType::MergePatch => "repository.json",
-												JsonPatchType::JsonPatch => "JSON.patch.json"
-											},
-
-											EditorData::UnlockablesPatch { patch_type, .. } => match patch_type {
-												JsonPatchType::MergePatch => "unlockables.json",
-												JsonPatchType::JsonPatch => "JSON.patch.json"
-											}
-										}]
-									)
-									.blocking_save_file()
-								{
-									editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
-
-									fs::write(&path.as_path().context("Invalid path")?, data_to_save)
-										.context("Couldn't write file")?;
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: tab,
-											unsaved: false
-										})
-									)?;
-								}
+					if entity.blueprint == tblu.0
+						&& let Some(sub_entity) = entity.entities.get_mut(&id)
+					{
+						sub_entity.properties.insert(
+							"m_mTransform".into(),
+							Property {
+								value: Variant::Transform(transform.to_owned()),
+								post_init: false
 							}
+						);
 
-							finish_task(&app, task)?;
-						}
+						send_request(
+							&app,
+							Request::Global(GlobalRequest::SetTabUnsaved {
+								id: editor_id.to_owned(),
+								unsaved: true
+							})
+						)?;
 
-						GlobalEvent::UploadLogAndReport(error) => {
-							let log_contents = fs::read_to_string(
-								app.path()
-									.app_log_dir()
-									.context("Couldn't get log dir")?
-									.join("GlacierKit.log")
-							)
-							.context("Couldn't read log file")?;
+						let mut buf = Vec::new();
+						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							if let Ok(res) = reqwest::Client::new()
-								.post(UPLOAD_LOG_ENDPOINT)
-								.json(&json!({
-									"content": log_contents
-								}))
-								.send()
-								.await
-								.and_then(|x| x.error_for_status())
-							{
-								let log_url = res.text().await.context("Couldn't decode log upload response")?;
-								app.track_event("Error with log", Some(json!({ "error": error, "log": log_url })))
-									.unwrap();
-							} else {
-								send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
-							}
-						}
+						entity
+							.entities
+							.get(&id)
+							.context("No such entity")?
+							.serialize(&mut ser)?;
 
-						GlobalEvent::UploadLastPanic => {
-							let last_panic = fs::read_to_string(
-								app.path()
-									.app_log_dir()
-									.context("Couldn't get log dir")?
-									.join("..")
-									.join("last_panic.txt")
-							)
-							.context("Couldn't read panic report")?;
+						send_request(
+							&app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+								EntityMonacoRequest::ReplaceContentIfSameEntityID {
+									editor_id: editor_id.to_owned(),
+									entity_id: id.to_owned(),
+									content: String::from_utf8(buf)?
+								}
+							)))
+						)?;
 
-							if let Ok(res) = reqwest::Client::new()
-								.post(UPLOAD_LOG_ENDPOINT)
-								.json(&json!({
-									"content": last_panic
-								}))
-								.send()
-								.await
-								.and_then(|x| x.error_for_status())
-							{
-								let report_url = res.text().await.context("Couldn't decode report upload response")?;
-								app.track_event("Panic report", Some(json!({ "report": report_url })))
-									.unwrap();
-							} else {
-								send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
-							}
-
-							fs::rename(
-								app.path()
-									.app_log_dir()
-									.context("Couldn't get log dir")?
-									.join("..")
-									.join("last_panic.txt"),
-								app.path()
-									.app_log_dir()
-									.context("Couldn't get log dir")?
-									.join("..")
-									.join(format!("panic_{}.txt", rng().random::<u32>()))
+						if let EditorData::QNPatch {
+							ref base, ref current, ..
+						} = editor_state.data
+						{
+							send_request(
+								&app,
+								Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
+									let (new, modified, removed) = get_diff_info(base, current);
+									EntityTreeRequest::SetDiffInfo {
+										editor_id,
+										new,
+										modified,
+										removed
+									}
+								})))
 							)?;
-						}
-
-						GlobalEvent::ClearLastPanic => {
-							fs::rename(
-								app.path()
-									.app_log_dir()
-									.context("Couldn't get log dir")?
-									.join("..")
-									.join("last_panic.txt"),
-								app.path()
-									.app_log_dir()
-									.context("Couldn't get log dir")?
-									.join("..")
-									.join(format!("panic_{}.txt", rng().random::<u32>()))
-							)?;
-						}
-					},
-
-					Event::EditorConnection(event) => match event {
-						EditorConnectionEvent::EntitySelected(id, tblu) => {
-							for editor in app.state::<AppState>().editor_states.iter() {
-								let entity = match editor.data {
-									EditorData::QNEntity { ref entity, .. } => entity,
-									EditorData::QNPatch { ref current, .. } => current,
-
-									_ => continue
-								};
-
-								if entity.blueprint_hash == tblu {
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-											EntityTreeRequest::Select {
-												editor_id: editor.key().to_owned(),
-												id: entity.entities.contains_key(&id).then_some(id.to_owned())
-											}
-										)))
-									)?;
-								}
-							}
-						}
-
-						EditorConnectionEvent::EntityTransformUpdated(id, tblu, transform) => {
-							let mut qn_editors = vec![];
-							for editor in app_state.editor_states.iter() {
-								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-									qn_editors.push(editor.key().to_owned());
-								}
-							}
-
-							for editor_id in qn_editors {
-								let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
-								let entity = match editor_state.data {
-									EditorData::QNEntity { ref mut entity, .. } => entity,
-									EditorData::QNPatch { ref mut current, .. } => current,
-
-									_ => continue
-								};
-
-								if entity.blueprint_hash == tblu
-									&& let Some(sub_entity) = entity.entities.get_mut(&id)
-								{
-									sub_entity.properties.get_or_insert_default().insert(
-										"m_mTransform".into(),
-										Property {
-											property_type: "SMatrix43".into(),
-											value: to_value(&transform)?,
-											post_init: None
-										}
-									);
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id.to_owned(),
-											unsaved: true
-										})
-									)?;
-
-									let mut buf = Vec::new();
-									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-									entity
-										.entities
-										.get(&id)
-										.context("No such entity")?
-										.serialize(&mut ser)?;
-
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-											EntityMonacoRequest::ReplaceContentIfSameEntityID {
-												editor_id: editor_id.to_owned(),
-												entity_id: id.to_owned(),
-												content: String::from_utf8(buf)?
-											}
-										)))
-									)?;
-
-									if let EditorData::QNPatch {
-										ref base, ref current, ..
-									} = editor_state.data
-									{
-										send_request(
-											&app,
-											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-												EntityTreeRequest::SetDiffInfo {
-													editor_id,
-													diff_info: get_diff_info(base, current)
-												}
-											)))
-										)?;
-									}
-								}
-							}
-						}
-
-						EditorConnectionEvent::EntityPropertyChanged(
-							id,
-							tblu,
-							property_name,
-							property_type,
-							property_value
-						) => {
-							let mut qn_editors = vec![];
-							for editor in app_state.editor_states.iter() {
-								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-									qn_editors.push(editor.key().to_owned());
-								}
-							}
-
-							for editor_id in qn_editors {
-								let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
-								let entity = match editor_state.data {
-									EditorData::QNEntity { ref mut entity, .. } => entity,
-									EditorData::QNPatch { ref mut current, .. } => current,
-
-									_ => continue
-								};
-
-								if entity.blueprint_hash == tblu && entity.entities.contains_key(&id) {
-									let post_init = if let Some(intellisense) = app_state.intellisense.load().as_ref()
-										&& let Some(game_files) = app_state.game_files.load().as_ref()
-										&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-										&& let Some(install) = app_settings.load().game_install.as_ref()
-									{
-										if let Some((_, _, _, post_init)) = intellisense
-											.get_properties(
-												game_files,
-												&app_state.cached_entities,
-												hash_list,
-												get_loaded_game_version(&app, install)?,
-												entity,
-												&id,
-												true
-											)?
-											.into_iter()
-											.find(|(name, _, _, _)| *name == property_name)
-										{
-											post_init.then_some(true)
-										} else {
-											None
-										}
-									} else {
-										None
-									};
-
-									let Some(sub_entity) = entity.entities.get_mut(&id) else {
-										unreachable!();
-									};
-
-									sub_entity.properties.get_or_insert_default().insert(
-										property_name.to_owned(),
-										Property {
-											property_type: property_type.to_owned(),
-											value: property_value.to_owned(),
-											post_init
-										}
-									);
-
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: editor_id.to_owned(),
-											unsaved: true
-										})
-									)?;
-
-									let mut buf = Vec::new();
-									let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-									let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-									entity
-										.entities
-										.get(&id)
-										.context("No such entity")?
-										.serialize(&mut ser)?;
-
-									send_request(
-										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-											EntityMonacoRequest::ReplaceContentIfSameEntityID {
-												editor_id: editor_id.to_owned(),
-												entity_id: id.to_owned(),
-												content: String::from_utf8(buf)?
-											}
-										)))
-									)?;
-
-									if let EditorData::QNPatch {
-										ref base, ref current, ..
-									} = editor_state.data
-									{
-										send_request(
-											&app,
-											Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-												EntityTreeRequest::SetDiffInfo {
-													editor_id,
-													diff_info: get_diff_info(base, current)
-												}
-											)))
-										)?;
-									}
-								}
-							}
 						}
 					}
 				}
-			} {
+			}
+
+			EditorConnectionEvent::EntityPropertyChanged(id, tblu, property_name, property_value) => {
+				let mut qn_editors = vec![];
+				for editor in app_state.editor_states.iter() {
+					if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+						qn_editors.push(editor.key().to_owned());
+					}
+				}
+
+				for editor_id in qn_editors {
+					let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+					let entity = match editor_state.data {
+						EditorData::QNEntity { ref mut entity, .. } => entity,
+						EditorData::QNPatch { ref mut current, .. } => current,
+
+						_ => continue
+					};
+
+					if entity.blueprint == tblu.0 && entity.entities.contains_key(&id) {
+						let post_init = if let Some(intellisense) = app_state.intellisense.load().as_ref()
+							&& let Some(game_files) = app_state.game_files.load().as_ref()
+							&& let Some(install) = app_settings.load().game_install.as_ref()
+						{
+							if let Some((_, _, post_init)) = intellisense
+								.get_properties(
+									game_files,
+									&app_state.cached_entities,
+									get_loaded_game_version(&app, install)?,
+									entity,
+									id,
+									true
+								)?
+								.into_iter()
+								.find(|(name, _, _)| *name == property_name)
+							{
+								post_init
+							} else {
+								false
+							}
+						} else {
+							false
+						};
+
+						let Some(sub_entity) = entity.entities.get_mut(&id) else {
+							unreachable!();
+						};
+
+						sub_entity.properties.insert(
+							property_name.to_owned().into(),
+							Property {
+								value: property_value.to_owned(),
+								post_init
+							}
+						);
+
+						send_request(
+							&app,
+							Request::Global(GlobalRequest::SetTabUnsaved {
+								id: editor_id.to_owned(),
+								unsaved: true
+							})
+						)?;
+
+						let mut buf = Vec::new();
+						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+						entity
+							.entities
+							.get(&id)
+							.context("No such entity")?
+							.serialize(&mut ser)?;
+
+						send_request(
+							&app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+								EntityMonacoRequest::ReplaceContentIfSameEntityID {
+									editor_id: editor_id.to_owned(),
+									entity_id: id.to_owned(),
+									content: String::from_utf8(buf)?
+								}
+							)))
+						)?;
+
+						if let EditorData::QNPatch {
+							ref base, ref current, ..
+						} = editor_state.data
+						{
+							send_request(
+								&app,
+								Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
+									let (new, modified, removed) = get_diff_info(base, current);
+									EntityTreeRequest::SetDiffInfo {
+										editor_id,
+										new,
+										modified,
+										removed
+									}
+								})))
+							)?;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+#[tauri::command]
+#[specta::specta]
+fn event(app: AppHandle, event: Event) {
+	async_runtime::spawn(async move {
+		trace!("Handling event: {:?}", event);
+
+		let cloned_app = app.clone();
+
+		if let Err(e) = async_runtime::spawn(async move {
+			if let Err::<_, Error>(e) = handle_event_logic(app.clone(), event).await {
 				send_request(
 					&app,
 					Request::Global(GlobalRequest::ErrorReport {

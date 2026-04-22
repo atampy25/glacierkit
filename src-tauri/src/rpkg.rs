@@ -2,25 +2,17 @@ use anyhow::{Context, Result, anyhow, bail};
 use dashmap::{DashMap, mapref::one::Ref};
 use hitman_commons::{
 	game::GameVersion,
-	hash_list::HashList,
-	metadata::{ExtendedResourceMetadata, ResourceType, RuntimeID},
-	rpkg_tool::RpkgResourceMeta
+	metadata::{ExtendedResourceMetadata, ReferenceFlags, ResourceReference, ResourceType, RuntimeID}
 };
 use itertools::Itertools;
-use quickentity_rs::{convert_to_qn, qn_structs::Entity};
+use quickentity_rs::{convert_to_qn, entity::Entity};
 use rpkg_rs::resource::{
-	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_package::ResourceReferenceFlags,
-	resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
+	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_partition::PatchId,
+	runtime_resource_id::RuntimeResourceID
 };
-use tryvial::try_fn;
+use tryvial::{try_block, try_fn};
 
-use crate::{
-	model::{ResourceChangelogEntry, ResourceChangelogOperation},
-	resourcelib::{
-		h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
-		h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory
-	}
-};
+use crate::model::{ResourceChangelogEntry, ResourceChangelogOperation};
 
 /// Extract the latest copy of a resource.
 pub fn extract_latest_resource(
@@ -75,7 +67,7 @@ pub fn extract_latest_metadata(
 pub fn extract_latest_overview_info(
 	game_files: &PartitionManager,
 	resource: impl Into<RuntimeID>
-) -> Result<(ResourceType, String, Vec<(RuntimeID, String)>)> {
+) -> Result<(ResourceType, String, Vec<ResourceReference>)> {
 	let resource_id = RuntimeResourceID::from(resource.into());
 
 	for partition in &game_files.partitions {
@@ -100,16 +92,10 @@ pub fn extract_latest_overview_info(
 				info.references()
 					.iter()
 					.map(|(res_id, flag)| {
-						Ok((
-							(*res_id).try_into()?,
-							format!(
-								"{:02X}",
-								match flag {
-									ResourceReferenceFlags::Legacy(x) => x.into_bits(),
-									ResourceReferenceFlags::Standard(x) => x.into_bits()
-								}
-							)
-						))
+						Ok(ResourceReference {
+							resource: res_id.try_into()?,
+							flags: ReferenceFlags::from_any(flag.as_byte())
+						})
 					})
 					.collect::<Result<_>>()
 					.with_context(|| format!("Couldn't extract overview info for resource {resource_id}"))?
@@ -126,7 +112,6 @@ pub fn extract_entity<'a>(
 	resource_packages: &PartitionManager,
 	cached_entities: &'a DashMap<RuntimeID, Entity>,
 	game_version: GameVersion,
-	hash_list: &HashList,
 	factory_id: impl Into<RuntimeID>
 ) -> Result<Ref<'a, RuntimeID, Entity>> {
 	let runtime_id = factory_id.into();
@@ -137,7 +122,7 @@ pub fn extract_entity<'a>(
 		}
 	}
 
-	let x: Result<_> = try {
+	let x: Result<_> = try_block! {
 		let (temp_meta, temp_data) =
 			extract_latest_resource(resource_packages, runtime_id).context("Couldn't extract TEMP")?;
 
@@ -146,18 +131,17 @@ pub fn extract_entity<'a>(
 		}
 
 		let factory = match game_version {
-			GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
-				.context("Couldn't convert binary data to ResourceLib factory")?
-				.into_modern(),
+			GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
+				.context("Couldn't deserialise factory")?.try_into()?,
 
-			GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
-				.context("Couldn't convert binary data to ResourceLib factory")?,
+			GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
+				.context("Couldn't deserialise factory")?.try_into()?,
 
-			GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
-				.context("Couldn't convert binary data to ResourceLib factory")?
+			GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
+				.context("Couldn't deserialise factory")?
 		};
 
-		let blueprint_id = &temp_meta
+		let blueprint_id = temp_meta
 			.core_info
 			.references
 			.get(factory.blueprint_index_in_resource_header as usize)
@@ -165,25 +149,24 @@ pub fn extract_entity<'a>(
 			.resource;
 
 		let (tblu_meta, tblu_data) =
-			extract_latest_resource(resource_packages, blueprint_id.get_id()).context("Couldn't extract TBLU")?;
+			extract_latest_resource(resource_packages, blueprint_id).context("Couldn't extract TBLU")?;
 
 		let blueprint = match game_version {
-			GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)
-				.context("Couldn't convert binary data to ResourceLib blueprint")?
-				.into_modern(),
+			GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
+				.context("Couldn't deserialise blueprint")?.try_into()?,
 
-			GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
-				.context("Couldn't convert binary data to ResourceLib blueprint")?,
+			GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
+				.context("Couldn't deserialise blueprint")?.try_into()?,
 
-			GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data)
-				.context("Couldn't convert binary data to ResourceLib blueprint")?
+			GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
+				.context("Couldn't deserialise blueprint")?
 		};
 
 		let entity = convert_to_qn(
 			&factory,
-			&RpkgResourceMeta::from_resource_metadata(temp_meta, false).with_hash_list(&hash_list.entries)?,
+			&temp_meta.core_info,
 			&blueprint,
-			&RpkgResourceMeta::from_resource_metadata(tblu_meta, false).with_hash_list(&hash_list.entries)?,
+			&tblu_meta.core_info,
 			false
 		)
 		.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
@@ -214,7 +197,7 @@ pub fn extract_resource_changelog(
 		let occurrences = changes
 			.clone()
 			.into_iter()
-			.chain(deletions.clone().into_iter())
+			.chain(deletions.clone())
 			.collect::<Vec<PatchId>>();
 
 		for occurence in occurrences.iter().sorted() {

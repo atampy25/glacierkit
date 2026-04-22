@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EntityMetadataRequest, SubType } from "$lib/bindings-types"
+	import type { EntityMetadataRequest, SubType } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import { TextInput, Dropdown } from "carbon-components-svelte"
 	import { onMount } from "svelte"
@@ -9,8 +9,8 @@
 
 	export let editorID: string
 
-	let factoryHash = ""
-	let blueprintHash = ""
+	let factory = ""
+	let blueprint = ""
 	let rootEntity = ""
 	let subType: SubType = "scene"
 	let externalScenes: string[] = []
@@ -22,19 +22,19 @@
 
 		switch (request.type) {
 			case "initialise":
-				factoryHash = request.data.factory_hash
-				blueprintHash = request.data.blueprint_hash
+				factory = request.data.factory
+				blueprint = request.data.blueprint
 				rootEntity = request.data.root_entity
 				subType = request.data.sub_type
 				externalScenes = request.data.external_scenes
 				break
 
-			case "setFactoryHash":
-				factoryHash = request.data.factory_hash
+			case "setFactory":
+				factory = request.data.factory
 				break
 
-			case "setBlueprintHash":
-				blueprintHash = request.data.blueprint_hash
+			case "setBlueprint":
+				blueprint = request.data.blueprint
 				break
 
 			case "setHashModificationAllowed":
@@ -79,10 +79,10 @@
 				data: {
 					type: "metadata",
 					data: {
-						type: "setFactoryHash",
+						type: "setFactory",
 						data: {
 							editor_id: editorID,
-							factory_hash: _event.detail
+							factory: _event.detail
 						}
 					}
 				}
@@ -100,10 +100,10 @@
 				data: {
 					type: "metadata",
 					data: {
-						type: "setBlueprintHash",
+						type: "setBlueprint",
 						data: {
 							editor_id: editorID,
-							blueprint_hash: _event.detail
+							blueprint: _event.detail
 						}
 					}
 				}
@@ -134,26 +134,10 @@
 </script>
 
 <div class="h-full w-full overflow-y-auto" use:help={{ title: "Metadata", description: "This view lets you see and edit the metadata of an entity." }}>
-	<TextInput
-		bind:value={factoryHash}
-		placeholder="A hash, or a path that will be auto-converted into a hash"
-		labelText="Factory hash"
-		helperText={customPaths.find((a) => ("00" + md5(a.toLowerCase()).slice(2, 16)).toUpperCase() === factoryHash)}
-		on:change={factoryHashInput}
-		disabled={!hashModificationAllowed}
-		class="code-font"
-	/>
+	<TextInput bind:value={factory} placeholder="A hash or path" labelText="Factory" on:change={factoryHashInput} disabled={!hashModificationAllowed} class="code-font" />
 
 	<div class="my-4">
-		<TextInput
-			bind:value={blueprintHash}
-			placeholder="A hash, or a path that will be auto-converted into a hash"
-			labelText="Blueprint hash"
-			helperText={customPaths.find((a) => ("00" + md5(a.toLowerCase()).slice(2, 16)).toUpperCase() === blueprintHash)}
-			on:change={blueprintHashInput}
-			disabled={!hashModificationAllowed}
-			class="code-font"
-		/>
+		<TextInput bind:value={blueprint} placeholder="A hash or path" labelText="Blueprint" on:change={blueprintHashInput} disabled={!hashModificationAllowed} class="code-font" />
 	</div>
 
 	<div class="grid grid-cols-2 gap-2">

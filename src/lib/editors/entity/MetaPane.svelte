@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EntityMetaPaneRequest, ReverseReference } from "$lib/bindings-types"
+	import type { EntityMetaPaneRequest, ReverseReference } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import { ClickableTile, TextArea } from "carbon-components-svelte"
 	import { debounce } from "lodash"
@@ -11,7 +11,7 @@
 	let reverseRefs: ReverseReference[] = []
 	let notesEntityID: string | null = null
 	let notes = ""
-	let entityNames: Record<string, string> = {}
+	let entityNames: Record<string, string | undefined> = {}
 
 	export async function handleRequest(request: EntityMetaPaneRequest) {
 		console.log(`Meta pane for editor ${editorID} handling request`, request)

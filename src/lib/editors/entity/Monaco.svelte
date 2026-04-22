@@ -4,7 +4,7 @@
 	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import baseSchema from "./schema.json"
-	import type { EditorValidity, EntityMonacoRequest, JsonValue } from "$lib/bindings-types"
+	import type { EditorValidity, EntityMonacoRequest, JsonValue } from "$lib/bindings"
 	import { cloneDeep, debounce, merge } from "lodash"
 	import propertyTypeSchemas from "./property-type-schemas.json"
 	import enums from "./enums.json"
@@ -34,97 +34,18 @@
 
 	let editorConnected = false
 
-	const baseIntellisenseSchema = merge(cloneDeep(baseSchema), {
-		$ref: "#/definitions/SubEntity",
-		definitions: {
-			SubEntity: {
-				properties: {
+	const baseIntellisenseSchema = merge(
+		{ $defs: cloneDeep(baseSchema.$defs) },
+		{
+			$ref: "#/$defs/SubEntity",
+			$defs: {
+				SubEntity: {
 					properties: {
-						additionalProperties: {
-							anyOf: [
-								...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: propType
-											},
-											value: valSchema
-										},
-										...(Object.hasOwn(valSchema, "default")
-											? {
-													default: {
-														type: propType,
-														value: valSchema.default
-													}
-												}
-											: {})
-									})
-								}),
-								...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: `TArray<${propType}>`
-											},
-											value: { type: "array", items: valSchema }
-										},
-										...(Object.hasOwn(valSchema, "default")
-											? {
-													default: {
-														type: `TArray<${propType}>`,
-														value: [valSchema.default]
-													}
-												}
-											: {})
-									})
-								}),
-								...Object.entries(enums).map(([propType, possibleValues]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: propType
-											},
-											value: {
-												enum: possibleValues
-											}
-										},
-										default: {
-											type: propType,
-											value: possibleValues[0]
-										}
-									})
-								}),
-								...Object.entries(enums).map(([propType, possibleValues]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: `TArray<${propType}>`
-											},
-											value: {
-												type: "array",
-												items: {
-													enum: possibleValues
-												}
-											}
-										},
-										default: {
-											type: `TArray<${propType}>`,
-											value: [possibleValues[0]]
-										}
-									})
-								}),
-								{
-									$ref: "#/definitions/Property"
-								}
-							]
-						}
-					},
-					platformSpecificProperties: {
-						additionalProperties: {
+						properties: {
 							additionalProperties: {
 								anyOf: [
 									...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
-										return merge(cloneDeep(baseSchema.definitions.Property), {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
 											properties: {
 												type: {
 													const: propType
@@ -142,7 +63,7 @@
 										})
 									}),
 									...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
-										return merge(cloneDeep(baseSchema.definitions.Property), {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
 											properties: {
 												type: {
 													const: `TArray<${propType}>`
@@ -160,7 +81,7 @@
 										})
 									}),
 									...Object.entries(enums).map(([propType, possibleValues]) => {
-										return merge(cloneDeep(baseSchema.definitions.Property), {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
 											properties: {
 												type: {
 													const: propType
@@ -176,7 +97,7 @@
 										})
 									}),
 									...Object.entries(enums).map(([propType, possibleValues]) => {
-										return merge(cloneDeep(baseSchema.definitions.Property), {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
 											properties: {
 												type: {
 													const: `TArray<${propType}>`
@@ -193,18 +114,96 @@
 												value: [possibleValues[0]]
 											}
 										})
-									}),
-									{
-										$ref: "#/definitions/Property"
-									}
-								]
+									})
+								],
+								$ref: null
+							}
+						},
+						platformSpecificProperties: {
+							additionalProperties: {
+								additionalProperties: {
+									anyOf: [
+										...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
+											return merge(cloneDeep(baseSchema.$defs.Property), {
+												properties: {
+													type: {
+														const: propType
+													},
+													value: valSchema
+												},
+												...(Object.hasOwn(valSchema, "default")
+													? {
+															default: {
+																type: propType,
+																value: valSchema.default
+															}
+														}
+													: {})
+											})
+										}),
+										...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
+											return merge(cloneDeep(baseSchema.$defs.Property), {
+												properties: {
+													type: {
+														const: `TArray<${propType}>`
+													},
+													value: { type: "array", items: valSchema }
+												},
+												...(Object.hasOwn(valSchema, "default")
+													? {
+															default: {
+																type: `TArray<${propType}>`,
+																value: [valSchema.default]
+															}
+														}
+													: {})
+											})
+										}),
+										...Object.entries(enums).map(([propType, possibleValues]) => {
+											return merge(cloneDeep(baseSchema.$defs.Property), {
+												properties: {
+													type: {
+														const: propType
+													},
+													value: {
+														enum: possibleValues
+													}
+												},
+												default: {
+													type: propType,
+													value: possibleValues[0]
+												}
+											})
+										}),
+										...Object.entries(enums).map(([propType, possibleValues]) => {
+											return merge(cloneDeep(baseSchema.$defs.Property), {
+												properties: {
+													type: {
+														const: `TArray<${propType}>`
+													},
+													value: {
+														type: "array",
+														items: {
+															enum: possibleValues
+														}
+													}
+												},
+												default: {
+													type: `TArray<${propType}>`,
+													value: [possibleValues[0]]
+												}
+											})
+										})
+									],
+									$ref: null
+								}
 							}
 						}
 					}
 				}
 			}
 		}
-	})
+	)
 
 	onDestroy(() => {
 		destroyFunc.run()
@@ -446,7 +445,7 @@
 		})
 	})
 
-	function updateIntellisense(data: { properties: [string, string, JsonValue, boolean][]; pins: [string[], string[]] }) {
+	function updateIntellisense(data: { properties: [string, { type: string; value: JsonValue }, boolean][]; inputPins: string[]; outputPins: string[] }) {
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			...monaco.languages.json.jsonDefaults.diagnosticsOptions,
 			schemas: [
@@ -455,12 +454,12 @@
 					uri: `monaco-schema://qn-subentity-${editorID}`,
 					fileMatch: [`*subentity-${editorID}*`],
 					schema: merge(cloneDeep(baseIntellisenseSchema), {
-						definitions: {
+						$defs: {
 							SubEntity: {
 								properties: {
 									properties: {
 										properties: Object.fromEntries(
-											data.properties.map(([name, type, defaultValue, postInit]) => {
+											data.properties.map(([name, { type, value }, postInit]) => {
 												return [
 													name,
 													{
@@ -477,7 +476,7 @@
 																		: (propertyTypeSchemas as Record<string, any>)[type] || {}
 																),
 																{
-																	default: defaultValue
+																	default: value
 																}
 															),
 															postInit: {
@@ -488,7 +487,7 @@
 														required: ["type", "value"],
 														default: {
 															type,
-															value: defaultValue,
+															value,
 															postInit: postInit || undefined
 														}
 													}
@@ -498,14 +497,14 @@
 									},
 									events: {
 										properties: Object.fromEntries(
-											data.pins[1].map((a) => [
+											data.outputPins.map((a) => [
 												a,
 												{
 													type: "object",
 													additionalProperties: {
 														type: "array",
 														items: {
-															$ref: "#/definitions/RefMaybeConstantValue"
+															$ref: "#/$defs/PinConnection"
 														}
 													}
 												}
@@ -514,14 +513,14 @@
 									},
 									inputCopying: {
 										properties: Object.fromEntries(
-											data.pins[0].map((a) => [
+											data.inputPins.map((a) => [
 												a,
 												{
 													type: "object",
 													additionalProperties: {
 														type: "array",
 														items: {
-															$ref: "#/definitions/RefMaybeConstantValue"
+															$ref: "#/$defs/LocalPinConnection"
 														}
 													}
 												}
@@ -530,14 +529,14 @@
 									},
 									outputCopying: {
 										properties: Object.fromEntries(
-											data.pins[1].map((a) => [
+											data.outputPins.map((a) => [
 												a,
 												{
 													type: "object",
 													additionalProperties: {
 														type: "array",
 														items: {
-															$ref: "#/definitions/RefMaybeConstantValue"
+															$ref: "#/$defs/LocalPinConnection"
 														}
 													}
 												}
@@ -626,7 +625,8 @@
 				if (request.data.entity_id === entityID) {
 					updateIntellisense({
 						properties: request.data.properties,
-						pins: request.data.pins
+						inputPins: request.data.input_pins,
+						outputPins: request.data.output_pins
 					})
 				}
 				break

@@ -6,17 +6,17 @@ use std::{
 	time::Duration
 };
 
-use anyhow::{Context, Error, Result, anyhow};
+use anyhow::{Context, Error, Result, anyhow, bail};
 use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
-use hitman_commons::metadata::RuntimeID;
+use hitman_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
+use hitman_commons::metadata::ResourceMetadata;
 use indexmap::IndexMap;
 use quickentity_rs::{
-	convert_qn_property_value_to_rt, convert_rt_property_value_to_qn,
-	qn_structs::{FullRef, Property, Ref}
+	entity::{EntityID, Ref},
+	variant::{Transform, Variant, Vec3}
 };
-use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_value, json};
 use specta::Type;
@@ -27,13 +27,13 @@ use tokio::{
 };
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
-use tryvial::try_fn;
+use tryvial::{try_block, try_fn};
 
 use crate::{
 	Notification, NotificationKind, handle_event,
 	model::{
 		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest,
-		EntityTreeRequest, Event, GlobalRequest, Request
+		EntityTreeRequest, Event, GlobalRequest, Hash, Request
 	},
 	send_notification, send_request
 };
@@ -55,14 +55,6 @@ pub enum PropertyID {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Vec3 {
-	pub x: f64,
-	pub y: f64,
-	pub z: f64
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Type)]
-#[serde(rename_all = "camelCase")]
 pub struct Rotation {
 	yaw: f64,
 	pitch: f64,
@@ -71,20 +63,10 @@ pub struct Rotation {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Transform {
+pub struct SDKTransform {
 	position: Vec3,
 	rotation: Rotation,
 	scale: Vec3
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct QNTransform {
-	pub rotation: Vec3,
-	pub position: Vec3,
-
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub scale: Option<Vec3>
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -101,7 +83,7 @@ pub enum SDKEditorRequest {
 
 	SetEntityTransform {
 		entity: EntitySelector,
-		transform: Transform,
+		transform: SDKTransform,
 		relative: bool
 	},
 
@@ -337,23 +319,17 @@ impl EditorConnection {
 						handle_event(
 							&app,
 							Event::EditorConnection(EditorConnectionEvent::EntityTransformUpdated(
-								id,
-								tblu,
-								from_value(
-									convert_rt_property_value_to_qn(
-										&hitman_commons::resourcelib::PropertyValue {
-											property_type: transform.property_type,
-											property_value: transform.data
-										},
-										&Default::default(),
-										&Default::default(),
-										&Default::default(),
-										false
-									)
-									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
-									.expect("Couldn't convert transform value to QN")
-								)
-								.expect("Couldn't parse QN transform")
+								id.parse().expect("Couldn't parse entity ID"),
+								Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
+								{
+									let matrix = from_value::<ZVariant>(json!({
+										"$type": transform.property_type,
+										"$val": transform.data
+									}))
+									.expect("Couldn't parse transform as ZVariant");
+
+									Transform::from_game(matrix.as_ref().expect("Transform was not SMatrix43"), false)
+								}
 							))
 						);
 					}
@@ -366,21 +342,45 @@ impl EditorConnection {
 						handle_event(
 							&app,
 							Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged(
-								id,
-								tblu,
+								id.parse().expect("Couldn't parse entity ID"),
+								Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
 								match property {
 									PropertyID::Unknown(id) => id.to_string(),
 									PropertyID::Known(name) => name
 								},
-								value.property_type.to_owned(),
-								match convert_rt_property_value_to_qn(
-									&hitman_commons::resourcelib::PropertyValue {
-										property_type: value.property_type,
-										property_value: value.data
+								match Variant::from_game(
+									&from_value::<ZVariant>(json!({
+										"$type": value.property_type,
+										"$val": value.data
+									}))
+									.expect("Couldn't parse value as ZVariant"),
+									&STemplateEntityFactory {
+										blueprint_index_in_resource_header: 0,
+										root_entity_index: 0,
+										sub_type: 0,
+										sub_entities: vec![],
+										external_scene_type_indices_in_resource_header: vec![],
+										property_overrides: vec![]
 									},
-									&Default::default(),
-									&Default::default(),
-									&Default::default(),
+									&ResourceMetadata {
+										id: "[assembly:/dummy]".parse().unwrap(),
+										resource_type: "TEMP".try_into().unwrap(),
+										compressed: true,
+										scrambled: true,
+										references: vec![]
+									},
+									&STemplateEntityBlueprint {
+										sub_type: 0,
+										root_entity_index: 0,
+										sub_entities: vec![],
+										external_scene_type_indices_in_resource_header: vec![],
+										pin_connections: vec![],
+										input_pin_forwardings: vec![],
+										output_pin_forwardings: vec![],
+										override_deletes: vec![],
+										pin_connection_overrides: vec![],
+										pin_connection_override_deletes: vec![]
+									},
 									false
 								)
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
@@ -447,14 +447,14 @@ impl EditorConnection {
 				read.for_each(|msg| async {
 					match msg {
 						Ok(msg) => {
-							if let Err::<_, Error>(e) = try {
-								match msg {
-									Message::Ping(_) => {}
-									Message::Pong(_) => {}
+							match msg {
+								Message::Ping(_) => {}
+								Message::Pong(_) => {}
 
-									Message::Close(_) => {
-										sender.write().await.take();
+								Message::Close(_) => {
+									sender.write().await.take();
 
+									if let Err::<_, Error>(e) = try_block! {
 										for editor in app.state::<AppState>().editor_states.iter() {
 											if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } =
 												editor.data
@@ -492,27 +492,42 @@ impl EditorConnection {
 													.into()
 											}
 										)?;
+									} {
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::ErrorReport {
+												error: format!(
+													"{:?}",
+													e.context("Editor connection message handling error")
+												)
+											})
+										)
+										.expect("Couldn't send error report to frontend");
 									}
+								}
 
-									_ => {
+								_ => {
+									if let Err::<_, Error>(e) = try_block! {
 										let msg = msg.to_text().context("Couldn't convert message to text")?;
 
-										let msg: SDKEditorEvent = serde_json::from_str(msg).with_context(|| {
-											format!("Couldn't parse message {msg:?} as SDKEditorEvent")
-										})?;
+										let msg: SDKEditorEvent = serde_json::from_str(msg)
+											.with_context(|| format!("Couldn't parse message {msg:?} as SDKEditorEvent"))?;
 
 										// It's ok if there are no listeners
 										let _ = events.send(msg);
+									} {
+										send_request(
+											&app,
+											Request::Global(GlobalRequest::ErrorReport {
+												error: format!(
+													"{:?}",
+													e.context("Editor connection message handling error")
+												)
+											})
+										)
+										.expect("Couldn't send error report to frontend");
 									}
 								}
-							} {
-								send_request(
-									&app,
-									Request::Global(GlobalRequest::ErrorReport {
-										error: format!("{:?}", e.context("Editor connection message handling error"))
-									})
-								)
-								.expect("Couldn't send error report to frontend");
 							}
 						}
 
@@ -585,7 +600,10 @@ impl EditorConnection {
 							} => {
 								handle_event(
 									&app,
-									Event::EditorConnection(EditorConnectionEvent::EntitySelected(id, tblu))
+									Event::EditorConnection(EditorConnectionEvent::EntitySelected(
+										id.parse().expect("Couldn't parse entity ID"),
+										Hash(tblu.parse().expect("Couldn't parse TBLU hash"))
+									))
 								);
 							}
 
@@ -597,16 +615,16 @@ impl EditorConnection {
 									.expect("Couldn't queue debounced event");
 							}
 
-							SDKEditorEvent::Error { message, .. } => {
-								if !message.contains("Could not find entity for the given selector") {
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::ErrorReport {
-											error: format!("SDK editor error: {:?}", message)
-										})
-									)
-									.expect("Couldn't send error report to frontend");
-								}
+							SDKEditorEvent::Error { message, .. }
+								if !message.contains("Could not find entity for the given selector") =>
+							{
+								send_request(
+									&app,
+									Request::Global(GlobalRequest::ErrorReport {
+										error: format!("SDK editor error: {:?}", message)
+									})
+								)
+								.expect("Couldn't send error report to frontend");
 							}
 
 							_ => {}
@@ -725,10 +743,10 @@ impl EditorConnection {
 
 	#[try_fn]
 	#[context("Couldn't select entity {:?}", entity_id)]
-	pub async fn select_entity(&self, entity_id: &str, tblu: &str) -> Result<()> {
+	pub async fn select_entity(&self, entity_id: EntityID, tblu: &str) -> Result<()> {
 		self.send_request(SDKEditorRequest::SelectEntity {
 			entity: EntitySelector::Game {
-				id: entity_id.to_owned(),
+				id: entity_id.to_string(),
 				tblu: tblu.to_owned()
 			}
 		})
@@ -737,8 +755,8 @@ impl EditorConnection {
 
 	#[try_fn]
 	#[context("Couldn't get player transform")]
-	pub async fn get_player_transform(&self) -> Result<QNTransform> {
-		let msg_id: i64 = rng().random();
+	pub async fn get_player_transform(&self) -> Result<Transform> {
+		let msg_id: i64 = rand::random();
 		self.send_request(SDKEditorRequest::GetHitmanEntity { msgId: Some(msg_id) })
 			.await?;
 
@@ -754,9 +772,9 @@ impl EditorConnection {
 		};
 
 		let transform = transform.context("Returned hitman entity had no transform")?;
-		let transform: Transform = from_value(transform).context("Invalid transform")?;
+		let transform: SDKTransform = from_value(transform).context("Invalid transform")?;
 
-		QNTransform {
+		Transform {
 			position: transform.position,
 			rotation: Vec3 {
 				x: transform.rotation.yaw * 180.0 / std::f64::consts::PI,
@@ -776,8 +794,8 @@ impl EditorConnection {
 
 	#[try_fn]
 	#[context("Couldn't get camera transform")]
-	pub async fn get_camera_transform(&self) -> Result<QNTransform> {
-		let msg_id: i64 = rng().random();
+	pub async fn get_camera_transform(&self) -> Result<Transform> {
+		let msg_id: i64 = rand::random();
 		self.send_request(SDKEditorRequest::GetCameraEntity { msgId: Some(msg_id) })
 			.await?;
 
@@ -793,9 +811,9 @@ impl EditorConnection {
 		};
 
 		let transform = transform.context("Returned camera entity had no transform")?;
-		let transform: Transform = from_value(transform).context("Invalid transform")?;
+		let transform: SDKTransform = from_value(transform).context("Invalid transform")?;
 
-		QNTransform {
+		Transform {
 			position: transform.position,
 			rotation: Vec3 {
 				x: transform.rotation.yaw * 180.0 / std::f64::consts::PI,
@@ -815,128 +833,159 @@ impl EditorConnection {
 
 	#[try_fn]
 	#[context("Couldn't set property {property} on {entity_id}")]
-	pub async fn set_property(&self, entity_id: &str, tblu: &str, property: &str, value: PropertyValue) -> Result<()> {
-		if value.property_type == "SEntityTemplateReference" {
-			self.send_request(SDKEditorRequest::SetEntityProperty {
-				entity: EntitySelector::Game {
-					id: entity_id.to_owned(),
-					tblu: tblu.to_owned()
-				},
-				property: property
-					.parse()
-					.map(PropertyID::Unknown)
-					.unwrap_or(PropertyID::Known(property.to_owned())),
-				value: match from_value::<Ref>(value.data)? {
-					Ref::Full(FullRef {
-						entity_ref,
-						external_scene: Some(scene),
-						exposed_entity: None
-					}) => json!({
-						"id": entity_ref,
-						"source": "game",
-						"tblu": RuntimeID::from_any(&scene)?.to_string()
-					}),
-
-					Ref::Short(Some(entity_id)) => json!({
-						"id": entity_id,
-						"source": "game",
-						"tblu": tblu.to_owned()
-					}),
-
-					Ref::Short(None) => Value::Null,
-
-					_ => return Ok(()) // Can't set exposed entities
-				}
-			})
-			.await?;
-		} else if value.property_type == "TArray<SEntityTemplateReference>" {
-			self.send_request(SDKEditorRequest::SetEntityProperty {
-				entity: EntitySelector::Game {
-					id: entity_id.to_owned(),
-					tblu: tblu.to_owned()
-				},
-				property: property
-					.parse()
-					.map(PropertyID::Unknown)
-					.unwrap_or(PropertyID::Known(property.to_owned())),
-				value: match from_value::<Vec<Ref>>(value.data)?
-					.into_iter()
-					.map(|x| {
-						Ok(match x {
-							Ref::Full(FullRef {
-								entity_ref,
-								external_scene: Some(scene),
-								exposed_entity: None
-							}) => Some(json!({
-								"id": entity_ref,
-								"source": "game",
-								"tblu": RuntimeID::from_any(&scene)?.to_string()
-							})),
-
-							Ref::Short(Some(entity_id)) => Some(json!({
-								"id": entity_id,
-								"source": "game",
-								"tblu": tblu.to_owned()
-							})),
-
-							Ref::Short(None) => Some(Value::Null),
-
-							_ => None // Can't set exposed entities
-						})
-					})
-					.collect::<Result<Option<Vec<Value>>>>()?
-				{
-					Some(x) => Value::Array(x),
-					None => return Ok(())
-				}
-			})
-			.await?;
-		} else if value.property_type == "ZGuid" {
-			self.send_request(SDKEditorRequest::SetEntityProperty {
-				entity: EntitySelector::Game {
-					id: entity_id.to_owned(),
-					tblu: tblu.to_owned()
-				},
-				property: property
-					.parse()
-					.map(PropertyID::Unknown)
-					.unwrap_or(PropertyID::Known(property.to_owned())),
-				value: Value::String(value.data.as_str().context("ZGuid was not string")?.to_uppercase())
-			})
-			.await?;
-		} else {
-			self.send_request(SDKEditorRequest::SetEntityProperty {
-				entity: EntitySelector::Game {
-					id: entity_id.to_owned(),
-					tblu: tblu.to_owned()
-				},
-				property: property
-					.parse()
-					.map(PropertyID::Unknown)
-					.unwrap_or(PropertyID::Known(property.to_owned())),
-				value: convert_qn_property_value_to_rt(
-					&Property {
-						property_type: value.property_type,
-						value: value.data,
-						post_init: None
+	pub async fn set_property(&self, entity_id: EntityID, tblu: &str, property: &str, value: Variant) -> Result<()> {
+		match value {
+			Variant::Ref(val) => {
+				self.send_request(SDKEditorRequest::SetEntityProperty {
+					entity: EntitySelector::Game {
+						id: entity_id.to_string(),
+						tblu: tblu.to_owned()
 					},
-					&Default::default(),
-					&Default::default(),
-					&Default::default(),
-					&Default::default()
-				)
-				.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-			})
-			.await?;
+					property: property
+						.parse()
+						.map(PropertyID::Unknown)
+						.unwrap_or(PropertyID::Known(property.to_owned())),
+					value: match val {
+						Some(Ref {
+							entity_id,
+							external_scene: Some(scene),
+							exposed_entity: None
+						}) => json!({
+							"id": entity_id,
+							"source": "game",
+							"tblu": scene.to_hash()
+						}),
+
+						Some(Ref {
+							entity_id,
+							external_scene: None,
+							exposed_entity: None
+						}) => json!({
+							"id": entity_id,
+							"source": "game",
+							"tblu": tblu.to_owned()
+						}),
+
+						None => Value::Null,
+
+						_ => return Ok(()) // Can't set exposed entities
+					}
+				})
+				.await?;
+			}
+
+			Variant::Array(ty, vals) if ty == "SEntityTemplateReference" => {
+				self.send_request(SDKEditorRequest::SetEntityProperty {
+					entity: EntitySelector::Game {
+						id: entity_id.to_string(),
+						tblu: tblu.to_owned()
+					},
+					property: property
+						.parse()
+						.map(PropertyID::Unknown)
+						.unwrap_or(PropertyID::Known(property.to_owned())),
+					value: match vals
+						.into_iter()
+						.map(|val| {
+							let Variant::Ref(val) = val else {
+								bail!("Expected array of SEntityTemplateReference to contain refs")
+							};
+
+							Ok(match val {
+								Some(Ref {
+									entity_id,
+									external_scene: Some(scene),
+									exposed_entity: None
+								}) => Some(json!({
+									"id": entity_id,
+									"source": "game",
+									"tblu": scene.to_hash()
+								})),
+
+								Some(Ref {
+									entity_id,
+									external_scene: None,
+									exposed_entity: None
+								}) => Some(json!({
+									"id": entity_id,
+									"source": "game",
+									"tblu": tblu.to_owned()
+								})),
+
+								None => Some(Value::Null),
+
+								_ => None // Can't set exposed entities
+							})
+						})
+						.collect::<Result<Option<Vec<Value>>>>()?
+					{
+						Some(x) => Value::Array(x),
+						None => return Ok(())
+					}
+				})
+				.await?;
+			}
+
+			Variant::Uuid(val) => {
+				self.send_request(SDKEditorRequest::SetEntityProperty {
+					entity: EntitySelector::Game {
+						id: entity_id.to_string(),
+						tblu: tblu.to_owned()
+					},
+					property: property
+						.parse()
+						.map(PropertyID::Unknown)
+						.unwrap_or(PropertyID::Known(property.to_owned())),
+					value: Value::String(val.to_string().to_uppercase())
+				})
+				.await?;
+			}
+
+			_ => {
+				self.send_request(SDKEditorRequest::SetEntityProperty {
+					entity: EntitySelector::Game {
+						id: entity_id.to_string(),
+						tblu: tblu.to_owned()
+					},
+					property: property
+						.parse()
+						.map(PropertyID::Unknown)
+						.unwrap_or(PropertyID::Known(property.to_owned())),
+					value: serde_json::to_value(
+						value
+							.to_game(
+								&STemplateEntityFactory {
+									blueprint_index_in_resource_header: 0,
+									root_entity_index: 0,
+									sub_type: 0,
+									sub_entities: vec![],
+									external_scene_type_indices_in_resource_header: vec![],
+									property_overrides: vec![]
+								},
+								&ResourceMetadata {
+									id: "[assembly:/dummy]".parse().unwrap(),
+									resource_type: "TEMP".try_into().unwrap(),
+									compressed: true,
+									scrambled: true,
+									references: vec![]
+								},
+								&Default::default(),
+								&Default::default()
+							)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					)?
+				})
+				.await?;
+			}
 		}
 	}
 
 	#[try_fn]
 	#[context("Couldn't signal pin {pin} on {entity_id}")]
-	pub async fn signal_pin(&self, entity_id: &str, tblu: &str, pin: &str, output: bool) -> Result<()> {
+	pub async fn signal_pin(&self, entity_id: EntityID, tblu: &str, pin: &str, output: bool) -> Result<()> {
 		self.send_request(SDKEditorRequest::SignalEntityPin {
 			entity: EntitySelector::Game {
-				id: entity_id.to_owned(),
+				id: entity_id.to_string(),
 				tblu: tblu.to_owned()
 			},
 			pin: pin

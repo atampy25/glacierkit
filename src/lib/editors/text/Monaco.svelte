@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as monaco from "monaco-editor"
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
-	import type { TextFileType } from "$lib/bindings-types"
+	import type { TextFileType } from "$lib/bindings"
 	import { debounce } from "lodash"
 	import { help } from "$lib/helpray"
 

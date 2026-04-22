@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { UnlockableInformation, UnlockablesPatchEditorRequest } from "$lib/bindings-types"
+	import type { UnlockableInformation, UnlockablesPatchEditorRequest } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import { onMount } from "svelte"
 	import Monaco from "./Monaco.svelte"

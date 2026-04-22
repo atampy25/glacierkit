@@ -1,11 +1,10 @@
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
-use quickentity_rs::qn_structs::{CommentEntity, Ref};
+use quickentity_rs::entity::CommentEntity;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 
 use crate::{
-	entity::get_local_reference,
 	model::{
 		AppState, EditorData, EditorRequest, EntityEditorRequest, EntityMetaPaneEvent, EntityTreeRequest,
 		GlobalRequest, Request
@@ -49,15 +48,13 @@ pub async fn handle(app: &AppHandle, event: EntityMetaPaneEvent) -> Result<()> {
 			};
 
 			// Remove comment referring to given entity
-			entity
-				.comments
-				.retain(|x| get_local_reference(&x.parent).map(|x| x != entity_id).unwrap_or(true));
+			entity.comments.retain(|x| x.parent.is_none_or(|x| x != entity_id));
 
 			// Add new comment
 			entity.comments.push(CommentEntity {
-				parent: Ref::Short(Some(entity_id)),
+				parent: Some(entity_id),
 				name: "Notes".into(),
-				text: notes
+				text: notes.into()
 			});
 
 			send_request(

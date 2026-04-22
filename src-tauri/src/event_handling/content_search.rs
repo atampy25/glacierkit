@@ -4,7 +4,11 @@ use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use hashbrown::{HashMap, HashSet};
-use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{
+	game::GameVersion,
+	metadata::{ResourceMetadata, RuntimeID},
+	rpkg_tool::RpkgResourceMeta
+};
 use hitman_formats::ores::{parse_hashes_ores, parse_json_ores};
 use itertools::Itertools;
 use quickentity_rs::convert_to_qn;
@@ -15,7 +19,7 @@ use serde::Serialize;
 use serde_json::{to_string, to_vec};
 use tauri::{AppHandle, Manager};
 use tonytools::hmlanguages;
-use tryvial::try_fn;
+use tryvial::{try_block, try_fn};
 use uuid::Uuid;
 
 use crate::{
@@ -48,7 +52,6 @@ pub fn start_content_search(
 	let filetypes = filetypes.into_iter().collect::<HashSet<String>>();
 
 	if let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 	{
 		let game_version = get_loaded_game_version(app, install)?;
@@ -88,43 +91,45 @@ pub fn start_content_search(
 						if filetypes.contains(&filetype) {
 							match filetype.as_ref() {
 								"TEMP" => {
-									let s: Option<Vec<u8>> = try {
+									let s: Option<Vec<u8>> = try_block! {
 										if use_qn_format {
 											let (temp_data, temp_meta) = (
 												partition.read_resource(resource_id).ok()?,
-												RpkgResourceMeta::from(*resource_info)
+												ResourceMetadata::try_from(*resource_info).ok()?
 											);
 
 											let factory = match game_version {
-												GameVersion::H1 => {
-													h2016_convert_binary_to_factory(&temp_data).ok()?.into_modern()
-												}
+												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H2 => h2_convert_binary_to_factory(&temp_data).ok()?,
+												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H3 => h3_convert_binary_to_factory(&temp_data).ok()?
+												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
+													.ok()?
 											};
 
 											let blueprint_hash = &temp_meta
-												.hash_reference_data
+												.references
 												.get(factory.blueprint_index_in_resource_header as usize)?
-												.hash;
+												.resource;
 
-											let tblu_rrid = RuntimeResourceID::from_hex_string(blueprint_hash).ok()?;
+											let tblu_rrid = RuntimeResourceID::from(blueprint_hash);
 
 											let (tblu_data, tblu_meta) = (
 												partition.read_resource(&tblu_rrid).ok()?,
-												RpkgResourceMeta::from(partition.get_resource_info(&tblu_rrid).ok()?)
+												ResourceMetadata::try_from(partition.get_resource_info(&tblu_rrid).ok()?).ok()?
 											);
 
 											let blueprint = match game_version {
-												GameVersion::H1 => {
-													h2016_convert_binary_to_blueprint(&tblu_data).ok()?.into_modern()
-												}
+												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data).ok()?,
+												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data).ok()?
+												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
+													.ok()?
 											};
 
 											let entity =
@@ -173,7 +178,7 @@ pub fn start_content_search(
 
 								"AIRG" | "ATMD" | "VIDB" | "UICB" | "CPPT" | "CRMD" | "DSWB" | "WSWB" | "GFXF"
 								| "GIDX" | "WSGB" | "ECPB" | "ENUM" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										convert_generic_str(
 											&partition.read_resource(resource_id).ok()?,
 											game_version,
@@ -194,13 +199,13 @@ pub fn start_content_search(
 								}
 
 								"JSON" | "REPO" => {
-									let s: Option<_> = try { partition.read_resource(resource_id).ok()? };
+									let s: Option<_> = try_block! { partition.read_resource(resource_id).ok()? };
 
 									if let Some(s) = s { query.is_match(&s) } else { false }
 								}
 
 								"ORES" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										let data = partition.read_resource(resource_id).ok()?;
 
 										if resource_id.to_hex_string() == "0057C2C3941115CA" {
@@ -214,9 +219,9 @@ pub fn start_content_search(
 								}
 
 								"CLNG" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::from(*resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -224,7 +229,7 @@ pub fn start_content_search(
 											let mut iteration = 0;
 
 											loop {
-												if let Ok::<_, anyhow::Error>(x) = try {
+												if let Ok::<_, anyhow::Error>(x) = try_block! {
 													let langmap = get_language_map(game_version, iteration)
 														.context("No more alternate language maps available")?;
 
@@ -261,9 +266,9 @@ pub fn start_content_search(
 								}
 
 								"DITL" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::from(*resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -288,9 +293,9 @@ pub fn start_content_search(
 								}
 
 								"DLGE" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::from(*resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -298,7 +303,7 @@ pub fn start_content_search(
 											let mut iteration = 0;
 
 											loop {
-												if let Ok::<_, anyhow::Error>(x) = try {
+												if let Ok::<_, anyhow::Error>(x) = try_block! {
 													let langmap = get_language_map(game_version, iteration)
 														.context("No more alternate language maps available")?;
 
@@ -344,9 +349,9 @@ pub fn start_content_search(
 								}
 
 								"LOCR" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::from(*resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -354,7 +359,7 @@ pub fn start_content_search(
 											let mut iteration = 0;
 
 											loop {
-												if let Ok::<_, anyhow::Error>(x) = try {
+												if let Ok::<_, anyhow::Error>(x) = try_block! {
 													let langmap = get_language_map(game_version, iteration)
 														.context("No more alternate language maps available")?;
 
@@ -399,9 +404,9 @@ pub fn start_content_search(
 								}
 
 								"RTLV" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::from(*resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
@@ -425,15 +430,15 @@ pub fn start_content_search(
 								}
 
 								"LINE" => {
-									let s: Option<_> = try {
+									let s: Option<_> = try_block! {
 										let (res_meta, res_data) = (
-											RpkgResourceMeta::from(*resource_info),
+											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
 										);
 
 										let (locr_meta, locr_data) = extract_latest_resource(
 											game_files,
-											RuntimeID::from_any(&res_meta.hash_reference_data.first()?.hash).ok()?
+											res_meta.hash_reference_data.first()?.hash
 										)
 										.ok()?;
 
@@ -441,7 +446,7 @@ pub fn start_content_search(
 											let mut iteration = 0;
 
 											loop {
-												if let Ok::<_, anyhow::Error>(x) = try {
+												if let Ok::<_, anyhow::Error>(x) = try_block! {
 													let langmap = get_language_map(game_version, iteration)
 														.context("No more alternate language maps available")?;
 
@@ -564,16 +569,17 @@ pub fn start_content_search(
 		let results = matching_ids
 			.into_iter()
 			.map(|hash| {
-				let filetype = hash_list
-					.entries
-					.get(&RuntimeID::from_str(&hash).expect("Invalid ID added to matching array"))
+				let filetype = RuntimeID::from_str(&hash)
+					.expect("Invalid ID added to matching array")
+					.get_info()
 					.map(|x| x.resource_type.into())
 					.unwrap_or("".into());
 
-				let path = hash_list
-					.entries
-					.get(&RuntimeID::from_str(&hash).expect("Invalid ID added to matching array"))
-					.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned());
+				let path = RuntimeID::from_str(&hash)
+					.expect("Invalid ID added to matching array")
+					.get_info()
+					.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
+					.map(|x| x.into());
 
 				(hash, filetype, path)
 			})

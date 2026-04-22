@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EntityEditorRequest } from "$lib/bindings-types"
+	import type { EntityEditorRequest } from "$lib/bindings"
 	import { Pane, Splitpanes } from "svelte-splitpanes"
 	import Tree from "./Tree.svelte"
 	import Monaco from "./Monaco.svelte"

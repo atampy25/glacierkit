@@ -1,41 +1,40 @@
-use std::str::FromStr;
-
-use anyhow::{Context, Result};
-use anyhow::{anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use dashmap::DashMap;
+use ecow::EcoString;
 use fn_error_context::context;
-use hashbrown::HashMap;
-use hitman_commons::game::GameVersion;
-use hitman_commons::hash_list::HashList;
-use hitman_commons::metadata::{ResourceType, RuntimeID};
-use hitman_commons::rpkg_tool::RpkgResourceMeta;
+use hashbrown::{HashMap, HashSet};
+use hitman_commons::{
+	game::GameVersion,
+	metadata::{ResourceType, RuntimeID},
+	rpkg_tool::RpkgResourceMeta
+};
 use indexmap::IndexMap;
 use itertools::Itertools;
-use quickentity_rs::qn_structs::{Entity, FullRef, Ref, RefMaybeConstantValue, RefWithConstantValue, SubEntity};
-use rand::rng;
-use rand::seq::IndexedRandom;
-use rayon::iter::IntoParallelRefIterator;
-use rayon::iter::ParallelIterator;
+use quickentity_rs::{
+	entity::{Entity, EntityID, Ref, SubEntity},
+	variant::Variant
+};
+use rand::{rng, seq::IndexedRandom};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, from_value, to_string};
+use serde_json::to_string;
 use specta::Type;
 use tonytools::hmlanguages;
-use tryvial::try_fn;
+use tryvial::{try_block, try_fn};
 use velcro::vec;
 
-use crate::languages::get_language_map;
-use crate::rpkg::extract_entity;
 use crate::{
+	languages::get_language_map,
 	model::EditorValidity,
 	ores_repo::RepositoryItem,
-	rpkg::{extract_latest_metadata, extract_latest_resource}
+	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource}
 };
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ReverseReference {
-	pub from: String,
+	pub from: EntityID,
 	pub data: ReverseReferenceData
 }
 
@@ -44,60 +43,98 @@ pub struct ReverseReference {
 pub enum ReverseReferenceData {
 	Parent,
 	Property {
-		property_name: String
+		#[specta(type = String)]
+		property_name: EcoString
 	},
 	PlatformSpecificProperty {
-		property_name: String,
-		platform: String
+		#[specta(type = String)]
+		property_name: EcoString,
+
+		#[specta(type = String)]
+		platform: EcoString
 	},
 	Event {
-		event: String,
-		trigger: String
+		#[specta(type = String)]
+		event: EcoString,
+
+		#[specta(type = String)]
+		trigger: EcoString
 	},
 	InputCopy {
-		trigger: String,
-		propagate: String
+		#[specta(type = String)]
+		trigger: EcoString,
+
+		#[specta(type = String)]
+		propagate: EcoString
 	},
 	OutputCopy {
-		event: String,
-		propagate: String
+		#[specta(type = String)]
+		event: EcoString,
+
+		#[specta(type = String)]
+		propagate: EcoString
 	},
 	PropertyAlias {
-		aliased_name: String,
-		original_property: String
+		#[specta(type = String)]
+		aliased_name: EcoString,
+
+		#[specta(type = String)]
+		original_property: EcoString
 	},
 	ExposedEntity {
-		exposed_name: String
+		#[specta(type = String)]
+		exposed_name: EcoString
 	},
 	ExposedInterface {
-		interface: String
+		#[specta(type = String)]
+		interface: EcoString
 	},
 	Subset {
-		subset: String
+		#[specta(type = String)]
+		subset: EcoString
 	}
 }
 
-/// Get the local reference contained within a Ref, or None if it's an external or null reference.
-pub fn get_local_reference(reference: &Ref) -> Option<String> {
-	match reference {
-		Ref::Short(Some(ent)) => Some(ent.to_owned()),
+pub fn visit_variant(variant: &Variant, handle: &mut impl FnMut(&Variant)) {
+	handle(variant);
 
-		Ref::Full(reference) => {
-			if reference.external_scene.is_none() {
-				Some(reference.entity_ref.to_owned())
-			} else {
-				None
+	match variant {
+		Variant::PairStringVariant(_, variant) => visit_variant(variant, handle),
+
+		Variant::Variant(variant) => visit_variant(variant, handle),
+
+		Variant::Array(_, variants) => {
+			for variant in variants {
+				visit_variant(variant, handle);
 			}
 		}
 
-		_ => None
+		_ => {}
+	}
+}
+
+pub fn visit_variant_mut(variant: &mut Variant, handle: &mut impl FnMut(&mut Variant)) {
+	handle(variant);
+
+	match variant {
+		Variant::PairStringVariant(_, variant) => visit_variant_mut(variant, handle),
+
+		Variant::Variant(variant) => visit_variant_mut(variant, handle),
+
+		Variant::Array(_, variants) => {
+			for variant in variants {
+				visit_variant_mut(variant, handle);
+			}
+		}
+
+		_ => {}
 	}
 }
 
 #[try_fn]
 #[context("Couldn't calculate reverse references")]
-pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, Vec<ReverseReference>>> {
-	let mut reverse_references: HashMap<String, Vec<ReverseReference>> = HashMap::new();
+pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID, Vec<ReverseReference>>> {
+	let mut reverse_references: HashMap<EntityID, Vec<ReverseReference>> = HashMap::new();
 
 	reverse_references.reserve(entity.entities.len());
 
@@ -106,88 +143,52 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 	}
 
 	for (entity_id, entity) in entity.entities.iter() {
-		if let Some(ent) = get_local_reference(&entity.parent) {
+		if let Some(ent) = entity.parent.as_ref().and_then(Ref::as_local) {
 			reverse_references.entry(ent).or_default().push(ReverseReference {
 				from: entity_id.to_owned(),
 				data: ReverseReferenceData::Parent
 			});
 		}
 
-		for (property_name, property_data) in entity.properties.as_ref().unwrap_or(&Default::default()) {
-			if property_data.property_type == "SEntityTemplateReference" {
-				if let Some(ent) = get_local_reference(
-					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-				) {
+		for (property_name, property_data) in &entity.properties {
+			visit_variant(&property_data.value, &mut |val| {
+				if let Variant::Ref(val) = val
+					&& let Some(ent) = val.as_ref().and_then(Ref::as_local)
+				{
 					reverse_references.entry(ent).or_default().push(ReverseReference {
-						from: entity_id.to_owned(),
+						from: *entity_id,
 						data: ReverseReferenceData::Property {
 							property_name: property_name.to_owned()
 						}
 					});
 				}
-			} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
-				for reference in
-					from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
-				{
-					if let Some(ent) = get_local_reference(&reference) {
-						reverse_references.entry(ent).or_default().push(ReverseReference {
-							from: entity_id.to_owned(),
-							data: ReverseReferenceData::Property {
-								property_name: property_name.to_owned()
-							}
-						});
-					}
-				}
-			}
+			});
 		}
 
-		for (platform, properties) in entity
-			.platform_specific_properties
-			.as_ref()
-			.unwrap_or(&Default::default())
-		{
+		for (platform, properties) in &entity.platform_specific_properties {
 			for (property_name, property_data) in properties {
-				if property_data.property_type == "SEntityTemplateReference" {
-					if let Some(ent) = get_local_reference(
-						&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-					) {
+				visit_variant(&property_data.value, &mut |val| {
+					if let Variant::Ref(val) = val
+						&& let Some(ent) = val.as_ref().and_then(Ref::as_local)
+					{
 						reverse_references.entry(ent).or_default().push(ReverseReference {
-							from: entity_id.to_owned(),
+							from: *entity_id,
 							data: ReverseReferenceData::PlatformSpecificProperty {
 								property_name: property_name.to_owned(),
 								platform: platform.to_owned()
 							}
 						});
 					}
-				} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
-					for reference in
-						from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
-					{
-						if let Some(ent) = get_local_reference(&reference) {
-							reverse_references.entry(ent).or_default().push(ReverseReference {
-								from: entity_id.to_owned(),
-								data: ReverseReferenceData::PlatformSpecificProperty {
-									property_name: property_name.to_owned(),
-									platform: platform.to_owned()
-								}
-							});
-						}
-					}
-				}
+				});
 			}
 		}
 
-		for (event, triggers) in entity.events.as_ref().unwrap_or(&Default::default()) {
+		for (event, triggers) in &entity.events {
 			for (trigger, trigger_entities) in triggers {
 				for reference in trigger_entities {
-					let reference = match reference {
-						RefMaybeConstantValue::Ref(x) => x,
-						RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => {
-							entity_ref
-						}
-					};
+					let reference = &reference.entity_ref;
 
-					if let Some(ent) = get_local_reference(reference) {
+					if let Some(ent) = reference.as_local() {
 						reverse_references.entry(ent).or_default().push(ReverseReference {
 							from: entity_id.to_owned(),
 							data: ReverseReferenceData::Event {
@@ -200,69 +201,58 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 			}
 		}
 
-		for (trigger, propagates) in entity.input_copying.as_ref().unwrap_or(&Default::default()) {
+		for (trigger, propagates) in &entity.input_copying {
 			for (propagate, propagate_entities) in propagates {
 				for reference in propagate_entities {
-					let reference = match reference {
-						RefMaybeConstantValue::Ref(x) => x,
-						RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => {
-							entity_ref
-						}
-					};
-
-					if let Some(ent) = get_local_reference(reference) {
-						reverse_references.entry(ent).or_default().push(ReverseReference {
+					reverse_references
+						.entry(reference.entity_id)
+						.or_default()
+						.push(ReverseReference {
 							from: entity_id.to_owned(),
 							data: ReverseReferenceData::InputCopy {
 								trigger: trigger.to_owned(),
 								propagate: propagate.to_owned()
 							}
 						});
-					}
 				}
 			}
 		}
 
-		for (event, propagates) in entity.output_copying.as_ref().unwrap_or(&Default::default()) {
+		for (event, propagates) in &entity.output_copying {
 			for (propagate, propagate_entities) in propagates {
 				for reference in propagate_entities {
-					let reference = match reference {
-						RefMaybeConstantValue::Ref(x) => x,
-						RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => {
-							entity_ref
-						}
-					};
-
-					if let Some(ent) = get_local_reference(reference) {
-						reverse_references.entry(ent).or_default().push(ReverseReference {
+					reverse_references
+						.entry(reference.entity_id)
+						.or_default()
+						.push(ReverseReference {
 							from: entity_id.to_owned(),
 							data: ReverseReferenceData::OutputCopy {
 								event: event.to_owned(),
 								propagate: propagate.to_owned()
 							}
 						});
-					}
 				}
 			}
 		}
 
-		for (aliased_name, aliases) in entity.property_aliases.as_ref().unwrap_or(&Default::default()) {
+		for (aliased_name, aliases) in &entity.property_aliases {
 			for alias_data in aliases {
-				if let Some(ent) = get_local_reference(&alias_data.original_entity) {
-					reverse_references.entry(ent).or_default().push(ReverseReference {
+				reverse_references
+					.entry(alias_data.original_entity)
+					.or_default()
+					.push(ReverseReference {
 						from: entity_id.to_owned(),
 						data: ReverseReferenceData::PropertyAlias {
 							aliased_name: aliased_name.to_owned(),
 							original_property: alias_data.original_property.to_owned()
 						}
 					});
-				}
 			}
 		}
 
-		for (exposed_name, exposed_entity) in entity.exposed_entities.as_ref().unwrap_or(&Default::default()) {
+		for (exposed_name, exposed_entity) in &entity.exposed_entities {
 			for reference in &exposed_entity.refers_to {
-				if let Some(ent) = get_local_reference(reference) {
+				if let Some(ent) = reference.as_local() {
 					reverse_references.entry(ent).or_default().push(ReverseReference {
 						from: entity_id.to_owned(),
 						data: ReverseReferenceData::ExposedEntity {
@@ -273,7 +263,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 			}
 		}
 
-		for (interface, referenced_entity) in entity.exposed_interfaces.as_ref().unwrap_or(&Default::default()) {
+		for (interface, referenced_entity) in &entity.exposed_interfaces {
 			reverse_references
 				.entry(referenced_entity.to_owned())
 				.or_default()
@@ -285,7 +275,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 				});
 		}
 
-		for (subset, member_of) in entity.subsets.as_ref().unwrap_or(&Default::default()) {
+		for (subset, member_of) in &entity.subsets {
 			for parental_entity in member_of {
 				reverse_references
 					.entry(parental_entity.to_owned())
@@ -308,13 +298,13 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<String, V
 #[context("Couldn't get recursive children of {}", target)]
 pub fn get_recursive_children(
 	entity: &Entity,
-	target: &str,
-	reverse_references: &HashMap<String, Vec<ReverseReference>>
-) -> Result<Vec<String>> {
+	target: EntityID,
+	reverse_references: &HashMap<EntityID, Vec<ReverseReference>>
+) -> Result<Vec<EntityID>> {
 	let child_ents = entity
 		.entities
 		.iter()
-		.filter(|(_, x)| get_local_reference(&x.parent).map(|x| x == target).unwrap_or(false))
+		.filter(|(_, x)| x.parent.as_ref().and_then(Ref::as_local).is_some_and(|x| x == target))
 		.map(|(x, _)| x)
 		.cloned()
 		.collect_vec();
@@ -322,7 +312,7 @@ pub fn get_recursive_children(
 	let mut children = vec![target.to_owned()];
 
 	for child in child_ents {
-		children.extend(get_recursive_children(entity, &child, reverse_references)?);
+		children.extend(get_recursive_children(entity, child, reverse_references)?);
 	}
 
 	children
@@ -332,12 +322,12 @@ pub fn get_recursive_children(
 #[serde(rename_all = "camelCase")]
 pub struct CopiedEntityData {
 	/// Which entity has been copied (and should be parented to the selection when pasting).
-	pub root_entity: String,
+	pub root_entity: EntityID,
 
-	pub data: IndexMap<String, SubEntity>
+	pub data: IndexMap<EntityID, SubEntity>
 }
 
-pub fn random_entity_id() -> String {
+pub fn random_entity_id() -> EntityID {
 	let digits = [
 		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
 	];
@@ -348,123 +338,72 @@ pub fn random_entity_id() -> String {
 		id.push(*digits.choose(&mut rng()).expect("Slice is not empty"));
 	}
 
-	id
-}
-
-/// Changes a Ref to refer to a given local entity, keeping the exposed entity the same if there was one.
-pub fn change_reference_to_local(reference: &Ref, local: String) -> Ref {
-	match reference {
-		Ref::Short(_) => Ref::Short(Some(local)),
-
-		Ref::Full(reference) => {
-			if let Some(exposed) = reference.exposed_entity.as_ref() {
-				Ref::Full(FullRef {
-					entity_ref: local,
-					exposed_entity: Some(exposed.to_owned()),
-					external_scene: None
-				})
-			} else {
-				Ref::Short(Some(local))
-			}
-		}
-	}
+	id.parse().unwrap()
 }
 
 /// Changes a Ref based on the given changelist (original entity ID -> new entity ID). Used for pasting.
-pub fn alter_ref_according_to_changelist(reference: &Ref, changelist: &HashMap<String, String>) -> Ref {
-	match reference {
-		Ref::Short(None) => reference.to_owned(),
-
-		Ref::Short(Some(local)) => {
-			if let Some(changed) = changelist.get(local) {
-				Ref::Short(Some(changed.to_owned()))
-			} else {
-				reference.to_owned()
-			}
-		}
-
-		Ref::Full(full_ref) => {
-			if let Some(changed) = changelist.get(&full_ref.entity_ref) {
-				change_reference_to_local(reference, changed.to_owned())
-			} else {
-				reference.to_owned()
-			}
-		}
+pub fn alter_ref_according_to_changelist(reference: &Ref, changelist: &HashMap<EntityID, EntityID>) -> Ref {
+	if let Some(local) = reference.as_local()
+		&& let Some(changed) = changelist.get(&local)
+	{
+		reference.to_local(*changed)
+	} else {
+		reference.to_owned()
 	}
 }
 
 #[try_fn]
 #[context("Couldn't check whether local references refer to existing entities")]
 pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> Result<EditorValidity> {
-	if let Some(ent) = get_local_reference(&sub_entity.parent) {
-		if !entity.entities.contains_key(&ent) {
-			return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-		}
-	}
-
-	for property_data in sub_entity.properties.as_ref().unwrap_or(&Default::default()).values() {
-		if property_data.property_type == "SEntityTemplateReference" {
-			if let Some(ent) =
-				get_local_reference(&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?)
-			{
-				if !entity.entities.contains_key(&ent) {
-					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-				}
-			}
-		} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
-			for reference in
-				from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
-			{
-				if let Some(ent) = get_local_reference(&reference) {
-					if !entity.entities.contains_key(&ent) {
-						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-					}
-				}
-			}
-		}
-	}
-
-	for properties in sub_entity
-		.platform_specific_properties
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
+	if let Some(ent) = sub_entity.parent.as_ref().and_then(Ref::as_local)
+		&& !entity.entities.contains_key(&ent)
 	{
+		return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
+	}
+
+	for property_data in sub_entity.properties.values() {
+		let mut res = EditorValidity::Valid;
+		visit_variant(&property_data.value, &mut |val| {
+			if let Variant::Ref(val) = val
+				&& let Some(ent) = val.as_ref().and_then(Ref::as_local)
+				&& !entity.entities.contains_key(&ent)
+			{
+				res = EditorValidity::Invalid(format!("Invalid reference {}", ent));
+			}
+		});
+
+		if matches!(res, EditorValidity::Invalid(_)) {
+			return Ok(res);
+		}
+	}
+
+	for properties in sub_entity.platform_specific_properties.values() {
 		for property_data in properties.values() {
-			if property_data.property_type == "SEntityTemplateReference" {
-				if let Some(ent) = get_local_reference(
-					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-				) {
-					if !entity.entities.contains_key(&ent) {
-						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-					}
-				}
-			} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
-				for reference in
-					from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
+			let mut res = EditorValidity::Valid;
+			visit_variant(&property_data.value, &mut |val| {
+				if let Variant::Ref(val) = val
+					&& let Some(ent) = val.as_ref().and_then(Ref::as_local)
+					&& !entity.entities.contains_key(&ent)
 				{
-					if let Some(ent) = get_local_reference(&reference) {
-						if !entity.entities.contains_key(&ent) {
-							return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-						}
-					}
+					res = EditorValidity::Invalid(format!("Invalid reference {}", ent));
 				}
+			});
+
+			if matches!(res, EditorValidity::Invalid(_)) {
+				return Ok(res);
 			}
 		}
 	}
 
-	for triggers in sub_entity.events.as_ref().unwrap_or(&Default::default()).values() {
+	for triggers in sub_entity.events.values() {
 		for trigger_entities in triggers.values() {
 			for reference in trigger_entities {
-				let reference = match reference {
-					RefMaybeConstantValue::Ref(x) => x,
-					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
-				};
+				let reference = &reference.entity_ref;
 
-				if let Some(ent) = get_local_reference(reference) {
-					if !entity.entities.contains_key(&ent) {
-						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-					}
+				if let Some(ent) = reference.as_local()
+					&& !entity.entities.contains_key(&ent)
+				{
+					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
 				}
 			}
 		}
@@ -472,84 +411,43 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 
 	for propagates in sub_entity
 		.input_copying
-		.as_ref()
-		.unwrap_or(&Default::default())
 		.values()
+		.chain(sub_entity.output_copying.values())
 	{
 		for propagate_entities in propagates.values() {
 			for reference in propagate_entities {
-				let reference = match reference {
-					RefMaybeConstantValue::Ref(x) => x,
-					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
-				};
-
-				if let Some(ent) = get_local_reference(reference) {
-					if !entity.entities.contains_key(&ent) {
-						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-					}
+				if !entity.entities.contains_key(&reference.entity_id) {
+					return Ok(EditorValidity::Invalid(format!(
+						"Invalid reference {}",
+						reference.entity_id
+					)));
 				}
 			}
 		}
 	}
 
-	for propagates in sub_entity
-		.output_copying
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
-		for propagate_entities in propagates.values() {
-			for reference in propagate_entities {
-				let reference = match reference {
-					RefMaybeConstantValue::Ref(x) => x,
-					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
-				};
-
-				if let Some(ent) = get_local_reference(reference) {
-					if !entity.entities.contains_key(&ent) {
-						return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-					}
-				}
-			}
-		}
-	}
-
-	for aliases in sub_entity
-		.property_aliases
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
+	for aliases in sub_entity.property_aliases.values() {
 		for alias_data in aliases {
-			if let Some(ent) = get_local_reference(&alias_data.original_entity) {
-				if !entity.entities.contains_key(&ent) {
-					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-				}
+			if !entity.entities.contains_key(&alias_data.original_entity) {
+				return Ok(EditorValidity::Invalid(format!(
+					"Invalid reference {}",
+					alias_data.original_entity
+				)));
 			}
 		}
 	}
 
-	for exposed_entity in sub_entity
-		.exposed_entities
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
+	for exposed_entity in sub_entity.exposed_entities.values() {
 		for reference in &exposed_entity.refers_to {
-			if let Some(ent) = get_local_reference(reference) {
-				if !entity.entities.contains_key(&ent) {
-					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
-				}
+			if let Some(ent) = reference.as_local()
+				&& !entity.entities.contains_key(&ent)
+			{
+				return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
 			}
 		}
 	}
 
-	for referenced_entity in sub_entity
-		.exposed_interfaces
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
+	for referenced_entity in sub_entity.exposed_interfaces.values() {
 		if !entity.entities.contains_key(referenced_entity) {
 			return Ok(EditorValidity::Invalid(format!(
 				"Invalid reference {}",
@@ -558,7 +456,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for member_of in sub_entity.subsets.as_ref().unwrap_or(&Default::default()).values() {
+	for member_of in sub_entity.subsets.values() {
 		for parental_entity in member_of {
 			if !entity.entities.contains_key(parental_entity) {
 				return Ok(EditorValidity::Invalid(format!(
@@ -576,33 +474,24 @@ pub fn get_ref_decoration(
 	game_files: &PartitionManager,
 	cached_entities: &DashMap<RuntimeID, Entity>,
 	game_version: GameVersion,
-	hash_list: &HashList,
 	entity: &Entity,
-	reference: &Ref
+	reference: Option<&Ref>
 ) -> Option<(String, String)> {
-	if let Some(ent) = get_local_reference(reference) {
-		Some((ent.to_owned(), entity.entities.get(&ent)?.name.to_owned()))
-	} else {
-		match reference {
-			Ref::Short(None) => None,
-
-			Ref::Full(reference) => Some((reference.entity_ref.to_owned(), {
-				extract_entity(
-					game_files,
-					cached_entities,
-					game_version,
-					hash_list,
-					RuntimeID::from_any(reference.external_scene.as_ref().expect("Not a local reference")).ok()?
-				)
+	if let Some(ent) = reference.and_then(Ref::as_local) {
+		Some((ent.to_string(), entity.entities.get(&ent)?.name.to_string()))
+	} else if let Some(entity_ref) = reference
+		&& let Some(external_scene) = entity_ref.external_scene
+	{
+		Some((entity_ref.entity_id.to_string(), {
+			extract_entity(game_files, cached_entities, game_version, external_scene)
 				.ok()?
 				.entities
-				.get(&reference.entity_ref)?
+				.get(&entity_ref.entity_id)?
 				.name
-				.to_owned()
-			})),
-
-			_ => unreachable!()
-		}
+				.to_string()
+		}))
+	} else {
+		None
 	}
 }
 
@@ -624,14 +513,13 @@ pub fn get_line_decoration(
 			.first()
 			.context("No LOCR dependency on LINE")?
 			.resource
-			.get_id()
 	)?;
 
 	let locr = {
 		let mut iteration = 0;
 
 		loop {
-			if let Ok::<_, anyhow::Error>(x) = try {
+			if let Ok::<_, anyhow::Error>(x) = try_block! {
 				let langmap =
 					get_language_map(game_version, iteration).context("No more alternate language maps available")?;
 
@@ -691,9 +579,9 @@ pub fn get_line_decoration(
 #[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
 pub fn get_decorations(
 	game_files: &PartitionManager,
+	file_types: &HashMap<RuntimeID, ResourceType>,
 	cached_entities: &DashMap<RuntimeID, Entity>,
 	repository: &[RepositoryItem],
-	hash_list: &HashList,
 	game_version: GameVersion,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	sub_entity: &SubEntity,
@@ -705,256 +593,112 @@ pub fn get_decorations(
 		game_files,
 		cached_entities,
 		game_version,
-		hash_list,
 		entity,
-		&sub_entity.parent
+		sub_entity.parent.as_ref()
 	) {
 		decorations.push(decoration);
 	}
 
 	// Hint decoration for unknown paths
-	if sub_entity.factory.starts_with('0') {
-		if let Some(entry) = hash_list.entries.get(&RuntimeID::from_str(&sub_entity.factory)?) {
-			if let Some(hint) = entry.hint.as_ref() {
-				decorations.push((sub_entity.factory.to_owned(), hint.to_owned()));
-			}
-		}
-	}
-
-	if sub_entity.blueprint.starts_with('0') {
-		if let Some(entry) = hash_list.entries.get(&RuntimeID::from_str(&sub_entity.blueprint)?) {
-			if let Some(hint) = entry.hint.as_ref() {
-				decorations.push((sub_entity.blueprint.to_owned(), hint.to_owned()));
-			}
-		}
-	}
-
-	for property_data in sub_entity.properties.as_ref().unwrap_or(&Default::default()).values() {
-		if property_data.property_type == "SEntityTemplateReference" {
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				cached_entities,
-				game_version,
-				hash_list,
-				entity,
-				&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-			) {
-				decorations.push(decoration);
-			}
-		} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
-			for reference in
-				from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
-			{
-				if let Some(decoration) =
-					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, &reference)
-				{
-					decorations.push(decoration);
-				}
-			}
-		} else if property_data.property_type == "ZGuid" {
-			let repository_id = from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
-
-			if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
-				if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
-					decorations.push((
-						repository_id.to_string(),
-						name.as_str().context("Name or CommonName was not string")?.to_owned()
-					));
-				}
-			}
-		} else if property_data.property_type == "TArray<ZGuid>" {
-			for repository_id in
-				from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
-			{
-				if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
-					if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
-						decorations.push((
-							repository_id.to_string(),
-							name.as_str().context("Name or CommonName was not string")?.to_owned()
-						));
-					}
-				}
-			}
-		} else if property_data.property_type == "ZRuntimeResourceID" {
-			let res = if let Some(obj) = property_data.value.as_object() {
-				obj.get("resource")
-					.context("No resource property on object ZRuntimeResourceID")?
-					.as_str()
-					.context("Resource was not string")?
-			} else {
-				property_data.value.as_str().unwrap_or_default()
-			};
-
-			if let Some(entry) = hash_list.entries.get(&RuntimeID::from_any(res)?)
-				&& entry.resource_type == "LINE"
-			{
-				if let Some(decoration) =
-					get_line_decoration(game_files, game_version, tonytools_hash_list, RuntimeID::from_any(res)?)?
-				{
-					decorations.push((res.to_owned(), decoration));
-				}
-			} else if res.starts_with('0') {
-				if let Some(entry) = hash_list.entries.get(&RuntimeID::from_str(res)?) {
-					if let Some(hint) = entry.hint.as_ref() {
-						decorations.push((res.to_owned(), hint.to_owned()));
-					}
-				}
-			}
-		} else if property_data.property_type == "TArray<ZRuntimeResourceID>" {
-			for val in from_value::<Vec<Value>>(property_data.value.to_owned())
-				.context("TArray<ZRuntimeResourceID> was not an array")?
-			{
-				let res = if let Some(obj) = val.as_object() {
-					obj.get("resource")
-						.context("No resource property on object ZRuntimeResourceID")?
-						.as_str()
-						.context("Resource was not string")?
-				} else {
-					val.as_str().unwrap_or_default()
-				};
-
-				if let Some(entry) = hash_list.entries.get(&RuntimeID::from_any(res)?)
-					&& entry.resource_type == "LINE"
-				{
-					if let Some(decoration) =
-						get_line_decoration(game_files, game_version, tonytools_hash_list, RuntimeID::from_any(res)?)?
-					{
-						decorations.push((res.to_owned(), decoration));
-					}
-				} else if res.starts_with('0') {
-					if let Some(entry) = hash_list.entries.get(&RuntimeID::from_str(res)?) {
-						if let Some(hint) = entry.hint.as_ref() {
-							decorations.push((res.to_owned(), hint.to_owned()));
-						}
-					}
-				}
-			}
-		}
-	}
-
-	for properties in sub_entity
-		.platform_specific_properties
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
+	if sub_entity.factory.resource.get_path().is_none()
+		&& let Some(entry) = sub_entity.factory.resource.get_info()
+		&& let Some(hint) = entry.hint
 	{
-		for property_data in properties.values() {
-			if property_data.property_type == "SEntityTemplateReference" {
-				if let Some(decoration) = get_ref_decoration(
-					game_files,
-					cached_entities,
-					game_version,
-					hash_list,
-					entity,
-					&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-				) {
+		decorations.push((sub_entity.factory.resource.to_string(), hint.into()));
+	}
+
+	if sub_entity.blueprint.get_path().is_none()
+		&& let Some(entry) = sub_entity.blueprint.get_info()
+		&& let Some(hint) = entry.hint
+	{
+		decorations.push((sub_entity.blueprint.to_string(), hint.into()));
+	}
+
+	for property_data in sub_entity.properties.values() {
+		visit_variant(&property_data.value, &mut |val| match val {
+			Variant::Ref(val) => {
+				if let Some(decoration) =
+					get_ref_decoration(game_files, cached_entities, game_version, entity, val.as_ref())
+				{
 					decorations.push(decoration);
 				}
-			} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
-				for reference in
-					from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
+			}
+
+			Variant::Resource(Some(reference)) => {
+				let res = reference.resource;
+				if file_types.get(&res).is_some_and(|x| x == "LINE") {
+					if let Ok(Some(decoration)) =
+						get_line_decoration(game_files, game_version, tonytools_hash_list, res)
+					{
+						decorations.push((res.to_string(), decoration));
+					}
+				} else if res.get_path().is_none()
+					&& let Some(entry) = res.get_info()
+					&& let Some(hint) = entry.hint
 				{
+					decorations.push((res.to_string(), hint.into()));
+				}
+			}
+
+			Variant::Uuid(uuid) => {
+				if let Some(repo_item) = repository.iter().find(|x| x.id == *uuid)
+					&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
+				{
+					decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
+				}
+			}
+
+			_ => {}
+		});
+	}
+
+	for properties in sub_entity.platform_specific_properties.values() {
+		for property_data in properties.values() {
+			visit_variant(&property_data.value, &mut |val| match val {
+				Variant::Ref(val) => {
 					if let Some(decoration) =
-						get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, &reference)
+						get_ref_decoration(game_files, cached_entities, game_version, entity, val.as_ref())
 					{
 						decorations.push(decoration);
 					}
 				}
-			} else if property_data.property_type == "ZGuid" {
-				let repository_id = from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
 
-				if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
-					if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
-						decorations.push((
-							repository_id.to_string(),
-							name.as_str().context("Name or CommonName was not string")?.to_owned()
-						));
-					}
-				}
-			} else if property_data.property_type == "TArray<ZGuid>" {
-				for repository_id in
-					from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
-				{
-					if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
-						if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
-							decorations.push((
-								repository_id.to_string(),
-								name.as_str().context("Name or CommonName was not string")?.to_owned()
-							));
+				Variant::Resource(Some(reference)) => {
+					let res = reference.resource;
+					if file_types.get(&res).is_some_and(|x| x == "LINE") {
+						if let Ok(Some(decoration)) =
+							get_line_decoration(game_files, game_version, tonytools_hash_list, res)
+						{
+							decorations.push((res.to_string(), decoration));
 						}
-					}
-				}
-			} else if property_data.property_type == "ZRuntimeResourceID" {
-				let res = if let Some(obj) = property_data.value.as_object() {
-					obj.get("resource")
-						.context("No resource property on object ZRuntimeResourceID")?
-						.as_str()
-						.context("Resource was not string")?
-				} else {
-					property_data.value.as_str().unwrap_or_default()
-				};
-
-				if let Some(entry) = hash_list.entries.get(&RuntimeID::from_any(res)?)
-					&& entry.resource_type == "LINE"
-				{
-					if let Some(decoration) =
-						get_line_decoration(game_files, game_version, tonytools_hash_list, RuntimeID::from_any(res)?)?
+					} else if res.get_path().is_none()
+						&& let Some(entry) = res.get_info()
+						&& let Some(hint) = entry.hint
 					{
-						decorations.push((res.to_owned(), decoration));
-					}
-				} else if res.starts_with('0') {
-					if let Some(entry) = hash_list.entries.get(&RuntimeID::from_str(res)?) {
-						if let Some(hint) = entry.hint.as_ref() {
-							decorations.push((res.to_owned(), hint.to_owned()));
-						}
+						decorations.push((res.to_string(), hint.into()));
 					}
 				}
-			} else if property_data.property_type == "TArray<ZRuntimeResourceID>" {
-				for val in from_value::<Vec<Value>>(property_data.value.to_owned())
-					.context("TArray<ZRuntimeResourceID> was not an array")?
-				{
-					let res = if let Some(obj) = val.as_object() {
-						obj.get("resource")
-							.context("No resource property on object ZRuntimeResourceID")?
-							.as_str()
-							.context("Resource was not string")?
-					} else {
-						val.as_str().unwrap_or_default()
-					};
 
-					if let Some(entry) = hash_list.entries.get(&RuntimeID::from_any(res)?)
-						&& entry.resource_type == "LINE"
+				Variant::Uuid(uuid) => {
+					if let Some(repo_item) = repository.iter().find(|x| x.id == *uuid)
+						&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 					{
-						if let Some(decoration) = get_line_decoration(
-							game_files,
-							game_version,
-							tonytools_hash_list,
-							RuntimeID::from_any(res)?
-						)? {
-							decorations.push((res.to_owned(), decoration));
-						}
-					} else if res.starts_with('0') {
-						if let Some(entry) = hash_list.entries.get(&RuntimeID::from_str(res)?) {
-							if let Some(hint) = entry.hint.as_ref() {
-								decorations.push((res.to_owned(), hint.to_owned()));
-							}
-						}
+						decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
 					}
 				}
-			}
+
+				_ => {}
+			});
 		}
 	}
 
-	for triggers in sub_entity.events.as_ref().unwrap_or(&Default::default()).values() {
+	for triggers in sub_entity.events.values() {
 		for trigger_entities in triggers.values() {
 			for reference in trigger_entities {
-				let reference = match reference {
-					RefMaybeConstantValue::Ref(x) => x,
-					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
-				};
+				let reference = &reference.entity_ref;
 
 				if let Some(decoration) =
-					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
+					get_ref_decoration(game_files, cached_entities, game_version, entity, Some(reference))
 				{
 					decorations.push(decoration);
 				}
@@ -964,175 +708,121 @@ pub fn get_decorations(
 
 	for propagates in sub_entity
 		.input_copying
-		.as_ref()
-		.unwrap_or(&Default::default())
 		.values()
+		.chain(sub_entity.output_copying.values())
 	{
 		for propagate_entities in propagates.values() {
 			for reference in propagate_entities {
-				let reference = match reference {
-					RefMaybeConstantValue::Ref(x) => x,
-					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
-				};
+				let reference = reference.entity_id;
 
-				if let Some(decoration) =
-					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
-				{
+				if let Some(decoration) = get_ref_decoration(
+					game_files,
+					cached_entities,
+					game_version,
+					entity,
+					Some(&Ref::local(reference))
+				) {
 					decorations.push(decoration);
 				}
 			}
 		}
 	}
 
-	for propagates in sub_entity
-		.output_copying
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
-		for propagate_entities in propagates.values() {
-			for reference in propagate_entities {
-				let reference = match reference {
-					RefMaybeConstantValue::Ref(x) => x,
-					RefMaybeConstantValue::RefWithConstantValue(RefWithConstantValue { entity_ref, .. }) => entity_ref
-				};
-
-				if let Some(decoration) =
-					get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
-				{
-					decorations.push(decoration);
-				}
-			}
-		}
-	}
-
-	for aliases in sub_entity
-		.property_aliases
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
+	for aliases in sub_entity.property_aliases.values() {
 		for alias_data in aliases {
 			if let Some(decoration) = get_ref_decoration(
 				game_files,
 				cached_entities,
 				game_version,
-				hash_list,
 				entity,
-				&alias_data.original_entity
+				Some(&Ref::local(alias_data.original_entity))
 			) {
 				decorations.push(decoration);
 			}
 		}
 	}
 
-	for exposed_entity in sub_entity
-		.exposed_entities
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
+	for exposed_entity in sub_entity.exposed_entities.values() {
 		for reference in &exposed_entity.refers_to {
 			if let Some(decoration) =
-				get_ref_decoration(game_files, cached_entities, game_version, hash_list, entity, reference)
+				get_ref_decoration(game_files, cached_entities, game_version, entity, Some(reference))
 			{
 				decorations.push(decoration);
 			}
 		}
 	}
 
-	for referenced_entity in sub_entity
-		.exposed_interfaces
-		.as_ref()
-		.unwrap_or(&Default::default())
-		.values()
-	{
+	for referenced_entity in sub_entity.exposed_interfaces.values() {
 		if let Some(decoration) = get_ref_decoration(
 			game_files,
 			cached_entities,
 			game_version,
-			hash_list,
 			entity,
-			&Ref::Short(Some(referenced_entity.to_owned()))
+			Some(&Ref::local(*referenced_entity))
 		) {
 			decorations.push(decoration);
 		}
 	}
 
-	for member_of in sub_entity.subsets.as_ref().unwrap_or(&Default::default()).values() {
+	for member_of in sub_entity.subsets.values() {
 		for parental_entity in member_of {
 			if let Some(decoration) = get_ref_decoration(
 				game_files,
 				cached_entities,
 				game_version,
-				hash_list,
 				entity,
-				&Ref::Short(Some(parental_entity.to_owned()))
+				Some(&Ref::local(parental_entity.to_owned()))
 			) {
 				decorations.push(decoration);
 			}
 		}
 	}
 
-	if hash_list
-		.entries
-		.get(&RuntimeID::from_any(&sub_entity.factory)?)
-		.map(|entry| entry.resource_type == "MATT")
-		.unwrap_or(false)
-	{
-		if let Some(mati) = extract_latest_metadata(game_files, RuntimeID::from_any(&sub_entity.factory)?)?
+	if sub_entity
+		.factory
+		.resource
+		.get_info()
+		.is_some_and(|entry| entry.resource_type == "MATT")
+		&& let Some(mati) = extract_latest_metadata(game_files, sub_entity.factory.resource)?
 			.core_info
 			.references
 			.into_iter()
-			.find(|x| {
-				hash_list
-					.entries
-					.get(&x.resource.get_id())
-					.map(|entry| entry.resource_type == "MATI")
-					.unwrap_or(false)
-			}) {
-			if let Some(mate) = extract_latest_metadata(game_files, mati.resource.get_id())?
-				.core_info
-				.references
-				.into_iter()
-				.find(|x| {
-					hash_list
-						.entries
-						.get(&x.resource.get_id())
-						.map(|entry| entry.resource_type == "MATE")
-						.unwrap_or(false)
-				}) {
-				let mate_data = extract_latest_resource(game_files, mate.resource.get_id())?.1;
+			.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "MATI"))
+		&& let Some(mate) = extract_latest_metadata(game_files, mati.resource)?
+			.core_info
+			.references
+			.into_iter()
+			.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "MATE"))
+	{
+		let mate_data = extract_latest_resource(game_files, mate.resource)?.1;
 
-				let mut beginning = mate_data.len() - 1;
-				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {
-					beginning -= 1;
-				}
-				beginning += 1;
-
-				decorations.extend(
-					String::from_utf8(mate_data[beginning..mate_data.len() - 1].into())?
-						.split('\x00')
-						.filter(|x| !x.is_empty() && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
-						.map(|x| x.trim().to_owned())
-						.tuples()
-						.map(|(prop, friendly)| {
-							(
-								if prop.starts_with("map") {
-									prop.chars().skip(3).collect()
-								} else {
-									prop
-								},
-								if friendly.starts_with("map") {
-									friendly.chars().skip(3).collect()
-								} else {
-									friendly
-								}
-							)
-						})
-				);
-			}
+		let mut beginning = mate_data.len() - 1;
+		while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {
+			beginning -= 1;
 		}
+		beginning += 1;
+
+		decorations.extend(
+			String::from_utf8(mate_data[beginning..mate_data.len() - 1].into())?
+				.split('\x00')
+				.filter(|x| !x.is_empty() && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
+				.map(|x| x.trim().to_owned())
+				.tuples()
+				.map(|(prop, friendly)| {
+					(
+						if prop.starts_with("map") {
+							prop.chars().skip(3).collect()
+						} else {
+							prop
+						},
+						if friendly.starts_with("map") {
+							friendly.chars().skip(3).collect()
+						} else {
+							friendly
+						}
+					)
+				})
+		);
 	}
 
 	decorations.into_iter().unique().collect()
@@ -1163,32 +853,29 @@ pub fn is_valid_entity_blueprint(resource_type: ResourceType) -> bool {
 		|| resource_type == "WSGB"
 }
 
-/// New, modified, removed (ID, name, parent, factory, has reverse parent refs)
+/// Get the set of all entities which have reverse parent refs.
+pub fn reverse_parent_refs_set(entity: &Entity) -> HashSet<EntityID> {
+	let mut reverse_parent_refs = HashSet::new();
+
+	for entity_data in entity.entities.values() {
+		if let Some(parent) = entity_data.parent.as_ref().and_then(Ref::as_local) {
+			reverse_parent_refs.insert(parent);
+		}
+	}
+
+	reverse_parent_refs
+}
+
+/// New, modified, removed (ID, parent, name, factory, has reverse parent refs)
 pub fn get_diff_info(
 	original: &Entity,
 	modified: &Entity
-) -> (Vec<String>, Vec<String>, Vec<(String, String, Ref, String, bool)>) {
-	let mut old_reverse_parent_refs: HashMap<String, Vec<String>> = HashMap::new();
-
-	for (entity_id, entity_data) in original.entities.iter() {
-		match entity_data.parent {
-			Ref::Full(ref reference) if reference.external_scene.is_none() => {
-				old_reverse_parent_refs
-					.entry(reference.entity_ref.to_owned())
-					.and_modify(|x| x.push(entity_id.to_owned()))
-					.or_insert(vec![entity_id.to_owned()]);
-			}
-
-			Ref::Short(Some(ref reference)) => {
-				old_reverse_parent_refs
-					.entry(reference.to_owned())
-					.and_modify(|x| x.push(entity_id.to_owned()))
-					.or_insert(vec![entity_id.to_owned()]);
-			}
-
-			_ => {}
-		}
-	}
+) -> (
+	Vec<EntityID>,
+	Vec<EntityID>,
+	Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
+) {
+	let old_reverse_parent_refs = reverse_parent_refs_set(original);
 
 	let removed = original
 		.entities
@@ -1197,10 +884,10 @@ pub fn get_diff_info(
 		.map(|(id, orig)| {
 			(
 				id.to_owned(),
-				orig.name.to_owned(),
 				orig.parent.to_owned(),
-				orig.factory.to_owned(),
-				old_reverse_parent_refs.contains_key(id)
+				orig.name.to_owned(),
+				orig.factory.resource.to_owned(),
+				old_reverse_parent_refs.contains(id)
 			)
 		})
 		.collect();

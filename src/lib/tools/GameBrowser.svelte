@@ -2,7 +2,7 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter } from "$lib/bindings-types"
+	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter } from "$lib/bindings"
 	import { Checkbox, Dropdown, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"

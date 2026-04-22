@@ -1,17 +1,21 @@
-use std::{fs, ops::Deref, time::Duration};
+use std::{fs, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
+use ecow::eco_format;
 use fn_error_context::context;
-use hitman_commons::metadata::RuntimeID;
-use hitman_commons::{game::GameVersion, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::game::GameVersion;
+use hitman_commons::hash_list::HASH_LIST;
+use hitman_commons::metadata::{ResourceReference, RuntimeID};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use quickentity_rs::entity::EntityID;
 use quickentity_rs::{
-	apply_patch, convert_to_qn, convert_to_rt, generate_patch,
-	patch_structs::Patch,
-	qn_structs::{CommentEntity, Entity, Ref, SubEntity, SubType}
+	apply_patch, convert_to_game, convert_to_qn,
+	entity::{CommentEntity, Entity, SubEntity, SubType},
+	generate_patch,
+	patch::Patch
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
@@ -23,11 +27,8 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
+use crate::model::Hash;
 use crate::ores_repo::UnlockableItem;
-use crate::resourcelib::{
-	h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
-	h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory
-};
 use crate::rpkg::extract_latest_resource;
 use crate::{Notification, NotificationKind, send_notification};
 use crate::{
@@ -87,26 +88,25 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							fs::write(
 								path,
 								to_string(&Entity {
-									factory_hash: String::new(),
-									blueprint_hash: String::new(),
-									root_entity: "fffffffffffffffe".into(),
+									factory: "[assembly:/something.entity].pc_entitytemplate".parse()?,
+									blueprint: "[assembly:/something.entity].pc_entityblueprint".parse()?,
+									root_entity: 0xfffffffffffffffe.into(),
 									entities: velcro::map_iter! {
-										"fffffffffffffffe": SubEntity {
-											parent: Ref::Short(None),
+										EntityID::from(0xfffffffffffffffe): SubEntity {
+											parent: None,
 											name: "Scene".into(),
-											factory: "[modules:/zspatialentity.class].pc_entitytype".into(),
-											blueprint: "[modules:/zspatialentity.class].pc_entityblueprint".into(),
-											factory_flag: None,
-											editor_only: None,
-											properties: None,
-											platform_specific_properties: None,
-											events: None,
-											input_copying: None,
-											output_copying: None,
-											property_aliases: None,
-											exposed_entities: None,
-											exposed_interfaces: None,
-											subsets: None
+											factory: ResourceReference{resource:"[modules:/zspatialentity.class].pc_entitytype".parse().unwrap(),flags:Default::default()},
+											blueprint: "[modules:/zspatialentity.class].pc_entityblueprint".parse().unwrap(),
+											editor_only: Default::default(),
+											properties: Default::default(),
+											platform_specific_properties: Default::default(),
+											events: Default::default(),
+											input_copying: Default::default(),
+											output_copying: Default::default(),
+											property_aliases: Default::default(),
+											exposed_entities: Default::default(),
+											exposed_interfaces: Default::default(),
+											subsets: Default::default()
 										}
 									}
 									.map(|(x, y)| (x.to_owned(), y))
@@ -117,9 +117,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 									pin_connection_override_deletes: vec![],
 									external_scenes: vec![],
 									sub_type: SubType::Scene,
-									quick_entity_version: 3.1,
-									extra_factory_dependencies: vec![],
-									extra_blueprint_dependencies: vec![],
+									quickentity_version: 3.1,
+									extra_factory_references: vec![],
+									extra_blueprint_references: vec![],
 									comments: vec![]
 								})?
 							)?;
@@ -181,72 +181,72 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.collect_vec()
 					.join(".");
 
-				match extension.as_ref() {
-					"entity.json" => {
-						let mut entity: Entity =
-							from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
-
-						// Normalise comments to form used by GlacierKit (single comment for each entity)
-						let mut comments: Vec<CommentEntity> = vec![];
-						for comment in entity.comments {
-							if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-								x.text = format!("{}\n\n{}", x.text, comment.text);
-							} else {
-								comments.push(CommentEntity {
-									parent: comment.parent,
-									name: "Notes".into(),
-									text: comment.text
-								});
-							}
-						}
-						entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
-
-						let (fac, fac_meta, blu, blu_meta) =
-							convert_to_rt(&entity).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-
-						let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
-							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-
-						reconverted.comments = comments;
-
-						fs::write(path, to_vec(&reconverted)?)?;
-
-						send_notification(
-							app,
-							Notification {
-								kind: NotificationKind::Success,
-								title: "File normalised".into(),
-								subtitle: "The entity file has been re-saved in canonical format.".into()
-							}
-						)?;
-					}
-
-					"entity.patch.json" => {
-						let patch: Patch =
-							from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
-
-						if let Some(game_files) = app_state.game_files.load().as_ref()
-							&& let Some(install) = app_settings.load().game_install.as_ref()
-							&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-						{
-							let mut entity = extract_entity(
-								game_files,
-								&app_state.cached_entities,
-								get_loaded_game_version(app, install)?,
-								hash_list,
-								RuntimeID::from_any(&patch.factory_hash)?
-							)?
-							.to_owned();
-
-							let base = entity.to_owned();
-
-							apply_patch(&mut entity, patch, true).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+				if let Some(game_files) = app_state.game_files.load().as_ref()
+					&& let Some(install) = app_settings.load().game_install.as_ref()
+				{
+					match extension.as_ref() {
+						"entity.json" => {
+							let mut entity: Entity = from_slice(&fs::read(&path).context("Couldn't read file")?)
+								.context("Invalid entity")?;
 
 							// Normalise comments to form used by GlacierKit (single comment for each entity)
 							let mut comments: Vec<CommentEntity> = vec![];
 							for comment in entity.comments {
 								if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-									x.text = format!("{}\n\n{}", x.text, comment.text);
+									x.text = eco_format!("{}\n\n{}", x.text, comment.text);
+								} else {
+									comments.push(CommentEntity {
+										parent: comment.parent,
+										name: "Notes".into(),
+										text: comment.text
+									});
+								}
+							}
+							entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
+
+							let (fac, fac_meta, blu, blu_meta) =
+								convert_to_game(&entity, get_loaded_game_version(app, install)?)
+									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+							let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
+								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+							reconverted.comments = comments;
+
+							fs::write(path, to_vec(&reconverted)?)?;
+
+							send_notification(
+								app,
+								Notification {
+									kind: NotificationKind::Success,
+									title: "File normalised".into(),
+									subtitle: "The entity file has been re-saved in canonical format.".into()
+								}
+							)?;
+						}
+
+						"entity.patch.json" => {
+							let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
+								.context("Invalid entity")?;
+
+							let mut entity = extract_entity(
+								game_files,
+								&app_state.cached_entities,
+								get_loaded_game_version(app, install)?,
+								patch.factory
+							)?
+							.to_owned();
+
+							let base = entity.to_owned();
+
+							apply_patch(&mut entity, patch, |_| {})
+								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+							// Normalise comments to form used by GlacierKit (single comment for each entity)
+							let mut comments: Vec<CommentEntity> = vec![];
+							for comment in entity.comments {
+								if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+									x.text = eco_format!("{}\n\n{}", x.text, comment.text);
 								} else {
 									comments.push(CommentEntity {
 										parent: comment.parent,
@@ -258,7 +258,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							entity.comments = vec![];
 
 							let (fac, fac_meta, blu, blu_meta) =
-								convert_to_rt(&entity).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+								convert_to_game(&entity, get_loaded_game_version(app, install)?)
+									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 							let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
@@ -281,23 +282,23 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 									subtitle: "The patch file has been re-saved in canonical format.".into()
 								}
 							)?;
-						} else {
-							send_notification(
-								app,
-								Notification {
-									kind: NotificationKind::Error,
-									title: "No game selected".into(),
-									subtitle: "You can't normalise patch files without a copy of the game selected."
-										.into()
-								}
-							)?;
+						}
+
+						_ => {
+							Err(anyhow!("Can't normalise non-QN files"))?;
+							panic!();
 						}
 					}
-
-					_ => {
-						Err(anyhow!("Can't normalise non-QN files"))?;
-						panic!();
-					}
+				} else {
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Error,
+							title: "No game selected".into(),
+							subtitle: "You can't normalise QuickEntity files without a copy of the game selected."
+								.into()
+						}
+					)?;
 				}
 
 				finish_task(app, task)?;
@@ -306,7 +307,6 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			FileBrowserEvent::ConvertEntityToPatch { path } => {
 				if let Some(game_files) = app_state.game_files.load().as_ref()
 					&& let Some(install) = app_settings.load().game_install.as_ref()
-					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
 					let mut entity: Entity =
 						from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
@@ -315,7 +315,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					let mut comments: Vec<CommentEntity> = vec![];
 					for comment in entity.comments {
 						if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-							x.text = format!("{}\n\n{}", x.text, comment.text);
+							x.text = eco_format!("{}\n\n{}", x.text, comment.text);
 						} else {
 							comments.push(CommentEntity {
 								parent: comment.parent,
@@ -329,19 +329,25 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					let game_version = get_loaded_game_version(app, install)?;
 
 					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
-					let (temp_meta, temp_data) =
-						extract_latest_resource(game_files, RuntimeID::from_any(&entity.factory_hash)?)?;
+					let (temp_meta, temp_data) = extract_latest_resource(game_files, entity.factory)?;
 
 					let factory = match game_version {
-						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
-							.context("Couldn't convert binary data to ResourceLib factory")?
-							.into_modern(),
+						GameVersion::H1 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
+								.context("Couldn't deserialise factory")?
+								.try_into()?
+						}
 
-						GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
-							.context("Couldn't convert binary data to ResourceLib factory")?,
+						GameVersion::H2 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
+								.context("Couldn't deserialise factory")?
+								.try_into()?
+						}
 
-						GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
-							.context("Couldn't convert binary data to ResourceLib factory")?
+						GameVersion::H3 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
+								.context("Couldn't deserialise factory")?
+						}
 					};
 
 					let blueprint_hash = temp_meta
@@ -349,33 +355,31 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						.references
 						.get(factory.blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
-						.resource
-						.get_id();
+						.resource;
 
 					let (tblu_meta, tblu_data) = extract_latest_resource(game_files, blueprint_hash)?;
 
 					let blueprint = match game_version {
-						GameVersion::H1 => h2016_convert_binary_to_blueprint(&tblu_data)
-							.context("Couldn't convert binary data to ResourceLib blueprint")?
-							.into_modern(),
+						GameVersion::H1 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
+								.context("Couldn't deserialise blueprint")?
+								.try_into()?
+						}
 
-						GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data)
-							.context("Couldn't convert binary data to ResourceLib blueprint")?,
+						GameVersion::H2 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
+								.context("Couldn't deserialise blueprint")?
+								.try_into()?
+						}
 
-						GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data)
-							.context("Couldn't convert binary data to ResourceLib blueprint")?
+						GameVersion::H3 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
+								.context("Couldn't deserialise blueprint")?
+						}
 					};
 
-					let base = convert_to_qn(
-						&factory,
-						&RpkgResourceMeta::from_resource_metadata(temp_meta, false)
-							.with_hash_list(&hash_list.entries)?,
-						&blueprint,
-						&RpkgResourceMeta::from_resource_metadata(tblu_meta, false)
-							.with_hash_list(&hash_list.entries)?,
-						false
-					)
-					.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+					let base = convert_to_qn(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
+						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 					fs::write(
 						{
@@ -421,24 +425,22 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 				if let Some(game_files) = app_state.game_files.load().as_ref()
 					&& let Some(install) = app_settings.load().game_install.as_ref()
-					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
 					let mut entity = extract_entity(
 						game_files,
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
-						hash_list,
-						RuntimeID::from_any(&patch.factory_hash)?
+						patch.factory
 					)?
 					.to_owned();
 
-					apply_patch(&mut entity, patch, true).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+					apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 					// Normalise comments to form used by GlacierKit (single comment for each entity)
 					let mut comments: Vec<CommentEntity> = vec![];
 					for comment in entity.comments {
 						if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-							x.text = format!("{}\n\n{}", x.text, comment.text);
+							x.text = eco_format!("{}\n\n{}", x.text, comment.text);
 						} else {
 							comments.push(CommentEntity {
 								parent: comment.parent,
@@ -816,7 +818,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					id.to_owned(),
 					EditorState {
 						file: None,
-						data: EditorData::ResourceOverview { hash: hash.to_owned() }
+						data: EditorData::ResourceOverview { hash: hash.0 }
 					}
 				);
 
@@ -824,7 +826,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					app,
 					Request::Global(GlobalRequest::CreateTab {
 						id,
-						name: format!("Resource overview ({hash})"),
+						name: format!("Resource overview ({})", hash.0),
 						editor_type: EditorType::ResourceOverview
 					})
 				)?;
@@ -856,118 +858,110 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 					let query_terms = query.split(' ').collect_vec();
 
-					if let Some(hash_list) = app_state.hash_list.load().deref() {
-						send_request(
-							app,
-							Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::NewTree {
-								game_description: format!(
-									"{} ({})",
-									match install.version {
-										GameVersion::H1 => "HITMAN™",
-										GameVersion::H2 => "HITMAN 2",
-										GameVersion::H3 => "HITMAN 3"
-									},
-									install.platform
-								),
-								entries: {
-									if matches!(filter, SearchFilter::All) {
-										hash_list
-											.entries
-											.par_iter()
-											.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-											.filter(|(hash, entry)| {
-												query_terms.iter().all(|&y| {
-													let mut s = format!(
-														"{}{}{}.{}",
-														entry.path.as_deref().unwrap_or(""),
-														entry.hint.as_deref().unwrap_or(""),
-														hash,
-														entry.resource_type
-													);
+					send_request(
+						app,
+						Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::NewTree {
+							game_description: format!(
+								"{} ({})",
+								match install.version {
+									GameVersion::H1 => "HITMAN™",
+									GameVersion::H2 => "HITMAN 2",
+									GameVersion::H3 => "HITMAN 3"
+								},
+								install.platform
+							),
+							entries: {
+								if matches!(filter, SearchFilter::All) {
+									HASH_LIST
+										.entries
+										.load()
+										.par_iter()
+										.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+										.filter(|(hash, entry)| {
+											query_terms.iter().all(|&y| {
+												let mut s = format!(
+													"{}{}{}.{}",
+													entry.path.as_deref().unwrap_or(""),
+													entry.hint.as_deref().unwrap_or(""),
+													hash,
+													entry.resource_type
+												);
 
-													s.make_ascii_lowercase();
+												s.make_ascii_lowercase();
 
-													s.contains(y)
-												})
+												s.contains(y)
 											})
-											.map(|(&hash, entry)| GameBrowserEntry {
-												hash,
-												path: entry.path.to_owned(),
-												hint: entry.hint.to_owned(),
-												filetype: entry.resource_type,
-												partition: {
-													let rrid = RuntimeResourceID::from(hash);
+										})
+										.map(|(&hash, entry)| GameBrowserEntry {
+											hash: Hash(hash),
+											path: entry.path.to_owned(),
+											hint: entry.hint.to_owned(),
+											filetype: entry.resource_type,
+											partition: {
+												let rrid = RuntimeResourceID::from(hash);
 
-													let partition = game_files
-														.partitions
-														.iter()
-														.find(|x| x.contains(&rrid))
-														.unwrap();
+												let partition =
+													game_files.partitions.iter().find(|x| x.contains(&rrid)).unwrap();
 
-													(
-														partition.partition_info().id.to_string(),
-														partition
-															.partition_info()
-															.name
-															.to_owned()
-															.unwrap_or("<unnamed>".into())
-													)
-												}
+												(
+													partition.partition_info().id.to_string(),
+													partition
+														.partition_info()
+														.name
+														.to_owned()
+														.unwrap_or("<unnamed>".into())
+												)
+											}
+										})
+										.collect()
+								} else {
+									HASH_LIST
+										.entries
+										.load()
+										.par_iter()
+										.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
+										.filter(|(_, entry)| filter_includes.iter().any(|&x| entry.resource_type == x))
+										.filter(|(hash, entry)| {
+											query_terms.iter().all(|&y| {
+												let mut s = format!(
+													"{}{}{}.{}",
+													entry.path.as_deref().unwrap_or(""),
+													entry.hint.as_deref().unwrap_or(""),
+													hash,
+													entry.resource_type
+												);
+
+												s.make_ascii_lowercase();
+
+												s.contains(y)
 											})
-											.collect()
-									} else {
-										hash_list
-											.entries
-											.par_iter()
-											.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-											.filter(|(_, entry)| {
-												filter_includes.iter().any(|&x| entry.resource_type == x)
-											})
-											.filter(|(hash, entry)| {
-												query_terms.iter().all(|&y| {
-													let mut s = format!(
-														"{}{}{}.{}",
-														entry.path.as_deref().unwrap_or(""),
-														entry.hint.as_deref().unwrap_or(""),
-														hash,
-														entry.resource_type
-													);
+										})
+										.map(|(&hash, entry)| GameBrowserEntry {
+											hash: Hash(hash),
+											path: entry.path.to_owned(),
+											hint: entry.hint.to_owned(),
+											filetype: entry.resource_type,
+											partition: {
+												let rrid = RuntimeResourceID::from(hash);
 
-													s.make_ascii_lowercase();
+												let partition =
+													game_files.partitions.iter().find(|x| x.contains(&rrid)).unwrap();
 
-													s.contains(y)
-												})
-											})
-											.map(|(&hash, entry)| GameBrowserEntry {
-												hash,
-												path: entry.path.to_owned(),
-												hint: entry.hint.to_owned(),
-												filetype: entry.resource_type,
-												partition: {
-													let rrid = RuntimeResourceID::from(hash);
-
-													let partition = game_files
-														.partitions
-														.iter()
-														.find(|x| x.contains(&rrid))
-														.unwrap();
-
-													(
-														partition.partition_info().id.to_string(),
-														partition
-															.partition_info()
-															.name
-															.to_owned()
-															.unwrap_or("<unnamed>".into())
-													)
-												}
-											})
-											.collect()
-									}
+												(
+													partition.partition_info().id.to_string(),
+													partition
+														.partition_info()
+														.name
+														.to_owned()
+														.unwrap_or("<unnamed>".into())
+												)
+											}
+										})
+										.collect()
 								}
-							}))
-						)?;
-					}
+							}
+						}))
+					)?;
 				}
 
 				finish_task(app, task)?;
@@ -976,9 +970,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			GameBrowserEvent::OpenInEditor(hash) => {
 				if let Some(game_files) = app_state.game_files.load().as_ref()
 					&& let Some(install) = app_settings.load().game_install.as_ref()
-					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
-					open_in_editor(app, game_files, install, hash_list, hash).await?;
+					open_in_editor(app, game_files, install, hash.0).await?;
 				}
 			}
 		},

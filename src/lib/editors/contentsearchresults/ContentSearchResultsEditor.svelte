@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ContentSearchResultsRequest } from "$lib/bindings-types"
+	import type { ContentSearchResultsRequest } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import { onMount } from "svelte"
 	import { trackEvent } from "$lib/utils"

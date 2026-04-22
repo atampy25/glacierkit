@@ -2,15 +2,15 @@ use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use itertools::Itertools;
-use quickentity_rs::qn_structs::{Entity, Ref};
+use quickentity_rs::{entity::Entity, variant::Variant};
 use serde::Serialize;
-use serde_json::{from_str, from_value};
+use serde_json::from_str;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
-	entity::get_ref_decoration,
+	entity::{get_ref_decoration, visit_variant},
 	finish_task, get_loaded_game_version,
 	model::{
 		AppSettings, AppState, EditorData, EditorRequest, EntityEditorRequest, EntityOverridesEvent,
@@ -20,13 +20,12 @@ use crate::{
 };
 
 #[try_fn]
-#[context("Couldn't get overrides decorations for {}", entity.factory_hash)]
+#[context("Couldn't get overrides decorations for {}", entity.factory)]
 pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Entity) -> Result<()> {
 	let app_state = app.state::<AppState>();
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 
 	if let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
 		&& let Some(repository) = app_state.repository.load().as_ref()
 	{
@@ -42,67 +41,38 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 					game_files,
 					&app_state.cached_entities,
 					game_version,
-					hash_list,
 					entity,
-					reference
+					Some(reference)
 				) {
 					decorations.push(decoration);
 				}
 			}
 
 			for property_data in property_override.properties.values() {
-				if property_data.property_type == "SEntityTemplateReference" {
-					if let Some(decoration) = get_ref_decoration(
-						game_files,
-						&app_state.cached_entities,
-						game_version,
-						hash_list,
-						entity,
-						&from_value::<Ref>(property_data.value.to_owned()).context("Invalid reference")?
-					) {
-						decorations.push(decoration);
-					}
-				} else if property_data.property_type == "TArray<SEntityTemplateReference>" {
-					for reference in
-						from_value::<Vec<Ref>>(property_data.value.to_owned()).context("Invalid reference array")?
-					{
+				visit_variant(property_data, &mut |val| match val {
+					Variant::Ref(val) => {
 						if let Some(decoration) = get_ref_decoration(
 							game_files,
 							&app_state.cached_entities,
 							game_version,
-							hash_list,
 							entity,
-							&reference
+							val.as_ref()
 						) {
 							decorations.push(decoration);
 						}
 					}
-				} else if property_data.property_type == "ZGuid" {
-					let repository_id =
-						from_value::<String>(property_data.value.to_owned()).context("Invalid ZGuid")?;
 
-					if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
-						if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
-							decorations.push((
-								repository_id,
-								name.as_str().context("Name or CommonName was not string")?.to_owned()
-							));
+					Variant::Uuid(uuid) => {
+						if let Some(repo_item) = repository.iter().find(|x| x.id == *uuid)
+							&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
+						{
+							decorations
+								.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
 						}
 					}
-				} else if property_data.property_type == "TArray<ZGuid>" {
-					for repository_id in
-						from_value::<Vec<String>>(property_data.value.to_owned()).context("Invalid ZGuid array")?
-					{
-						if let Some(repo_item) = repository.iter().find(|x| x.id.to_string() == repository_id) {
-							if let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName")) {
-								decorations.push((
-									repository_id,
-									name.as_str().context("Name or CommonName was not string")?.to_owned()
-								));
-							}
-						}
-					}
-				}
+
+					_ => {}
+				});
 			}
 		}
 
@@ -111,9 +81,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				game_files,
 				&app_state.cached_entities,
 				game_version,
-				hash_list,
 				entity,
-				reference
+				Some(reference)
 			) {
 				decorations.push(decoration);
 			}
@@ -124,9 +93,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				game_files,
 				&app_state.cached_entities,
 				game_version,
-				hash_list,
 				entity,
-				&pin_connection_override.from_entity
+				Some(&pin_connection_override.from_entity)
 			) {
 				decorations.push(decoration);
 			}
@@ -135,9 +103,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				game_files,
 				&app_state.cached_entities,
 				game_version,
-				hash_list,
 				entity,
-				&pin_connection_override.to_entity
+				Some(&pin_connection_override.to_entity)
 			) {
 				decorations.push(decoration);
 			}
@@ -148,9 +115,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				game_files,
 				&app_state.cached_entities,
 				game_version,
-				hash_list,
 				entity,
-				&pin_connection_override_delete.from_entity
+				Some(&pin_connection_override_delete.from_entity)
 			) {
 				decorations.push(decoration);
 			}
@@ -159,9 +125,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 				game_files,
 				&app_state.cached_entities,
 				game_version,
-				hash_list,
 				entity,
-				&pin_connection_override_delete.to_entity
+				Some(&pin_connection_override_delete.to_entity)
 			) {
 				decorations.push(decoration);
 			}
@@ -261,20 +226,20 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 				}
 			};
 
-			if let Ok(deserialised) = from_str(&content) {
-				if entity.property_overrides != deserialised {
-					entity.property_overrides = deserialised;
+			if let Ok(deserialised) = from_str(&content)
+				&& entity.property_overrides != deserialised
+			{
+				entity.property_overrides = deserialised;
 
-					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
+				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
-					send_request(
-						app,
-						Request::Global(GlobalRequest::SetTabUnsaved {
-							id: editor_id,
-							unsaved: true
-						})
-					)?;
-				}
+				send_request(
+					app,
+					Request::Global(GlobalRequest::SetTabUnsaved {
+						id: editor_id,
+						unsaved: true
+					})
+				)?;
 			}
 		}
 
@@ -291,20 +256,20 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 				}
 			};
 
-			if let Ok(deserialised) = from_str(&content) {
-				if entity.override_deletes != deserialised {
-					entity.override_deletes = deserialised;
+			if let Ok(deserialised) = from_str(&content)
+				&& entity.override_deletes != deserialised
+			{
+				entity.override_deletes = deserialised;
 
-					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
+				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
-					send_request(
-						app,
-						Request::Global(GlobalRequest::SetTabUnsaved {
-							id: editor_id,
-							unsaved: true
-						})
-					)?;
-				}
+				send_request(
+					app,
+					Request::Global(GlobalRequest::SetTabUnsaved {
+						id: editor_id,
+						unsaved: true
+					})
+				)?;
 			}
 		}
 
@@ -321,20 +286,20 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 				}
 			};
 
-			if let Ok(deserialised) = from_str(&content) {
-				if entity.pin_connection_overrides != deserialised {
-					entity.pin_connection_overrides = deserialised;
+			if let Ok(deserialised) = from_str(&content)
+				&& entity.pin_connection_overrides != deserialised
+			{
+				entity.pin_connection_overrides = deserialised;
 
-					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
+				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
-					send_request(
-						app,
-						Request::Global(GlobalRequest::SetTabUnsaved {
-							id: editor_id,
-							unsaved: true
-						})
-					)?;
-				}
+				send_request(
+					app,
+					Request::Global(GlobalRequest::SetTabUnsaved {
+						id: editor_id,
+						unsaved: true
+					})
+				)?;
 			}
 		}
 
@@ -351,20 +316,20 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 				}
 			};
 
-			if let Ok(deserialised) = from_str(&content) {
-				if entity.pin_connection_override_deletes != deserialised {
-					entity.pin_connection_override_deletes = deserialised;
+			if let Ok(deserialised) = from_str(&content)
+				&& entity.pin_connection_override_deletes != deserialised
+			{
+				entity.pin_connection_override_deletes = deserialised;
 
-					send_overrides_decorations(app, editor_id.to_owned(), entity)?;
+				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
 
-					send_request(
-						app,
-						Request::Global(GlobalRequest::SetTabUnsaved {
-							id: editor_id,
-							unsaved: true
-						})
-					)?;
-				}
+				send_request(
+					app,
+					Request::Global(GlobalRequest::SetTabUnsaved {
+						id: editor_id,
+						unsaved: true
+					})
+				)?;
 			}
 		}
 	}

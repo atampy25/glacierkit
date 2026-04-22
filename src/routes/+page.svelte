@@ -10,7 +10,7 @@
 	import { Button, ToastNotification } from "carbon-components-svelte"
 	import { beforeUpdate, onDestroy } from "svelte"
 	import { listen } from "@tauri-apps/api/event"
-	import type { Announcement, EditorType, Request } from "$lib/bindings-types"
+	import type { Announcement, EditorType, Request } from "$lib/bindings"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
 	import Close from "carbon-icons-svelte/lib/Close.svelte"
 	import Save from "carbon-icons-svelte/lib/Save.svelte"

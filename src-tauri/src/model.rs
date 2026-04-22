@@ -2,15 +2,18 @@ use std::{path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 use dashmap::DashMap;
+use ecow::EcoString;
 use hashbrown::HashMap;
 use hitman_commons::{
 	game_detection::GameInstall,
-	hash_list::HashList,
-	metadata::{ResourceType, RuntimeID}
+	metadata::{ReferenceFlags, ResourceType, RuntimeID}
 };
 use notify::RecommendedWatcher;
 use notify_debouncer_full::FileIdMap;
-use quickentity_rs::qn_structs::{Entity, Ref, SubEntity, SubType};
+use quickentity_rs::{
+	entity::{Entity, EntityID, Ref, SubEntity, SubType},
+	variant::{Transform, Variant}
+};
 use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -19,7 +22,7 @@ use structstruck::strike;
 use uuid::Uuid;
 
 use crate::{
-	editor_connection::{EditorConnection, QNTransform},
+	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
 	intellisense::Intellisense,
 	ores_repo::{RepositoryItem, RepositoryItemInformation, UnlockableInformation, UnlockableItem}
@@ -50,7 +53,6 @@ impl Default for AppSettings {
 pub struct AppState {
 	pub game_installs: Vec<GameInstall>,
 	pub project: ArcSwapOption<Project>,
-	pub hash_list: ArcSwapOption<HashList>,
 	pub tonytools_hash_list: ArcSwapOption<tonytools::hashlist::HashList>,
 	pub fs_watcher: ArcSwapOption<notify_debouncer_full::Debouncer<RecommendedWatcher, FileIdMap>>,
 	pub editor_states: Arc<DashMap<Uuid, EditorState>>,
@@ -58,6 +60,7 @@ pub struct AppState {
 
 	/// Resource -> Resources which depend on it
 	pub resource_reverse_dependencies: ArcSwapOption<HashMap<RuntimeID, Vec<RuntimeID>>>,
+	pub file_types: ArcSwapOption<HashMap<RuntimeID, ResourceType>>,
 
 	pub cached_entities: Arc<DashMap<RuntimeID, Entity>>,
 	pub repository: ArcSwapOption<Vec<RepositoryItem>>,
@@ -142,11 +145,54 @@ impl Default for ProjectSettings {
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[serde(from = "HashProxy", into = "HashProxy")]
+pub struct Hash(pub RuntimeID);
+
+struct HashProxy(RuntimeID);
+
+impl From<Hash> for HashProxy {
+	fn from(value: Hash) -> Self {
+		Self(value.0)
+	}
+}
+
+impl From<HashProxy> for Hash {
+	fn from(value: HashProxy) -> Self {
+		Self(value.0)
+	}
+}
+
+impl Serialize for HashProxy {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer
+	{
+		serializer.serialize_str(&self.0.to_hash())
+	}
+}
+
+impl<'de> Deserialize<'de> for HashProxy {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>
+	{
+		use serde::de::Error;
+
+		String::deserialize(deserializer)?
+			.parse()
+			.map_err(D::Error::custom)
+			.map(Self)
+	}
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct GameBrowserEntry {
-	pub hash: RuntimeID,
-	pub path: Option<String>,
-	pub hint: Option<String>,
+	pub hash: Hash,
+	#[specta(type = Option<String>)]
+	pub path: Option<EcoString>,
+	#[specta(type = Option<String>)]
+	pub hint: Option<EcoString>,
 	pub filetype: ResourceType,
 	pub partition: (String, String)
 }
@@ -206,8 +252,9 @@ pub struct PastableTemplateCategory {
 pub enum ResourceOverviewData {
 	Generic,
 	Entity {
-		blueprint_hash: String,
-		blueprint_path_or_hint: Option<String>
+		blueprint_hash: Hash,
+		#[specta(type = Option<String>)]
+		blueprint_path_or_hint: Option<EcoString>
 	},
 	GenericRL {
 		json: String
@@ -306,8 +353,8 @@ pub enum AnnouncementKind {
 }
 
 strike! {
-	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, Debug)]]
-	#[strikethrough[serde(rename_all = "camelCase", tag = "type", content = "data")]]
+	#[structstruck::each[derive(Type, Serialize, Deserialize, Clone, Debug)]]
+	#[structstruck::each[serde(rename_all = "camelCase", tag = "type", content = "data")]]
 	pub enum Event {
 		Tool(pub enum ToolEvent {
 			FileBrowser(pub enum FileBrowserEvent {
@@ -355,9 +402,9 @@ strike! {
 			}),
 
 			GameBrowser(pub enum GameBrowserEvent {
-				Select(RuntimeID),
+				Select(Hash),
 				Search(String, SearchFilter),
-				OpenInEditor(RuntimeID)
+				OpenInEditor(Hash)
 			}),
 
 			Settings(pub enum SettingsEvent {
@@ -408,35 +455,35 @@ strike! {
 
 					Select {
 						editor_id: Uuid,
-						id: String
+						id: EntityID
 					},
 
 					Create {
 						editor_id: Uuid,
-						id: String,
+						id: EntityID,
 						content: SubEntity
 					},
 
 					Delete {
 						editor_id: Uuid,
-						id: String
+						id: EntityID
 					},
 
 					Rename {
 						editor_id: Uuid,
-						id: String,
+						id: EntityID,
 						new_name: String
 					},
 
 					Reparent {
 						editor_id: Uuid,
-						id: String,
-						new_parent: Ref
+						id: EntityID,
+						new_parent: Option<EntityID>
 					},
 
 					Copy {
 						editor_id: Uuid,
-						id: String
+						id: EntityID
 					},
 
 					Paste {
@@ -451,7 +498,7 @@ strike! {
 
 					ShowHelpMenu {
 						editor_id: Uuid,
-						entity_id: String
+						entity_id: EntityID
 					},
 
 					UseTemplate {
@@ -463,79 +510,79 @@ strike! {
 					AddGameBrowserItem {
 						editor_id: Uuid,
 						parent_id: String,
-						file: RuntimeID
+						file: Hash
 					},
 
 					SelectEntityInEditor {
 						editor_id: Uuid,
-						entity_id: String
+						entity_id: EntityID
 					},
 
 					MoveEntityToPlayer {
 						editor_id: Uuid,
-						entity_id: String
+						entity_id: EntityID
 					},
 
 					RotateEntityAsPlayer {
 						editor_id: Uuid,
-						entity_id: String
+						entity_id: EntityID
 					},
 
 					MoveEntityToCamera {
 						editor_id: Uuid,
-						entity_id: String
+						entity_id: EntityID
 					},
 
 					RotateEntityAsCamera {
 						editor_id: Uuid,
-						entity_id: String
+						entity_id: EntityID
 					},
 
 					RestoreToOriginal {
 						editor_id: Uuid,
-						entity_id: String
+						entity_id: EntityID
 					}
 				}),
 
 				Monaco(pub enum EntityMonacoEvent {
 					UpdateContent {
 						editor_id: Uuid,
-						entity_id: String,
+						entity_id: EntityID,
 						content: String
 					},
 
 					FollowReference {
 						editor_id: Uuid,
-						reference: String
+						reference: EntityID
 					},
 
 					OpenFactory {
 						editor_id: Uuid,
-						factory: String
+						factory: RuntimeID
 					},
 
 					SignalPin {
 						editor_id: Uuid,
-						entity_id: String,
+						entity_id: EntityID,
 						pin: String,
 						output: bool
 					},
 
 					OpenResourceOverview {
 						editor_id: Uuid,
-						resource: String
+						resource: RuntimeID
 					}
 				}),
 
 				MetaPane(pub enum EntityMetaPaneEvent {
 					JumpToReference {
 						editor_id: Uuid,
-						reference: String
+						reference: EntityID
 					},
 
 					SetNotes {
 						editor_id: Uuid,
-						entity_id: String,
+						entity_id: EntityID,
 						notes: String
 					}
 				}),
@@ -545,19 +592,19 @@ strike! {
 						editor_id: Uuid
 					},
 
-					SetFactoryHash {
+					SetFactory {
 						editor_id: Uuid,
-						factory_hash: String
+						factory: RuntimeID
 					},
 
-					SetBlueprintHash {
+					SetBlueprint {
 						editor_id: Uuid,
-						blueprint_hash: String
+						blueprint: RuntimeID
 					},
 
 					SetRootEntity {
 						editor_id: Uuid,
-						root_entity: String
+						root_entity: EntityID
 					},
 
 					SetSubType {
@@ -567,7 +614,7 @@ strike! {
 
 					SetExternalScenes {
 						editor_id: Uuid,
-						external_scenes: Vec<String>
+						external_scenes: Vec<RuntimeID>
 					}
 				}),
 
@@ -605,12 +652,12 @@ strike! {
 
 				FollowDependency {
 					id: Uuid,
-					new_hash: String
+					new_hash: RuntimeID
 				},
 
 				FollowDependencyInNewTab {
 					id: Uuid,
-					hash: String
+					hash: RuntimeID
 				},
 
 				OpenInEditor {
@@ -726,7 +773,7 @@ strike! {
 
 				OpenResourceOverview {
 					id: Uuid,
-					hash: RuntimeID
+					hash: Hash
 				}
 			})
 		}),
@@ -745,20 +792,20 @@ strike! {
 
 		EditorConnection(pub enum EditorConnectionEvent {
 			// Entity ID, TBLU hash
-			EntitySelected(String, String),
+			EntitySelected(EntityID, Hash),
 
 			// Entity ID, TBLU hash, transform
-			EntityTransformUpdated(String, String, QNTransform),
+			EntityTransformUpdated(EntityID, Hash, Transform),
 
 			// Entity ID, TBLU hash, property name, property type, new value
-			EntityPropertyChanged(String, String, String, String, Value)
+			EntityPropertyChanged(EntityID, Hash, String, Variant)
 		})
 	}
 }
 
 strike! {
-	#[strikethrough[derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]]
-	#[strikethrough[serde(rename_all = "camelCase", tag = "type", content = "data")]]
+	#[structstruck::each[derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]]
+	#[structstruck::each[serde(rename_all = "camelCase", tag = "type", content = "data")]]
 	pub enum Request {
 		Tool(pub enum ToolRequest {
 			FileBrowser(pub enum FileBrowserRequest {
@@ -843,7 +890,7 @@ strike! {
 					/// Will trigger a Select event from the tree - ensure this doesn't end up in a loop
 					Select {
 						editor_id: Uuid,
-						id: Option<String>
+						id: Option<EntityID>
 					},
 
 					NewTree {
@@ -851,7 +898,8 @@ strike! {
 
 						/// ID, parent, name, factory, has reverse parent refs
 						#[debug(skip)]
-						entities: Vec<(String, Ref, String, String, bool)>
+						#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
+						entities: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
 					},
 
 					/// Instructs the frontend to take the list of new entities, add any new ones and update any ones that already exist (by ID) with the new information.
@@ -861,7 +909,8 @@ strike! {
 
 						/// ID, parent, name, factory, has reverse parent refs
 						#[debug(skip)]
-						new_entities: Vec<(String, Ref, String, String, bool)>
+						#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
+						new_entities: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
 					},
 
 					SearchResults {
@@ -869,14 +918,16 @@ strike! {
 
 						/// The IDs of the entities matching the query
 						#[debug(skip)]
-						results: Vec<String>
+						results: Vec<EntityID>
 					},
 
 					ShowHelpMenu {
 						editor_id: Uuid,
-						factory: String,
-						input_pins: Vec<String>,
-						output_pins: Vec<String>,
+						factory: RuntimeID,
+						#[specta(type = Vec<String>)]
+						input_pins: Vec<EcoString>,
+						#[specta(type = Vec<String>)]
+						output_pins: Vec<EcoString>,
 						default_properties_json: String
 					},
 
@@ -897,40 +948,47 @@ strike! {
 
 					SetDiffInfo {
 						editor_id: Uuid,
-						diff_info: (Vec<String>, Vec<String>, Vec<(String, String, Ref, String, bool)>)
+						new: Vec<EntityID>,
+						modified: Vec<EntityID>,
+						#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
+						removed: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
 					}
 				}),
 
 				Monaco(pub enum EntityMonacoRequest {
 					DeselectIfSelected {
 						editor_id: Uuid,
-						entity_ids: Vec<String>
+						entity_ids: Vec<EntityID>
 					},
 
 					ReplaceContent {
 						editor_id: Uuid,
-						entity_id: String,
+						entity_id: EntityID,
 						content: String
 					},
 
 					ReplaceContentIfSameEntityID {
 						editor_id: Uuid,
-						entity_id: String,
+						entity_id: EntityID,
 						content: String
 					},
 
 					UpdateIntellisense {
 						editor_id: Uuid,
-						entity_id: String,
-						properties: Vec<(String, String, Value, bool)>,
-						pins: (Vec<String>, Vec<String>)
+						entity_id: EntityID,
+						#[specta(type = Vec<(String, Variant, bool)>)]
+						properties: Vec<(EcoString, Variant, bool)>,
+						#[specta(type = Vec<String>)]
+						input_pins: Vec<EcoString>,
+						#[specta(type = Vec<String>)]
+						output_pins: Vec<EcoString>,
 					},
 
 					UpdateDecorationsAndMonacoInfo {
 						editor_id: Uuid,
-						entity_id: String,
+						entity_id: EntityID,
 						decorations: Vec<(String, String)>,
-						local_ref_entity_ids: Vec<String>
+						local_ref_entity_ids: Vec<EntityID>
 					},
 
 					UpdateValidity {
@@ -947,25 +1005,28 @@ strike! {
 				MetaPane(pub enum EntityMetaPaneRequest {
 					SetReverseRefs {
 						editor_id: Uuid,
-						entity_names: std::collections::HashMap<String, String>,
+						#[specta(type = std::collections::HashMap<EntityID, String>)]
+						entity_names: std::collections::HashMap<EntityID, EcoString>,
 						reverse_refs: Vec<ReverseReference>
 					},
 
 					SetNotes {
 						editor_id: Uuid,
-						entity_id: String,
-						notes: String
+						entity_id: EntityID,
+
+						#[specta(type = String)]
+						notes: EcoString
 					}
 				}),
 
 				Metadata(pub enum EntityMetadataRequest {
 					Initialise {
 						editor_id: Uuid,
-						factory_hash: String,
-						blueprint_hash: String,
-						root_entity: String,
+						factory: RuntimeID,
+						blueprint: RuntimeID,
+						root_entity: EntityID,
 						sub_type: SubType,
-						external_scenes: Vec<String>
+						external_scenes: Vec<RuntimeID>
 					},
 
 					SetHashModificationAllowed {
@@ -973,14 +1034,14 @@ strike! {
 						hash_modification_allowed: bool
 					},
 
-					SetFactoryHash {
+					SetFactory {
 						editor_id: Uuid,
-						factory_hash: String
+						factory: RuntimeID
 					},
 
-					SetBlueprintHash {
+					SetBlueprint {
 						editor_id: Uuid,
-						blueprint_hash: String
+						blueprint: RuntimeID
 					},
 
 					UpdateCustomPaths {
@@ -1008,18 +1069,22 @@ strike! {
 			ResourceOverview(pub enum ResourceOverviewRequest {
 				Initialise {
 					id: Uuid,
-					hash: String,
+					hash: Hash,
 					filetype: String,
 					chunk_patch: String,
-					path_or_hint: Option<String>,
 
-					/// Hash, type, path/hint, flag, is actually in current game version
+					#[specta(type = Option<String>)]
+					path_or_hint: Option<EcoString>,
+
+					/// Hash, type, path/hint, flags, is actually in current game version
 					#[debug(skip)]
-					dependencies: Vec<(String, String, Option<String>, String, bool)>,
+					#[specta(type = Vec<(String, String, Option<String>, ReferenceFlags, bool)>)]
+					dependencies: Vec<(Hash, Option<ResourceType>, Option<EcoString>, ReferenceFlags, bool)>,
 
 					/// Hash, type, path/hint
 					#[debug(skip)]
-					reverse_dependencies: Vec<(String, String, Option<String>)>,
+					#[specta(type = Vec<(String, String, Option<String>)>)]
+					reverse_dependencies: Vec<(Hash, ResourceType, Option<EcoString>)>,
 
 					changelog: Vec<ResourceChangelogEntry>,
 

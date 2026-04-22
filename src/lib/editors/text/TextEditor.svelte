@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TextEditorRequest, TextFileType } from "$lib/bindings-types"
+	import type { TextEditorRequest, TextFileType } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import Monaco from "./Monaco.svelte"
 

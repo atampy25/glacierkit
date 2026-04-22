@@ -1,49 +1,48 @@
 use std::{
 	fs,
-	path::{Path, PathBuf}
+	path::{Path, PathBuf},
+	sync::{Arc, atomic::Ordering}
 };
 
 use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
+use ecow::eco_format;
 use fn_error_context::context;
+use glacier_ini::IniFileSystem;
 use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID};
+use hitman_commons::{game::GameVersion, hash_list::HASH_LIST, metadata::RuntimeID};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
 	apply_patch,
-	patch_structs::Patch,
-	qn_structs::{CommentEntity, Entity}
+	entity::{CommentEntity, Entity},
+	patch::Patch
 };
 use rayon::iter::{
 	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator
 };
-use rpkg_rs::{
-	misc::ini_file_system::IniFileSystem, resource::partition_manager::PartitionManager,
-	resource::pdefs::PackageDefinitionSource
-};
+use rpkg_rs::resource::{partition_manager::PartitionManager, pdefs::PackageDefinitionSource};
 use serde_json::{Value, from_slice, from_str, from_value, to_value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::ores_repo::RepositoryItem;
-use crate::rpkg::extract_latest_resource;
 use crate::{
 	HASH_LIST_ENDPOINT, HASH_LIST_VERSION_ENDPOINT, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT,
-	TONYTOOLS_HASH_LIST_VERSION_ENDPOINT, finish_task, send_notification, send_request, start_task
-};
-use crate::{event_handling::resource_overview::initialise_resource_overview, get_loaded_game_version};
-use crate::{intellisense::Intellisense, ores_repo::UnlockableItem};
-use crate::{
+	TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
+	event_handling::resource_overview::initialise_resource_overview,
+	finish_task, get_loaded_game_version,
+	intellisense::Intellisense,
 	model::{
 		AppSettings, AppState, ContentSearchRequest, EditorData, EditorState, EditorType, FileBrowserRequest,
 		GameBrowserRequest, GlobalRequest, JsonPatchType, Request, TextFileType, ToolRequest
 	},
-	rpkg::extract_entity
+	ores_repo::{RepositoryItem, UnlockableItem},
+	rpkg::{extract_entity, extract_latest_resource},
+	send_notification, send_request, start_task
 };
 
 #[try_fn]
@@ -66,7 +65,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 		app_state
 			.editor_states
 			.iter()
-			.find(|x| x.file.as_ref().map(|x| x == path).unwrap_or(false))
+			.find(|x| x.file.as_ref().is_some_and(|x| x == path))
 			.map(|x| x.key().to_owned())
 	};
 
@@ -93,7 +92,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				let mut comments: Vec<CommentEntity> = vec![];
 				for comment in entity.comments {
 					if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-						x.text = format!("{}\n\n{}", x.text, comment.text);
+						x.text = eco_format!("{}\n\n{}", x.text, comment.text);
 					} else {
 						comments.push(CommentEntity {
 							parent: comment.parent,
@@ -130,7 +129,6 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				if let Some(game_files) = app_state.game_files.load().as_ref()
 					&& let Some(install) = app_settings.load().game_install.as_ref()
-					&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 				{
 					let patch: Patch =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
@@ -139,20 +137,19 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						game_files,
 						&app_state.cached_entities,
 						get_loaded_game_version(app, install)?,
-						hash_list,
-						RuntimeID::from_any(&patch.factory_hash)?
+						patch.factory
 					)?
 					.to_owned();
 
 					let base = entity.to_owned();
 
-					apply_patch(&mut entity, patch, true).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+					apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 					// Normalise comments to form used by GlacierKit (single comment for each entity)
 					let mut comments: Vec<CommentEntity> = vec![];
 					for comment in entity.comments {
 						if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-							x.text = format!("{}\n\n{}", x.text, comment.text);
+							x.text = eco_format!("{}\n\n{}", x.text, comment.text);
 						} else {
 							comments.push(CommentEntity {
 								parent: comment.parent,
@@ -732,7 +729,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	if let Some(path) = app_settings.load().game_install.as_ref() {
 		let task = start_task(app, "Loading game files")?;
 
-		let thumbs = IniFileSystem::from(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
+		let thumbs = IniFileSystem::from_path(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
 
 		let thumbs = thumbs
 			.root()
@@ -878,6 +875,25 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			)))
 		)?;
 
+		app_state.file_types.store(Some(Arc::new(
+			partition_manager
+				.partitions
+				.par_iter()
+				.rev()
+				.flat_map(|partition| {
+					partition.latest_resources().into_par_iter().map(|(resource, _)| {
+						(
+							RuntimeID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
+							resource
+								.data_type()
+								.try_into()
+								.expect("Invalid resource type in game files")
+						)
+					})
+				})
+				.collect()
+		)));
+
 		app_state.game_files.store(Some(partition_manager.into()));
 
 		app_state.resource_reverse_dependencies.store(Some(
@@ -898,32 +914,29 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 	let task = start_task(app, "Acquiring latest hash list")?;
 
-	let current_version = app_state.hash_list.load().as_ref().map(|x| x.version).unwrap_or(0);
+	let current_version = HASH_LIST.version.load(Ordering::SeqCst);
 
-	if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await {
-		if let Ok(data) = data.text().await {
-			let new_version = data
-				.trim()
-				.parse::<u32>()
-				.context("Online hash list version wasn't a number")?;
+	if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await
+		&& let Ok(data) = data.text().await
+	{
+		let new_version = data
+			.trim()
+			.parse::<u32>()
+			.context("Online hash list version wasn't a number")?;
 
-			if current_version < new_version {
-				if let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await {
-					if let Ok(data) = data.bytes().await {
-						let hash_list = HashList::from_compressed(&data)?;
+		if current_version < new_version
+			&& let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await
+			&& let Ok(data) = data.bytes().await
+		{
+			HASH_LIST.load_compressed(&data)?;
 
-						fs::write(
-							app.path()
-								.app_data_dir()
-								.context("Couldn't get app data dir")?
-								.join("hash_list.sml"),
-							serde_smile::to_vec(&hash_list)?
-						)?;
-
-						app_state.hash_list.store(Some(hash_list.into()));
-					}
-				}
-			}
+			fs::write(
+				app.path()
+					.app_data_dir()
+					.context("Couldn't get app data dir")?
+					.join("hash_list.sml"),
+				data
+			)?;
 		}
 	}
 
@@ -934,67 +947,60 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		.map(|x| x.version)
 		.unwrap_or(0);
 
-	if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_VERSION_ENDPOINT).await {
-		if let Ok(data) = data.text().await {
-			let new_version = from_str::<Value>(&data)
-				.context("Couldn't parse online version data as JSON")?
-				.get("version")
-				.context("No version key in online version data")?
-				.as_u64()
-				.context("Online hash list version wasn't a number")? as u32;
+	if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_VERSION_ENDPOINT).await
+		&& let Ok(data) = data.text().await
+	{
+		let new_version = from_str::<Value>(&data)
+			.context("Couldn't parse online version data as JSON")?
+			.get("version")
+			.context("No version key in online version data")?
+			.as_u64()
+			.context("Online hash list version wasn't a number")? as u32;
 
-			if current_version < new_version {
-				if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_ENDPOINT).await {
-					if let Ok(data) = data.bytes().await {
-						let tonytools_hash_list = tonytools::hashlist::HashList::load(&data)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+		if current_version < new_version
+			&& let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_ENDPOINT).await
+			&& let Ok(data) = data.bytes().await
+		{
+			let tonytools_hash_list =
+				tonytools::hashlist::HashList::load(&data).map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-						fs::write(
-							app.path()
-								.app_data_dir()
-								.context("Couldn't get app data dir")?
-								.join("tonytools_hash_list.hmla"),
-							data
-						)?;
+			fs::write(
+				app.path()
+					.app_data_dir()
+					.context("Couldn't get app data dir")?
+					.join("tonytools_hash_list.hmla"),
+				data
+			)?;
 
-						app_state.tonytools_hash_list.store(Some(tonytools_hash_list.into()));
-					}
-				}
-			}
+			app_state.tonytools_hash_list.store(Some(tonytools_hash_list.into()));
 		}
 	}
 
 	send_request(
 		app,
 		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
-			app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
+			app_settings.load().game_install.is_some()
 		)))
 	)?;
 
 	send_request(
 		app,
 		Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetEnabled(
-			app_settings.load().game_install.is_some() && app_state.hash_list.load().is_some()
+			app_settings.load().game_install.is_some()
 		)))
 	)?;
 
 	finish_task(app, task)?;
 
-	if let Some(hash_list) = app_state.hash_list.load().as_ref()
-		&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
-	{
+	if let Some(file_types) = app_state.file_types.load().as_ref() {
 		let task = start_task(app, "Setting up intellisense")?;
 
 		app_state.intellisense.store(Some(
 			Intellisense {
 				cppt_properties: DashMap::new().into(),
 				cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
-				uicb_prop_types: from_slice(include_bytes!("../assets/uicbPropTypes.json")).unwrap(),
 				matt_properties: DashMap::new().into(),
-				file_types: resource_reverse_dependencies
-					.par_iter()
-					.filter_map(|(x, _)| Some((x.to_owned(), hash_list.entries.get(x)?.resource_type.to_owned())))
-					.collect()
+				file_types: file_types.clone()
 			}
 			.into()
 		));
@@ -1017,8 +1023,8 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 	if let Some(game_files) = app_state.game_files.load().as_ref()
 		&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
+		&& let Some(file_types) = app_state.file_types.load().as_ref()
 		&& let Some(install) = app_settings.load().game_install.as_ref()
-		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 	{
 		let task = start_task(app, "Refreshing editors")?;
 
@@ -1034,7 +1040,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 					game_files,
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
-					hash_list
+					file_types
 				)
 				.await?;
 
@@ -1053,18 +1059,11 @@ pub async fn open_in_editor(
 	app: &AppHandle,
 	game_files: &PartitionManager,
 	install: &PathBuf,
-	hash_list: &HashList,
 	hash: RuntimeID
 ) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	match hash_list
-		.entries
-		.get(&hash)
-		.context("Not in hash list")?
-		.resource_type
-		.as_ref()
-	{
+	match hash.get_info().context("Not in hash list")?.resource_type.as_ref() {
 		"TEMP" => {
 			let task = start_task(app, format!("Loading entity {}", hash))?;
 
@@ -1072,7 +1071,6 @@ pub async fn open_in_editor(
 				game_files,
 				&app_state.cached_entities,
 				get_loaded_game_version(app, install)?,
-				hash_list,
 				hash
 			)?
 			.to_owned();
@@ -1087,7 +1085,7 @@ pub async fn open_in_editor(
 				hash
 			);
 
-			let tab_name = if let Some(entry) = hash_list.entries.get(&hash) {
+			let tab_name = if let Some(entry) = hash.get_info() {
 				if let Some(path) = entry.path.as_ref() {
 					path.replace("].pc_entitytype", "")
 						.replace("].pc_entitytemplate", "")

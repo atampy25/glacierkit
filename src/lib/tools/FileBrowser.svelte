@@ -3,7 +3,7 @@
 	import "jstree"
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
 	import { join, sep as getSep } from "@tauri-apps/api/path"
-	import type { FileBrowserRequest } from "$lib/bindings-types"
+	import type { FileBrowserRequest } from "$lib/bindings"
 	import { Button, Search } from "carbon-components-svelte"
 	import { event, showInFolder } from "$lib/utils"
 	import { open } from "@tauri-apps/plugin-dialog"

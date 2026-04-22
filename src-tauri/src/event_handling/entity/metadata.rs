@@ -1,20 +1,14 @@
-use std::fs;
-
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
-use hitman_commons::metadata::RuntimeID;
-use serde_json::to_vec;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_aptabase::EventTracker;
 use tryvial::try_fn;
 
 use crate::{
-	Notification, NotificationKind,
 	model::{
 		AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
-		EntityMetadataRequest, GlobalRequest, Request, SettingsRequest, ToolRequest
+		EntityMetadataRequest, GlobalRequest, Request
 	},
-	send_notification, send_request
+	send_request
 };
 
 #[try_fn]
@@ -41,8 +35,8 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
 					EntityMetadataRequest::Initialise {
 						editor_id: editor_id.to_owned(),
-						factory_hash: entity.factory_hash.to_owned(),
-						blueprint_hash: entity.blueprint_hash.to_owned(),
+						factory: entity.factory.to_owned(),
+						blueprint: entity.blueprint.to_owned(),
 						root_entity: entity.root_entity.to_owned(),
 						sub_type: entity.sub_type.to_owned(),
 						external_scenes: entity.external_scenes.to_owned()
@@ -76,61 +70,8 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 			)?;
 		}
 
-		EntityMetadataEvent::SetFactoryHash {
-			editor_id,
-			mut factory_hash
-		} => {
+		EntityMetadataEvent::SetFactory { editor_id, factory } => {
 			let mut is_patch_editor = false;
-
-			if factory_hash != RuntimeID::from_any(&factory_hash)?.to_string() {
-				if let Some(project) = app_state.project.load().as_ref() {
-					let mut settings = (*project.settings.load_full()).to_owned();
-					settings.custom_paths.push(factory_hash.to_owned());
-
-					app.track_event("Save custom path by factory input", None).unwrap();
-
-					send_request(
-						app,
-						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-							EntityMetadataRequest::UpdateCustomPaths {
-								editor_id: editor_id.to_owned(),
-								custom_paths: settings.custom_paths.to_owned()
-							}
-						)))
-					)?;
-
-					send_request(
-						app,
-						Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings(
-							settings.to_owned()
-						)))
-					)?;
-
-					fs::write(project.path.join("project.json"), to_vec(&settings)?)?;
-					project.settings.store(settings.into());
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Info,
-							title: "Custom path saved".into(),
-							subtitle: "The entered path has been saved in your custom paths list.".into()
-						}
-					)?;
-				}
-
-				factory_hash = RuntimeID::from_any(&factory_hash)?.to_string();
-
-				send_request(
-					app,
-					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-						EntityMetadataRequest::SetFactoryHash {
-							editor_id: editor_id.to_owned(),
-							factory_hash: factory_hash.to_owned()
-						}
-					)))
-				)?;
-			}
 
 			{
 				let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
@@ -149,7 +90,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					}
 				};
 
-				entity.factory_hash = factory_hash;
+				entity.factory = factory;
 			}
 
 			// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity
@@ -185,61 +126,8 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 			)?;
 		}
 
-		EntityMetadataEvent::SetBlueprintHash {
-			editor_id,
-			mut blueprint_hash
-		} => {
+		EntityMetadataEvent::SetBlueprint { editor_id, blueprint } => {
 			let mut is_patch_editor = false;
-
-			if blueprint_hash != RuntimeID::from_any(&blueprint_hash)?.to_string() {
-				if let Some(project) = app_state.project.load().as_ref() {
-					let mut settings = (*project.settings.load_full()).to_owned();
-					settings.custom_paths.push(blueprint_hash.to_owned());
-
-					app.track_event("Save custom path by blueprint input", None).unwrap();
-
-					send_request(
-						app,
-						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-							EntityMetadataRequest::UpdateCustomPaths {
-								editor_id: editor_id.to_owned(),
-								custom_paths: settings.custom_paths.to_owned()
-							}
-						)))
-					)?;
-
-					send_request(
-						app,
-						Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings(
-							settings.to_owned()
-						)))
-					)?;
-
-					fs::write(project.path.join("project.json"), to_vec(&settings)?)?;
-					project.settings.store(settings.into());
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Info,
-							title: "Custom path saved".into(),
-							subtitle: "The entered path has been saved in your custom paths list.".into()
-						}
-					)?;
-				}
-
-				blueprint_hash = RuntimeID::from_any(&blueprint_hash)?.to_string();
-
-				send_request(
-					app,
-					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-						EntityMetadataRequest::SetBlueprintHash {
-							editor_id: editor_id.to_owned(),
-							blueprint_hash: blueprint_hash.to_owned()
-						}
-					)))
-				)?;
-			}
 
 			{
 				let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
@@ -258,7 +146,7 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 					}
 				};
 
-				entity.blueprint_hash = blueprint_hash;
+				entity.blueprint = blueprint;
 			}
 
 			// If it was a patch editor, we should convert it into an entity editor since now we're working on a new entity

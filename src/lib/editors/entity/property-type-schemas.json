@@ -80,10 +80,7 @@
 	"ZRuntimeResourceID": {
 		"anyOf": [
 			{
-				"$ref": "#/definitions/DependencyWithFlag"
-			},
-			{
-				"type": "string"
+				"$ref": "#/$defs/ResourceReference"
 			},
 			{
 				"type": "null"
@@ -376,7 +373,14 @@
 		"required": ["position", "rotation"]
 	},
 	"SEntityTemplateReference": {
-		"$ref": "#/definitions/Ref",
+		"anyOf": [
+			{
+				"$ref": "#/$defs/Ref"
+			},
+			{
+				"type": "null"
+			}
+		],
 		"description": "A reference to another sub-entity, in this entity or another.",
 		"default": null
 	},

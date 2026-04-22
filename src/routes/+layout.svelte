@@ -12,7 +12,7 @@
 	import { beforeUpdate, onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
 	import { fade, fly } from "svelte/transition"
-	import type { Property, Request } from "$lib/bindings-types"
+	import type { Property, Request } from "$lib/bindings"
 	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import * as monaco from "monaco-editor"

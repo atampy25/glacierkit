@@ -1,4 +1,10 @@
-use std::{fmt::Write, fs, io::Cursor, ops::Deref, sync::Arc};
+use std::{
+	fmt::Write,
+	fs::{self, File},
+	io::{BufWriter, Cursor},
+	ops::Deref,
+	sync::Arc
+};
 
 use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
@@ -8,9 +14,12 @@ use glacier_texture::{
 	mipblock::MipblockData,
 	texture_map::TextureMap
 };
-
 use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, hash_list::HashList, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
+use hitman_commons::{
+	game::GameVersion,
+	metadata::{ResourceType, RuntimeID},
+	rpkg_tool::RpkgResourceMeta
+};
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	ores::{parse_hashes_ores, parse_json_ores},
@@ -19,27 +28,27 @@ use hitman_formats::{
 };
 use image::{ImageFormat, ImageReader};
 use prim_rs::render_primitive::RenderPrimitive;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rpkg_rs::{GlacierResource, resource::partition_manager::PartitionManager};
 use serde::Serialize;
 use serde_json::{Value, json, to_string, to_vec};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_aptabase::EventTracker;
 use tauri_plugin_dialog::DialogExt;
-use tauri_plugin_shell::ShellExt;
 use tonytools::hmlanguages;
-use tryvial::try_fn;
+use tryvial::{try_block, try_fn};
 use uuid::Uuid;
+use ww2ogg::{CodebookLibrary, WwiseRiffVorbis};
 
 use crate::{
-	Notification, NotificationKind, RunCommandExt,
+	Notification, NotificationKind,
 	biome::format_json,
 	finish_task,
 	general::open_in_editor,
 	get_loaded_game_version,
 	languages::get_language_map,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Request,
+		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Hash, Request,
 		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
 	},
 	resourcelib::{
@@ -60,7 +69,7 @@ pub async fn initialise_resource_overview(
 	game_files: &PartitionManager,
 	game_version: GameVersion,
 	resource_reverse_dependencies: &Arc<HashMap<RuntimeID, Vec<RuntimeID>>>,
-	hash_list: &Arc<HashList>
+	file_types: &Arc<HashMap<RuntimeID, ResourceType>>
 ) -> Result<()> {
 	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, hash)?;
 
@@ -68,29 +77,21 @@ pub async fn initialise_resource_overview(
 		app,
 		Request::Editor(EditorRequest::ResourceOverview(ResourceOverviewRequest::Initialise {
 			id,
-			hash: hash.to_string(),
+			hash: Hash(hash),
 			filetype: filetype.into(),
 			chunk_patch,
-			path_or_hint: hash_list
-				.entries
-				.get(&hash)
+			path_or_hint: hash
+				.get_info()
 				.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
 			dependencies: deps
-				.par_iter()
-				.map(|(hash, flag)| {
+				.into_par_iter()
+				.map(|dep| {
 					(
-						hash.to_string(),
-						hash_list
-							.entries
-							.get(hash)
-							.map(|x| x.resource_type.into())
-							.unwrap_or("".into()),
-						hash_list
-							.entries
-							.get(hash)
-							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
-						flag.to_owned(),
-						resource_reverse_dependencies.contains_key(hash)
+						Hash(dep.resource),
+						file_types.get(&dep.resource).copied(),
+						dep.resource.get_info().and_then(|x| x.path.or(x.hint)),
+						dep.flags,
+						resource_reverse_dependencies.contains_key(&dep.resource)
 					)
 				})
 				.collect(),
@@ -101,16 +102,9 @@ pub async fn initialise_resource_overview(
 						.iter()
 						.map(|hash| {
 							(
-								hash.to_string(),
-								hash_list
-									.entries
-									.get(hash)
-									.map(|x| x.resource_type.into())
-									.unwrap_or("".into()),
-								hash_list
-									.entries
-									.get(hash)
-									.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
+								Hash(*hash),
+								*file_types.get(hash).unwrap(),
+								hash.get_info().and_then(|x| x.path.or(x.hint))
 							)
 						})
 						.collect()
@@ -119,13 +113,13 @@ pub async fn initialise_resource_overview(
 			changelog: extract_resource_changelog(game_files, hash),
 			data: match filetype.as_ref() {
 				"TEMP" => {
-					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash_list, hash)?;
+					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash)?;
 
 					ResourceOverviewData::Entity {
-						blueprint_hash: entity.blueprint_hash.to_owned(),
-						blueprint_path_or_hint: hash_list
-							.entries
-							.get(&RuntimeID::from_any(&entity.blueprint_hash)?)
+						blueprint_hash: Hash(entity.blueprint),
+						blueprint_path_or_hint: entity
+							.blueprint
+							.get_info()
 							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
 					}
 				}
@@ -275,7 +269,7 @@ pub async fn initialise_resource_overview(
 						.context("Couldn't process texture data")?;
 
 					if let Some(texd_depend) = res_meta.core_info.references.first() {
-						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource.get_id())?;
+						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
 						let mipblock = MipblockData::from_memory(&texd_data, game_version.into())
 							.context("Couldn't process TEXD data")?;
 						texture.set_mipblock1(mipblock);
@@ -333,26 +327,15 @@ pub async fn initialise_resource_overview(
 
 					let mut wav_paths = vec![];
 
-					let wwev = WwiseEvent::parse(&res_data)?;
+					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
 
 					for object in wwev.non_streamed {
 						let temp_file_id = Uuid::new_v4();
 
-						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
-
-						app.shell()
-							.sidecar("vgmstream-cli")
-							.unwrap()
-							.current_dir(data_dir.join("temp"))
-							.args([
-								&format!("{}.wem", temp_file_id),
-								"-L",
-								"-o",
-								&format!("{}.wav", temp_file_id)
-							])
-							.run()
-							.await
-							.with_context(|| format!("Couldn't convert non-streamed object {}", object.wem_id))?;
+						WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(BufWriter::new(File::create(
+								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+							)?))?;
 
 						wav_paths.push((
 							"Embedded audio".into(),
@@ -363,34 +346,15 @@ pub async fn initialise_resource_overview(
 					for object in wwev.streamed {
 						let temp_file_id = Uuid::new_v4();
 
-						let wwem_hash = res_meta
-							.core_info
-							.references
-							.get(object.dependency_index as usize)
-							.context("No such WWEM dependency")?
-							.resource
-							.get_id();
+						let (_, wem_data) = extract_latest_resource(game_files, object.source)?;
 
-						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
-
-						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
-
-						app.shell()
-							.sidecar("vgmstream-cli")
-							.unwrap()
-							.current_dir(data_dir.join("temp"))
-							.args([
-								&format!("{}.wem", temp_file_id),
-								"-L",
-								"-o",
-								&format!("{}.wav", temp_file_id)
-							])
-							.run()
-							.await
-							.with_context(|| format!("Couldn't convert streamed object {wwem_hash}"))?;
+						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(BufWriter::new(File::create(
+								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+							)?))?;
 
 						wav_paths.push((
-							wwem_hash.to_string(),
+							object.source.to_string(),
 							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
 						))
 					}
@@ -409,21 +373,11 @@ pub async fn initialise_resource_overview(
 
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
-
-					app.shell()
-						.sidecar("vgmstream-cli")
-						.unwrap()
-						.current_dir(data_dir.join("temp"))
-						.args([
-							&format!("{}.wem", temp_file_id),
-							"-L",
-							"-o",
-							&format!("{}.wav", temp_file_id)
-						])
-						.run()
-						.await
-						.context("VGMStream command failed")?;
+					WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?.generate_ogg(
+						BufWriter::new(File::create(
+							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+						)?)
+					)?;
 
 					ResourceOverviewData::Audio {
 						wav_path: data_dir.join("temp").join(format!("{}.wav", temp_file_id))
@@ -444,7 +398,7 @@ pub async fn initialise_resource_overview(
 							let mut iteration = 0;
 
 							loop {
-								if let Ok::<_, anyhow::Error>(x) = try {
+								if let Ok::<_, anyhow::Error>(x) = try_block! {
 									let langmap = get_language_map(game_version, iteration)
 										.context("No more alternate language maps available")?;
 
@@ -455,7 +409,7 @@ pub async fn initialise_resource_overview(
 										&res_data,
 										to_string(
 											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
-												.with_hash_list(&hash_list.entries)?
+
 										)?
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -502,10 +456,7 @@ pub async fn initialise_resource_overview(
 
 						ditl.convert(
 							&res_data,
-							to_string(
-								&RpkgResourceMeta::from_resource_metadata(res_meta, false)
-									.with_hash_list(&hash_list.entries)?
-							)?
+							to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
 						)
 						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 						.serialize(&mut ser)?;
@@ -522,7 +473,7 @@ pub async fn initialise_resource_overview(
 							let mut iteration = 0;
 
 							loop {
-								if let Ok::<_, anyhow::Error>(x) = try {
+								if let Ok::<_, anyhow::Error>(x) = try_block! {
 									let langmap = get_language_map(game_version, iteration)
 										.context("No more alternate language maps available")?;
 
@@ -545,7 +496,7 @@ pub async fn initialise_resource_overview(
 										&res_data,
 										to_string(
 											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
-												.with_hash_list(&hash_list.entries)?
+
 										)?
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -579,7 +530,7 @@ pub async fn initialise_resource_overview(
 							let mut iteration = 0;
 
 							loop {
-								if let Ok::<_, anyhow::Error>(x) = try {
+								if let Ok::<_, anyhow::Error>(x) = try_block! {
 									let langmap = get_language_map(game_version, iteration)
 										.context("No more alternate language maps available")?;
 
@@ -601,7 +552,7 @@ pub async fn initialise_resource_overview(
 										&res_data,
 										to_string(
 											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
-												.with_hash_list(&hash_list.entries)?
+
 										)?
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -635,10 +586,7 @@ pub async fn initialise_resource_overview(
 							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 							.convert(
 								&res_data,
-								to_string(
-									&RpkgResourceMeta::from_resource_metadata(res_meta, false)
-										.with_hash_list(&hash_list.entries)?
-								)?
+								to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
 							)
 							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
@@ -664,14 +612,13 @@ pub async fn initialise_resource_overview(
 								.first()
 								.context("No LOCR dependency on LINE")?
 								.resource
-								.get_id()
 						)?;
 
 						let locr = {
 							let mut iteration = 0;
 
 							loop {
-								if let Ok::<_, anyhow::Error>(x) = try {
+								if let Ok::<_, anyhow::Error>(x) = try_block! {
 									let langmap = get_language_map(game_version, iteration)
 										.context("No more alternate language maps available")?;
 
@@ -754,9 +701,8 @@ pub async fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let material =
-							MaterialInstance::parse(&res_data, &res_meta.core_info.with_hash_list(&hash_list.entries))
-								.context("Couldn't parse material instance")?;
+						let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
+							.context("Couldn't parse material instance")?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -779,16 +725,11 @@ pub async fn initialise_resource_overview(
 								.get(1)
 								.context("No MATB dependency")?
 								.resource
-								.get_id()
 						)?;
 
-						let material = MaterialEntity::parse(
-							&matt_data,
-							&matt_meta.core_info,
-							&matb_data,
-							&matb_meta.core_info.with_hash_list(&hash_list.entries)
-						)
-						.context("Couldn't parse material entity")?;
+						let material =
+							MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)
+								.context("Couldn't parse material entity")?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -804,12 +745,8 @@ pub async fn initialise_resource_overview(
 					json: {
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let sdef = SoundDefinitions::parse(
-							&res_data,
-							&res_meta.core_info.with_hash_list(&hash_list.entries),
-							game_version
-						)
-						.context("Couldn't parse sound definitions")?;
+						let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game_version)
+							.context("Couldn't parse sound definitions")?;
 
 						let mut buf = Vec::new();
 						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
@@ -850,8 +787,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
+				&& let Some(file_types) = app_state.file_types.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				initialise_resource_overview(
 					app,
@@ -861,7 +798,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					game_files,
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
-					hash_list
+					file_types
 				)
 				.await?;
 			}
@@ -881,14 +818,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			*hash = RuntimeID::from_any(&new_hash)?;
+			*hash = new_hash;
 
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
+				&& let Some(file_types) = app_state.file_types.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				initialise_resource_overview(
 					app,
@@ -898,7 +835,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					game_files,
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
-					hash_list
+					file_types
 				)
 				.await?;
 
@@ -921,9 +858,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				id.to_owned(),
 				EditorState {
 					file: None,
-					data: EditorData::ResourceOverview {
-						hash: RuntimeID::from_any(&hash)?
-					}
+					data: EditorData::ResourceOverview { hash }
 				}
 			);
 
@@ -954,9 +889,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
-				open_in_editor(app, game_files, install, hash_list, hash).await?;
+				open_in_editor(app, game_files, install, hash).await?;
 			}
 		}
 
@@ -972,17 +906,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 			};
 
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
-			{
+			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let (metadata, data) = extract_latest_resource(game_files, hash)?;
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false)
 					.to_binary()
 					.context("Couldn't serialise meta file")?;
 
-				let file_type = hash_list
-					.entries
-					.get(&hash)
+				let file_type = hash
+					.get_info()
 					.expect("Can only open files from the hash list")
 					.resource_type
 					.to_owned();
@@ -994,7 +925,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}.{}", &hash, &file_type))
+					.set_file_name(format!("{}.{}", &hash, &file_type))
 					.add_filter(format!("{} file", &file_type), &[file_type.as_ref()])
 					.blocking_save_file()
 				{
@@ -1026,13 +957,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let entity_json = to_vec(&*extract_entity(
 					game_files,
 					&app_state.cached_entities,
 					get_loaded_game_version(app, install)?,
-					hash_list,
 					hash
 				)?)?;
 
@@ -1093,7 +1022,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}.TEMP.json", hash))
+					.set_file_name(format!("{}.TEMP.json", hash))
 					.add_filter("TEMP.json file", &["TEMP.json"])
 					.blocking_save_file()
 				{
@@ -1123,20 +1052,16 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					RuntimeID::from_any(
-						&extract_entity(
-							game_files,
-							&app_state.cached_entities,
-							get_loaded_game_version(app, install)?,
-							hash_list,
-							hash
-						)?
-						.blueprint_hash
+					extract_entity(
+						game_files,
+						&app_state.cached_entities,
+						get_loaded_game_version(app, install)?,
+						hash
 					)?
+					.blueprint
 				)?;
 
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false)
@@ -1150,7 +1075,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}.TBLU", metadata.core_info.id))
+					.set_file_name(format!("{}.TBLU", metadata.core_info.id))
 					.add_filter("TBLU file", &["TBLU"])
 					.blocking_save_file()
 				{
@@ -1182,22 +1107,18 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let game_version = get_loaded_game_version(app, install)?;
 
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					RuntimeID::from_any(
-						&extract_entity(
-							game_files,
-							&app_state.cached_entities,
-							get_loaded_game_version(app, install)?,
-							hash_list,
-							hash
-						)?
-						.blueprint_hash
+					extract_entity(
+						game_files,
+						&app_state.cached_entities,
+						get_loaded_game_version(app, install)?,
+						hash
 					)?
+					.blueprint
 				)?;
 
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false);
@@ -1226,7 +1147,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}.TBLU.json", metadata.core_info.id))
+					.set_file_name(format!("{}.TBLU.json", metadata.core_info.id))
 					.add_filter("TBLU.json file", &["TBLU.json"])
 					.blocking_save_file()
 				{
@@ -1268,7 +1189,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}.{}.json", hash, res_meta.core_info.resource_type))
+					.set_file_name(format!("{}.{}.json", hash, res_meta.core_info.resource_type))
 					.add_filter(
 						format!("{}.json file", res_meta.core_info.resource_type),
 						&[&format!("{}.json", res_meta.core_info.resource_type)]
@@ -1322,7 +1243,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					let res_data = parse_json_ores(&res_data)?;
 
 					if let Some(path) = dialog
-						.set_file_name(&format!("{}.json", hash))
+						.set_file_name(format!("{}.json", hash))
 						.add_filter("JSON file", &["json"])
 						.blocking_save_file()
 					{
@@ -1340,7 +1261,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					let res_data = parse_hashes_ores(&res_data)?;
 
 					if let Some(path) = dialog
-						.set_file_name(&format!("{}.json", hash))
+						.set_file_name(format!("{}.json", hash))
 						.add_filter("JSON file", &["json"])
 						.blocking_save_file()
 					{
@@ -1374,7 +1295,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}.png", hash))
+					.set_file_name(format!("{}.png", hash))
 					.add_filter("PNG file", &["png"])
 					.add_filter("JPEG file", &["jpg"])
 					.add_filter("TGA file", &["tga"])
@@ -1438,8 +1359,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
-								let (_, texd_data) =
-									extract_latest_resource(game_files, texd_depend.resource.get_id())?;
+								let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
 
 								let mip_block = MipblockData::from_memory(
 									&texd_data,
@@ -1512,31 +1432,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}.wav", hash))
+					.set_file_name(format!("{}.wav", hash))
 					.add_filter("WAV file", &["wav"])
 					.blocking_save_file()
 				{
 					let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-
-					let temp_file_id = Uuid::new_v4();
-
-					fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), res_data)?;
-
-					app.shell()
-						.sidecar("vgmstream-cli")
-						.unwrap()
-						.current_dir(data_dir.join("temp"))
-						.args([
-							&format!("{}.wem", temp_file_id),
-							"-L",
-							"-o",
+					WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?.generate_ogg(
+						BufWriter::new(File::create(
 							path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
-						])
-						.run()
-						.await
-						.context("VGMStream command failed")?;
+						)?)
+					)?;
 				}
 			}
 		}
@@ -1561,72 +1467,36 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog.blocking_pick_folder() {
-					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-
 					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let wwev = WwiseEvent::parse(&res_data)?;
+					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
 
 					let mut idx = 0;
 
 					for object in wwev.non_streamed {
-						let temp_file_id = Uuid::new_v4();
-
-						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), object.data)?;
-
-						app.shell()
-							.sidecar("vgmstream-cli")
-							.unwrap()
-							.current_dir(data_dir.join("temp"))
-							.args([
-								&format!("{}.wem", temp_file_id),
-								"-L",
-								"-o",
+						WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(BufWriter::new(File::create(
 								path.as_path()
 									.context("Invalid path")?
 									.join(format!("{}.wav", idx))
 									.to_string_lossy()
 									.as_ref()
-							])
-							.run()
-							.await
-							.context("VGMStream command failed")?;
+							)?))?;
 
 						idx += 1;
 					}
 
 					for object in wwev.streamed {
-						let temp_file_id = Uuid::new_v4();
+						let (_, wem_data) = extract_latest_resource(game_files, object.source)?;
 
-						let wwem_hash = res_meta
-							.core_info
-							.references
-							.get(object.dependency_index as usize)
-							.context("No such WWEM dependency")?
-							.resource
-							.get_id();
-
-						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
-
-						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
-
-						app.shell()
-							.sidecar("vgmstream-cli")
-							.unwrap()
-							.current_dir(data_dir.join("temp"))
-							.args([
-								&format!("{}.wem", temp_file_id),
-								"-L",
-								"-o",
+						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(BufWriter::new(File::create(
 								path.as_path()
 									.context("Invalid path")?
 									.join(format!("{}.wav", idx))
 									.to_string_lossy()
 									.as_ref()
-							])
-							.run()
-							.await
-							.context("VGMStream command failed")?;
+							)?))?;
 
 						idx += 1;
 					}
@@ -1654,72 +1524,41 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!("{}~{}.wav", hash, index))
+					.set_file_name(format!("{}~{}.wav", hash, index))
 					.add_filter("WAV file", &["wav"])
 					.blocking_save_file()
 				{
-					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-
 					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-					let wwev = WwiseEvent::parse(&res_data)?;
-
-					let temp_file_id = Uuid::new_v4();
+					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
 
 					if index < wwev.non_streamed.len() as u32 {
-						fs::write(
-							data_dir.join("temp").join(format!("{}.wem", temp_file_id)),
-							&wwev
-								.non_streamed
-								.get(index as usize)
-								.context("No such audio object")?
-								.data
-						)?;
-
-						app.shell()
-							.sidecar("vgmstream-cli")
-							.unwrap()
-							.current_dir(data_dir.join("temp"))
-							.args([
-								&format!("{}.wem", temp_file_id),
-								"-L",
-								"-o",
-								path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
-							])
-							.run()
-							.await
-							.context("VGMStream command failed")?;
-					} else {
-						let wwem_hash = res_meta
-							.core_info
-							.references
-							.get(
-								wwev.streamed
-									.get(index as usize - wwev.non_streamed.len())
+						WwiseRiffVorbis::new(
+							Cursor::new(
+								&wwev
+									.non_streamed
+									.get(index as usize)
 									.context("No such audio object")?
-									.dependency_index as usize
-							)
-							.context("No such WWEM dependency")?
-							.resource
-							.get_id();
+									.data
+							),
+							CodebookLibrary::aotuv_codebooks()?
+						)?
+						.generate_ogg(BufWriter::new(File::create(
+							path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
+						)?))?;
+					} else {
+						let wwem_hash = wwev
+							.streamed
+							.get(index as usize - wwev.non_streamed.len())
+							.context("No such audio object")?
+							.source;
 
 						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
 
-						fs::write(data_dir.join("temp").join(format!("{}.wem", temp_file_id)), wem_data)?;
-
-						app.shell()
-							.sidecar("vgmstream-cli")
-							.unwrap()
-							.current_dir(data_dir.join("temp"))
-							.args([
-								&format!("{}.wem", temp_file_id),
-								"-L",
-								"-o",
+						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(BufWriter::new(File::create(
 								path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
-							])
-							.run()
-							.await
-							.context("VGMStream command failed")?;
+							)?))?;
 					}
 				}
 			}
@@ -1739,7 +1578,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
-				&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 			{
 				let game_version = get_loaded_game_version(app, install)?;
 
@@ -1752,7 +1590,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(&format!(
+					.set_file_name(format!(
 						"{}.{}.json",
 						hash,
 						res_meta.core_info.resource_type.as_ref().to_lowercase()
@@ -1774,7 +1612,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									let mut iteration = 0;
 
 									loop {
-										if let Ok::<_, anyhow::Error>(x) = try {
+										if let Ok::<_, anyhow::Error>(x) = try_block! {
 											let langmap = get_language_map(game_version, iteration)
 												.context("No more alternate language maps available")?;
 
@@ -1789,7 +1627,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 														res_meta.to_owned(),
 														false
 													)
-													.with_hash_list(&hash_list.entries)?
+
 												)?
 											)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -1832,10 +1670,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 								ditl.convert(
 									&res_data,
-									to_string(
-										&RpkgResourceMeta::from_resource_metadata(res_meta, false)
-											.with_hash_list(&hash_list.entries)?
-									)?
+									to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
 								)
 								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 								.serialize(&mut ser)?;
@@ -1848,7 +1683,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									let mut iteration = 0;
 
 									loop {
-										if let Ok::<_, anyhow::Error>(x) = try {
+										if let Ok::<_, anyhow::Error>(x) = try_block! {
 											let langmap = get_language_map(game_version, iteration)
 												.context("No more alternate language maps available")?;
 
@@ -1874,7 +1709,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 														res_meta.to_owned(),
 														false
 													)
-													.with_hash_list(&hash_list.entries)?
+
 												)?
 											)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -1904,7 +1739,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									let mut iteration = 0;
 
 									loop {
-										if let Ok::<_, anyhow::Error>(x) = try {
+										if let Ok::<_, anyhow::Error>(x) = try_block! {
 											let langmap = get_language_map(game_version, iteration)
 												.context("No more alternate language maps available")?;
 
@@ -1929,7 +1764,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 														res_meta.to_owned(),
 														false
 													)
-													.with_hash_list(&hash_list.entries)?
+
 												)?
 											)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
@@ -1959,10 +1794,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 									.convert(
 										&res_data,
-										to_string(
-											&RpkgResourceMeta::from_resource_metadata(res_meta, false)
-												.with_hash_list(&hash_list.entries)?
-										)?
+										to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
 									)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 

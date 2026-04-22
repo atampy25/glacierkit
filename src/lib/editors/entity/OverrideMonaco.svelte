@@ -21,86 +21,89 @@
 	let decorations: monaco.editor.IEditorDecorationsCollection
 	let decorationsToCheck: [string, string][] = []
 
-	const baseOverrideSchema = merge(cloneDeep(baseSchema), {
-		definitions: {
-			PropertyOverride: {
-				properties: {
+	const baseOverrideSchema = merge(
+		{ $defs: cloneDeep(baseSchema).$defs },
+		{
+			$defs: {
+				PropertyOverride: {
 					properties: {
-						additionalProperties: {
-							anyOf: [
-								...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: propType
+						properties: {
+							additionalProperties: {
+								anyOf: [
+									...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
+											properties: {
+												type: {
+													const: propType
+												},
+												value: valSchema
 											},
-											value: valSchema
-										},
-										default: {
-											type: propType,
-											value: valSchema.default
-										}
-									})
-								}),
-								...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: `TArray<${propType}>`
-											},
-											value: { type: "array", items: valSchema }
-										},
-										default: {
-											type: `TArray<${propType}>`,
-											value: [valSchema.default]
-										}
-									})
-								}),
-								...Object.entries(enums).map(([propType, possibleValues]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: propType
-											},
-											value: {
-												enum: possibleValues
+											default: {
+												type: propType,
+												value: valSchema.default
 											}
-										},
-										default: {
-											type: propType,
-											value: possibleValues[0]
-										}
-									})
-								}),
-								...Object.entries(enums).map(([propType, possibleValues]) => {
-									return merge(cloneDeep(baseSchema.definitions.Property), {
-										properties: {
-											type: {
-												const: `TArray<${propType}>`
+										})
+									}),
+									...Object.entries(propertyTypeSchemas).map(([propType, valSchema]) => {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
+											properties: {
+												type: {
+													const: `TArray<${propType}>`
+												},
+												value: { type: "array", items: valSchema }
 											},
-											value: {
-												type: "array",
-												items: {
+											default: {
+												type: `TArray<${propType}>`,
+												value: [valSchema.default]
+											}
+										})
+									}),
+									...Object.entries(enums).map(([propType, possibleValues]) => {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
+											properties: {
+												type: {
+													const: propType
+												},
+												value: {
 													enum: possibleValues
 												}
+											},
+											default: {
+												type: propType,
+												value: possibleValues[0]
 											}
-										},
-										default: {
-											type: `TArray<${propType}>`,
-											value: [possibleValues[0]]
-										}
-									})
-								}),
-								{
-									$ref: "#/definitions/OverriddenProperty"
-								}
-							]
+										})
+									}),
+									...Object.entries(enums).map(([propType, possibleValues]) => {
+										return merge(cloneDeep(baseSchema.$defs.Property), {
+											properties: {
+												type: {
+													const: `TArray<${propType}>`
+												},
+												value: {
+													type: "array",
+													items: {
+														enum: possibleValues
+													}
+												}
+											},
+											default: {
+												type: `TArray<${propType}>`,
+												value: [possibleValues[0]]
+											}
+										})
+									}),
+									{
+										$ref: "#/$defs/Variant"
+									}
+								]
+							}
 						}
 					}
 				}
 			}
 		}
-	})
+	)
 
 	onDestroy(() => {
 		destroyFunc.run()
@@ -133,28 +136,28 @@
 					uri: "monaco-schema://qn-override-propertyOverrides",
 					fileMatch: ["*-propertyoverrides*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
-						$ref: "#/definitions/Entity/properties/propertyOverrides"
+						$ref: "#/$defs/Entity/properties/propertyOverrides"
 					})
 				},
 				{
 					uri: "monaco-schema://qn-override-overrideDeletes",
 					fileMatch: ["*-overridedeletes*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
-						$ref: "#/definitions/Entity/properties/overrideDeletes"
+						$ref: "#/$defs/Entity/properties/overrideDeletes"
 					})
 				},
 				{
 					uri: "monaco-schema://qn-override-pinConnectionOverrides",
 					fileMatch: ["*-pinconnectionoverrides*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
-						$ref: "#/definitions/Entity/properties/pinConnectionOverrides"
+						$ref: "#/$defs/Entity/properties/pinConnectionOverrides"
 					})
 				},
 				{
 					uri: "monaco-schema://qn-override-pinConnectionOverrideDeletes",
 					fileMatch: ["*-pinconnectionoverridedeletes*"],
 					schema: merge(cloneDeep(baseOverrideSchema), {
-						$ref: "#/definitions/Entity/properties/pinConnectionOverrideDeletes"
+						$ref: "#/$defs/Entity/properties/pinConnectionOverrideDeletes"
 					})
 				}
 			]

@@ -1,23 +1,19 @@
 use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
-use hashbrown::HashSet;
 use hitman_commons::metadata::RuntimeID;
 use log::debug;
-use quickentity_rs::qn_structs::Ref;
-
+use quickentity_rs::entity::EntityID;
 use serde_json::from_str;
-
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
 	Notification, NotificationKind,
-	editor_connection::PropertyValue,
 	entity::{
 		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
-		is_valid_entity_factory
+		is_valid_entity_factory, reverse_parent_refs_set
 	},
 	finish_task,
 	general::open_in_editor,
@@ -126,14 +122,12 @@ pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
 
 			app_state
 				.editor_connection
-				.signal_pin(&entity_id, &entity.blueprint_hash, &pin, output)
+				.signal_pin(entity_id, &entity.blueprint.to_hash(), &pin, output)
 				.await?;
 		}
 
 		EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
 			if let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref() {
-				let resource = RuntimeID::from_any(&resource)?;
-
 				if resource_reverse_dependencies.contains_key(&resource) {
 					let id = Uuid::new_v4();
 
@@ -179,7 +173,7 @@ pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
 
 #[try_fn]
 #[context("Couldn't handle update content event")]
-pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String, content: String) -> Result<()> {
+pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityID, content: String) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
@@ -205,61 +199,45 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 					.to_owned();
 
 				if sub_entity != previous {
-					if let Some(hash_list) = app_state.hash_list.load().as_ref() {
-						if let Some(entry) = hash_list.entries.get(&RuntimeID::from_any(&sub_entity.factory)?) {
-							if !is_valid_entity_factory(entry.resource_type) {
-								send_request(
-									app,
-									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-										EntityMonacoRequest::UpdateValidity {
-											editor_id,
-											validity: EditorValidity::Invalid(
-												"Invalid factory; unsupported resource type".into()
-											)
-										}
-									)))
-								)?;
+					if let Some(entry) = sub_entity.factory.resource.get_info()
+						&& !is_valid_entity_factory(entry.resource_type)
+					{
+						send_request(
+							app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+								EntityMonacoRequest::UpdateValidity {
+									editor_id,
+									validity: EditorValidity::Invalid(
+										"Invalid factory; unsupported resource type".into()
+									)
+								}
+							)))
+						)?;
 
-								return Ok(());
-							}
-						}
+						return Ok(());
+					}
 
-						if let Some(entry) = hash_list.entries.get(&RuntimeID::from_any(&sub_entity.blueprint)?) {
-							if !is_valid_entity_blueprint(entry.resource_type) {
-								send_request(
-									app,
-									Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-										EntityMonacoRequest::UpdateValidity {
-											editor_id,
-											validity: EditorValidity::Invalid(
-												"Invalid blueprint; unsupported resource type".into()
-											)
-										}
-									)))
-								)?;
+					if let Some(entry) = sub_entity.blueprint.get_info()
+						&& !is_valid_entity_blueprint(entry.resource_type)
+					{
+						send_request(
+							app,
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
+								EntityMonacoRequest::UpdateValidity {
+									editor_id,
+									validity: EditorValidity::Invalid(
+										"Invalid blueprint; unsupported resource type".into()
+									)
+								}
+							)))
+						)?;
 
-								return Ok(());
-							}
-						}
+						return Ok(());
 					}
 
 					entity.entities.insert(entity_id.to_owned(), sub_entity.to_owned());
 
-					let mut reverse_parent_refs: HashSet<String> = HashSet::new();
-
-					for entity_data in entity.entities.values() {
-						match entity_data.parent {
-							Ref::Full(ref reference) if reference.external_scene.is_none() => {
-								reverse_parent_refs.insert(reference.entity_ref.to_owned());
-							}
-
-							Ref::Short(Some(ref reference)) => {
-								reverse_parent_refs.insert(reference.to_owned());
-							}
-
-							_ => {}
-						}
-					}
+					let reverse_parent_refs = reverse_parent_refs_set(entity);
 
 					send_request(
 						app,
@@ -270,7 +248,7 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 									entity_id.to_owned(),
 									sub_entity.parent.to_owned(),
 									sub_entity.name.to_owned(),
-									sub_entity.factory.to_owned(),
+									sub_entity.factory.resource.to_owned(),
 									reverse_parent_refs.contains(&entity_id)
 								)]
 							}
@@ -296,8 +274,8 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 					)?;
 
 					if let Some(game_files) = app_state.game_files.load().as_ref()
-						&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 						&& let Some(install) = app_settings.load().game_install.as_ref()
+						&& let Some(file_types) = app_state.file_types.load().as_ref()
 						&& let Some(repository) = app_state.repository.load().as_ref()
 						&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
 					{
@@ -305,9 +283,9 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 
 						let decorations = get_decorations(
 							game_files,
+							file_types,
 							&app_state.cached_entities,
 							repository,
-							hash_list,
 							get_loaded_game_version(app, install)?,
 							tonytools_hash_list,
 							entity.entities.get(&entity_id).context("No such entity")?,
@@ -322,8 +300,9 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 									entity_id: entity_id.to_owned(),
 									local_ref_entity_ids: decorations
 										.iter()
-										.filter(|(x, _)| entity.entities.contains_key(x))
-										.map(|(x, _)| x.to_owned())
+										.filter_map(|(x, _)| {
+											x.parse::<EntityID>().ok().filter(|x| entity.entities.contains_key(x))
+										})
 										.collect(),
 									decorations
 								}
@@ -336,32 +315,29 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 					let task = start_task(app, "Syncing properties")?;
 
 					if app_state.editor_connection.is_connected().await {
-						let prev_props = previous.properties.unwrap_or_default();
+						let prev_props = previous.properties;
 
-						for (property, val) in sub_entity.properties.to_owned().unwrap_or_default() {
+						for (property, val) in &sub_entity.properties {
 							let mut should_sync = false;
 
-							if let Some(previous_val) = prev_props.get(&property)
-								&& *previous_val != val
+							if let Some(previous_val) = prev_props.get(property)
+								&& previous_val != val
 							{
 								should_sync = true;
-							} else if !prev_props.contains_key(&property) {
+							} else if !prev_props.contains_key(property) {
 								should_sync = true;
 							}
 
-							if should_sync && SAFE_TO_SYNC.iter().any(|&x| val.property_type == x) {
+							if should_sync && SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x) {
 								debug!("Syncing property {} for entity {}", property, entity_id);
 
 								app_state
 									.editor_connection
 									.set_property(
-										&entity_id,
-										&entity.blueprint_hash,
-										&property,
-										PropertyValue {
-											property_type: val.property_type,
-											data: val.value
-										}
+										entity_id,
+										&entity.blueprint.to_hash(),
+										property,
+										val.value.to_owned()
 									)
 									.await?;
 							}
@@ -370,48 +346,33 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 						// Set any removed properties back to their default values
 						if let Some(intellisense) = app_state.intellisense.load().as_ref()
 							&& let Some(game_files) = app_state.game_files.load().as_ref()
-							&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 							&& let Some(install) = app_settings.load().game_install.as_ref()
 						{
 							for (property, val) in prev_props {
-								if !sub_entity
-									.properties
-									.to_owned()
-									.unwrap_or_default()
-									.contains_key(&property) && SAFE_TO_SYNC.iter().any(|&x| val.property_type == x)
-								{
-									if let Some((_, ty, def_val, _)) = intellisense
+								if !sub_entity.properties.contains_key(&property)
+									&& SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x)
+									&& let Some((_, def_val, _)) = intellisense
 										.get_properties(
 											game_files,
 											&app_state.cached_entities,
-											hash_list,
 											get_loaded_game_version(app, install)?,
 											entity,
-											&entity_id,
+											entity_id,
 											false
 										)?
 										.into_iter()
-										.find(|(name, _, _, _)| *name == property)
-									{
-										debug!(
-											"Syncing removed property {} for entity {} with default value according \
-											 to intellisense",
-											property, entity_id
-										);
+										.find(|(name, _, _)| *name == property)
+								{
+									debug!(
+										"Syncing removed property {} for entity {} with default value according to \
+										 intellisense",
+										property, entity_id
+									);
 
-										app_state
-											.editor_connection
-											.set_property(
-												&entity_id,
-												&entity.blueprint_hash,
-												&property,
-												PropertyValue {
-													property_type: ty,
-													data: def_val
-												}
-											)
-											.await?;
-									}
+									app_state
+										.editor_connection
+										.set_property(entity_id, &entity.blueprint.to_hash(), &property, def_val)
+										.await?;
 								}
 							}
 						}
@@ -427,12 +388,15 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 					{
 						send_request(
 							app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
+							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
+								let (new, modified, removed) = get_diff_info(base, current);
 								EntityTreeRequest::SetDiffInfo {
 									editor_id,
-									diff_info: get_diff_info(base, current)
+									new,
+									modified,
+									removed
 								}
-							)))
+							})))
 						)?;
 					}
 
@@ -491,19 +455,16 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: String,
 
 #[try_fn]
 #[context("Couldn't handle open factory event")]
-pub async fn open_factory(app: &AppHandle, factory: String) -> Result<()> {
+pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	if let Some(install) = app_settings.load().game_install.as_ref()
-		&& let Some(hash_list) = app_state.hash_list.load().as_ref()
 		&& let Some(game_files) = app_state.game_files.load().as_deref()
 	{
-		let factory = RuntimeID::from_any(&factory)?;
-
 		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, factory) {
 			if filetype == "TEMP" {
-				open_in_editor(app, game_files, install, hash_list, factory).await?;
+				open_in_editor(app, game_files, install, factory).await?;
 			} else {
 				let id = Uuid::new_v4();
 
