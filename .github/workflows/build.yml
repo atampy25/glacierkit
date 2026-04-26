@@ -19,6 +19,8 @@ jobs:
         runs-on: ${{ matrix.platform }}
         steps:
             - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - name: Setup node
               uses: actions/setup-node@v4
@@ -29,21 +31,21 @@ jobs:
               uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
               if: matrix.platform == 'ubuntu-24.04'
               with:
-                profile: minimal
-                toolchain: nightly
-                target: x86_64-unknown-linux-gnu
-                components: clippy, rustfmt
-                default: true
-            
+                  profile: minimal
+                  toolchain: nightly-2026-04-26
+                  target: x86_64-unknown-linux-gnu
+                  components: clippy, rustfmt
+                  default: true
+
             - name: Set up Rust (Windows)
               uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
               if: matrix.platform == 'windows-latest'
               with:
-                profile: minimal
-                toolchain: nightly
-                target: x86_64-pc-windows-msvc
-                components: clippy, rustfmt
-                default: true
+                  profile: minimal
+                  toolchain: nightly-2026-04-26
+                  target: x86_64-pc-windows-msvc
+                  components: clippy, rustfmt
+                  default: true
 
             - name: Rust cache
               uses: Swatinem/rust-cache@v2.7.3
@@ -80,3 +82,21 @@ jobs:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: |
                   yarn tauri build --verbose
+
+            - name: Get latest tag
+              id: latest_tag
+              uses: WyriHaximus/github-action-get-previous-tag@61819f33034117e6c686e6a31dba995a85afc9de
+
+            - name: Upload artifact (Linux)
+              if: matrix.platform == 'ubuntu-24.04'
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  path: src-tauri/target/release/bundle/appimage/GlacierKit_${{ steps.latest_tag.outputs.tag }}_amd64.AppImage.tar.gz
+                  archive: false
+
+            - name: Upload artifact (Windows)
+              if: matrix.platform == 'windows-latest'
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  path: src-tauri\target\release\bundle\msi\GlacierKit_${{ steps.latest_tag.outputs.tag }}_x64_en-US.msi.zip
+                  archive: false
