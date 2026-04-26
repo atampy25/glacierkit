@@ -91,12 +91,12 @@ jobs:
               if: matrix.platform == 'ubuntu-24.04'
               uses: actions/upload-artifact@v7.0.1
               with:
-                  path: src-tauri/target/release/bundle/appimage/GlacierKit_${{ steps.latest_tag.outputs.tag }}_amd64.AppImage.tar.gz
+                  path: src-tauri/target/release/bundle/appimage/GlacierKit_${{ steps.latest_tag.outputs.tag }}_amd64.AppImage
                   archive: false
 
             - name: Upload artifact (Windows)
               if: matrix.platform == 'windows-latest'
               uses: actions/upload-artifact@v7.0.1
               with:
-                  path: src-tauri\target\release\bundle\msi\GlacierKit_${{ steps.latest_tag.outputs.tag }}_x64_en-US.msi.zip
+                  path: src-tauri\target\release\bundle\msi\GlacierKit_${{ steps.latest_tag.outputs.tag }}_x64_en-US.msi
                   archive: false
