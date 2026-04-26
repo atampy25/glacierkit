@@ -40,10 +40,6 @@ use crate::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorValidity, EntityEditorRequest, EntityGeneralRequest,
 		EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, GlobalRequest, Request
 	},
-	resourcelib::{
-		h2_convert_binary_to_factory, h2_convert_cppt, h3_convert_binary_to_factory, h3_convert_cppt,
-		h2016_convert_binary_to_factory, h2016_convert_cppt
-	},
 	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource},
 	send_notification, send_request, start_task
 };
@@ -1480,22 +1476,30 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				"TEMP" => {
 					let (temp_meta, temp_data) = extract_latest_resource(game_files, file)?;
 
-					let factory = match game_version {
-						GameVersion::H1 => h2016_convert_binary_to_factory(&temp_data)
-							.context("Couldn't convert binary data to ResourceLib factory")?
-							.into_modern(),
+					let blueprint_index_in_resource_header = match game_version {
+						GameVersion::H1 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
+								.context("Couldn't deserialise factory")?
+								.blueprint_index_in_resource_header
+						}
 
-						GameVersion::H2 => h2_convert_binary_to_factory(&temp_data)
-							.context("Couldn't convert binary data to ResourceLib factory")?,
+						GameVersion::H2 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
+								.context("Couldn't deserialise factory")?
+								.blueprint_index_in_resource_header
+						}
 
-						GameVersion::H3 => h3_convert_binary_to_factory(&temp_data)
-							.context("Couldn't convert binary data to ResourceLib factory")?
+						GameVersion::H3 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
+								.context("Couldn't deserialise factory")?
+								.blueprint_index_in_resource_header
+						}
 					};
 
 					let blueprint = &temp_meta
 						.core_info
 						.references
-						.get(factory.blueprint_index_in_resource_header as usize)
+						.get(blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
 						.resource;
 
@@ -1537,22 +1541,30 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				"CPPT" => {
 					let (cppt_meta, cppt_data) = extract_latest_resource(game_files, file)?;
 
-					let factory =
-						match game_version {
-							GameVersion::H1 => h2016_convert_cppt(&cppt_data)
-								.context("Couldn't convert binary data to ResourceLib format")?,
+					let blueprint_index_in_resource_header = match game_version {
+						GameVersion::H1 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h1::SCppEntity>(&cppt_data)
+								.context("Couldn't deserialise CPPT")?
+								.blueprint_index_in_resource_header
+						}
 
-							GameVersion::H2 => h2_convert_cppt(&cppt_data)
-								.context("Couldn't convert binary data to ResourceLib format")?,
+						GameVersion::H2 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h2::SCppEntity>(&cppt_data)
+								.context("Couldn't deserialise CPPT")?
+								.blueprint_index_in_resource_header
+						}
 
-							GameVersion::H3 => h3_convert_cppt(&cppt_data)
-								.context("Couldn't convert binary data to ResourceLib format")?
-						};
+						GameVersion::H3 => {
+							hitman_bin1::deserialize::<hitman_bin1::game::h3::SCppEntity>(&cppt_data)
+								.context("Couldn't deserialise CPPT")?
+								.blueprint_index_in_resource_header
+						}
+					};
 
 					let blueprint = &cppt_meta
 						.core_info
 						.references
-						.get(factory.blueprint_index_in_resource_header as usize)
+						.get(blueprint_index_in_resource_header as usize)
 						.context("Blueprint referenced in factory does not exist in dependencies")?
 						.resource;
 

@@ -16,7 +16,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend,
 use regex::bytes::Regex;
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use serde::Serialize;
-use serde_json::{to_string, to_vec};
+use serde_json::{to_string, to_vec, to_writer};
 use tauri::{AppHandle, Manager};
 use tonytools::hmlanguages;
 use tryvial::{try_block, try_fn};
@@ -26,11 +26,7 @@ use crate::{
 	finish_task, get_loaded_game_version,
 	languages::get_language_map,
 	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
-	resourcelib::{
-		convert_generic_str, h2_convert_binary_to_blueprint, h2_convert_binary_to_factory,
-		h3_convert_binary_to_blueprint, h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint,
-		h2016_convert_binary_to_factory
-	},
+	resourcelib::convert_generic_str,
 	rpkg::extract_latest_resource,
 	send_request, start_task
 };
@@ -141,13 +137,14 @@ pub fn start_content_search(
 											let temp_data = partition.read_resource(resource_id).ok()?;
 
 											let factory = match game_version {
-												GameVersion::H1 => {
-													h2016_convert_binary_to_factory(&temp_data).ok()?.into_modern()
-												}
+												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H2 => h2_convert_binary_to_factory(&temp_data).ok()?,
+												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H3 => h3_convert_binary_to_factory(&temp_data).ok()?
+												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
+													.ok()?
 											};
 
 											let (tblu_rrid, _) = &resource_info
@@ -157,17 +154,18 @@ pub fn start_content_search(
 											let tblu_data = partition.read_resource(tblu_rrid).ok()?;
 
 											let blueprint = match game_version {
-												GameVersion::H1 => {
-													h2016_convert_binary_to_blueprint(&tblu_data).ok()?.into_modern()
-												}
+												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H2 => h2_convert_binary_to_blueprint(&tblu_data).ok()?,
+												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
+													.ok()?.try_into().ok()?,
 
-												GameVersion::H3 => h3_convert_binary_to_blueprint(&tblu_data).ok()?
+												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
+													.ok()?
 											};
 
 											let mut s = to_vec(&factory).ok()?;
-											s.append(&mut to_vec(&blueprint).ok()?);
+											to_writer(&mut s, &blueprint).ok()?;
 
 											s
 										}
