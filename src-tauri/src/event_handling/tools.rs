@@ -883,7 +883,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 													"{}{}{}.{}",
 													entry.path.as_deref().unwrap_or(""),
 													entry.hint.as_deref().unwrap_or(""),
-													hash,
+													hash.to_hash(),
 													entry.resource_type
 												);
 
@@ -927,7 +927,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 													"{}{}{}.{}",
 													entry.path.as_deref().unwrap_or(""),
 													entry.hint.as_deref().unwrap_or(""),
-													hash,
+													hash.to_hash(),
 													entry.resource_type
 												);
 

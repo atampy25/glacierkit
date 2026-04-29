@@ -951,29 +951,28 @@ impl EditorConnection {
 						.parse()
 						.map(PropertyID::Unknown)
 						.unwrap_or(PropertyID::Known(property.to_owned())),
-					value: serde_json::to_value(
-						value
-							.to_game(
-								&STemplateEntityFactory {
-									blueprint_index_in_resource_header: 0,
-									root_entity_index: 0,
-									sub_type: 0,
-									sub_entities: vec![],
-									external_scene_type_indices_in_resource_header: vec![],
-									property_overrides: vec![]
-								},
-								&ResourceMetadata {
-									id: "[assembly:/dummy]".parse().unwrap(),
-									resource_type: "TEMP".try_into().unwrap(),
-									compressed: true,
-									scrambled: true,
-									references: vec![]
-								},
-								&Default::default(),
-								&Default::default()
-							)
-							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-					)?
+					value: value
+						.to_game(
+							&STemplateEntityFactory {
+								blueprint_index_in_resource_header: 0,
+								root_entity_index: 0,
+								sub_type: 0,
+								sub_entities: vec![],
+								external_scene_type_indices_in_resource_header: vec![],
+								property_overrides: vec![]
+							},
+							&ResourceMetadata {
+								id: "[assembly:/dummy]".parse().unwrap(),
+								resource_type: "TEMP".try_into().unwrap(),
+								compressed: true,
+								scrambled: true,
+								references: vec![]
+							},
+							&Default::default(),
+							&Default::default()
+						)
+						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+						.to_serde()?
 				})
 				.await?;
 			}

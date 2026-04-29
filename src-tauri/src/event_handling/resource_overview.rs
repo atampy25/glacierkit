@@ -51,10 +51,7 @@ use crate::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Hash, Request,
 		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
 	},
-	resourcelib::{
-		convert_generic, h2_convert_binary_to_blueprint, h2_convert_binary_to_factory, h3_convert_binary_to_blueprint,
-		h3_convert_binary_to_factory, h2016_convert_binary_to_blueprint, h2016_convert_binary_to_factory
-	},
+	resourcelib::convert_generic,
 	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource, extract_resource_changelog},
 	send_notification, send_request, start_task
 };
@@ -998,22 +995,18 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				let (metadata, data) = extract_latest_resource(game_files, hash)?;
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false);
 
-				let data = match get_loaded_game_version(app, install)? {
-					GameVersion::H1 => to_vec(
-						&h2016_convert_binary_to_factory(&data)
-							.context("Couldn't convert binary data to ResourceLib factory")?
-					)?,
+				let data = to_vec(&match get_loaded_game_version(app, install)? {
+					GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&data)
+						.context("Couldn't deserialise factory")?
+						.try_into()?,
 
-					GameVersion::H2 => to_vec(
-						&h2_convert_binary_to_factory(&data)
-							.context("Couldn't convert binary data to ResourceLib factory")?
-					)?,
+					GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&data)
+						.context("Couldn't deserialise factory")?
+						.try_into()?,
 
-					GameVersion::H3 => to_vec(
-						&h3_convert_binary_to_factory(&data)
-							.context("Couldn't convert binary data to ResourceLib factory")?
-					)?
-				};
+					GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&data)
+						.context("Couldn't deserialise factory")?
+				})?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1112,33 +1105,29 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				let (metadata, data) = extract_latest_resource(
 					game_files,
-					extract_entity(
-						game_files,
-						&app_state.cached_entities,
-						get_loaded_game_version(app, install)?,
-						hash
-					)?
-					.blueprint
+					extract_entity(game_files, &app_state.cached_entities, game_version, hash)?.blueprint
 				)?;
 
 				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false);
 
-				let data = match game_version {
-					GameVersion::H1 => to_vec(
-						&h2016_convert_binary_to_blueprint(&data)
-							.context("Couldn't convert binary data to ResourceLib blueprint")?
-					)?,
+				let data = to_vec(&match game_version {
+					GameVersion::H1 => {
+						hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&data)
+							.context("Couldn't deserialise blueprint")?
+							.try_into()?
+					}
 
-					GameVersion::H2 => to_vec(
-						&h2_convert_binary_to_blueprint(&data)
-							.context("Couldn't convert binary data to ResourceLib blueprint")?
-					)?,
+					GameVersion::H2 => {
+						hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&data)
+							.context("Couldn't deserialise blueprint")?
+							.try_into()?
+					}
 
-					GameVersion::H3 => to_vec(
-						&h3_convert_binary_to_blueprint(&data)
-							.context("Couldn't convert binary data to ResourceLib blueprint")?
-					)?
-				};
+					GameVersion::H3 => {
+						hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&data)
+							.context("Couldn't deserialise blueprint")?
+					}
+				})?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 

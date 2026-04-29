@@ -1,4 +1,4 @@
-use std::{ops::Deref, str::FromStr, time::Instant};
+use std::{io::Write, ops::Deref, time::Instant};
 
 use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
@@ -13,10 +13,8 @@ use hitman_formats::ores::{parse_hashes_ores, parse_json_ores};
 use itertools::Itertools;
 use quickentity_rs::convert_to_qn;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend, ParallelIterator};
-use regex::bytes::Regex;
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
-use serde::Serialize;
-use serde_json::{to_string, to_vec, to_writer};
+use serde_json::{to_string, to_writer};
 use tauri::{AppHandle, Manager};
 use tonytools::hmlanguages;
 use tryvial::{try_block, try_fn};
@@ -26,7 +24,7 @@ use crate::{
 	finish_task, get_loaded_game_version,
 	languages::get_language_map,
 	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
-	resourcelib::convert_generic_str,
+	resourcelib::convert_generic,
 	rpkg::extract_latest_resource,
 	send_request, start_task
 };
@@ -43,7 +41,7 @@ pub fn start_content_search(
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let query = Regex::new(&query).context("Invalid regex")?;
+	let pattern = matchers::Pattern::new(&format!("{query}(?s:.)*")).context("Invalid regex")?;
 
 	let filetypes = filetypes.into_iter().collect::<HashSet<String>>();
 
@@ -87,7 +85,9 @@ pub fn start_content_search(
 						if filetypes.contains(&filetype) {
 							match filetype.as_ref() {
 								"TEMP" => {
-									let s: Option<Vec<u8>> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										if use_qn_format {
 											let (temp_data, temp_meta) = (
 												partition.read_resource(resource_id).ok()?,
@@ -132,7 +132,7 @@ pub fn start_content_search(
 												convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
 													.ok()?;
 
-											to_vec(&entity).ok()?
+											to_writer(&mut matcher, &entity).ok()?;
 										} else {
 											let temp_data = partition.read_resource(resource_id).ok()?;
 
@@ -164,60 +164,65 @@ pub fn start_content_search(
 													.ok()?
 											};
 
-											let mut s = to_vec(&factory).ok()?;
-											to_writer(&mut s, &blueprint).ok()?;
-
-											s
+											to_writer(&mut matcher, &factory).ok()?;
+											to_writer(&mut matcher, &blueprint).ok()?;
 										}
 									};
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									matcher.is_matched()
 								}
 
 								"AIRG" | "ATMD" | "VIDB" | "UICB" | "CPPT" | "CRMD" | "DSWB" | "WSWB" | "GFXF"
 								| "GIDX" | "WSGB" | "ECPB" | "ENUM" => {
-									let s: Option<_> = try_block! {
-										convert_generic_str(
-											&partition.read_resource(resource_id).ok()?,
-											game_version,
-											if filetype == "WSWB" {
-												"DSWB".try_into().ok()?
-											} else {
-												filetype.try_into().ok()?
-											}
-										)
-										.ok()?
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
+										to_writer(
+											&mut matcher,
+											&convert_generic::<serde_json::Value>(
+												&partition.read_resource(resource_id).ok()?,
+												game_version,
+												if filetype == "WSWB" {
+													"DSWB".try_into().ok()?
+												} else {
+													filetype.try_into().ok()?
+												}
+											)
+											.ok()?
+										).ok()?;
 									};
 
-									if let Some(s) = s {
-										query.is_match(s.as_ref())
-									} else {
-										false
-									}
+									matcher.is_matched()
 								}
 
 								"JSON" | "REPO" => {
-									let s: Option<_> = try_block! { partition.read_resource(resource_id).ok()? };
+									let mut matcher = pattern.matcher();
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									let _: Option<_> = try_block! { matcher.write_all(&partition.read_resource(resource_id).ok()?).ok()?; };
+
+									matcher.is_matched()
 								}
 
 								"ORES" => {
-									let s: Option<_> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										let data = partition.read_resource(resource_id).ok()?;
 
 										if resource_id.to_hex_string() == "0057C2C3941115CA" {
-											parse_json_ores(&data).ok()?.into_bytes()
+											matcher.write_all(parse_json_ores(&data).ok()?.as_bytes()).ok()?;
 										} else {
-											to_vec(&parse_hashes_ores(&data).ok()?).ok()?
+											to_writer(&mut matcher, &parse_hashes_ores(&data).ok()?).ok()?;
 										}
 									};
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									matcher.is_matched()
 								}
 
 								"CLNG" => {
-									let s: Option<_> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
@@ -251,20 +256,16 @@ pub fn start_content_search(
 											}
 										};
 
-										let mut buf = Vec::new();
-										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-										clng.serialize(&mut ser).ok()?;
-
-										buf
+										to_writer(&mut matcher, &clng).ok()?;
 									};
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									matcher.is_matched()
 								}
 
 								"DITL" => {
-									let s: Option<_> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
@@ -275,23 +276,19 @@ pub fn start_content_search(
 										)
 										.ok()?;
 
-										let mut buf = Vec::new();
-										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-										ditl.convert(&res_data, to_string(&res_meta).ok()?)
-											.ok()?
-											.serialize(&mut ser)
-											.ok()?;
-
-										buf
+										to_writer(
+											&mut matcher,
+											&ditl.convert(&res_data, to_string(&res_meta).ok()?).ok()?
+										).ok()?;
 									};
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									matcher.is_matched()
 								}
 
 								"DLGE" => {
-									let s: Option<_> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
@@ -334,20 +331,16 @@ pub fn start_content_search(
 											}
 										};
 
-										let mut buf = Vec::new();
-										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-										dlge.serialize(&mut ser).ok()?;
-
-										buf
+										to_writer(&mut matcher, &dlge).ok()?;
 									};
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									matcher.is_matched()
 								}
 
 								"LOCR" => {
-									let s: Option<_> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
@@ -389,20 +382,16 @@ pub fn start_content_search(
 											}
 										};
 
-										let mut buf = Vec::new();
-										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-										locr.serialize(&mut ser).ok()?;
-
-										buf
+										to_writer(&mut matcher, &locr).ok()?;
 									};
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									matcher.is_matched()
 								}
 
 								"RTLV" => {
-									let s: Option<_> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
@@ -415,20 +404,16 @@ pub fn start_content_search(
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))
 											.ok()?;
 
-										let mut buf = Vec::new();
-										let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-										let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-										rtlv.serialize(&mut ser).ok()?;
-
-										buf
+										to_writer(&mut matcher, &rtlv).ok()?;
 									};
 
-									if let Some(s) = s { query.is_match(&s) } else { false }
+									matcher.is_matched()
 								}
 
 								"LINE" => {
-									let s: Option<_> = try_block! {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
 											partition.read_resource(resource_id).ok()?
@@ -497,37 +482,39 @@ pub fn start_content_search(
 											.cloned();
 
 										if let Some(line_str) = line_str {
-											locr.languages
-												.into_iter()
-												.filter_map(|(_, keys)| {
-													if let serde_json::Value::String(val) = keys.get(&line_str)? {
-														Some(val.to_owned())
-													} else {
-														None
-													}
-												})
-												.collect::<Vec<_>>()
-												.join("\n")
+											matcher.write_all(
+												locr.languages
+													.into_iter()
+													.filter_map(|(_, keys)| {
+														if let serde_json::Value::String(val) = keys.get(&line_str)? {
+															Some(val.to_owned())
+														} else {
+															None
+														}
+													})
+													.collect::<Vec<_>>()
+													.join("\n")
+													.as_bytes()
+											).ok()?;
 										} else {
-											locr.languages
-												.into_iter()
-												.filter_map(|(_, keys)| {
-													if let serde_json::Value::String(val) = keys.get(&line_hash)? {
-														Some(val.to_owned())
-													} else {
-														None
-													}
-												})
-												.collect::<Vec<_>>()
-												.join("\n")
+											matcher.write_all(
+												locr.languages
+													.into_iter()
+													.filter_map(|(_, keys)| {
+														if let serde_json::Value::String(val) = keys.get(&line_hash)? {
+															Some(val.to_owned())
+														} else {
+															None
+														}
+													})
+													.collect::<Vec<_>>()
+													.join("\n")
+													.as_bytes()
+											).ok()?;
 										}
 									};
 
-									if let Some(s) = s {
-										query.is_match(s.as_bytes())
-									} else {
-										false
-									}
+									matcher.is_matched()
 								}
 
 								_ => false
@@ -536,7 +523,7 @@ pub fn start_content_search(
 							false
 						}
 					})
-					.map(|(x, _)| x.to_hex_string())
+					.map(|(x, _)| RuntimeID::try_from(x).unwrap())
 			);
 
 			let percent = ((((progress * 1000) as f32) / (total_resources as f32)) * 100.0).round() as u8;
@@ -566,20 +553,12 @@ pub fn start_content_search(
 
 		let results = matching_ids
 			.into_iter()
-			.map(|hash| {
-				let filetype = RuntimeID::from_str(&hash)
-					.expect("Invalid ID added to matching array")
-					.get_info()
-					.map(|x| x.resource_type.into())
-					.unwrap_or("".into());
+			.map(|id| {
+				let info = id.get_info();
+				let filetype = info.as_ref().map(|x| x.resource_type.into()).unwrap_or("".into());
+				let path = info.and_then(|x| x.path.or(x.hint)).map(|x| x.into());
 
-				let path = RuntimeID::from_str(&hash)
-					.expect("Invalid ID added to matching array")
-					.get_info()
-					.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
-					.map(|x| x.into());
-
-				(hash, filetype, path)
+				(id.to_hash(), filetype, path)
 			})
 			.collect();
 

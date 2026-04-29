@@ -655,7 +655,7 @@
 	{#if validity.type === "Valid"}
 		<span class="text-green-200">Valid entity</span>
 	{:else}
-		<span class="text-red-200">{validity.data}</span>
+		<span class="text-red-200 truncate" title={validity.data}>{validity.data}</span>
 	{/if}
 </div>
 <div bind:this={el} class="overflow-visible" style="height: calc(100vh - 11rem - 2rem - 0.5rem - 2.25rem)" class:hidden={entityID === null} />

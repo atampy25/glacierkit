@@ -219,6 +219,7 @@ async fn main() {
 				])
 				.level_for("tauri_plugin_aptabase", LevelFilter::Off)
 				.level_for("quickentity_rs", LevelFilter::Off)
+				.level_for("mio", LevelFilter::Off)
 				.build()
 		)
 		.invoke_handler(specta.invoke_handler())
