@@ -191,7 +191,7 @@ pub async fn initialise_resource_overview(
 						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
 
 					ResourceOverviewData::Image {
-						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+						preview_image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
 						dds_data: None
 					}
 				}
@@ -281,19 +281,12 @@ pub async fn initialise_resource_overview(
 						texture.set_mipblock1(mipblock);
 					}
 
-					let tga_data =
-						glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
-
-					let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
-
-					reader.set_format(image::ImageFormat::Tga);
-
-					reader
-						.decode()?
-						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
+					let image =
+						glacier_texture::convert::create_dynamic_image(&texture).context("Couldn't convert texture")?;
+					image.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
 
 					ResourceOverviewData::Image {
-						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+						preview_image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
 						dds_data: Some((
 							match texture.texture_type() {
 								TextureType::Colour => "Colour",
@@ -1399,91 +1392,111 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					match res_meta.core_info.resource_type.as_ref() {
 						"GFXI" => {
 							let reader = ImageReader::new(Cursor::new(res_data.to_owned())).with_guessed_format()?;
+							let path_ref = path.as_path().context("Invalid path")?;
 
-							if path
-								.as_path()
-								.context("Invalid path")?
-								.file_name()
-								.context("No file name")?
-								.to_str()
-								.context("Filename was invalid string")?
-								.ends_with(".dds")
-							{
-								match reader.format().context("Couldn't get format")? {
-									ImageFormat::Dds => {
-										fs::write(path.as_path().context("Invalid path")?, res_data)?;
-									}
+							let ext = path_ref.extension()
+								.and_then(|e| e.to_str())
+								.map(|s| s.to_ascii_lowercase());
 
-									_ => {
-										send_notification(
-											app,
-											Notification {
-												kind: NotificationKind::Error,
-												title: "DDS encoding not supported".into(),
-												subtitle: "The image is not natively in DDS format and cannot be \
+							match ext.as_deref() {
+								None => bail!("Failed to read file type"),
+								Some("dds") => {
+									match reader.format().context("Couldn't get format")? {
+										ImageFormat::Dds => {
+											fs::write(path_ref, res_data)?;
+										}
+
+										_ => {
+											send_notification(
+												app,
+												Notification {
+													kind: NotificationKind::Error,
+													title: "DDS encoding not supported".into(),
+													subtitle: "The image is not natively in DDS format and cannot be \
 												           re-encoded as DDS. Please choose another format."
-													.into()
-											}
-										)?;
+														.into()
+												}
+											)?;
+										}
 									}
-								}
-							} else {
-								reader.decode()?.save(path.as_path().context("Invalid path")?)?;
+								},
+								_ => reader.decode()?.save(path_ref)?
 							}
 						}
 
 						"TEXT" => {
+							let game_version = get_loaded_game_version(app, install)
+								.context("Couldn't get loaded game version")?;
+
+							let path_ref = path.as_path().context("Invalid path")?;
+
+							let mut meta = json!({
+								"$schema": "https://tonytools.win/schemas/texture-meta.schema.json",
+								"text":  app_state.hash_list.load().as_ref().map(|list| list.entries.get(&hash)
+								.and_then(|entry| entry.path.to_owned()))
+								.flatten()
+								.unwrap_or(hash.to_string())
+							});
+
 							let mut texture =
-								TextureMap::process_data(get_loaded_game_version(app, install)?.into(), res_data)
+								TextureMap::process_data(game_version.into(), res_data)
 									.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
 								let (_, texd_data) =
 									extract_latest_resource(game_files, texd_depend.resource.get_id())?;
 
-								let mip_block = MipblockData::from_memory(
-									&texd_data,
-									get_loaded_game_version(app, install)?.into()
-								)
-								.context("Couldn't process TEXD data")?;
+								let mip_block = MipblockData::from_memory(&texd_data, game_version.into())
+									.context("Couldn't process TEXD data")?;
 								texture.set_mipblock1(mip_block);
+
+								let texd_path = texd_depend.resource.get_path()
+									.map(|s| s.to_owned())
+									.or_else(|| {
+										app_state.hash_list.load().as_ref()
+											.and_then(|list| list.entries.get(&texd_depend.resource.get_id()))
+											.and_then(|entry| entry.path.to_owned())
+									})
+									.unwrap_or_else(|| texd_depend.resource.to_string());
+
+								meta.as_object_mut()
+									.unwrap()
+									.insert("texd".to_owned(), Value::String(texd_path));
 							}
 
-							if path
-								.as_path()
-								.context("Invalid path")?
-								.file_name()
-								.context("No file name")?
-								.to_str()
-								.context("Filename was invalid string")?
-								.ends_with(".dds")
-							{
-								let dds_data = glacier_texture::convert::create_dds(&texture)
-									.context("Couldn't convert texture to DDS")?;
+							let ext = path_ref.extension()
+								.and_then(|e| e.to_str())
+								.map(|s| s.to_ascii_lowercase());
 
-								fs::write(path.as_path().context("Invalid path")?, dds_data)?;
-							} else {
-								let tga_data = glacier_texture::convert::create_tga(&texture)
-									.context("Couldn't convert texture to TGA")?;
-
-								let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
-
-								reader.set_format(image::ImageFormat::Tga);
-
-								if path
-									.as_path()
-									.context("Invalid path")?
-									.file_name()
-									.context("No file name")?
-									.to_str()
-									.context("Filename was invalid string")?
-									.ends_with(".tga")
-								{
-									fs::write(path.as_path().context("Invalid path")?, tga_data)?;
-								} else {
-									reader.decode()?.save(path.as_path().context("Invalid path")?)?;
+							match ext.as_deref() {
+								None => bail!("Failed to read file type"),
+								Some("dds") => {
+									let dds_data = glacier_texture::convert::create_dds(&texture)
+										.context("Couldn't convert texture to DDS")?;
+									fs::write(path_ref, dds_data)
+										.context("Failed to write DDS file")?;
+								}
+								_ => {
+									let image = glacier_texture::convert::create_dynamic_image(&texture)
+										.context("Couldn't convert texture")?;
+									image.save(path_ref)
+										.context("Failed to save image")?;
 								}
 							}
+
+							if let Some(obj) = meta.as_object_mut() {
+								obj.insert("type".to_owned(), Value::String(format!("{:?}", texture.texture_type())));
+								if texture.format() != RenderFormat::BC7 {
+									obj.insert("format".to_owned(), Value::String(format!("{:?}", texture.format())));
+								}
+								if let Some(interpret_as) = texture.interpret_as(){
+									obj.insert("interpretAs".to_owned(), Value::String(format!("{:?}", interpret_as)));
+								}
+							}
+
+							let meta_path = path_ref.with_extension("texture.json");
+							let meta_bytes = serde_json::to_vec(&meta).context("Couldn't serialize metadata")?;
+							fs::write(&meta_path, meta_bytes).context("Failed to write metadata file")?;
 						}
 
 						_ => bail!("Unsupported resource type")
