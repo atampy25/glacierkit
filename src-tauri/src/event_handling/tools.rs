@@ -27,6 +27,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
+use crate::bin1::{deserialize_modern_blueprint, deserialize_modern_factory};
 use crate::model::Hash;
 use crate::ores_repo::UnlockableItem;
 use crate::rpkg::extract_latest_resource;
@@ -331,24 +332,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
 					let (temp_meta, temp_data) = extract_latest_resource(game_files, entity.factory)?;
 
-					let factory = match game_version {
-						GameVersion::H1 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
-								.context("Couldn't deserialise factory")?
-								.try_into()?
-						}
-
-						GameVersion::H2 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
-								.context("Couldn't deserialise factory")?
-								.try_into()?
-						}
-
-						GameVersion::H3 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
-								.context("Couldn't deserialise factory")?
-						}
-					};
+					let factory = deserialize_modern_factory(game_version, &temp_data)?;
 
 					let blueprint_hash = temp_meta
 						.core_info
@@ -359,24 +343,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 					let (tblu_meta, tblu_data) = extract_latest_resource(game_files, blueprint_hash)?;
 
-					let blueprint = match game_version {
-						GameVersion::H1 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
-								.context("Couldn't deserialise blueprint")?
-								.try_into()?
-						}
-
-						GameVersion::H2 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
-								.context("Couldn't deserialise blueprint")?
-								.try_into()?
-						}
-
-						GameVersion::H3 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
-								.context("Couldn't deserialise blueprint")?
-						}
-					};
+					let blueprint = deserialize_modern_blueprint(game_version, &tblu_data)?;
 
 					let base = convert_to_qn(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
 						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;

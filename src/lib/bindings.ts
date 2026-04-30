@@ -339,7 +339,6 @@ export type ResourceOverviewData =
 	| { type: "Entity"; data: { blueprint_hash: Hash; blueprint_path_or_hint: string | null } }
 	| { type: "GenericRL"; data: { json: string } }
 	| { type: "Json"; data: { json: string } }
-	| { type: "Ores"; data: { json: string } }
 	| { type: "Image"; data: { image_path: string; dds_data: [string, string] | null } }
 	| { type: "Audio"; data: { wav_path: string } }
 	| { type: "Mesh"; data: { obj: string; bounding_box: [number, number, number, number, number, number] } }
@@ -366,7 +365,6 @@ export type ResourceOverviewEvent =
 	| { type: "extractAsWav"; data: { id: string } }
 	| { type: "extractMultiWav"; data: { id: string } }
 	| { type: "extractSpecificMultiWav"; data: { id: string; index: number } }
-	| { type: "extractORESAsJson"; data: { id: string } }
 	| { type: "extractAsHMLanguages"; data: { id: string } }
 export type ResourceOverviewRequest = {
 	type: "initialise"
@@ -415,7 +413,7 @@ export type SubEntity = {
 	 *
 	 * Has no effect on the entity in game.
 	 */
-	parent?: RefProxy | null
+	parent: RefProxy | null
 	/**
 	 * The name of the entity.
 	 */

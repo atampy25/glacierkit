@@ -9,7 +9,6 @@ use hitman_commons::{
 	metadata::{ResourceMetadata, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
-use hitman_formats::ores::{parse_hashes_ores, parse_json_ores};
 use itertools::Itertools;
 use quickentity_rs::convert_to_qn;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend, ParallelIterator};
@@ -21,10 +20,10 @@ use tryvial::{try_block, try_fn};
 use uuid::Uuid;
 
 use crate::{
+	bin1::{deserialize_generic_writer, deserialize_modern_blueprint, deserialize_modern_factory},
 	finish_task, get_loaded_game_version,
 	languages::get_language_map,
 	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
-	resourcelib::convert_generic,
 	rpkg::extract_latest_resource,
 	send_request, start_task
 };
@@ -94,16 +93,7 @@ pub fn start_content_search(
 												ResourceMetadata::try_from(*resource_info).ok()?
 											);
 
-											let factory = match game_version {
-												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
-													.ok()?.try_into().ok()?,
-
-												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
-													.ok()?.try_into().ok()?,
-
-												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
-													.ok()?
-											};
+											let factory = deserialize_modern_factory(game_version, &temp_data).ok()?;
 
 											let blueprint_hash = &temp_meta
 												.references
@@ -117,16 +107,7 @@ pub fn start_content_search(
 												ResourceMetadata::try_from(partition.get_resource_info(&tblu_rrid).ok()?).ok()?
 											);
 
-											let blueprint = match game_version {
-												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
-													.ok()?.try_into().ok()?,
-
-												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
-													.ok()?.try_into().ok()?,
-
-												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
-													.ok()?
-											};
+											let blueprint = deserialize_modern_blueprint(game_version, &tblu_data).ok()?;
 
 											let entity =
 												convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
@@ -136,60 +117,71 @@ pub fn start_content_search(
 										} else {
 											let temp_data = partition.read_resource(resource_id).ok()?;
 
-											let factory = match game_version {
-												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
-													.ok()?.try_into().ok()?,
+											match game_version {
+												GameVersion::H1 => to_writer(
+														&mut matcher,
+														&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data).ok()?
+													).ok()?,
 
-												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
-													.ok()?.try_into().ok()?,
+												GameVersion::H2 => to_writer(
+														&mut matcher,
+														&hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data).ok()?
+													).ok()?,
 
-												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
-													.ok()?
-											};
-
-											let (tblu_rrid, _) = &resource_info
-												.references()
-												.get(factory.blueprint_index_in_resource_header as usize)?;
-
-											let tblu_data = partition.read_resource(tblu_rrid).ok()?;
-
-											let blueprint = match game_version {
-												GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
-													.ok()?.try_into().ok()?,
-
-												GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
-													.ok()?.try_into().ok()?,
-
-												GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
-													.ok()?
-											};
-
-											to_writer(&mut matcher, &factory).ok()?;
-											to_writer(&mut matcher, &blueprint).ok()?;
+												GameVersion::H3 => to_writer(
+														&mut matcher,
+														&hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data).ok()?
+													).ok()?,
+											}
 										}
 									};
 
 									matcher.is_matched()
 								}
 
-								"AIRG" | "ATMD" | "VIDB" | "UICB" | "CPPT" | "CRMD" | "DSWB" | "WSWB" | "GFXF"
-								| "GIDX" | "WSGB" | "ECPB" | "ENUM" => {
+								"TBLU" if !use_qn_format => {
 									let mut matcher = pattern.matcher();
 
 									let _: Option<_> = try_block! {
-										to_writer(
+										let tblu_data = partition.read_resource(resource_id).ok()?;
+
+										match game_version {
+											GameVersion::H1 => to_writer(
+													&mut matcher,
+													&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data).ok()?
+												).ok()?,
+
+											GameVersion::H2 => to_writer(
+													&mut matcher,
+													&hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data).ok()?
+												).ok()?,
+
+											GameVersion::H3 => to_writer(
+													&mut matcher,
+													&hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data).ok()?
+												).ok()?,
+										}
+									};
+
+									matcher.is_matched()
+								}
+
+								"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM"
+								| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "ORES" | "DSWB" => {
+									let mut matcher = pattern.matcher();
+
+									let _: Option<_> = try_block! {
+										deserialize_generic_writer(
+											game_version,
+											if filetype == "DSWB" {
+												"WSWB".try_into().ok()?
+											} else {
+												filetype.try_into().ok()?
+											},
 											&mut matcher,
-											&convert_generic::<serde_json::Value>(
-												&partition.read_resource(resource_id).ok()?,
-												game_version,
-												if filetype == "WSWB" {
-													"DSWB".try_into().ok()?
-												} else {
-													filetype.try_into().ok()?
-												}
-											)
-											.ok()?
-										).ok()?;
+											&partition.read_resource(resource_id).ok()?
+										)
+										.ok()?;
 									};
 
 									matcher.is_matched()
@@ -199,22 +191,6 @@ pub fn start_content_search(
 									let mut matcher = pattern.matcher();
 
 									let _: Option<_> = try_block! { matcher.write_all(&partition.read_resource(resource_id).ok()?).ok()?; };
-
-									matcher.is_matched()
-								}
-
-								"ORES" => {
-									let mut matcher = pattern.matcher();
-
-									let _: Option<_> = try_block! {
-										let data = partition.read_resource(resource_id).ok()?;
-
-										if resource_id.to_hex_string() == "0057C2C3941115CA" {
-											matcher.write_all(parse_json_ores(&data).ok()?.as_bytes()).ok()?;
-										} else {
-											to_writer(&mut matcher, &parse_hashes_ores(&data).ok()?).ok()?;
-										}
-									};
 
 									matcher.is_matched()
 								}

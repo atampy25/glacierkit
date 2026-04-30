@@ -12,7 +12,10 @@ use rpkg_rs::resource::{
 };
 use tryvial::{try_block, try_fn};
 
-use crate::model::{ResourceChangelogEntry, ResourceChangelogOperation};
+use crate::{
+	bin1::{deserialize_modern_blueprint, deserialize_modern_factory},
+	model::{ResourceChangelogEntry, ResourceChangelogOperation}
+};
 
 /// Extract the latest copy of a resource.
 pub fn extract_latest_resource(
@@ -130,16 +133,7 @@ pub fn extract_entity<'a>(
 			bail!("Given factory was not a TEMP");
 		}
 
-		let factory = match game_version {
-			GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
-				.context("Couldn't deserialise factory")?.try_into()?,
-
-			GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
-				.context("Couldn't deserialise factory")?.try_into()?,
-
-			GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
-				.context("Couldn't deserialise factory")?
-		};
+		let factory = deserialize_modern_factory(game_version, &temp_data)?;
 
 		let blueprint_id = temp_meta
 			.core_info
@@ -151,16 +145,7 @@ pub fn extract_entity<'a>(
 		let (tblu_meta, tblu_data) =
 			extract_latest_resource(resource_packages, blueprint_id).context("Couldn't extract TBLU")?;
 
-		let blueprint = match game_version {
-			GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data)
-				.context("Couldn't deserialise blueprint")?.try_into()?,
-
-			GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&tblu_data)
-				.context("Couldn't deserialise blueprint")?.try_into()?,
-
-			GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&tblu_data)
-				.context("Couldn't deserialise blueprint")?
-		};
+		let blueprint = deserialize_modern_blueprint(game_version, &tblu_data)?;
 
 		let entity = convert_to_qn(
 			&factory,

@@ -22,7 +22,6 @@ use hitman_commons::{
 };
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
-	ores::{parse_hashes_ores, parse_json_ores},
 	sdef::SoundDefinitions,
 	wwev::WwiseEvent
 };
@@ -31,7 +30,7 @@ use prim_rs::render_primitive::RenderPrimitive;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rpkg_rs::{GlacierResource, resource::partition_manager::PartitionManager};
 use serde::Serialize;
-use serde_json::{Value, json, to_string, to_vec};
+use serde_json::{json, to_string, to_vec};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_aptabase::EventTracker;
 use tauri_plugin_dialog::DialogExt;
@@ -42,6 +41,7 @@ use ww2ogg::{CodebookLibrary, WwiseRiffVorbis};
 
 use crate::{
 	Notification, NotificationKind,
+	bin1::deserialize_generic,
 	biome::format_json,
 	finish_task,
 	general::open_in_editor,
@@ -51,7 +51,6 @@ use crate::{
 		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Hash, Request,
 		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
 	},
-	resourcelib::convert_generic,
 	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource, extract_resource_changelog},
 	send_notification, send_request, start_task
 };
@@ -121,8 +120,10 @@ pub async fn initialise_resource_overview(
 					}
 				}
 
-				"AIRG" | "TBLU" | "ATMD" | "CPPT" | "VIDB" | "CBLU" | "CRMD" | "WSWB" | "DSWB" | "GFXF" | "GIDX"
-				| "WSGB" | "ECPB" | "UICB" | "ENUM" => {
+				"ORES" if hash == "0057C2C3941115CA".parse()? => ResourceOverviewData::Unlockables,
+
+				"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF" | "GIDX"
+				| "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" => {
 					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
 					ResourceOverviewData::GenericRL {
@@ -131,14 +132,14 @@ pub async fn initialise_resource_overview(
 							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							convert_generic::<Value>(
-								&res_data,
+							deserialize_generic(
 								game_version,
-								if res_meta.core_info.resource_type == "WSWB" {
-									"DSWB".try_into()?
+								if res_meta.core_info.resource_type == "DSWB" {
+									"WSWB".try_into()?
 								} else {
 									res_meta.core_info.resource_type
-								}
+								},
+								&res_data
 							)?
 							.serialize(&mut ser)?;
 
@@ -150,23 +151,6 @@ pub async fn initialise_resource_overview(
 						}
 					}
 				}
-
-				"ORES" if hash == "0057C2C3941115CA".parse()? => ResourceOverviewData::Unlockables,
-
-				"ORES" => ResourceOverviewData::Ores {
-					json: {
-						let (_, res_data) = extract_latest_resource(game_files, hash)?;
-						let res_data = parse_hashes_ores(&res_data)?;
-
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						res_data.serialize(&mut ser)?;
-
-						String::from_utf8(buf)?
-					}
-				},
 
 				"GFXI" => {
 					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
@@ -905,9 +889,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let (metadata, data) = extract_latest_resource(game_files, hash)?;
-				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false)
-					.to_binary()
-					.context("Couldn't serialise meta file")?;
 
 				let file_type = hash
 					.get_info()
@@ -922,7 +903,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.{}", &hash, &file_type))
+					.set_file_name(format!("{}.{}", hash.to_hash(), &file_type))
 					.add_filter(format!("{} file", &file_type), &[file_type.as_ref()])
 					.blocking_save_file()
 				{
@@ -931,10 +912,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(
 						path.as_path()
 							.context("Invalid path")?
-							.parent()
-							.unwrap()
-							.join(format!("{}.{}.meta", hash, file_type)),
-						metadata_file
+							.with_added_extension("metadata.json"),
+						format_json(&to_string(&metadata.core_info)?)?
 					)?;
 				}
 			}
@@ -993,20 +972,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
 				let (metadata, data) = extract_latest_resource(game_files, hash)?;
-				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata, false);
 
-				let data = to_vec(&match get_loaded_game_version(app, install)? {
-					GameVersion::H1 => hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&data)
-						.context("Couldn't deserialise factory")?
-						.try_into()?,
+				let data = match get_loaded_game_version(app, install)? {
+					GameVersion::H1 => to_vec(
+						&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&data)
+							.context("Couldn't deserialise factory")?
+					)?,
 
-					GameVersion::H2 => hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&data)
-						.context("Couldn't deserialise factory")?
-						.try_into()?,
+					GameVersion::H2 => to_vec(
+						&hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&data)
+							.context("Couldn't deserialise factory")?
+					)?,
 
-					GameVersion::H3 => hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&data)
-						.context("Couldn't deserialise factory")?
-				})?;
+					GameVersion::H3 => to_vec(
+						&hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&data)
+							.context("Couldn't deserialise factory")?
+					)?
+				};
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1015,17 +997,15 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.TEMP.json", hash))
+					.set_file_name(format!("{}.TEMP.json", hash.to_hash()))
 					.add_filter("TEMP.json file", &["TEMP.json"])
 					.blocking_save_file()
 				{
 					fs::write(path.as_path().context("Invalid path")?, data)?;
 
 					fs::write(
-						path.as_path()
-							.context("Invalid path")?
-							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
-						to_string(&metadata_file).context("Couldn't serialise meta file")?
+						path.as_path().context("Invalid path")?.with_extension("metadata.json"),
+						format_json(&to_string(&metadata.core_info)?)?
 					)?;
 				}
 			}
@@ -1057,10 +1037,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					.blueprint
 				)?;
 
-				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false)
-					.to_binary()
-					.context("Couldn't serialise meta file")?;
-
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
@@ -1068,7 +1044,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.TBLU", metadata.core_info.id))
+					.set_file_name(format!("{}.TBLU", metadata.core_info.id.to_hash()))
 					.add_filter("TBLU file", &["TBLU"])
 					.blocking_save_file()
 				{
@@ -1077,10 +1053,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					fs::write(
 						path.as_path()
 							.context("Invalid path")?
-							.parent()
-							.unwrap()
-							.join(format!("{}.{}.meta", hash, metadata.core_info.resource_type)),
-						metadata_file
+							.with_added_extension("metadata.json"),
+						format_json(&to_string(&metadata.core_info)?)?
 					)?;
 				}
 			}
@@ -1108,26 +1082,22 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 					extract_entity(game_files, &app_state.cached_entities, game_version, hash)?.blueprint
 				)?;
 
-				let metadata_file = RpkgResourceMeta::from_resource_metadata(metadata.to_owned(), false);
-
-				let data = to_vec(&match game_version {
-					GameVersion::H1 => {
-						hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&data)
+				let data = match game_version {
+					GameVersion::H1 => to_vec(
+						&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
-							.try_into()?
-					}
+					)?,
 
-					GameVersion::H2 => {
-						hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&data)
+					GameVersion::H2 => to_vec(
+						&hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
-							.try_into()?
-					}
+					)?,
 
-					GameVersion::H3 => {
-						hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&data)
+					GameVersion::H3 => to_vec(
+						&hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
-					}
-				})?;
+					)?
+				};
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1136,19 +1106,15 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.TBLU.json", metadata.core_info.id))
+					.set_file_name(format!("{}.TBLU.json", metadata.core_info.id.to_hash()))
 					.add_filter("TBLU.json file", &["TBLU.json"])
 					.blocking_save_file()
 				{
 					fs::write(path.as_path().context("Invalid path")?, data)?;
 
 					fs::write(
-						path.as_path()
-							.context("Invalid path")?
-							.parent()
-							.unwrap()
-							.join(format!("{}.{}.meta.json", hash, metadata_file.hash_resource_type)),
-						to_string(&metadata_file).context("Couldn't serialise meta file")?
+						path.as_path().context("Invalid path")?.with_extension("metadata.json"),
+						format_json(&to_string(&metadata.core_info)?)?
 					)?;
 				}
 			}
@@ -1178,7 +1144,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.{}.json", hash, res_meta.core_info.resource_type))
+					.set_file_name(format!("{}.{}.json", hash.to_hash(), res_meta.core_info.resource_type))
 					.add_filter(
 						format!("{}.json file", res_meta.core_info.resource_type),
 						&[&format!("{}.json", res_meta.core_info.resource_type)]
@@ -1187,75 +1153,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				{
 					fs::write(
 						path.as_path().context("Invalid path")?,
-						to_vec(&convert_generic::<Value>(
-							&res_data,
+						to_vec(&deserialize_generic(
 							get_loaded_game_version(app, install)?,
-							res_meta.core_info.resource_type
+							res_meta.core_info.resource_type,
+							&res_data
 						)?)?
 					)?;
 
 					fs::write(
-						path.as_path()
-							.context("Invalid path")?
-							.parent()
-							.unwrap()
-							.join(format!("{}.{}.meta.json", hash, res_meta.core_info.resource_type)),
-						to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))
-							.context("Couldn't serialise meta file")?
+						path.as_path().context("Invalid path")?.with_extension("metadata.json"),
+						format_json(&to_string(&res_meta.core_info)?)?
 					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractORESAsJson { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
-			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				if hash == "0057C2C3941115CA".parse()? {
-					let (_, res_data) = extract_latest_resource(game_files, hash)?;
-
-					let mut dialog = app.dialog().file().set_title("Extract file");
-
-					if let Some(project) = app_state.project.load().as_ref() {
-						dialog = dialog.set_directory(&project.path);
-					}
-
-					let res_data = parse_json_ores(&res_data)?;
-
-					if let Some(path) = dialog
-						.set_file_name(format!("{}.json", hash))
-						.add_filter("JSON file", &["json"])
-						.blocking_save_file()
-					{
-						fs::write(path.as_path().context("Invalid path")?, res_data)?;
-					}
-				} else {
-					let (_, res_data) = extract_latest_resource(game_files, hash)?;
-
-					let mut dialog = app.dialog().file().set_title("Extract file");
-
-					if let Some(project) = app_state.project.load().as_ref() {
-						dialog = dialog.set_directory(&project.path);
-					}
-
-					let res_data = parse_hashes_ores(&res_data)?;
-
-					if let Some(path) = dialog
-						.set_file_name(format!("{}.json", hash))
-						.add_filter("JSON file", &["json"])
-						.blocking_save_file()
-					{
-						fs::write(path.as_path().context("Invalid path")?, to_vec(&res_data)?)?;
-					}
 				}
 			}
 		}
@@ -1284,7 +1192,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.png", hash))
+					.set_file_name(format!("{}.png", hash.to_hash()))
 					.add_filter("PNG file", &["png"])
 					.add_filter("JPEG file", &["jpg"])
 					.add_filter("TGA file", &["tga"])
@@ -1421,7 +1329,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.wav", hash))
+					.set_file_name(format!("{}.wav", hash.to_hash()))
 					.add_filter("WAV file", &["wav"])
 					.blocking_save_file()
 				{
@@ -1513,7 +1421,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}~{}.wav", hash, index))
+					.set_file_name(format!("{}~{}.wav", hash.to_hash(), index))
 					.add_filter("WAV file", &["wav"])
 					.blocking_save_file()
 				{
@@ -1581,7 +1489,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 				if let Some(path) = dialog
 					.set_file_name(format!(
 						"{}.{}.json",
-						hash,
+						hash.to_hash(),
 						res_meta.core_info.resource_type.as_ref().to_lowercase()
 					))
 					.add_filter(

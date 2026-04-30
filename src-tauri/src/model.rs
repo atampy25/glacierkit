@@ -262,9 +262,6 @@ pub enum ResourceOverviewData {
 	Json {
 		json: String
 	},
-	Ores {
-		json: String
-	},
 	Image {
 		image_path: PathBuf,
 		dds_data: Option<(String, String)>
@@ -703,10 +700,6 @@ strike! {
 				ExtractSpecificMultiWav {
 					id: Uuid,
 					index: u32
-				},
-
-				ExtractORESAsJson {
-					id: Uuid
 				},
 
 				ExtractAsHMLanguages {

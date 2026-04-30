@@ -56,7 +56,7 @@
 	let previewImage: any = null
 	let referenceTab = 0
 
-	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Ores", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
+	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
 
 	onMount(async () => {
 		await event({
@@ -162,46 +162,34 @@
 											<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
 										</div>
 									{:else if data.type === "Audio"}
-										{#await platform() then platform}
-											{#if platform === "linux"}
-												<div class="text-neutral-400">Audio preview is unavailable on Linux due to a bug in WebKit.</div>
-											{:else}
-												<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
-											{/if}
-										{/await}
+										<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
 									{:else if data.type === "MultiAudio"}
-										{#await platform() then platform}
-											{#if platform === "linux"}
-												<div class="text-neutral-400">Audio preview is unavailable on Linux due to a bug in WebKit.</div>
-											{:else}
-												<div class="text-neutral-400 mb-2">{data.data.name}</div>
-												{#if data.data.wav_paths.length}
-													<MultiWaveformPlayer
-														src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
-														on:download={async ({ detail }) => {
-															trackEvent("Extract specific audio from WWEV file as WAV")
+										<div class="text-neutral-400 mb-2">{data.data.name}</div>
+										{#if data.data.wav_paths.length}
+											<MultiWaveformPlayer
+												src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
+												on:download={async ({ detail }) => {
+													trackEvent("Extract specific audio from WWEV file as WAV")
 
-															await event({
-																type: "editor",
+													await event({
+														type: "editor",
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractSpecificMultiWav",
 																data: {
-																	type: "resourceOverview",
-																	data: {
-																		type: "extractSpecificMultiWav",
-																		data: {
-																			id,
-																			index: detail
-																		}
-																	}
+																	id,
+																	index: detail
 																}
-															})
-														}}
-													/>
-												{:else}
-													<div class="-mt-1 text-lg">No linked audio</div>
-												{/if}
-											{/if}
-										{/await}
-									{:else if data.type === "GenericRL" || data.type === "Ores" || data.type === "Json" || data.type === "HMLanguages" || data.type === "MaterialInstance" || data.type === "MaterialEntity" || data.type === "SoundDefinitions"}
+															}
+														}
+													})
+												}}
+											/>
+										{:else}
+											<div class="-mt-1 text-lg">No linked audio</div>
+										{/if}
+									{:else if data.type === "GenericRL" || data.type === "Json" || data.type === "HMLanguages" || data.type === "MaterialInstance" || data.type === "MaterialEntity" || data.type === "SoundDefinitions"}
 										<div class="h-[30vh]">
 											<Monaco id={v4()} content={data.data.json} />
 										</div>
@@ -290,7 +278,7 @@
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
-												trackEvent("Extract TEMP as RL JSON")
+												trackEvent("Extract TEMP as JSON")
 
 												await event({
 													type: "editor",
@@ -304,7 +292,7 @@
 														}
 													}
 												})
-											}}>Extract TEMP as ResourceLib JSON</Button
+											}}>Extract TEMP as JSON</Button
 										>
 										<Button
 											icon={DocumentExport}
@@ -328,7 +316,7 @@
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
-												trackEvent("Extract TBLU as RL JSON")
+												trackEvent("Extract TBLU as JSON")
 
 												await event({
 													type: "editor",
@@ -342,7 +330,7 @@
 														}
 													}
 												})
-											}}>Extract TBLU as ResourceLib JSON</Button
+											}}>Extract TBLU as JSON</Button
 										>
 									{:else if data.type === "Image"}
 										<Button
@@ -465,7 +453,7 @@
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
-												trackEvent("Extract generic ResourceLib file as JSON", { hash, filetype })
+												trackEvent("Extract generic BIN1 file as JSON", { hash, filetype })
 
 												await event({
 													type: "editor",
@@ -479,51 +467,12 @@
 														}
 													}
 												})
-											}}>Extract as ResourceLib JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract generic ResourceLib file as binary")
-
-												await event({
-													type: "editor",
-													data: {
-														type: "resourceOverview",
-														data: {
-															type: "extractAsFile",
-															data: {
-																id
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "Ores"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract ORES as JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														type: "resourceOverview",
-														data: {
-															type: "extractORESAsJson",
-															data: {
-																id
-															}
-														}
-													}
-												})
 											}}>Extract as JSON</Button
 										>
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
-												trackEvent("Extract ORES as binary")
+												trackEvent("Extract generic BIN1 file as binary", { hash, filetype })
 
 												await event({
 													type: "editor",
@@ -608,7 +557,7 @@
 													data: {
 														type: "resourceOverview",
 														data: {
-															type: "extractORESAsJson",
+															type: "extractAsRTGeneric",
 															data: {
 																id
 															}

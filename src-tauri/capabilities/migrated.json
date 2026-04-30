@@ -52,17 +52,6 @@
 		"core:window:allow-set-ignore-cursor-events",
 		"core:window:allow-start-dragging",
 		"core:webview:allow-print",
-		{
-			"identifier": "shell:allow-execute",
-			"allow": [
-				{
-					"args": false,
-					"cmd": "",
-					"name": "bin/vgmstream-cli",
-					"sidecar": true
-				}
-			]
-		},
 		"shell:allow-open",
 		"dialog:allow-open",
 		"dialog:allow-save",

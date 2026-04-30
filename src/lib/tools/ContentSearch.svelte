@@ -54,7 +54,7 @@
 			<div class="mb-4">
 				<Checkbox labelText="Search entities" bind:checked={searchEntities} />
 				<Checkbox labelText="Use QuickEntity format" bind:checked={searchQN} />
-				<Checkbox labelText="Search ResourceLib types" bind:checked={searchRL} />
+				<Checkbox labelText="Search BIN1 files" bind:checked={searchRL} />
 				<Checkbox labelText="Search textual files (JSON, REPO, ORES)" bind:checked={searchText} />
 				<Checkbox labelText="Search localisation" bind:checked={searchLocalisation} />
 			</div>
@@ -100,9 +100,9 @@
 
 					const searchTypes = []
 
-					if (searchEntities) searchTypes.push("TEMP")
+					if (searchEntities) searchTypes.push("TEMP", "TBLU")
 
-					if (searchRL) searchTypes.push("AIRG", "RTLV", "ATMD", "VIDB", "UICB", "CPPT", "CBLU", "CRMD", "DSWB", "WSWB", "GFXF", "GIDX", "WSGB", "ECPB", "ENUM")
+					if (searchRL) searchTypes.push("AIBB", "AIRG", "ASVA", "ATMD", "BMSK", "CBLU", "CPPT", "CRMD", "ENUM", "GFXF", "GIDX", "UICB", "VIDB", "WSGB", "WSWB", "ECPB")
 
 					if (searchText) searchTypes.push("JSON", "REPO", "ORES")
 

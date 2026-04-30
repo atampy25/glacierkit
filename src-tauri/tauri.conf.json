@@ -25,7 +25,6 @@
 			"providerShortName": null,
 			"signingIdentity": null
 		},
-		"resources": ["ResourceLib_HM2016.dll", "ResourceLib_HM2.dll", "ResourceLib_HM3.dll"],
 		"shortDescription": "",
 		"linux": {
 			"deb": {

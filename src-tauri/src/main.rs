@@ -6,6 +6,7 @@
 #![feature(try_find)]
 #![allow(clippy::type_complexity)]
 
+pub mod bin1;
 pub mod biome;
 pub mod editor_connection;
 pub mod entity;
@@ -15,7 +16,6 @@ pub mod intellisense;
 pub mod languages;
 pub mod model;
 pub mod ores_repo;
-pub mod resourcelib;
 pub mod rpkg;
 pub mod show_in_folder;
 
