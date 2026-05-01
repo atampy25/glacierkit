@@ -1160,6 +1160,12 @@ export type GlobalRequest =
 	  }
 	| { type: "requestLastPanicUpload" }
 	| { type: "logUploadRejected" }
+	| {
+			type: "setEnums"
+			data: {
+				enums: { [key in string]: string[] }
+			}
+	  }
 
 export type Hash = string
 

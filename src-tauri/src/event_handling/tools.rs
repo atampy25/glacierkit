@@ -28,6 +28,7 @@ use uuid::Uuid;
 use velcro::vec;
 
 use crate::bin1::{deserialize_modern_blueprint, deserialize_modern_factory};
+use crate::event_handling::entity::monaco::ENUMS;
 use crate::model::Hash;
 use crate::ores_repo::UnlockableItem;
 use crate::rpkg::extract_latest_resource;
@@ -947,6 +948,16 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 		ToolEvent::Settings(event) => match event {
 			SettingsEvent::Initialise => {
+				send_request(
+					app,
+					Request::Global(GlobalRequest::SetEnums {
+						enums: ENUMS
+							.iter()
+							.map(|(&x, y)| (x.to_owned(), y.iter().map(|&z| z.to_owned()).collect()))
+							.collect()
+					})
+				)?;
+
 				if let Ok(req) = reqwest::get("https://hitman-resources.netlify.app/glacierkit/dynamics.json").await {
 					send_request(
 						app,

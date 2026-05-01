@@ -1174,7 +1174,11 @@ nesting::nest! {
 				file_and_type: (String, String)
 			},
 			RequestLastPanicUpload,
-			LogUploadRejected
+			LogUploadRejected,
+			SetEnums {
+				#[debug(skip)]
+				enums: std::collections::HashMap<String, Vec<String>>
+			}
 		}
 	}
 }

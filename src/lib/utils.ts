@@ -28,3 +28,5 @@ export function trackEvent(name: string, props?: Record<string, unknown>) {
 }
 
 export const showInFolder = commands.showInFolder
+
+export const enums: Record<string, string[]> = {}

@@ -139,6 +139,7 @@ dependencies = [
  "derive_more",
  "ecow",
  "enumset",
+ "facet",
  "fn-error-context",
  "fork",
  "futures-util",
@@ -182,6 +183,7 @@ dependencies = [
  "serde_with",
  "specta",
  "specta-typescript",
+ "static_init",
  "tauri",
  "tauri-build",
  "tauri-plugin-aptabase",
@@ -2861,7 +2863,7 @@ dependencies = [
 [[package]]
 name = "hitman-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#37e27af261aeecca256f8027decdd858a534c948"
+source = "git+https://github.com/atampy25/hitman-bin1#1e237d3422f7c932f3fa55d1c4aea13969fbcb6b"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -2895,7 +2897,7 @@ dependencies = [
 [[package]]
 name = "hitman-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#37e27af261aeecca256f8027decdd858a534c948"
+source = "git+https://github.com/atampy25/hitman-bin1#1e237d3422f7c932f3fa55d1c4aea13969fbcb6b"
 dependencies = [
  "darling 0.21.3",
  "quote",

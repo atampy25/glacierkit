@@ -21,7 +21,7 @@
 	import { attachConsole, info } from "tauri-plugin-log"
 	import { help } from "$lib/helpray"
 	import HelpRay from "$lib/components/HelpRay.svelte"
-	import { trackEvent } from "$lib/utils"
+	import { enums, trackEvent } from "$lib/utils"
 	import { check, Update } from "@tauri-apps/plugin-updater"
 	import { getVersion } from "@tauri-apps/api/app"
 	import { relaunch } from "@tauri-apps/plugin-process"
@@ -69,49 +69,57 @@
 			})
 
 			const unlistenRequest = await listen("request", ({ payload: request }: { payload: Request }) => {
-				if (request.type === "global" && request.data.type === "setWindowTitle") {
-					console.log("Layout handling request", request)
+				if (request.type === "global") {
+					if (request.data.type === "setWindowTitle") {
+						console.log("Layout handling request", request)
 
-					getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
-					windowTitle = request.data.data.title
-				}
+						getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
+						windowTitle = request.data.data.title
+					}
 
-				if (request.type === "global" && request.data.type === "errorReport") {
-					console.log("Layout handling request", request)
+					if (request.data.type === "errorReport") {
+						console.log("Layout handling request", request)
 
-					void trackEvent("Error", { error: request.data.data.error })
+						void trackEvent("Error", { error: request.data.data.error })
 
-					errorModalError = request.data.data.error
-					errorModalOpen = true
-					tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
-				}
+						errorModalError = request.data.data.error
+						errorModalOpen = true
+						tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+					}
 
-				// Because rfc6902 is the only patch creation library which properly handles arrays
-				if (request.type === "global" && request.data.type === "computeJSONPatchAndSave") {
-					console.log("Layout handling request", request)
+					// Because rfc6902 is the only patch creation library which properly handles arrays
+					if (request.data.type === "computeJSONPatchAndSave") {
+						console.log("Layout handling request", request)
 
-					const patch = createPatch(request.data.data.base, request.data.data.current)
+						const patch = createPatch(request.data.data.base, request.data.data.current)
 
-					void writeTextFile(
-						request.data.data.savePath,
-						JSON.stringify({
-							file: request.data.data.fileAndType[0],
-							type: request.data.data.fileAndType[1],
-							patch
-						})
-					)
-				}
+						void writeTextFile(
+							request.data.data.savePath,
+							JSON.stringify({
+								file: request.data.data.fileAndType[0],
+								type: request.data.data.fileAndType[1],
+								patch
+							})
+						)
+					}
 
-				if (request.type === "global" && request.data.type === "requestLastPanicUpload") {
-					console.log("Layout handling request", request)
+					if (request.data.type === "requestLastPanicUpload") {
+						console.log("Layout handling request", request)
 
-					lastPanicModalOpen = true
-				}
+						lastPanicModalOpen = true
+					}
 
-				if (request.type === "global" && request.data.type === "logUploadRejected") {
-					console.log("Layout handling request", request)
+					if (request.data.type === "logUploadRejected") {
+						console.log("Layout handling request", request)
 
-					logUploadRejectedModalOpen = true
+						logUploadRejectedModalOpen = true
+					}
+
+					if (request.data.type === "setEnums") {
+						console.log("Layout handling request", request)
+
+						Object.assign(enums, request.data.data.enums)
+					}
 				}
 			})
 

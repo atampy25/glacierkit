@@ -84,6 +84,8 @@ ww2ogg = "0.1.0"
 schemars = "1.2.1"
 matchers = "0.2.0"
 nesting = "0.1.1"
+static_init = "1.0.4"
+facet = "0.46.0"
 
 [dependencies.tokio]
 version = "1.43.0"

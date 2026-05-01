@@ -1,7 +1,9 @@
 use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
+use hashbrown::HashMap;
 use hitman_commons::metadata::RuntimeID;
+use itertools::Itertools;
 use log::debug;
 use quickentity_rs::entity::EntityID;
 use serde_json::from_str;
@@ -27,7 +29,7 @@ use crate::{
 	send_notification, send_request, start_task
 };
 
-pub const SAFE_TO_SYNC: [&str; 43] = [
+pub static SAFE_TO_SYNC: [&str; 44] = [
 	"SMatrix43",
 	"float32",
 	"bool",
@@ -70,8 +72,29 @@ pub const SAFE_TO_SYNC: [&str; 43] = [
 	"TArray<AI.SFirePattern02>",
 	"SSCCuriousConfiguration",
 	"TArray<SColorRGB>",
-	"SEntityTemplateReference"
+	"SEntityTemplateReference",
+	"ZSpatialEntity.ERoomBehaviour"
 ];
+
+#[static_init::dynamic]
+pub static ENUMS: HashMap<&'static str, Vec<&'static str>> = hitman_bin1::game::h1::ENUMS
+	.iter()
+	.chain(hitman_bin1::game::h2::ENUMS.iter())
+	.chain(hitman_bin1::game::h3::ENUMS.iter())
+	.map(|(ty, shape)| {
+		(
+			*ty,
+			match shape.ty {
+				facet::Type::User(facet::UserType::Enum(enum_ty)) => {
+					enum_ty.variants.iter().map(|variant| variant.name).collect()
+				}
+
+				_ => panic!("hitman-bin1 ENUMS member was not enum")
+			}
+		)
+	})
+	.unique()
+	.collect();
 
 #[try_fn]
 #[context("Couldn't handle monaco event")]

@@ -6,8 +6,7 @@
 	import baseSchema from "./schema.json"
 	import { cloneDeep, debounce, merge } from "lodash"
 	import propertyTypeSchemas from "./property-type-schemas.json"
-	import enums from "./enums.json"
-	import { event } from "$lib/utils"
+	import { event, enums } from "$lib/utils"
 
 	let el: HTMLDivElement = null!
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
