@@ -4,7 +4,7 @@
 	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import baseSchema from "./schema.json"
-	import type { EditorValidity, EntityMonacoRequest, JsonValue } from "$lib/bindings"
+	import type { EditorValidity, EntityMonacoRequest } from "$lib/bindings"
 	import { cloneDeep, debounce, merge } from "lodash"
 	import propertyTypeSchemas from "./property-type-schemas.json"
 	import enums from "./enums.json"
@@ -314,16 +314,18 @@
 					await event({
 						type: "editor",
 						data: {
-							type: "entity",
+							editor: editorID,
 							data: {
-								type: "monaco",
+								type: "entity",
 								data: {
-									type: "signalPin",
+									type: "monaco",
 									data: {
-										editor_id: editorID,
-										entity_id: entityID!,
-										pin,
-										output
+										type: "signalPin",
+										data: {
+											entityId: entityID!,
+											pin,
+											output
+										}
 									}
 								}
 							}
@@ -346,14 +348,16 @@
 				await event({
 					type: "editor",
 					data: {
-						type: "entity",
+						editor: editorID,
 						data: {
-							type: "monaco",
+							type: "entity",
 							data: {
-								type: "followReference",
+								type: "monaco",
 								data: {
-									editor_id: editorID,
-									reference: editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
+									type: "followReference",
+									data: {
+										reference: editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
+									}
 								}
 							}
 						}
@@ -375,14 +379,16 @@
 				await event({
 					type: "editor",
 					data: {
-						type: "entity",
+						editor: editorID,
 						data: {
-							type: "monaco",
+							type: "entity",
 							data: {
-								type: "openFactory",
+								type: "monaco",
 								data: {
-									editor_id: editorID,
-									factory: JSON.parse(editor.getValue()).factory
+									type: "openFactory",
+									data: {
+										factory: JSON.parse(editor.getValue()).factory
+									}
 								}
 							}
 						}
@@ -404,19 +410,21 @@
 				await event({
 					type: "editor",
 					data: {
-						type: "entity",
+						editor: editorID,
 						data: {
-							type: "monaco",
+							type: "entity",
 							data: {
-								type: "openResourceOverview",
+								type: "monaco",
 								data: {
-									editor_id: editorID,
-									resource: [
-										...editor
-											.getModel()!
-											.getLineContent(ed.getPosition()!.lineNumber)
-											.matchAll(/"(.*?)"/g)
-									].at(-1)![1]
+									type: "openResourceOverview",
+									data: {
+										resource: [
+											...editor
+												.getModel()!
+												.getLineContent(ed.getPosition()!.lineNumber)
+												.matchAll(/"(.*?)"/g)
+										].at(-1)![1]
+									}
 								}
 							}
 						}
@@ -445,7 +453,7 @@
 		})
 	})
 
-	function updateIntellisense(data: { properties: [string, { type: string; value: JsonValue }, boolean][]; inputPins: string[]; outputPins: string[] }) {
+	function updateIntellisense(data: { properties: [string, { type: string; value: any }, boolean][]; inputPins: string[]; outputPins: string[] }) {
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			...monaco.languages.json.jsonDefaults.diagnosticsOptions,
 			schemas: [
@@ -581,26 +589,28 @@
 
 		switch (request.type) {
 			case "deselectIfSelected":
-				if (request.data.entity_ids.includes(entityID || "")) {
+				if (request.data.entityIds.includes(entityID || "")) {
 					entityID = null
 				}
 				break
 
 			case "replaceContent":
-				entityID = request.data.entity_id
+				entityID = request.data.entityId
 				debouncedUpdateFunction.run = debounce(async (content: string) => {
 					await event({
 						type: "editor",
 						data: {
-							type: "entity",
+							editor: editorID,
 							data: {
-								type: "monaco",
+								type: "entity",
 								data: {
-									type: "updateContent",
+									type: "monaco",
 									data: {
-										editor_id: editorID,
-										entity_id: request.data.entity_id,
-										content
+										type: "updateContent",
+										data: {
+											entityId: request.data.entityId,
+											content
+										}
 									}
 								}
 							}
@@ -611,7 +621,7 @@
 				break
 
 			case "replaceContentIfSameEntityID":
-				if (entityID === request.data.entity_id) {
+				if (entityID === request.data.entityId) {
 					editor.setValue(request.data.content)
 				}
 				break
@@ -622,19 +632,19 @@
 
 			case "updateIntellisense":
 				// Relies on the intellisense request getting processed after the content replacement request but that should be the case, since intellisense is fairly slow
-				if (request.data.entity_id === entityID) {
+				if (request.data.entityId === entityID) {
 					updateIntellisense({
 						properties: request.data.properties,
-						inputPins: request.data.input_pins,
-						outputPins: request.data.output_pins
+						inputPins: request.data.inputPins,
+						outputPins: request.data.outputPins
 					})
 				}
 				break
 
 			case "updateDecorationsAndMonacoInfo":
-				if (request.data.entity_id === entityID) {
+				if (request.data.entityId === entityID) {
 					decorationsToCheck = request.data.decorations
-					localRefEntityIDs = request.data.local_ref_entity_ids
+					localRefEntityIDs = request.data.localRefEntityIds
 					updateDecorations()
 				}
 				break

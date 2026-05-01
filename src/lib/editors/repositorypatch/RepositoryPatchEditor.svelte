@@ -38,7 +38,7 @@
 				break
 
 			case "addNewRepositoryItem":
-				repositoryItems.push(request.data.new_item)
+				repositoryItems.push(request.data.newItem)
 				break
 
 			case "removeRepositoryItem":
@@ -52,7 +52,7 @@
 					contentChanged(request.data.item, d)
 				}, 500)
 
-				setTimeout(() => monacoEditor.setContents(request.data.orig_data, request.data.data), 0)
+				setTimeout(() => monacoEditor.setContents(request.data.origData, request.data.data), 0)
 				break
 
 			case "deselectMonaco":
@@ -80,13 +80,15 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "repositoryPatch",
+				editor: id,
 				data: {
-					type: "modifyItem",
+					type: "repositoryPatch",
 					data: {
-						id,
-						item: item,
-						data: content
+						type: "modifyItem",
+						data: {
+							item: item,
+							data: content
+						}
 					}
 				}
 			}
@@ -97,11 +99,11 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "repositoryPatch",
+				editor: id,
 				data: {
-					type: "initialise",
+					type: "repositoryPatch",
 					data: {
-						id
+						type: "initialise"
 					}
 				}
 			}
@@ -126,11 +128,11 @@
 						await event({
 							type: "editor",
 							data: {
-								type: "repositoryPatch",
+								editor: id,
 								data: {
-									type: "createRepositoryItem",
+									type: "repositoryPatch",
 									data: {
-										id
+										type: "createRepositoryItem"
 									}
 								}
 							}
@@ -148,10 +150,13 @@
 							await event({
 								type: "editor",
 								data: {
-									type: "repositoryPatch",
+									editor: id,
 									data: {
-										type: "selectItem",
-										data: { id, item: itemId }
+										type: "repositoryPatch",
+										data: {
+											type: "selectItem",
+											data: { item: itemId }
+										}
 									}
 								}
 							})
@@ -402,10 +407,13 @@
 							await event({
 								type: "editor",
 								data: {
-									type: "repositoryPatch",
+									editor: id,
 									data: {
-										type: "selectItem",
-										data: { id, item: itemId }
+										type: "repositoryPatch",
+										data: {
+											type: "selectItem",
+											data: { item: itemId }
+										}
 									}
 								}
 							})
@@ -624,12 +632,14 @@
 							await event({
 								type: "editor",
 								data: {
-									type: "repositoryPatch",
+									editor: id,
 									data: {
-										type: "resetModifications",
+										type: "repositoryPatch",
 										data: {
-											id,
-											item: selectedItem
+											type: "resetModifications",
+											data: {
+												item: selectedItem
+											}
 										}
 									}
 								}

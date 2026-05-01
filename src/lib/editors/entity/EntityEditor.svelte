@@ -43,7 +43,7 @@
 				break
 
 			case "general":
-				isPatchEditor = request.data.data.is_patch_editor
+				isPatchEditor = request.data.data.isPatchEditor
 				break
 
 			default:
@@ -66,14 +66,16 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: id,
 				data: {
-					type: "general",
+					type: "entity",
 					data: {
-						type: "setShowReverseParentRefs",
+						type: "general",
 						data: {
-							editor_id: id,
-							show_reverse_parent_refs: _event.target.checked
+							type: "setShowReverseParentRefs",
+							data: {
+								showReverseParentRefs: _event.target.checked
+							}
 						}
 					}
 				}
@@ -87,14 +89,16 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: id,
 				data: {
-					type: "general",
+					type: "entity",
 					data: {
-						type: "setShowChangesFromOriginal",
+						type: "general",
 						data: {
-							editor_id: id,
-							show_changes_from_original: _event.target.checked
+							type: "setShowChangesFromOriginal",
+							data: {
+								showChangesFromOriginal: _event.target.checked
+							}
 						}
 					}
 				}

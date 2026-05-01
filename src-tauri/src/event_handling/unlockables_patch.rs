@@ -13,8 +13,8 @@ use uuid::Uuid;
 use crate::{
 	finish_task,
 	model::{
-		AppState, EditorData, EditorRequest, GlobalRequest, Request, UnlockablesPatchEditorEvent,
-		UnlockablesPatchEditorRequest
+		AppState, EditorData, EditorRequest, EditorRequestData, Request, TabRequest, TabRequestData,
+		UnlockablesPatchEditorEvent, UnlockablesPatchEditorRequest
 	},
 	ores_repo::{UnlockableInformation, UnlockableItem},
 	send_request, start_task
@@ -90,11 +90,15 @@ fn get_modified_items(base: &[UnlockableItem], current: &[UnlockableItem]) -> Ve
 
 #[try_fn]
 #[context("Couldn't handle unlockables patch event")]
-pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesPatchEditorEvent) -> Result<()> {
+pub async fn handle_unlockables_patch_event(
+	app: &AppHandle,
+	id: Uuid,
+	event: UnlockablesPatchEditorEvent
+) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {
-		UnlockablesPatchEditorEvent::Initialise { id } => {
+		UnlockablesPatchEditorEvent::Initialise => {
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Loading unlockables")?;
@@ -116,25 +120,28 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::UnlockablesPatch(
-					UnlockablesPatchEditorRequest::SetUnlockables { id, unlockables: items }
-				))
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::SetUnlockables {
+						unlockables: items
+					})
+				})
 			)?;
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::UnlockablesPatch(
-					UnlockablesPatchEditorRequest::SetModifiedUnlockables {
-						id,
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::SetModifiedUnlockables {
 						modified: get_modified_items(base, unlockables)
-					}
-				))
+					})
+				})
 			)?;
 
 			finish_task(app, task)?;
 		}
 
-		UnlockablesPatchEditorEvent::CreateUnlockable { id } => {
+		UnlockablesPatchEditorEvent::CreateUnlockable => {
 			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Creating unlockable")?;
@@ -169,35 +176,41 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::UnlockablesPatch(
-					UnlockablesPatchEditorRequest::AddNewUnlockable {
-						id: id.to_owned(),
+				Request::Editor(EditorRequest {
+					editor: id.to_owned(),
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::AddNewUnlockable {
 						new_unlockable: (
 							new_id.to_owned(),
 							UnlockableInformation::Unknown {
 								id: Some(format!("ITEM_{}", new_id.to_string().to_uppercase().replace('-', "_")))
 							}
 						)
-					}
-				))
+					})
+				})
 			)?;
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::UnlockablesPatch(
-					UnlockablesPatchEditorRequest::SetModifiedUnlockables {
-						id,
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::SetModifiedUnlockables {
 						modified: get_modified_items(base, unlockables)
-					}
-				))
+					})
+				})
 			)?;
 
-			send_request(app, Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true }))?;
+			send_request(
+				app,
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
+				})
+			)?;
 
 			finish_task(app, task)?;
 		}
 
-		UnlockablesPatchEditorEvent::ResetModifications { id, unlockable } => {
+		UnlockablesPatchEditorEvent::ResetModifications { unlockable } => {
 			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Resetting changes")?;
@@ -224,38 +237,45 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 
 				send_request(
 					app,
-					Request::Editor(EditorRequest::UnlockablesPatch(
-						UnlockablesPatchEditorRequest::RemoveUnlockable {
-							id: id.to_owned(),
+					Request::Editor(EditorRequest {
+						editor: id.to_owned(),
+						data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::RemoveUnlockable {
 							unlockable
-						}
-					))
+						})
+					})
 				)?;
 			}
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::UnlockablesPatch(
-					UnlockablesPatchEditorRequest::SetModifiedUnlockables {
-						id: id.to_owned(),
+				Request::Editor(EditorRequest {
+					editor: id.to_owned(),
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::SetModifiedUnlockables {
 						modified: get_modified_items(base, unlockables)
-					}
-				))
+					})
+				})
 			)?;
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::UnlockablesPatch(
-					UnlockablesPatchEditorRequest::DeselectMonaco { id }
-				))
+				Request::Editor(EditorRequest {
+					editor: id.to_owned(),
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::DeselectMonaco)
+				})
 			)?;
 
-			send_request(app, Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true }))?;
+			send_request(
+				app,
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
+				})
+			)?;
 
 			finish_task(app, task)?;
 		}
 
-		UnlockablesPatchEditorEvent::ModifyUnlockable { id, unlockable, data } => {
+		UnlockablesPatchEditorEvent::ModifyUnlockable { unlockable, data } => {
 			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Saving unlockable")?;
@@ -293,32 +313,44 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 			if modified {
 				send_request(
 					app,
-					Request::Editor(EditorRequest::UnlockablesPatch(
-						UnlockablesPatchEditorRequest::SetModifiedUnlockables {
-							id,
-							modified: get_modified_items(base, unlockables)
-						}
-					))
+					Request::Editor(EditorRequest {
+						editor: id,
+						data: EditorRequestData::UnlockablesPatch(
+							UnlockablesPatchEditorRequest::SetModifiedUnlockables {
+								modified: get_modified_items(base, unlockables)
+							}
+						)
+					})
 				)?;
 
 				send_request(
 					app,
-					Request::Editor(EditorRequest::UnlockablesPatch(
-						UnlockablesPatchEditorRequest::ModifyUnlockableInformation {
-							id,
-							info: get_unlockable_information(unlockables.iter().find(|x| x.id == unlockable).unwrap())?,
-							unlockable
-						}
-					))
+					Request::Editor(EditorRequest {
+						editor: id,
+						data: EditorRequestData::UnlockablesPatch(
+							UnlockablesPatchEditorRequest::ModifyUnlockableInformation {
+								info: get_unlockable_information(
+									unlockables.iter().find(|x| x.id == unlockable).unwrap()
+								)?,
+								unlockable
+							}
+						)
+					})
 				)?;
 
-				send_request(app, Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true }))?;
+				send_request(
+					app,
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::SetUnsaved { unsaved: true }
+					})
+				)?;
 			}
 
 			finish_task(app, task)?;
 		}
 
-		UnlockablesPatchEditorEvent::SelectUnlockable { id, unlockable } => {
+		UnlockablesPatchEditorEvent::SelectUnlockable { unlockable } => {
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Selecting unlockable")?;
@@ -354,14 +386,14 @@ pub async fn handle_unlockables_patch_event(app: &AppHandle, event: UnlockablesP
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::UnlockablesPatch(
-					UnlockablesPatchEditorRequest::SetMonacoContent {
-						id,
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::SetMonacoContent {
 						unlockable,
 						orig_data: String::from_utf8(buf_orig)?,
 						data: String::from_utf8(buf)?
-					}
-				))
+					})
+				})
 			)?;
 
 			finish_task(app, task)?;

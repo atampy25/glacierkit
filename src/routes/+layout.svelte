@@ -73,7 +73,7 @@
 					console.log("Layout handling request", request)
 
 					getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
-					windowTitle = request.data.data
+					windowTitle = request.data.data.title
 				}
 
 				if (request.type === "global" && request.data.type === "errorReport") {
@@ -93,10 +93,10 @@
 					const patch = createPatch(request.data.data.base, request.data.data.current)
 
 					void writeTextFile(
-						request.data.data.save_path,
+						request.data.data.savePath,
 						JSON.stringify({
-							file: request.data.data.file_and_type[0],
-							type: request.data.data.file_and_type[1],
+							file: request.data.data.fileAndType[0],
+							type: request.data.data.fileAndType[1],
 							patch
 						})
 					)

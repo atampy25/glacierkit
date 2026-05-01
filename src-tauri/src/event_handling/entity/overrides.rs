@@ -13,8 +13,8 @@ use crate::{
 	entity::{get_ref_decoration, visit_variant},
 	finish_task, get_loaded_game_version,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EntityEditorRequest, EntityOverridesEvent,
-		EntityOverridesRequest, GlobalRequest, Request
+		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityOverridesEvent,
+		EntityOverridesRequest, Request, TabRequest, TabRequestData
 	},
 	send_request, start_task
 };
@@ -134,12 +134,14 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Overrides(
-				EntityOverridesRequest::UpdateDecorations {
-					editor_id,
-					decorations: decorations.into_iter().unique().collect()
-				}
-			)))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Overrides(
+					EntityOverridesRequest::UpdateDecorations {
+						decorations: decorations.into_iter().unique().collect()
+					}
+				))
+			})
 		)?;
 
 		finish_task(app, task)?;
@@ -148,11 +150,11 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 
 #[try_fn]
 #[context("Couldn't handle entity overrides event")]
-pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {
-		EntityOverridesEvent::Initialise { editor_id } => {
+		EntityOverridesEvent::Initialise => {
 			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -167,53 +169,55 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Overrides(
-					EntityOverridesRequest::Initialise {
-						editor_id,
-						property_overrides: {
-							let mut buf = Vec::new();
-							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+				Request::Editor(EditorRequest {
+					editor: editor_id,
+					data: EditorRequestData::Entity(EntityEditorRequest::Overrides(
+						EntityOverridesRequest::Initialise {
+							property_overrides: {
+								let mut buf = Vec::new();
+								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							entity.property_overrides.serialize(&mut ser)?;
+								entity.property_overrides.serialize(&mut ser)?;
 
-							String::from_utf8(buf)?
-						},
-						override_deletes: {
-							let mut buf = Vec::new();
-							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+								String::from_utf8(buf)?
+							},
+							override_deletes: {
+								let mut buf = Vec::new();
+								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							entity.override_deletes.serialize(&mut ser)?;
+								entity.override_deletes.serialize(&mut ser)?;
 
-							String::from_utf8(buf)?
-						},
-						pin_connection_overrides: {
-							let mut buf = Vec::new();
-							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+								String::from_utf8(buf)?
+							},
+							pin_connection_overrides: {
+								let mut buf = Vec::new();
+								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							entity.pin_connection_overrides.serialize(&mut ser)?;
+								entity.pin_connection_overrides.serialize(&mut ser)?;
 
-							String::from_utf8(buf)?
-						},
-						pin_connection_override_deletes: {
-							let mut buf = Vec::new();
-							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+								String::from_utf8(buf)?
+							},
+							pin_connection_override_deletes: {
+								let mut buf = Vec::new();
+								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							entity.pin_connection_override_deletes.serialize(&mut ser)?;
+								entity.pin_connection_override_deletes.serialize(&mut ser)?;
 
-							String::from_utf8(buf)?
+								String::from_utf8(buf)?
+							}
 						}
-					}
-				)))
+					))
+				})
 			)?;
 
 			send_overrides_decorations(app, editor_id, entity)?;
 		}
 
-		EntityOverridesEvent::UpdatePropertyOverrides { editor_id, content } => {
+		EntityOverridesEvent::UpdatePropertyOverrides { content } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -235,15 +239,15 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::SetTabUnsaved {
-						id: editor_id,
-						unsaved: true
+					Request::Tab(TabRequest {
+						tab: editor_id,
+						data: TabRequestData::SetUnsaved { unsaved: true }
 					})
 				)?;
 			}
 		}
 
-		EntityOverridesEvent::UpdateOverrideDeletes { editor_id, content } => {
+		EntityOverridesEvent::UpdateOverrideDeletes { content } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -265,15 +269,15 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::SetTabUnsaved {
-						id: editor_id,
-						unsaved: true
+					Request::Tab(TabRequest {
+						tab: editor_id,
+						data: TabRequestData::SetUnsaved { unsaved: true }
 					})
 				)?;
 			}
 		}
 
-		EntityOverridesEvent::UpdatePinConnectionOverrides { editor_id, content } => {
+		EntityOverridesEvent::UpdatePinConnectionOverrides { content } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -295,15 +299,15 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::SetTabUnsaved {
-						id: editor_id,
-						unsaved: true
+					Request::Tab(TabRequest {
+						tab: editor_id,
+						data: TabRequestData::SetUnsaved { unsaved: true }
 					})
 				)?;
 			}
 		}
 
-		EntityOverridesEvent::UpdatePinConnectionOverrideDeletes { editor_id, content } => {
+		EntityOverridesEvent::UpdatePinConnectionOverrideDeletes { content } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -325,9 +329,9 @@ pub async fn handle(app: &AppHandle, event: EntityOverridesEvent) -> Result<()> 
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::SetTabUnsaved {
-						id: editor_id,
-						unsaved: true
+					Request::Tab(TabRequest {
+						tab: editor_id,
+						data: TabRequestData::SetUnsaved { unsaved: true }
 					})
 				)?;
 			}

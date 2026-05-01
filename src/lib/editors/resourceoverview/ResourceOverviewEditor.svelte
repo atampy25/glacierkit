@@ -62,11 +62,11 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "resourceOverview",
+				editor: id,
 				data: {
-					type: "initialise",
+					type: "resourceOverview",
 					data: {
-						id
+						type: "initialise"
 					}
 				}
 			}
@@ -80,10 +80,10 @@
 			case "initialise":
 				hash = request.data.hash
 				filetype = request.data.filetype
-				partition = request.data.chunk_patch.replace(/patch[0-9]+/, "")
-				pathOrHint = request.data.path_or_hint
+				partition = request.data.chunkPatch.replace(/patch[0-9]+/, "")
+				pathOrHint = request.data.pathOrHint
 				dependencies = request.data.dependencies
-				reverseDependencies = request.data.reverse_dependencies
+				reverseDependencies = request.data.reverseDependencies
 				changelog = request.data.changelog
 				data = request.data.data
 				break
@@ -174,12 +174,14 @@
 													await event({
 														type: "editor",
 														data: {
-															type: "resourceOverview",
+															editor: id,
 															data: {
-																type: "extractSpecificMultiWav",
+																type: "resourceOverview",
 																data: {
-																	id,
-																	index: detail
+																	type: "extractSpecificMultiWav",
+																	data: {
+																		index: detail
+																	}
 																}
 															}
 														}
@@ -226,11 +228,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "openInEditor",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "openInEditor"
 															}
 														}
 													}
@@ -245,11 +247,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsQN",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsQN"
 															}
 														}
 													}
@@ -264,11 +266,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -283,11 +285,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractTEMPAsRT",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractTEMPAsRT"
 															}
 														}
 													}
@@ -302,11 +304,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractTBLUAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractTBLUAsFile"
 															}
 														}
 													}
@@ -321,11 +323,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractTBLUAsRT",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractTBLUAsRT"
 															}
 														}
 													}
@@ -341,11 +343,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsImage",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsImage"
 															}
 														}
 													}
@@ -360,11 +362,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -380,11 +382,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsWav",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsWav"
 															}
 														}
 													}
@@ -399,11 +401,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -419,11 +421,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractMultiWav",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractMultiWav"
 															}
 														}
 													}
@@ -438,11 +440,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -458,11 +460,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsRTGeneric",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsRTGeneric"
 															}
 														}
 													}
@@ -477,11 +479,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -497,11 +499,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "openInEditor",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "openInEditor"
 															}
 														}
 													}
@@ -516,11 +518,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -536,11 +538,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "openInEditor",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "openInEditor"
 															}
 														}
 													}
@@ -555,11 +557,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsRTGeneric",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsRTGeneric"
 															}
 														}
 													}
@@ -574,11 +576,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -594,11 +596,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsHMLanguages",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsHMLanguages"
 															}
 														}
 													}
@@ -613,11 +615,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -633,11 +635,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -653,11 +655,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -673,11 +675,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -693,11 +695,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -713,11 +715,11 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "resourceOverview",
+														editor: id,
 														data: {
-															type: "extractAsFile",
+															type: "resourceOverview",
 															data: {
-																id
+																type: "extractAsFile"
 															}
 														}
 													}
@@ -798,22 +800,23 @@
 											await event({
 												type: "editor",
 												data: {
-													type: "resourceOverview",
-													data: !e.ctrlKey
-														? {
-																type: "followDependency",
-																data: {
-																	id,
-																	new_hash: hash
+													editor: id,
+													data: {
+														type: "resourceOverview",
+														data: !e.ctrlKey
+															? {
+																	type: "followDependency",
+																	data: {
+																		newHash: hash
+																	}
 																}
-															}
-														: {
-																type: "followDependencyInNewTab",
-																data: {
-																	id,
-																	hash
+															: {
+																	type: "followDependencyInNewTab",
+																	data: {
+																		hash
+																	}
 																}
-															}
+													}
 												}
 											})
 										}}
@@ -861,22 +864,23 @@
 											await event({
 												type: "editor",
 												data: {
-													type: "resourceOverview",
-													data: !e.ctrlKey
-														? {
-																type: "followDependency",
-																data: {
-																	id,
-																	new_hash: hash
+													editor: id,
+													data: {
+														type: "resourceOverview",
+														data: !e.ctrlKey
+															? {
+																	type: "followDependency",
+																	data: {
+																		newHash: hash
+																	}
 																}
-															}
-														: {
-																type: "followDependencyInNewTab",
-																data: {
-																	id,
-																	hash
+															: {
+																	type: "followDependencyInNewTab",
+																	data: {
+																		hash
+																	}
 																}
-															}
+													}
 												}
 											})
 										}}

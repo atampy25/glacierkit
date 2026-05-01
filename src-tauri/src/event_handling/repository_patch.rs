@@ -12,8 +12,8 @@ use uuid::Uuid;
 use crate::{
 	finish_task,
 	model::{
-		AppState, EditorData, EditorRequest, GlobalRequest, RepositoryPatchEditorEvent, RepositoryPatchEditorRequest,
-		Request
+		AppState, EditorData, EditorRequest, EditorRequestData, RepositoryPatchEditorEvent,
+		RepositoryPatchEditorRequest, Request, TabRequest, TabRequestData
 	},
 	ores_repo::{RepositoryItem, RepositoryItemInformation},
 	send_request, start_task
@@ -192,11 +192,11 @@ fn get_modified_items(base: &[RepositoryItem], current: &[RepositoryItem]) -> Ve
 
 #[try_fn]
 #[context("Couldn't handle repository patch event")]
-pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPatchEditorEvent) -> Result<()> {
+pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: RepositoryPatchEditorEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {
-		RepositoryPatchEditorEvent::Initialise { id } => {
+		RepositoryPatchEditorEvent::Initialise => {
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Loading repository items")?;
@@ -218,25 +218,30 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::RepositoryPatch(
-					RepositoryPatchEditorRequest::SetRepositoryItems { id, items }
-				))
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::SetRepositoryItems {
+						items
+					})
+				})
 			)?;
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::RepositoryPatch(
-					RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
-						id,
-						modified: get_modified_items(base, repository)
-					}
-				))
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::RepositoryPatch(
+						RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
+							modified: get_modified_items(base, repository)
+						}
+					)
+				})
 			)?;
 
 			finish_task(app, task)?;
 		}
 
-		RepositoryPatchEditorEvent::CreateRepositoryItem { id } => {
+		RepositoryPatchEditorEvent::CreateRepositoryItem => {
 			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Creating repository item")?;
@@ -262,30 +267,38 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::RepositoryPatch(
-					RepositoryPatchEditorRequest::AddNewRepositoryItem {
-						id: id.to_owned(),
+				Request::Editor(EditorRequest {
+					editor: id.to_owned(),
+					data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::AddNewRepositoryItem {
 						new_item: (new_id.to_owned(), RepositoryItemInformation::Unknown)
-					}
-				))
+					})
+				})
 			)?;
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::RepositoryPatch(
-					RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
-						id,
-						modified: get_modified_items(base, repository)
-					}
-				))
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::RepositoryPatch(
+						RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
+							modified: get_modified_items(base, repository)
+						}
+					)
+				})
 			)?;
 
-			send_request(app, Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true }))?;
+			send_request(
+				app,
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
+				})
+			)?;
 
 			finish_task(app, task)?;
 		}
 
-		RepositoryPatchEditorEvent::ResetModifications { id, item } => {
+		RepositoryPatchEditorEvent::ResetModifications { item } => {
 			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Resetting changes")?;
@@ -312,38 +325,47 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 
 				send_request(
 					app,
-					Request::Editor(EditorRequest::RepositoryPatch(
-						RepositoryPatchEditorRequest::RemoveRepositoryItem {
-							id: id.to_owned(),
+					Request::Editor(EditorRequest {
+						editor: id.to_owned(),
+						data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::RemoveRepositoryItem {
 							item
-						}
-					))
+						})
+					})
 				)?;
 			}
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::RepositoryPatch(
-					RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
-						id: id.to_owned(),
-						modified: get_modified_items(base, repository)
-					}
-				))
+				Request::Editor(EditorRequest {
+					editor: id.to_owned(),
+					data: EditorRequestData::RepositoryPatch(
+						RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
+							modified: get_modified_items(base, repository)
+						}
+					)
+				})
 			)?;
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::RepositoryPatch(
-					RepositoryPatchEditorRequest::DeselectMonaco { id }
-				))
+				Request::Editor(EditorRequest {
+					editor: id.to_owned(),
+					data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::DeselectMonaco)
+				})
 			)?;
 
-			send_request(app, Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true }))?;
+			send_request(
+				app,
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
+				})
+			)?;
 
 			finish_task(app, task)?;
 		}
 
-		RepositoryPatchEditorEvent::ModifyItem { id, item, data } => {
+		RepositoryPatchEditorEvent::ModifyItem { item, data } => {
 			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
 
 			let task = start_task(app, "Saving repository item")?;
@@ -378,32 +400,40 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 			if modified {
 				send_request(
 					app,
-					Request::Editor(EditorRequest::RepositoryPatch(
-						RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
-							id,
-							modified: get_modified_items(base, repository)
-						}
-					))
+					Request::Editor(EditorRequest {
+						editor: id,
+						data: EditorRequestData::RepositoryPatch(
+							RepositoryPatchEditorRequest::SetModifiedRepositoryItems {
+								modified: get_modified_items(base, repository)
+							}
+						)
+					})
 				)?;
 
 				send_request(
 					app,
-					Request::Editor(EditorRequest::RepositoryPatch(
-						RepositoryPatchEditorRequest::ModifyItemInformation {
-							id,
+					Request::Editor(EditorRequest {
+						editor: id,
+						data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::ModifyItemInformation {
 							info: get_repository_item_information(repository.iter().find(|x| x.id == item).unwrap())?,
 							item
-						}
-					))
+						})
+					})
 				)?;
 
-				send_request(app, Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true }))?;
+				send_request(
+					app,
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::SetUnsaved { unsaved: true }
+					})
+				)?;
 			}
 
 			finish_task(app, task)?;
 		}
 
-		RepositoryPatchEditorEvent::SelectItem { id, item } => {
+		RepositoryPatchEditorEvent::SelectItem { item } => {
 			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
 
 			let task = start_task(app, "Selecting repository item")?;
@@ -439,14 +469,14 @@ pub async fn handle_repository_patch_event(app: &AppHandle, event: RepositoryPat
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::RepositoryPatch(
-					RepositoryPatchEditorRequest::SetMonacoContent {
-						id,
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::SetMonacoContent {
 						item,
 						orig_data: String::from_utf8(buf_orig)?,
 						data: String::from_utf8(buf)?
-					}
-				))
+					})
+				})
 			)?;
 
 			finish_task(app, task)?;

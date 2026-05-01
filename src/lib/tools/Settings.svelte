@@ -12,7 +12,7 @@
 
 		switch (request.type) {
 			case "initialise":
-				gameInstalls = request.data.game_installs
+				gameInstalls = request.data.gameInstalls
 				extractModdedFiles = request.data.settings.extractModdedFiles
 				colourblind = request.data.settings.colourblindMode
 				editorConnectionEnabled = request.data.settings.editorConnection
@@ -21,7 +21,7 @@
 
 			case "changeProjectSettings":
 				projectLoaded = true
-				customPaths = request.data.customPaths
+				customPaths = request.data.settings.customPaths
 				break
 
 			default:
@@ -53,7 +53,7 @@
 					type: "settings",
 					data: {
 						type: "changeExtractModdedFiles",
-						data: _target.checked
+						data: { value: _target.checked }
 					}
 				}
 			})
@@ -71,7 +71,7 @@
 					type: "settings",
 					data: {
 						type: "changeColourblind",
-						data: _target.checked
+						data: { value: _target.checked }
 					}
 				}
 			})
@@ -89,7 +89,7 @@
 					type: "settings",
 					data: {
 						type: "changeEditorConnection",
-						data: _target.checked
+						data: { value: _target.checked }
 					}
 				}
 			})
@@ -165,7 +165,7 @@
 							type: "settings",
 							data: {
 								type: "changeGameInstall",
-								data: gameInstall.path
+								data: { path: gameInstall.path }
 							}
 						}
 					})
@@ -189,7 +189,7 @@
 						type: "settings",
 						data: {
 							type: "changeGameInstall",
-							data: null
+							data: { path: null }
 						}
 					}
 				})
@@ -211,7 +211,7 @@
 						type: "settings",
 						data: {
 							type: "changeCustomPaths",
-							data: detail
+							data: { value: detail }
 						}
 					}
 				})

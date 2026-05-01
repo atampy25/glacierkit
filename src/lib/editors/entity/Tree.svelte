@@ -103,14 +103,16 @@
 											await event({
 												type: "editor",
 												data: {
-													type: "entity",
+													editor: editorID,
 													data: {
-														type: "tree",
+														type: "entity",
 														data: {
-															type: "restoreToOriginal",
+															type: "tree",
 															data: {
-																editor_id: editorID,
-																entity_id: selected_node.id
+																type: "restoreToOriginal",
+																data: {
+																	entityId: selected_node.id
+																}
 															}
 														}
 													}
@@ -156,11 +158,11 @@
 													// Ensure parent gets reclassified as a folder if necessary
 													selected_node.original.hasReverseParentRefs = true
 													selected_node.original.folder =
-														selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+														selected_node.original.factory === "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
 
 													tree.set_icon(
 														selected_node.id,
-														selected_node.original.factory == "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+														selected_node.original.factory === "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
 															? "fa-regular fa-folder"
 															: icons.find((a) => selected_node.original.factory.includes(a[0]))
 																? icons.find((a) => selected_node.original.factory.includes(a[0]))![1]
@@ -173,19 +175,21 @@
 													await event({
 														type: "editor",
 														data: {
-															type: "entity",
+															editor: editorID,
 															data: {
-																type: "tree",
+																type: "entity",
 																data: {
-																	type: "create",
+																	type: "tree",
 																	data: {
-																		editor_id: editorID,
-																		id: newEntityID,
-																		content: {
-																			parent: selected_node.id,
-																			name: node.text,
-																			factory: "[modules:/zentity.class].pc_entitytype",
-																			blueprint: "[modules:/zentity.class].pc_entityblueprint"
+																		type: "create",
+																		data: {
+																			id: newEntityID,
+																			content: {
+																				parent: selected_node.id,
+																				name: node.text,
+																				factory: "[modules:/zentity.class].pc_entitytype",
+																				blueprint: "[modules:/zentity.class].pc_entityblueprint"
+																			}
 																		}
 																	}
 																}
@@ -220,15 +224,17 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "entity",
+														editor: editorID,
 														data: {
-															type: "tree",
+															type: "entity",
 															data: {
-																type: "rename",
+																type: "tree",
 																data: {
-																	editor_id: editorID,
-																	id: node.id,
-																	new_name: node.text
+																	type: "rename",
+																	data: {
+																		id: node.id,
+																		newName: node.text
+																	}
 																}
 															}
 														}
@@ -258,16 +264,16 @@
 
 										if (selected_node.parent !== "#") {
 											tree.get_node(selected_node.parent).original.hasReverseParentRefs = tree.settings!.core.data.some(
-												(a: any) => a.parent == tree.get_node(selected_node.parent).id
+												(a: any) => a.parent === tree.get_node(selected_node.parent).id
 											)
 											tree.get_node(selected_node.parent).original.folder =
-												tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+												tree.get_node(selected_node.parent).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 												tree.get_node(selected_node.parent).original.hasReverseParentRefs
 
 											// Reclassify parent as not folder if necessary
 											tree.set_icon(
 												selected_node.parent,
-												tree.get_node(selected_node.parent).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+												tree.get_node(selected_node.parent).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 													tree.get_node(selected_node.parent).original.hasReverseParentRefs
 													? "fa-regular fa-folder"
 													: icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))
@@ -290,14 +296,16 @@
 										await event({
 											type: "editor",
 											data: {
-												type: "entity",
+												editor: editorID,
 												data: {
-													type: "tree",
+													type: "entity",
 													data: {
-														type: "delete",
+														type: "tree",
 														data: {
-															editor_id: editorID,
-															id: selected_node.id
+															type: "delete",
+															data: {
+																id: selected_node.id
+															}
 														}
 													}
 												}
@@ -324,14 +332,16 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "entity",
+														editor: editorID,
 														data: {
-															type: "tree",
+															type: "entity",
 															data: {
-																type: "copy",
+																type: "tree",
 																data: {
-																	editor_id: editorID,
-																	id: selected_node.id
+																	type: "copy",
+																	data: {
+																		id: selected_node.id
+																	}
 																}
 															}
 														}
@@ -352,14 +362,16 @@
 												await event({
 													type: "editor",
 													data: {
-														type: "entity",
+														editor: editorID,
 														data: {
-															type: "tree",
+															type: "entity",
 															data: {
-																type: "paste",
+																type: "tree",
 																data: {
-																	editor_id: editorID,
-																	parent_id: selected_node.id
+																	type: "paste",
+																	data: {
+																		parentId: selected_node.id
+																	}
 																}
 															}
 														}
@@ -402,15 +414,17 @@
 																await event({
 																	type: "editor",
 																	data: {
-																		type: "entity",
+																		editor: editorID,
 																		data: {
-																			type: "tree",
+																			type: "entity",
 																			data: {
-																				type: "useTemplate",
+																				type: "tree",
 																				data: {
-																					editor_id: editorID,
-																					parent_id: selected_node.id,
-																					template: template.pasteData
+																					type: "useTemplate",
+																					data: {
+																						parentId: selected_node.id,
+																						template: template.pasteData as unknown as any
+																					}
 																				}
 																			}
 																		}
@@ -446,14 +460,16 @@
 															await event({
 																type: "editor",
 																data: {
-																	type: "entity",
+																	editor: editorID,
 																	data: {
-																		type: "tree",
+																		type: "entity",
 																		data: {
-																			type: "selectEntityInEditor",
+																			type: "tree",
 																			data: {
-																				editor_id: editorID,
-																				entity_id: d.id
+																				type: "selectEntityInEditor",
+																				data: {
+																					entityId: d.id
+																				}
 																			}
 																		}
 																	}
@@ -474,14 +490,16 @@
 															await event({
 																type: "editor",
 																data: {
-																	type: "entity",
+																	editor: editorID,
 																	data: {
-																		type: "tree",
+																		type: "entity",
 																		data: {
-																			type: "moveEntityToPlayer",
+																			type: "tree",
 																			data: {
-																				editor_id: editorID,
-																				entity_id: d.id
+																				type: "moveEntityToPlayer",
+																				data: {
+																					entityId: d.id
+																				}
 																			}
 																		}
 																	}
@@ -502,14 +520,16 @@
 															await event({
 																type: "editor",
 																data: {
-																	type: "entity",
+																	editor: editorID,
 																	data: {
-																		type: "tree",
+																		type: "entity",
 																		data: {
-																			type: "rotateEntityAsPlayer",
+																			type: "tree",
 																			data: {
-																				editor_id: editorID,
-																				entity_id: d.id
+																				type: "rotateEntityAsPlayer",
+																				data: {
+																					entityId: d.id
+																				}
 																			}
 																		}
 																	}
@@ -530,14 +550,16 @@
 															await event({
 																type: "editor",
 																data: {
-																	type: "entity",
+																	editor: editorID,
 																	data: {
-																		type: "tree",
+																		type: "entity",
 																		data: {
-																			type: "moveEntityToCamera",
+																			type: "tree",
 																			data: {
-																				editor_id: editorID,
-																				entity_id: d.id
+																				type: "moveEntityToCamera",
+																				data: {
+																					entityId: d.id
+																				}
 																			}
 																		}
 																	}
@@ -558,14 +580,16 @@
 															await event({
 																type: "editor",
 																data: {
-																	type: "entity",
+																	editor: editorID,
 																	data: {
-																		type: "tree",
+																		type: "entity",
 																		data: {
-																			type: "rotateEntityAsCamera",
+																			type: "tree",
 																			data: {
-																				editor_id: editorID,
-																				entity_id: d.id
+																				type: "rotateEntityAsCamera",
+																				data: {
+																					entityId: d.id
+																				}
 																			}
 																		}
 																	}
@@ -594,14 +618,16 @@
 													await event({
 														type: "editor",
 														data: {
-															type: "entity",
+															editor: editorID,
 															data: {
-																type: "tree",
+																type: "entity",
 																data: {
-																	type: "restoreToOriginal",
+																	type: "tree",
 																	data: {
-																		editor_id: editorID,
-																		entity_id: selected_node.id
+																		type: "restoreToOriginal",
+																		data: {
+																			entityId: selected_node.id
+																		}
 																	}
 																}
 															}
@@ -639,14 +665,16 @@
 										await event({
 											type: "editor",
 											data: {
-												type: "entity",
+												editor: editorID,
 												data: {
-													type: "tree",
+													type: "entity",
 													data: {
-														type: "showHelpMenu",
+														type: "tree",
 														data: {
-															editor_id: editorID,
-															entity_id: selected_node.id
+															type: "showHelpMenu",
+															data: {
+																entityId: selected_node.id
+															}
 														}
 													}
 												}
@@ -674,12 +702,15 @@
 					await event({
 						type: "editor",
 						data: {
-							type: "entity",
+							editor: editorID,
 							data: {
-								type: "tree",
+								type: "entity",
 								data: {
-									type: "select",
-									data: { editor_id: editorID, id: selected[0] }
+									type: "tree",
+									data: {
+										type: "select",
+										data: { id: selected[0] }
+									}
 								}
 							}
 						}
@@ -712,12 +743,15 @@
 				await event({
 					type: "editor",
 					data: {
-						type: "entity",
+						editor: editorID,
 						data: {
-							type: "tree",
+							type: "entity",
 							data: {
-								type: "reparent",
-								data: { editor_id: editorID, id: node.id, new_parent: node.original.parentRef }
+								type: "tree",
+								data: {
+									type: "reparent",
+									data: { id: node.id, newParent: node.original.parentRef }
+								}
 							}
 						}
 					}
@@ -734,15 +768,17 @@
 			await event({
 				type: "editor",
 				data: {
-					type: "entity",
+					editor: editorID,
 					data: {
-						type: "tree",
+						type: "entity",
 						data: {
-							type: "addGameBrowserItem",
+							type: "tree",
 							data: {
-								editor_id: editorID,
-								parent_id: node.parent,
-								file: original.id
+								type: "addGameBrowserItem",
+								data: {
+									parentId: node.parent,
+									file: original.id
+								}
 							}
 						}
 					}
@@ -757,13 +793,13 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: editorID,
 				data: {
-					type: "tree",
+					type: "entity",
 					data: {
-						type: "initialise",
+						type: "tree",
 						data: {
-							editor_id: editorID
+							type: "initialise"
 						}
 					}
 				}
@@ -789,7 +825,7 @@
 				break
 
 			case "newItems":
-				newItems(request.data.new_entities)
+				newItems(request.data.newEntities)
 				break
 
 			case "searchResults":
@@ -799,9 +835,9 @@
 
 			case "showHelpMenu":
 				helpMenuFactory = request.data.factory
-				helpMenuInputs = request.data.input_pins
-				helpMenuOutputs = request.data.output_pins
-				helpMenuDefaultPropertiesJSON = request.data.default_properties_json
+				helpMenuInputs = request.data.inputPins
+				helpMenuOutputs = request.data.outputPins
+				helpMenuDefaultPropertiesJSON = request.data.defaultPropertiesJson
 				helpMenuOpen = true
 				break
 
@@ -810,7 +846,7 @@
 				break
 
 			case "setEditorConnectionAvailable":
-				editorConnectionAvailable = request.data.editor_connection_available
+				editorConnectionAvailable = request.data.editorConnectionAvailable
 				break
 
 			case "setDiffInfo":
@@ -827,7 +863,7 @@
 				break
 
 			case "setShowDiff":
-				showDiff = request.data.show_diff
+				showDiff = request.data.showDiff
 				updateDiffing()
 				break
 
@@ -881,13 +917,13 @@
 				id: entityID,
 				parent: getReferencedLocalEntity(parent) || "#",
 				icon:
-					factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+					factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
 						? "fa-regular fa-folder"
 						: icons.find((a) => factory.includes(a[0]))
 							? icons.find((a) => factory.includes(a[0]))![1]
 							: "fa-regular fa-file",
 				text: `${name} (${entityID})`,
-				folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+				folder: factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
 				factory,
 				hasReverseParentRefs,
 				parentRef: parent
@@ -911,21 +947,21 @@
 						tree.move_node(
 							existingNode,
 							getReferencedLocalEntity(parent) || "#",
-							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
 						)
 
 						tree.rename_node(existingNode, `${name} (${entityID})`)
 
 						tree.set_icon(
 							existingNode,
-							factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+							factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
 								? "fa-regular fa-folder"
 								: icons.find((a) => factory.includes(a[0]))
 									? icons.find((a) => factory.includes(a[0]))![1]
 									: "fa-regular fa-file"
 						)
 
-						existingNode.original.folder = factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+						existingNode.original.folder = factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
 						existingNode.original.factory = factory
 						existingNode.original.hasReverseParentRefs = hasReverseParentRefs
 						existingNode.original.parentRef = parent
@@ -933,12 +969,12 @@
 						if (getReferencedLocalEntity(parent)) {
 							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
 							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 
 							tree.set_icon(
 								getReferencedLocalEntity(parent),
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 									? "fa-regular fa-folder"
 									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
@@ -963,29 +999,29 @@
 								id: entityID,
 								parent: getReferencedLocalEntity(parent) || "#",
 								icon:
-									factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+									factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
 										? "fa-regular fa-folder"
 										: icons.find((a) => factory.includes(a[0]))
 											? icons.find((a) => factory.includes(a[0]))![1]
 											: "fa-regular fa-file",
 								text: `${name} (${entityID})`,
-								folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+								folder: factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
 								factory,
 								hasReverseParentRefs,
 								parentRef: parent
 							},
-							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
 						)
 
 						if (getReferencedLocalEntity(parent)) {
 							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
 							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 
 							tree.set_icon(
 								getReferencedLocalEntity(parent),
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 									? "fa-regular fa-folder"
 									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
@@ -1056,13 +1092,13 @@
 									id: entityID,
 									parent: getReferencedLocalEntity(parent) || "#",
 									icon:
-										factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+										factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
 											? "fa-regular fa-folder"
 											: icons.find((a) => factory.includes(a[0]))
 												? icons.find((a) => factory.includes(a[0]))![1]
 												: "fa-regular fa-file",
 									text: `${name} (${entityID})`,
-									folder: factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+									folder: factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
 									factory,
 									hasReverseParentRefs,
 									parentRef: parent,
@@ -1070,18 +1106,18 @@
 										class: "item-removed"
 									}
 								},
-								getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory == "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+								getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
 							)
 
 							if (getReferencedLocalEntity(parent)) {
 								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
 								tree.get_node(getReferencedLocalEntity(parent)).original.folder =
-									tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+									tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 
 								tree.set_icon(
 									getReferencedLocalEntity(parent),
-									tree.get_node(getReferencedLocalEntity(parent)).original.factory == "[modules:/zentity.class].pc_entitytype" &&
+									tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
 										tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 										? "fa-regular fa-folder"
 										: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
@@ -1119,14 +1155,16 @@
 			await event({
 				type: "editor",
 				data: {
-					type: "entity",
+					editor: editorID,
 					data: {
-						type: "tree",
+						type: "entity",
 						data: {
-							type: "search",
+							type: "tree",
 							data: {
-								editor_id: editorID,
-								query: _event.target.value.toLowerCase()
+								type: "search",
+								data: {
+									query: _event.target.value.toLowerCase()
+								}
 							}
 						}
 					}

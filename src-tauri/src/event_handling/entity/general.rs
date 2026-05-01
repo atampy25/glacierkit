@@ -2,20 +2,23 @@ use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
+use uuid::Uuid;
 
 use crate::{
-	model::{AppState, EditorData, EditorRequest, EntityEditorRequest, EntityGeneralEvent, EntityTreeRequest, Request},
+	model::{
+		AppState, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityGeneralEvent,
+		EntityTreeRequest, Request
+	},
 	send_request
 };
 
 #[try_fn]
 #[context("Couldn't handle update content event")]
-pub async fn handle(app: &AppHandle, event: EntityGeneralEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityGeneralEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {
 		EntityGeneralEvent::SetShowReverseParentRefs {
-			editor_id,
 			show_reverse_parent_refs
 		} => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
@@ -34,7 +37,6 @@ pub async fn handle(app: &AppHandle, event: EntityGeneralEvent) -> Result<()> {
 		}
 
 		EntityGeneralEvent::SetShowChangesFromOriginal {
-			editor_id,
 			show_changes_from_original
 		} => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
@@ -53,12 +55,12 @@ pub async fn handle(app: &AppHandle, event: EntityGeneralEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-					EntityTreeRequest::SetShowDiff {
-						editor_id,
+				Request::Editor(EditorRequest {
+					editor: editor_id,
+					data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SetShowDiff {
 						show_diff: show_changes_from_original
-					}
-				)))
+					}))
+				})
 			)?;
 		}
 	}

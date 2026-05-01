@@ -13,11 +13,11 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "contentSearchResults",
+				editor: id,
 				data: {
-					type: "initialise",
+					type: "contentSearchResults",
 					data: {
-						id
+						type: "initialise"
 					}
 				}
 			}
@@ -56,12 +56,14 @@
 						await event({
 							type: "editor",
 							data: {
-								type: "contentSearchResults",
+								editor: id,
 								data: {
-									type: "openResourceOverview",
+									type: "contentSearchResults",
 									data: {
-										id,
-										hash
+										type: "openResourceOverview",
+										data: {
+											hash
+										}
 									}
 								}
 							}

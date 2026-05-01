@@ -22,7 +22,7 @@
 	let decorationsToCheck: [string, string][] = []
 
 	const baseOverrideSchema = merge(
-		{ $defs: cloneDeep(baseSchema).$defs },
+		{ $defs: { ...cloneDeep(baseSchema).$defs, Entity: { properties: cloneDeep(baseSchema).properties } } },
 		{
 			$defs: {
 				PropertyOverride: {
@@ -169,14 +169,16 @@
 			await event({
 				type: "editor",
 				data: {
-					type: "entity",
+					editor: editorID,
 					data: {
-						type: "overrides",
+						type: "entity",
 						data: {
-							type: ("update" + mode[0].toUpperCase() + mode.slice(1)) as any,
+							type: "overrides",
 							data: {
-								editor_id: editorID,
-								content
+								type: ("update" + mode[0].toUpperCase() + mode.slice(1)) as any,
+								data: {
+									content
+								}
 							}
 						}
 					}

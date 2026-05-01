@@ -38,7 +38,7 @@
 				break
 
 			case "addNewUnlockable":
-				unlockables.push(request.data.new_unlockable)
+				unlockables.push(request.data.newUnlockable)
 				break
 
 			case "removeUnlockable":
@@ -58,7 +58,7 @@
 					hasIdAttribute = false
 				}
 
-				setTimeout(() => monacoEditor.setContents(request.data.orig_data, request.data.data), 0)
+				setTimeout(() => monacoEditor.setContents(request.data.origData, request.data.data), 0)
 				break
 
 			case "deselectMonaco":
@@ -92,13 +92,15 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "unlockablesPatch",
+				editor: id,
 				data: {
-					type: "modifyUnlockable",
+					type: "unlockablesPatch",
 					data: {
-						id,
-						unlockable: item,
-						data: content
+						type: "modifyUnlockable",
+						data: {
+							unlockable: item,
+							data: content
+						}
 					}
 				}
 			}
@@ -109,11 +111,11 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "unlockablesPatch",
+				editor: id,
 				data: {
-					type: "initialise",
+					type: "unlockablesPatch",
 					data: {
-						id
+						type: "initialise"
 					}
 				}
 			}
@@ -138,11 +140,11 @@
 						await event({
 							type: "editor",
 							data: {
-								type: "unlockablesPatch",
+								editor: id,
 								data: {
-									type: "createUnlockable",
+									type: "unlockablesPatch",
 									data: {
-										id
+										type: "createUnlockable"
 									}
 								}
 							}
@@ -160,10 +162,13 @@
 							await event({
 								type: "editor",
 								data: {
-									type: "unlockablesPatch",
+									editor: id,
 									data: {
-										type: "selectUnlockable",
-										data: { id, unlockable: itemId }
+										type: "unlockablesPatch",
+										data: {
+											type: "selectUnlockable",
+											data: { unlockable: itemId }
+										}
 									}
 								}
 							})
@@ -338,10 +343,13 @@
 							await event({
 								type: "editor",
 								data: {
-									type: "unlockablesPatch",
+									editor: id,
 									data: {
-										type: "selectUnlockable",
-										data: { id, unlockable: itemId }
+										type: "unlockablesPatch",
+										data: {
+											type: "selectUnlockable",
+											data: { unlockable: itemId }
+										}
 									}
 								}
 							})
@@ -496,12 +504,14 @@
 							await event({
 								type: "editor",
 								data: {
-									type: "unlockablesPatch",
+									editor: id,
 									data: {
-										type: "resetModifications",
+										type: "unlockablesPatch",
 										data: {
-											id,
-											unlockable: selectedItem
+											type: "resetModifications",
+											data: {
+												unlockable: selectedItem
+											}
 										}
 									}
 								}

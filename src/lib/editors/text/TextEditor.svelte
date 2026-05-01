@@ -18,8 +18,8 @@
 				break
 
 			case "setFileType":
-				fileType = request.data.file_type
-				monacoEditor.setFileType(request.data.file_type)
+				fileType = request.data.fileType
+				monacoEditor.setFileType(request.data.fileType)
 				break
 
 			default:
@@ -40,12 +40,14 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "text",
+				editor: id,
 				data: {
-					type: "updateContent",
+					type: "text",
 					data: {
-						id,
-						content
+						type: "updateContent",
+						data: {
+							content
+						}
 					}
 				}
 			}
@@ -56,10 +58,12 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "text",
+				editor: id,
 				data: {
-					type: "initialise",
-					data: { id }
+					type: "text",
+					data: {
+						type: "initialise"
+					}
 				}
 			}
 		})

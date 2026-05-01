@@ -49,9 +49,10 @@ use json_patch::Patch;
 use log::{LevelFilter, info, trace};
 use model::{
 	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
-	EditorEvent, EditorRequest, EditorState, EditorType, EntityEditorRequest, EntityMetadataRequest,
-	EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
-	Project, ProjectSettings, Request, SettingsRequest, TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
+	EditorEventData, EditorRequest, EditorRequestData, EditorState, EditorType, EntityEditorRequest,
+	EntityMetadataRequest, EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent,
+	GlobalRequest, JsonPatchType, Project, ProjectSettings, Request, SettingsRequest, TabRequest, TabRequestData,
+	TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
 };
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
@@ -118,9 +119,7 @@ async fn main() {
 	if Path::new("../src/lib").is_dir() {
 		specta
 			.export(
-				specta_typescript::Typescript::default()
-					.formatter(specta_typescript::formatter::prettier)
-					.header("/* eslint-disable */"),
+				specta_typescript::Typescript::default().header("/* eslint-disable */"),
 				"../src/lib/bindings.ts"
 			)
 			.expect("Failed to export bindings");
@@ -326,42 +325,45 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 			handle_tool_event(&app, event).await?;
 		}
 
-		Event::Editor(event) => match event {
-			EditorEvent::Text(event) => match event {
-				TextEditorEvent::Initialise { id } => {
-					let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+		Event::Editor(event) => match event.data {
+			EditorEventData::Text(data) => match data {
+				TextEditorEvent::Initialise => {
+					let editor_state = app_state.editor_states.get(&event.editor).context("No such editor")?;
 
 					let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
-						Err(anyhow!("Editor {} is not a text editor", id))?;
+						Err(anyhow!("Editor {} is not a text editor", event.editor))?;
 						panic!();
 					};
 
 					send_request(
 						&app,
-						Request::Editor(EditorRequest::Text(TextEditorRequest::ReplaceContent {
-							id: id.to_owned(),
-							content
-						}))
+						Request::Editor(EditorRequest {
+							editor: event.editor,
+							data: EditorRequestData::Text(TextEditorRequest::ReplaceContent { content })
+						})
 					)?;
 
 					send_request(
 						&app,
-						Request::Editor(EditorRequest::Text(TextEditorRequest::SetFileType {
-							id: id.to_owned(),
-							file_type
-						}))
+						Request::Editor(EditorRequest {
+							editor: event.editor,
+							data: EditorRequestData::Text(TextEditorRequest::SetFileType { file_type })
+						})
 					)?;
 				}
 
-				TextEditorEvent::UpdateContent { id, content } => {
-					let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+				TextEditorEvent::UpdateContent { content } => {
+					let mut editor_state = app_state
+						.editor_states
+						.get_mut(&event.editor)
+						.context("No such editor")?;
 
 					let EditorData::Text {
 						file_type,
 						content: old_content
 					} = editor_state.data.to_owned()
 					else {
-						Err(anyhow!("Editor {} is not a text editor", id))?;
+						Err(anyhow!("Editor {} is not a text editor", event.editor))?;
 						panic!();
 					};
 
@@ -370,49 +372,52 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						send_request(
 							&app,
-							Request::Global(GlobalRequest::SetTabUnsaved { id, unsaved: true })
+							Request::Tab(TabRequest {
+								tab: event.editor,
+								data: TabRequestData::SetUnsaved { unsaved: true }
+							})
 						)?;
 					}
 				}
 			},
 
-			EditorEvent::Entity(event) => {
-				event_handling::entity::handle(&app, event).await?;
+			EditorEventData::Entity(data) => {
+				event_handling::entity::handle(&app, event.editor, data).await?;
 			}
 
-			EditorEvent::ResourceOverview(event) => {
-				handle_resource_overview_event(&app, event).await?;
+			EditorEventData::ResourceOverview(data) => {
+				handle_resource_overview_event(&app, event.editor, data).await?;
 			}
 
-			EditorEvent::RepositoryPatch(event) => {
-				handle_repository_patch_event(&app, event).await?;
+			EditorEventData::RepositoryPatch(data) => {
+				handle_repository_patch_event(&app, event.editor, data).await?;
 			}
 
-			EditorEvent::UnlockablesPatch(event) => {
-				handle_unlockables_patch_event(&app, event).await?;
+			EditorEventData::UnlockablesPatch(data) => {
+				handle_unlockables_patch_event(&app, event.editor, data).await?;
 			}
 
-			EditorEvent::ContentSearchResults(event) => match event {
-				ContentSearchResultsEvent::Initialise { id } => {
-					let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+			EditorEventData::ContentSearchResults(data) => match data {
+				ContentSearchResultsEvent::Initialise => {
+					let editor_state = app_state.editor_states.get(&event.editor).context("No such editor")?;
 
 					let results = match editor_state.data {
 						EditorData::ContentSearchResults { ref results, .. } => results,
 
 						_ => {
-							Err(anyhow!("Editor {} is not a content search results page", id))?;
+							Err(anyhow!("Editor {} is not a content search results page", event.editor))?;
 							panic!();
 						}
 					};
 
 					send_request(
 						&app,
-						Request::Editor(EditorRequest::ContentSearchResults(
-							ContentSearchResultsRequest::Initialise {
-								id,
+						Request::Editor(EditorRequest {
+							editor: event.editor,
+							data: EditorRequestData::ContentSearchResults(ContentSearchResultsRequest::Initialise {
 								results: results.to_owned()
-							}
-						))
+							})
+						})
 					)?;
 				}
 
@@ -429,10 +434,12 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 					send_request(
 						&app,
-						Request::Global(GlobalRequest::CreateTab {
-							id,
-							name: format!("Resource overview ({})", hash.0),
-							editor_type: EditorType::ResourceOverview
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: format!("Resource overview ({})", hash.0),
+								editor_type: EditorType::ResourceOverview
+							}
 						})
 					)?;
 				}
@@ -499,12 +506,14 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
 						send_request(
 							&app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-								EntityMetadataRequest::UpdateCustomPaths {
-									editor_id: editor.key().to_owned(),
-									custom_paths: settings.custom_paths.to_owned()
-								}
-							)))
+							Request::Editor(EditorRequest {
+								editor: editor.key().to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
+									EntityMetadataRequest::UpdateCustomPaths {
+										custom_paths: settings.custom_paths.to_owned()
+									}
+								))
+							})
 						)?;
 					}
 				}
@@ -519,16 +528,16 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 				send_request(
 					&app,
-					Request::Global(GlobalRequest::SetWindowTitle(
-						path.file_name().unwrap().to_string_lossy().into()
-					))
+					Request::Global(GlobalRequest::SetWindowTitle {
+						title: path.file_name().unwrap().to_string_lossy().into()
+					})
 				)?;
 
 				send_request(
 					&app,
-					Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings(
-						settings.to_owned()
-					)))
+					Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings {
+						settings: settings.to_owned()
+					}))
 				)?;
 
 				send_request(
@@ -692,12 +701,13 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												send_request(
 													&notify_app,
 													Request::Tool(ToolRequest::FileBrowser(
-														FileBrowserRequest::Delete(
-															evt.paths
+														FileBrowserRequest::Delete {
+															path: evt
+																.paths
 																.first()
 																.context("Remove event had no path")?
 																.to_owned()
-														)
+														}
 													))
 												)?;
 											}
@@ -741,15 +751,15 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					{
 						send_request(
 							&app,
-							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(Some(
-								file.to_owned()
-							))))
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select {
+								path: Some(file.to_owned())
+							}))
 						)?;
 					}
 				} else {
 					send_request(
 						&app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
 					)?;
 				}
 			}
@@ -760,11 +770,17 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				if old.file.is_some() {
 					send_request(
 						&app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
 					)?;
 				}
 
-				send_request(&app, Request::Global(GlobalRequest::RemoveTab(tab)))?;
+				send_request(
+					&app,
+					Request::Tab(TabRequest {
+						tab,
+						data: TabRequestData::Remove
+					})
+				)?;
 			}
 
 			GlobalEvent::SaveTab(tab) => {
@@ -847,12 +863,14 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						// Once a patch has been saved you can no longer modify the hashes without manually converting to entity.json
 						send_request(
 							&app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-								EntityMetadataRequest::SetHashModificationAllowed {
-									editor_id: tab.to_owned(),
-									hash_modification_allowed: false
-								}
-							)))
+							Request::Editor(EditorRequest {
+								editor: tab.to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
+									EntityMetadataRequest::SetHashModificationAllowed {
+										hash_modification_allowed: false
+									}
+								))
+							})
 						)?;
 
 						let unformatted = serde_json::to_string(
@@ -930,9 +948,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 									send_request(
 										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: tab,
-											unsaved: false
+										Request::Tab(TabRequest {
+											tab,
+											data: TabRequestData::SetUnsaved { unsaved: false }
 										})
 									)?;
 								} else {
@@ -960,9 +978,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 										send_request(
 											&app,
-											Request::Global(GlobalRequest::SetTabUnsaved {
-												id: tab,
-												unsaved: false
+											Request::Tab(TabRequest {
+												tab,
+												data: TabRequestData::SetUnsaved { unsaved: false }
 											})
 										)?;
 									}
@@ -1116,9 +1134,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 									send_request(
 										&app,
-										Request::Global(GlobalRequest::SetTabUnsaved {
-											id: tab,
-											unsaved: false
+										Request::Tab(TabRequest {
+											tab,
+											data: TabRequestData::SetUnsaved { unsaved: false }
 										})
 									)?;
 								} else {
@@ -1146,9 +1164,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 										send_request(
 											&app,
-											Request::Global(GlobalRequest::SetTabUnsaved {
-												id: tab,
-												unsaved: false
+											Request::Tab(TabRequest {
+												tab,
+												data: TabRequestData::SetUnsaved { unsaved: false }
 											})
 										)?;
 									}
@@ -1167,9 +1185,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 					send_request(
 						&app,
-						Request::Global(GlobalRequest::SetTabUnsaved {
-							id: tab,
-							unsaved: false
+						Request::Tab(TabRequest {
+							tab,
+							data: TabRequestData::SetUnsaved { unsaved: false }
 						})
 					)?;
 				} else {
@@ -1281,9 +1299,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						send_request(
 							&app,
-							Request::Global(GlobalRequest::SetTabUnsaved {
-								id: tab,
-								unsaved: false
+							Request::Tab(TabRequest {
+								tab,
+								data: TabRequestData::SetUnsaved { unsaved: false }
 							})
 						)?;
 					}
@@ -1375,7 +1393,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 		},
 
 		Event::EditorConnection(event) => match event {
-			EditorConnectionEvent::EntitySelected(id, tblu) => {
+			EditorConnectionEvent::EntitySelected { id, tblu } => {
 				for editor in app.state::<AppState>().editor_states.iter() {
 					let entity = match editor.data {
 						EditorData::QNEntity { ref entity, .. } => entity,
@@ -1387,18 +1405,18 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					if entity.blueprint == tblu.0 {
 						send_request(
 							&app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-								EntityTreeRequest::Select {
-									editor_id: editor.key().to_owned(),
+							Request::Editor(EditorRequest {
+								editor: editor.key().to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::Select {
 									id: entity.entities.contains_key(&id).then_some(id.to_owned())
-								}
-							)))
+								}))
+							})
 						)?;
 					}
 				}
 			}
 
-			EditorConnectionEvent::EntityTransformUpdated(id, tblu, transform) => {
+			EditorConnectionEvent::EntityTransformUpdated { id, tblu, transform } => {
 				let mut qn_editors = vec![];
 				for editor in app_state.editor_states.iter() {
 					if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
@@ -1428,9 +1446,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						send_request(
 							&app,
-							Request::Global(GlobalRequest::SetTabUnsaved {
-								id: editor_id.to_owned(),
-								unsaved: true
+							Request::Tab(TabRequest {
+								tab: editor_id.to_owned(),
+								data: TabRequestData::SetUnsaved { unsaved: true }
 							})
 						)?;
 
@@ -1446,13 +1464,15 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						send_request(
 							&app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-								EntityMonacoRequest::ReplaceContentIfSameEntityID {
-									editor_id: editor_id.to_owned(),
-									entity_id: id.to_owned(),
-									content: String::from_utf8(buf)?
-								}
-							)))
+							Request::Editor(EditorRequest {
+								editor: editor_id.to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+									EntityMonacoRequest::ReplaceContentIfSameEntityID {
+										entity_id: id.to_owned(),
+										content: String::from_utf8(buf)?
+									}
+								))
+							})
 						)?;
 
 						if let EditorData::QNPatch {
@@ -1461,22 +1481,25 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						{
 							send_request(
 								&app,
-								Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-									let (new, modified, removed) = get_diff_info(base, current);
-									EntityTreeRequest::SetDiffInfo {
-										editor_id,
-										new,
-										modified,
-										removed
-									}
-								})))
+								Request::Editor(EditorRequest {
+									editor: editor_id,
+									data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+										let (new, modified, removed) = get_diff_info(base, current);
+										EntityTreeRequest::SetDiffInfo { new, modified, removed }
+									}))
+								})
 							)?;
 						}
 					}
 				}
 			}
 
-			EditorConnectionEvent::EntityPropertyChanged(id, tblu, property_name, property_value) => {
+			EditorConnectionEvent::EntityPropertyChanged {
+				id,
+				tblu,
+				property_name,
+				property_value
+			} => {
 				let mut qn_editors = vec![];
 				for editor in app_state.editor_states.iter() {
 					if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
@@ -1532,9 +1555,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						send_request(
 							&app,
-							Request::Global(GlobalRequest::SetTabUnsaved {
-								id: editor_id.to_owned(),
-								unsaved: true
+							Request::Tab(TabRequest {
+								tab: editor_id.to_owned(),
+								data: TabRequestData::SetUnsaved { unsaved: true }
 							})
 						)?;
 
@@ -1550,13 +1573,15 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						send_request(
 							&app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-								EntityMonacoRequest::ReplaceContentIfSameEntityID {
-									editor_id: editor_id.to_owned(),
-									entity_id: id.to_owned(),
-									content: String::from_utf8(buf)?
-								}
-							)))
+							Request::Editor(EditorRequest {
+								editor: editor_id.to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+									EntityMonacoRequest::ReplaceContentIfSameEntityID {
+										entity_id: id.to_owned(),
+										content: String::from_utf8(buf)?
+									}
+								))
+							})
 						)?;
 
 						if let EditorData::QNPatch {
@@ -1565,15 +1590,13 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						{
 							send_request(
 								&app,
-								Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-									let (new, modified, removed) = get_diff_info(base, current);
-									EntityTreeRequest::SetDiffInfo {
-										editor_id,
-										new,
-										modified,
-										removed
-									}
-								})))
+								Request::Editor(EditorRequest {
+									editor: editor_id,
+									data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+										let (new, modified, removed) = get_diff_info(base, current);
+										EntityTreeRequest::SetDiffInfo { new, modified, removed }
+									}))
+								})
 							)?;
 						}
 					}

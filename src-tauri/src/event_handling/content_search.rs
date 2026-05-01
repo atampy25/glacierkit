@@ -23,7 +23,7 @@ use crate::{
 	bin1::{deserialize_generic_writer, deserialize_modern_blueprint, deserialize_modern_factory},
 	finish_task, get_loaded_game_version,
 	languages::get_language_map,
-	model::{AppSettings, AppState, EditorData, EditorState, EditorType, GlobalRequest, Request},
+	model::{AppSettings, AppState, EditorData, EditorState, EditorType, Request, TabRequest, TabRequestData},
 	rpkg::extract_latest_resource,
 	send_request, start_task
 };
@@ -550,10 +550,12 @@ pub fn start_content_search(
 
 		send_request(
 			app,
-			Request::Global(GlobalRequest::CreateTab {
-				id,
-				name: format!("Search results (\"{query}\")"),
-				editor_type: EditorType::ContentSearchResults
+			Request::Tab(TabRequest {
+				tab: id,
+				data: TabRequestData::Create {
+					name: format!("Search results (\"{query}\")"),
+					editor_type: EditorType::ContentSearchResults
+				}
 			})
 		)?;
 

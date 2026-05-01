@@ -37,7 +37,7 @@ use crate::{
 	model::{
 		AppSettings, AppState, ContentSearchEvent, EditorData, EditorState, EditorType, FileBrowserEvent,
 		GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalRequest, Request, SearchFilter, SettingsEvent,
-		SettingsRequest, ToolEvent, ToolRequest
+		SettingsRequest, TabRequest, TabRequestData, ToolEvent, ToolRequest
 	}
 };
 use crate::{event_handling::content_search::start_content_search, send_request};
@@ -56,7 +56,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 	match event {
 		ToolEvent::FileBrowser(event) => match event {
-			FileBrowserEvent::Select(path) => {
+			FileBrowserEvent::Select { path } => {
 				if let Some(path) = path {
 					open_file(app, path).await?;
 				}
@@ -141,7 +141,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				finish_task(app, task)?;
 			}
 
-			FileBrowserEvent::Delete(path) => {
+			FileBrowserEvent::Delete { path } => {
 				let task = start_task(
 					app,
 					format!("Moving {} to bin", path.file_name().unwrap().to_string_lossy())
@@ -778,28 +778,30 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 		},
 
 		ToolEvent::GameBrowser(event) => match event {
-			GameBrowserEvent::Select(hash) => {
+			GameBrowserEvent::Select { resource } => {
 				let id = Uuid::new_v4();
 
 				app_state.editor_states.insert(
 					id.to_owned(),
 					EditorState {
 						file: None,
-						data: EditorData::ResourceOverview { hash: hash.0 }
+						data: EditorData::ResourceOverview { hash: resource.0 }
 					}
 				);
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: format!("Resource overview ({})", hash.0),
-						editor_type: EditorType::ResourceOverview
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: format!("Resource overview ({})", resource.0),
+							editor_type: EditorType::ResourceOverview
+						}
 					})
 				)?;
 			}
 
-			GameBrowserEvent::Search(query, filter) => {
+			GameBrowserEvent::Search { query, filter } => {
 				let task = start_task(app, format!("Searching game files for {}", query))?;
 
 				if let Some(install) = app_settings.load().game_install.as_ref()
@@ -934,11 +936,11 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				finish_task(app, task)?;
 			}
 
-			GameBrowserEvent::OpenInEditor(hash) => {
+			GameBrowserEvent::OpenInEditor { resource } => {
 				if let Some(game_files) = app_state.game_files.load().as_ref()
 					&& let Some(install) = app_settings.load().game_install.as_ref()
 				{
-					open_in_editor(app, game_files, install, hash.0).await?;
+					open_in_editor(app, game_files, install, resource.0).await?;
 				}
 			}
 		},
@@ -1021,7 +1023,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				});
 			}
 
-			SettingsEvent::ChangeGameInstall(path) => {
+			SettingsEvent::ChangeGameInstall { path } => {
 				let mut settings = (*app_settings.load_full()).to_owned();
 
 				if path != settings.game_install {
@@ -1039,7 +1041,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				}
 			}
 
-			SettingsEvent::ChangeExtractModdedFiles(value) => {
+			SettingsEvent::ChangeExtractModdedFiles { value } => {
 				let mut settings = (*app_settings.load_full()).to_owned();
 				settings.extract_modded_files = value;
 				fs::write(
@@ -1052,7 +1054,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				app_settings.store(settings.into());
 			}
 
-			SettingsEvent::ChangeColourblind(value) => {
+			SettingsEvent::ChangeColourblind { value } => {
 				let mut settings = (*app_settings.load_full()).to_owned();
 				settings.colourblind_mode = value;
 				fs::write(
@@ -1065,7 +1067,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				app_settings.store(settings.into());
 			}
 
-			SettingsEvent::ChangeEditorConnection(value) => {
+			SettingsEvent::ChangeEditorConnection { value } => {
 				let mut settings = (*app_settings.load_full()).to_owned();
 				settings.editor_connection = value;
 
@@ -1083,7 +1085,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				app_settings.store(settings.into());
 			}
 
-			SettingsEvent::ChangeCustomPaths(value) => {
+			SettingsEvent::ChangeCustomPaths { value } => {
 				if let Some(project) = app_state.project.load().as_ref() {
 					app.track_event("Edit custom paths list manually", None).unwrap();
 
@@ -1096,8 +1098,13 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 		},
 
 		ToolEvent::ContentSearch(event) => match event {
-			ContentSearchEvent::Search(query, filetypes, use_qn_format, partitions_to_search) => {
-				start_content_search(app, query, filetypes, use_qn_format, partitions_to_search)?;
+			ContentSearchEvent::Search {
+				query,
+				resource_types,
+				use_qn_format,
+				partitions_to_search
+			} => {
+				start_content_search(app, query, resource_types, use_qn_format, partitions_to_search)?;
 			}
 		}
 	}

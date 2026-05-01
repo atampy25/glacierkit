@@ -38,7 +38,7 @@ use crate::{
 	intellisense::Intellisense,
 	model::{
 		AppSettings, AppState, ContentSearchRequest, EditorData, EditorState, EditorType, FileBrowserRequest,
-		GameBrowserRequest, GlobalRequest, JsonPatchType, Request, TextFileType, ToolRequest
+		GameBrowserRequest, JsonPatchType, Request, TabRequest, TabRequestData, TextFileType, ToolRequest
 	},
 	ores_repo::{RepositoryItem, UnlockableItem},
 	rpkg::{extract_entity, extract_latest_resource},
@@ -70,7 +70,13 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 	};
 
 	if let Some(existing) = existing {
-		send_request(app, Request::Global(GlobalRequest::SelectTab(existing)))?;
+		send_request(
+			app,
+			Request::Tab(TabRequest {
+				tab: existing,
+				data: TabRequestData::Select
+			})
+		)?;
 	} else {
 		let extension = path
 			.file_name()
@@ -116,10 +122,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: path.file_name().context("No file name")?.to_string_lossy().into(),
-						editor_type: EditorType::QNEntity
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: path.file_name().context("No file name")?.to_string_lossy().into(),
+							editor_type: EditorType::QNEntity
+						}
 					})
 				)?;
 			}
@@ -174,16 +182,18 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 					send_request(
 						app,
-						Request::Global(GlobalRequest::CreateTab {
-							id,
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::QNPatch
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::QNPatch
+							}
 						})
 					)?;
 				} else {
 					send_request(
 						app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
 					)?;
 
 					send_notification(
@@ -221,10 +231,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: path.file_name().context("No file name")?.to_string_lossy().into(),
-						editor_type: EditorType::Text { file_type }
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: path.file_name().context("No file name")?.to_string_lossy().into(),
+							editor_type: EditorType::Text { file_type }
+						}
 					})
 				)?;
 			}
@@ -247,11 +259,13 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: path.file_name().context("No file name")?.to_string_lossy().into(),
-						editor_type: EditorType::Text {
-							file_type: TextFileType::PlainText
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: path.file_name().context("No file name")?.to_string_lossy().into(),
+							editor_type: EditorType::Text {
+								file_type: TextFileType::PlainText
+							}
 						}
 					})
 				)?;
@@ -275,11 +289,13 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: path.file_name().context("No file name")?.to_string_lossy().into(),
-						editor_type: EditorType::Text {
-							file_type: TextFileType::Markdown
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: path.file_name().context("No file name")?.to_string_lossy().into(),
+							editor_type: EditorType::Text {
+								file_type: TextFileType::Markdown
+							}
 						}
 					})
 				)?;
@@ -323,18 +339,20 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 					send_request(
 						app,
-						Request::Global(GlobalRequest::CreateTab {
-							id,
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::RepositoryPatch {
-								patch_type: JsonPatchType::MergePatch
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::RepositoryPatch {
+									patch_type: JsonPatchType::MergePatch
+								}
 							}
 						})
 					)?;
 				} else {
 					send_request(
 						app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
 					)?;
 
 					send_notification(
@@ -418,18 +436,20 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 					send_request(
 						app,
-						Request::Global(GlobalRequest::CreateTab {
-							id,
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::UnlockablesPatch {
-								patch_type: JsonPatchType::MergePatch
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::UnlockablesPatch {
+									patch_type: JsonPatchType::MergePatch
+								}
 							}
 						})
 					)?;
 				} else {
 					send_request(
 						app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
 					)?;
 
 					send_notification(
@@ -497,18 +517,20 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 							send_request(
 								app,
-								Request::Global(GlobalRequest::CreateTab {
-									id,
-									name: path.file_name().context("No file name")?.to_string_lossy().into(),
-									editor_type: EditorType::RepositoryPatch {
-										patch_type: JsonPatchType::JsonPatch
+								Request::Tab(TabRequest {
+									tab: id,
+									data: TabRequestData::Create {
+										name: path.file_name().context("No file name")?.to_string_lossy().into(),
+										editor_type: EditorType::RepositoryPatch {
+											patch_type: JsonPatchType::JsonPatch
+										}
 									}
 								})
 							)?;
 						} else {
 							send_request(
 								app,
-								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
 							)?;
 
 							send_notification(
@@ -605,18 +627,20 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 							send_request(
 								app,
-								Request::Global(GlobalRequest::CreateTab {
-									id,
-									name: path.file_name().context("No file name")?.to_string_lossy().into(),
-									editor_type: EditorType::UnlockablesPatch {
-										patch_type: JsonPatchType::JsonPatch
+								Request::Tab(TabRequest {
+									tab: id,
+									data: TabRequestData::Create {
+										name: path.file_name().context("No file name")?.to_string_lossy().into(),
+										editor_type: EditorType::UnlockablesPatch {
+											patch_type: JsonPatchType::JsonPatch
+										}
 									}
 								})
 							)?;
 						} else {
 							send_request(
 								app,
-								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select(None)))
+								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
 							)?;
 
 							send_notification(
@@ -646,11 +670,13 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 						send_request(
 							app,
-							Request::Global(GlobalRequest::CreateTab {
-								id,
-								name: path.file_name().context("No file name")?.to_string_lossy().into(),
-								editor_type: EditorType::Text {
-									file_type: TextFileType::Json
+							Request::Tab(TabRequest {
+								tab: id,
+								data: TabRequestData::Create {
+									name: path.file_name().context("No file name")?.to_string_lossy().into(),
+									editor_type: EditorType::Text {
+										file_type: TextFileType::Json
+									}
 								}
 							})
 						)?;
@@ -676,11 +702,13 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: path.file_name().context("No file name")?.to_string_lossy().into(),
-						editor_type: EditorType::Text {
-							file_type: TextFileType::Json
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: path.file_name().context("No file name")?.to_string_lossy().into(),
+							editor_type: EditorType::Text {
+								file_type: TextFileType::Json
+							}
 						}
 					})
 				)?;
@@ -701,10 +729,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: path.file_name().context("No file name")?.to_string_lossy().into(),
-						editor_type: EditorType::Nil
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: path.file_name().context("No file name")?.to_string_lossy().into(),
+							editor_type: EditorType::Nil
+						}
 					})
 				)?;
 			}
@@ -861,8 +891,8 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 		send_request(
 			app,
-			Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetPartitions(
-				partition_manager
+			Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetPartitions {
+				partitions: partition_manager
 					.partitions
 					.iter()
 					.map(|x| {
@@ -872,7 +902,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 						)
 					})
 					.collect()
-			)))
+			}))
 		)?;
 
 		app_state.file_types.store(Some(Arc::new(
@@ -978,16 +1008,16 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 
 	send_request(
 		app,
-		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled(
-			app_settings.load().game_install.is_some()
-		)))
+		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled {
+			enabled: app_settings.load().game_install.is_some()
+		}))
 	)?;
 
 	send_request(
 		app,
-		Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetEnabled(
-			app_settings.load().game_install.is_some()
-		)))
+		Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetEnabled {
+			enabled: app_settings.load().game_install.is_some()
+		}))
 	)?;
 
 	finish_task(app, task)?;
@@ -1118,10 +1148,12 @@ pub async fn open_in_editor(
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::CreateTab {
-					id,
-					name: tab_name,
-					editor_type: EditorType::QNPatch
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::Create {
+						name: tab_name,
+						editor_type: EditorType::QNPatch
+					}
 				})
 			)?;
 
@@ -1153,11 +1185,13 @@ pub async fn open_in_editor(
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::CreateTab {
-					id,
-					name: "pro.repo".into(),
-					editor_type: EditorType::RepositoryPatch {
-						patch_type: JsonPatchType::MergePatch
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::Create {
+						name: "pro.repo".into(),
+						editor_type: EditorType::RepositoryPatch {
+							patch_type: JsonPatchType::MergePatch
+						}
 					}
 				})
 			)?;
@@ -1188,11 +1222,13 @@ pub async fn open_in_editor(
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::CreateTab {
-					id,
-					name: "config.unlockables".into(),
-					editor_type: EditorType::UnlockablesPatch {
-						patch_type: JsonPatchType::MergePatch
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::Create {
+						name: "config.unlockables".into(),
+						editor_type: EditorType::UnlockablesPatch {
+							patch_type: JsonPatchType::MergePatch
+						}
 					}
 				})
 			)?;

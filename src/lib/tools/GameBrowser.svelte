@@ -74,7 +74,7 @@
 															type: "gameBrowser",
 															data: {
 																type: "openInEditor",
-																data: selected_node.id
+																data: { resource: selected_node.id }
 															}
 														}
 													})
@@ -102,7 +102,7 @@
 															type: "gameBrowser",
 															data: {
 																type: "openInEditor",
-																data: selected_node.id
+																data: { resource: selected_node.id }
 															}
 														}
 													})
@@ -130,7 +130,7 @@
 															type: "gameBrowser",
 															data: {
 																type: "openInEditor",
-																data: selected_node.id
+																data: { resource: selected_node.id }
 															}
 														}
 													})
@@ -231,7 +231,7 @@
 
 		switch (request.type) {
 			case "setEnabled":
-				enabled = request.data
+				enabled = request.data.enabled
 				if (!enabled) {
 					tree.settings!.core.data = []
 					tree.refresh()
@@ -239,7 +239,7 @@
 				break
 
 			case "newTree":
-				gameDescription = request.data.game_description
+				gameDescription = request.data.gameDescription
 				entries = request.data.entries
 				await refreshTree()
 				break
@@ -446,7 +446,7 @@
 					type: "gameBrowser",
 					data: {
 						type: "search",
-						data: [_event.target.value.toLowerCase(), searchFilter]
+						data: { query: _event.target.value.toLowerCase(), filter: searchFilter }
 					}
 				}
 			})
@@ -534,7 +534,7 @@
 										type: "gameBrowser",
 										data: {
 											type: "search",
-											data: [searchQuery.toLowerCase(), selectedId]
+											data: { query: searchQuery.toLowerCase(), filter: selectedId }
 										}
 									}
 								})

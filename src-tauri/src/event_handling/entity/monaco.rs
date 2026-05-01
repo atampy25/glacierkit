@@ -19,8 +19,9 @@ use crate::{
 	general::open_in_editor,
 	get_loaded_game_version,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, EditorValidity, EntityEditorRequest,
-		EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, GlobalRequest, Request
+		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, EditorValidity,
+		EntityEditorRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, Request, TabRequest,
+		TabRequestData
 	},
 	rpkg::extract_latest_overview_info,
 	send_notification, send_request, start_task
@@ -74,27 +75,23 @@ pub const SAFE_TO_SYNC: [&str; 43] = [
 
 #[try_fn]
 #[context("Couldn't handle monaco event")]
-pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {
-		EntityMonacoEvent::UpdateContent {
-			editor_id,
-			entity_id,
-			content
-		} => {
+		EntityMonacoEvent::UpdateContent { entity_id, content } => {
 			update_content(app, editor_id, entity_id, content).await?;
 		}
 
-		EntityMonacoEvent::FollowReference { editor_id, reference } => {
+		EntityMonacoEvent::FollowReference { reference } => {
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-					EntityTreeRequest::Select {
-						editor_id,
+				Request::Editor(EditorRequest {
+					editor: editor_id,
+					data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::Select {
 						id: Some(reference)
-					}
-				)))
+					}))
+				})
 			)?;
 		}
 
@@ -102,12 +99,7 @@ pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
 			open_factory(app, factory).await?;
 		}
 
-		EntityMonacoEvent::SignalPin {
-			editor_id,
-			entity_id,
-			pin,
-			output
-		} => {
+		EntityMonacoEvent::SignalPin { entity_id, pin, output } => {
 			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -141,10 +133,12 @@ pub async fn handle(app: &AppHandle, event: EntityMonacoEvent) -> Result<()> {
 
 					send_request(
 						app,
-						Request::Global(GlobalRequest::CreateTab {
-							id,
-							name: format!("Resource overview ({resource})"),
-							editor_type: EditorType::ResourceOverview
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: format!("Resource overview ({resource})"),
+								editor_type: EditorType::ResourceOverview
+							}
 						})
 					)?;
 				} else {
@@ -204,14 +198,16 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 					{
 						send_request(
 							app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-								EntityMonacoRequest::UpdateValidity {
-									editor_id,
-									validity: EditorValidity::Invalid(
-										"Invalid factory; unsupported resource type".into()
-									)
-								}
-							)))
+							Request::Editor(EditorRequest {
+								editor: editor_id,
+								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+									EntityMonacoRequest::UpdateValidity {
+										validity: EditorValidity::Invalid(
+											"Invalid factory; unsupported resource type".into()
+										)
+									}
+								))
+							})
 						)?;
 
 						return Ok(());
@@ -222,14 +218,16 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 					{
 						send_request(
 							app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-								EntityMonacoRequest::UpdateValidity {
-									editor_id,
-									validity: EditorValidity::Invalid(
-										"Invalid blueprint; unsupported resource type".into()
-									)
-								}
-							)))
+							Request::Editor(EditorRequest {
+								editor: editor_id,
+								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+									EntityMonacoRequest::UpdateValidity {
+										validity: EditorValidity::Invalid(
+											"Invalid blueprint; unsupported resource type".into()
+										)
+									}
+								))
+							})
 						)?;
 
 						return Ok(());
@@ -241,9 +239,9 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 
 					send_request(
 						app,
-						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-							EntityTreeRequest::NewItems {
-								editor_id,
+						Request::Editor(EditorRequest {
+							editor: editor_id,
+							data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems {
 								new_entities: vec![(
 									entity_id.to_owned(),
 									sub_entity.parent.to_owned(),
@@ -251,25 +249,27 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 									sub_entity.factory.resource.to_owned(),
 									reverse_parent_refs.contains(&entity_id)
 								)]
-							}
-						)))
+							}))
+						})
 					)?;
 
 					send_request(
 						app,
-						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-							EntityMonacoRequest::UpdateValidity {
-								editor_id,
-								validity: EditorValidity::Valid
-							}
-						)))
+						Request::Editor(EditorRequest {
+							editor: editor_id,
+							data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+								EntityMonacoRequest::UpdateValidity {
+									validity: EditorValidity::Valid
+								}
+							))
+						})
 					)?;
 
 					send_request(
 						app,
-						Request::Global(GlobalRequest::SetTabUnsaved {
-							id: editor_id,
-							unsaved: true
+						Request::Tab(TabRequest {
+							tab: editor_id,
+							data: TabRequestData::SetUnsaved { unsaved: true }
 						})
 					)?;
 
@@ -294,19 +294,21 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 
 						send_request(
 							app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-								EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
-									editor_id: editor_id.to_owned(),
-									entity_id: entity_id.to_owned(),
-									local_ref_entity_ids: decorations
-										.iter()
-										.filter_map(|(x, _)| {
-											x.parse::<EntityID>().ok().filter(|x| entity.entities.contains_key(x))
-										})
-										.collect(),
-									decorations
-								}
-							)))
+							Request::Editor(EditorRequest {
+								editor: editor_id.to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+									EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
+										entity_id: entity_id.to_owned(),
+										local_ref_entity_ids: decorations
+											.iter()
+											.filter_map(|(x, _)| {
+												x.parse::<EntityID>().ok().filter(|x| entity.entities.contains_key(x))
+											})
+											.collect(),
+										decorations
+									}
+								))
+							})
 						)?;
 
 						finish_task(app, task)?;
@@ -388,15 +390,13 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 					{
 						send_request(
 							app,
-							Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-								let (new, modified, removed) = get_diff_info(base, current);
-								EntityTreeRequest::SetDiffInfo {
-									editor_id,
-									new,
-									modified,
-									removed
-								}
-							})))
+							Request::Editor(EditorRequest {
+								editor: editor_id,
+								data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+									let (new, modified, removed) = get_diff_info(base, current);
+									EntityTreeRequest::SetDiffInfo { new, modified, removed }
+								}))
+							})
 						)?;
 					}
 
@@ -404,12 +404,14 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 				} else {
 					send_request(
 						app,
-						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-							EntityMonacoRequest::UpdateValidity {
-								editor_id,
-								validity: EditorValidity::Valid
-							}
-						)))
+						Request::Editor(EditorRequest {
+							editor: editor_id,
+							data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+								EntityMonacoRequest::UpdateValidity {
+									validity: EditorValidity::Valid
+								}
+							))
+						})
 					)?;
 				}
 			}
@@ -417,24 +419,28 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 			Ok(EditorValidity::Invalid(reason)) => {
 				send_request(
 					app,
-					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-						EntityMonacoRequest::UpdateValidity {
-							editor_id,
-							validity: EditorValidity::Invalid(reason)
-						}
-					)))
+					Request::Editor(EditorRequest {
+						editor: editor_id,
+						data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+							EntityMonacoRequest::UpdateValidity {
+								validity: EditorValidity::Invalid(reason)
+							}
+						))
+					})
 				)?;
 			}
 
 			Err(err) => {
 				send_request(
 					app,
-					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-						EntityMonacoRequest::UpdateValidity {
-							editor_id,
-							validity: EditorValidity::Invalid(format!("Invalid entity: {}", err))
-						}
-					)))
+					Request::Editor(EditorRequest {
+						editor: editor_id,
+						data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+							EntityMonacoRequest::UpdateValidity {
+								validity: EditorValidity::Invalid(format!("Invalid entity: {}", err))
+							}
+						))
+					})
 				)?;
 			}
 		},
@@ -442,12 +448,12 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 		Err(err) => {
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-					EntityMonacoRequest::UpdateValidity {
-						editor_id,
+				Request::Editor(EditorRequest {
+					editor: editor_id,
+					data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::UpdateValidity {
 						validity: EditorValidity::Invalid(format!("Invalid entity: {}", err))
-					}
-				)))
+					}))
+				})
 			)?;
 		}
 	}
@@ -480,10 +486,12 @@ pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::CreateTab {
-						id,
-						name: format!("Resource overview ({factory})"),
-						editor_type: EditorType::ResourceOverview
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: format!("Resource overview ({factory})"),
+							editor_type: EditorType::ResourceOverview
+						}
 					})
 				)?;
 			}

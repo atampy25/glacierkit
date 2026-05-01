@@ -627,6 +627,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tauri-apps/api@npm:~2":
+  version: 2.11.0
+  resolution: "@tauri-apps/api@npm:2.11.0"
+  checksum: 70c9f692d14ef7a5f69aa56d474e993f2c25f393e30a26099cca198040ccd33724e4978cefd455c73ecb169b36ca9b7ee010db88b05b0a8bd4a85801caa317d6
+  languageName: node
+  linkType: hard
+
 "@tauri-apps/cli-darwin-arm64@npm:2.8.3":
   version: 2.8.3
   resolution: "@tauri-apps/cli-darwin-arm64@npm:2.8.3"
@@ -2891,7 +2898,7 @@ __metadata:
     "@sveltejs/adapter-static": "npm:^3.0.1"
     "@sveltejs/kit": "npm:^2.0.0"
     "@sveltejs/vite-plugin-svelte": "npm:^3.0.0"
-    "@tauri-apps/api": "npm:^2.10.1"
+    "@tauri-apps/api": "npm:~2"
     "@tauri-apps/cli": "npm:^2.8.3"
     "@tauri-apps/plugin-clipboard-manager": "npm:~2"
     "@tauri-apps/plugin-dialog": "npm:~2"

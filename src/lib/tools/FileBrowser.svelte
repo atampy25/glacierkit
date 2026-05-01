@@ -129,7 +129,7 @@
 																	type: "create",
 																	data: {
 																		path,
-																		is_folder: false
+																		isFolder: false
 																	}
 																}
 															}
@@ -180,7 +180,7 @@
 																	type: "create",
 																	data: {
 																		path,
-																		is_folder: true
+																		isFolder: true
 																	}
 																}
 															}
@@ -240,8 +240,8 @@
 												data: {
 													type: "rename",
 													data: {
-														old_path: oldPath,
-														new_path: newPath
+														oldPath,
+														newPath
 													}
 												}
 											}
@@ -270,7 +270,7 @@
 										type: "fileBrowser",
 										data: {
 											type: "delete",
-											data: path
+											data: { path }
 										}
 									}
 								})
@@ -545,7 +545,7 @@
 							type: "fileBrowser",
 							data: {
 								type: "select",
-								data: path
+								data: { path }
 							}
 						}
 					})
@@ -572,7 +572,7 @@
 							type: "fileBrowser",
 							data: {
 								type: "rename",
-								data: { old_path: oldPath, new_path: newPath }
+								data: { oldPath, newPath }
 							}
 						}
 					})
@@ -598,11 +598,11 @@
 						{
 							id: pathToID[request.data.path],
 							parent: pathToID[request.data.path.split(sep).slice(0, -1).join(sep)],
-							icon: `fa-regular fa-${request.data.is_folder ? "folder" : request.data.path.endsWith(".json") ? "pen-to-square" : "file"}`,
+							icon: `fa-regular fa-${request.data.isFolder ? "folder" : request.data.path.endsWith(".json") ? "pen-to-square" : "file"}`,
 							text: request.data.path.split(sep).at(-1)!,
-							folder: request.data.is_folder
+							folder: request.data.isFolder
 						},
-						getPositionOfNode(pathToID[request.data.path.split(sep).slice(0, -1).join(sep)], request.data.path.split(sep).at(-1)!, request.data.is_folder)
+						getPositionOfNode(pathToID[request.data.path.split(sep).slice(0, -1).join(sep)], request.data.path.split(sep).at(-1)!, request.data.isFolder)
 					)
 
 					fixSelection()
@@ -610,33 +610,33 @@
 				break
 
 			case "delete":
-				if (!request.data.endsWith("project.json")) {
-					tree.delete_node(pathToID[request.data])
-					delete pathToID[request.data]
+				if (!request.data.path.endsWith("project.json")) {
+					tree.delete_node(pathToID[request.data.path])
+					delete pathToID[request.data.path]
 				}
 				break
 
 			case "rename":
-				if (!(request.data.old_path.endsWith("project.json") || request.data.new_path.endsWith("project.json")) && pathToID[request.data.old_path]) {
-					if (request.data.old_path.split(sep).slice(0, -1).join(sep) === request.data.new_path.split(sep).slice(0, -1).join(sep)) {
-						tree.rename_node(tree.get_node(pathToID[request.data.old_path]), request.data.new_path.split(sep).at(-1)!)
-						pathToID[request.data.new_path] = pathToID[request.data.old_path]
-						delete pathToID[request.data.old_path]
+				if (!(request.data.oldPath.endsWith("project.json") || request.data.newPath.endsWith("project.json")) && pathToID[request.data.oldPath]) {
+					if (request.data.oldPath.split(sep).slice(0, -1).join(sep) === request.data.newPath.split(sep).slice(0, -1).join(sep)) {
+						tree.rename_node(tree.get_node(pathToID[request.data.oldPath]), request.data.newPath.split(sep).at(-1)!)
+						pathToID[request.data.newPath] = pathToID[request.data.oldPath]
+						delete pathToID[request.data.oldPath]
 					} else {
 						// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
-						tree.rename_node(tree.get_node(pathToID[request.data.old_path]), v4())
+						tree.rename_node(tree.get_node(pathToID[request.data.oldPath]), v4())
 						tree.move_node(
-							tree.get_node(pathToID[request.data.old_path]),
-							pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
+							tree.get_node(pathToID[request.data.oldPath]),
+							pathToID[request.data.newPath.split(sep).slice(0, -1).join(sep)],
 							getPositionOfNode(
-								pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
-								request.data.new_path.split(sep).at(-1)!,
-								tree.get_node(pathToID[request.data.old_path]).original.folder
+								pathToID[request.data.newPath.split(sep).slice(0, -1).join(sep)],
+								request.data.newPath.split(sep).at(-1)!,
+								tree.get_node(pathToID[request.data.oldPath]).original.folder
 							),
 							() => {
-								pathToID[request.data.new_path] = pathToID[request.data.old_path]
-								delete pathToID[request.data.old_path]
-								tree.rename_node(tree.get_node(pathToID[request.data.new_path]), request.data.new_path.split(sep).at(-1)!)
+								pathToID[request.data.newPath] = pathToID[request.data.oldPath]
+								delete pathToID[request.data.oldPath]
+								tree.rename_node(tree.get_node(pathToID[request.data.newPath]), request.data.newPath.split(sep).at(-1)!)
 							}
 						)
 					}
@@ -644,7 +644,7 @@
 				break
 
 			case "beginRename":
-				inProgressRename = request.data.old_path
+				inProgressRename = request.data.oldPath
 				break
 
 			case "finishRename":
@@ -653,27 +653,27 @@
 				}
 
 				if (typeof inProgressRename === "string") {
-					if (!(inProgressRename.endsWith("project.json") || request.data.new_path.endsWith("project.json")) && pathToID[inProgressRename]) {
-						if (inProgressRename.split(sep).slice(0, -1).join(sep) === request.data.new_path.split(sep).slice(0, -1).join(sep)) {
-							tree.rename_node(tree.get_node(pathToID[inProgressRename]), request.data.new_path.split(sep).at(-1)!)
-							pathToID[request.data.new_path] = pathToID[inProgressRename]
+					if (!(inProgressRename.endsWith("project.json") || request.data.newPath.endsWith("project.json")) && pathToID[inProgressRename]) {
+						if (inProgressRename.split(sep).slice(0, -1).join(sep) === request.data.newPath.split(sep).slice(0, -1).join(sep)) {
+							tree.rename_node(tree.get_node(pathToID[inProgressRename]), request.data.newPath.split(sep).at(-1)!)
+							pathToID[request.data.newPath] = pathToID[inProgressRename]
 							delete pathToID[inProgressRename]
 						} else {
 							// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
 							tree.rename_node(tree.get_node(pathToID[inProgressRename]), v4())
 							tree.move_node(
 								tree.get_node(pathToID[inProgressRename]),
-								pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
+								pathToID[request.data.newPath.split(sep).slice(0, -1).join(sep)],
 								getPositionOfNode(
-									pathToID[request.data.new_path.split(sep).slice(0, -1).join(sep)],
-									request.data.new_path.split(sep).at(-1)!,
+									pathToID[request.data.newPath.split(sep).slice(0, -1).join(sep)],
+									request.data.newPath.split(sep).at(-1)!,
 									tree.get_node(pathToID[inProgressRename]).original.folder
 								),
 								() => {
 									if (typeof inProgressRename === "string") {
-										pathToID[request.data.new_path] = pathToID[inProgressRename]
+										pathToID[request.data.newPath] = pathToID[inProgressRename]
 										delete pathToID[inProgressRename]
-										tree.rename_node(tree.get_node(pathToID[request.data.new_path]), request.data.new_path.split(sep).at(-1)!)
+										tree.rename_node(tree.get_node(pathToID[request.data.newPath]), request.data.newPath.split(sep).at(-1)!)
 									}
 								}
 							)
@@ -685,12 +685,12 @@
 				break
 
 			case "select":
-				selectedFile = request.data && pathToID[request.data] ? request.data : null
+				selectedFile = request.data.path && pathToID[request.data.path] ? request.data.path : null
 				fixSelection()
 				break
 
 			case "newTree":
-				path = request.data.base_path
+				path = request.data.basePath
 				await replaceTree(request.data.files)
 				break
 

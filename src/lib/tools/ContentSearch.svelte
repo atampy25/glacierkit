@@ -13,12 +13,12 @@
 
 		switch (request.type) {
 			case "setEnabled":
-				enabled = request.data
+				enabled = request.data.enabled
 				break
 
 			case "setPartitions":
-				allPartitions = request.data
-				searchPartitions = Object.fromEntries(request.data.map((a) => [a[1], true]))
+				allPartitions = request.data.partitions
+				searchPartitions = Object.fromEntries(request.data.partitions.map((a) => [a[1], true]))
 				break
 
 			default:
@@ -114,14 +114,14 @@
 							type: "contentSearch",
 							data: {
 								type: "search",
-								data: [
-									searchQuery,
-									searchTypes,
-									searchQN,
-									Object.entries(searchPartitions)
+								data: {
+									query: searchQuery,
+									resourceTypes: searchTypes,
+									useQnFormat: searchQN,
+									partitionsToSearch: Object.entries(searchPartitions)
 										.filter((a) => a[1])
 										.map((a) => a[0])
-								]
+								}
 							}
 						}
 					})

@@ -18,7 +18,6 @@ use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
-use structstruck::strike;
 use uuid::Uuid;
 
 use crate::{
@@ -168,6 +167,12 @@ impl Serialize for HashProxy {
 		S: serde::Serializer
 	{
 		serializer.serialize_str(&self.0.to_hash())
+	}
+}
+
+impl Type for HashProxy {
+	fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
+		String::definition(types)
 	}
 }
 
@@ -349,20 +354,27 @@ pub enum AnnouncementKind {
 	Error
 }
 
-strike! {
-	#[structstruck::each[derive(Type, Serialize, Deserialize, Clone, Debug)]]
-	#[structstruck::each[serde(rename_all = "camelCase", tag = "type", content = "data")]]
+nesting::nest! {
+	#![derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
+	#![enums(serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type", content = "data"))]
 	pub enum Event {
-		Tool(pub enum ToolEvent {
-			FileBrowser(pub enum FileBrowserEvent {
-				Select(Option<PathBuf>),
+		Tool(ToolEvent)
+
+		pub enum ToolEvent {
+			FileBrowser(FileBrowserEvent)
+			pub enum FileBrowserEvent {
+				Select {
+					path: Option<PathBuf>
+				},
 
 				Create {
 					path: PathBuf,
 					is_folder: bool
 				},
 
-				Delete(PathBuf),
+				Delete {
+					path: PathBuf
+				},
 
 				Rename {
 					old_path: PathBuf,
@@ -396,382 +408,329 @@ strike! {
 				ConvertUnlockablesPatchToJsonPatch {
 					path: PathBuf
 				}
-			}),
+			}
 
-			GameBrowser(pub enum GameBrowserEvent {
-				Select(Hash),
-				Search(String, SearchFilter),
-				OpenInEditor(Hash)
-			}),
+			GameBrowser(GameBrowserEvent)
+			pub enum GameBrowserEvent {
+				Select {
+					resource: Hash
+				},
+				Search {
+					query: String,
+					filter: SearchFilter
+				},
+				OpenInEditor {
+					resource: Hash
+				}
+			}
 
-			Settings(pub enum SettingsEvent {
+			Settings(SettingsEvent)
+			pub enum SettingsEvent {
 				Initialise,
 
-				ChangeGameInstall(Option<PathBuf>),
-				ChangeExtractModdedFiles(bool),
-				ChangeColourblind(bool),
-				ChangeEditorConnection(bool),
+				ChangeGameInstall { path: Option<PathBuf> },
+				ChangeExtractModdedFiles { value: bool },
+				ChangeColourblind { value: bool },
+				ChangeEditorConnection { value: bool },
 
-				ChangeCustomPaths(Vec<String>)
-			}),
+				ChangeCustomPaths { value: Vec<String> }
+			}
 
-			ContentSearch(pub enum ContentSearchEvent {
-				Search(String, Vec<String>, bool, Vec<String>)
-			})
-		}),
-
-		Editor(pub enum EditorEvent {
-			Text(pub enum TextEditorEvent {
-				Initialise {
-					id: Uuid
-				},
-
-				UpdateContent {
-					id: Uuid,
-					content: String
+			ContentSearch(ContentSearchEvent)
+			pub enum ContentSearchEvent {
+				Search {
+					query: String,
+					resource_types: Vec<String>,
+					use_qn_format: bool,
+					partitions_to_search: Vec<String>
 				}
-			}),
+			}
+		}
 
-			Entity(pub enum EntityEditorEvent {
-				General(pub enum EntityGeneralEvent {
-					SetShowReverseParentRefs {
-						editor_id: Uuid,
-						show_reverse_parent_refs: bool
-					},
+		Editor(EditorEvent)
 
-					SetShowChangesFromOriginal {
-						editor_id: Uuid,
-						show_changes_from_original: bool
-					}
-				}),
+		pub struct EditorEvent {
+			pub editor: Uuid,
+			pub data: EditorEventData
 
-				Tree(pub enum EntityTreeEvent {
-					Initialise {
-						editor_id: Uuid
-					},
+			pub enum EditorEventData {
+				Text(TextEditorEvent)
+				pub enum TextEditorEvent {
+					Initialise,
 
-					Select {
-						editor_id: Uuid,
-						id: EntityID
-					},
-
-					Create {
-						editor_id: Uuid,
-						id: EntityID,
-						content: SubEntity
-					},
-
-					Delete {
-						editor_id: Uuid,
-						id: EntityID
-					},
-
-					Rename {
-						editor_id: Uuid,
-						id: EntityID,
-						new_name: String
-					},
-
-					Reparent {
-						editor_id: Uuid,
-						id: EntityID,
-						new_parent: Option<EntityID>
-					},
-
-					Copy {
-						editor_id: Uuid,
-						id: EntityID
-					},
-
-					Paste {
-						editor_id: Uuid,
-						parent_id: String
-					},
-
-					Search {
-						editor_id: Uuid,
-						query: String
-					},
-
-					ShowHelpMenu {
-						editor_id: Uuid,
-						entity_id: EntityID
-					},
-
-					UseTemplate {
-						editor_id: Uuid,
-						parent_id: String,
-						template: CopiedEntityData
-					},
-
-					AddGameBrowserItem {
-						editor_id: Uuid,
-						parent_id: String,
-						file: Hash
-					},
-
-					SelectEntityInEditor {
-						editor_id: Uuid,
-						entity_id: EntityID
-					},
-
-					MoveEntityToPlayer {
-						editor_id: Uuid,
-						entity_id: EntityID
-					},
-
-					RotateEntityAsPlayer {
-						editor_id: Uuid,
-						entity_id: EntityID
-					},
-
-					MoveEntityToCamera {
-						editor_id: Uuid,
-						entity_id: EntityID
-					},
-
-					RotateEntityAsCamera {
-						editor_id: Uuid,
-						entity_id: EntityID
-					},
-
-					RestoreToOriginal {
-						editor_id: Uuid,
-						entity_id: EntityID
-					}
-				}),
-
-				Monaco(pub enum EntityMonacoEvent {
 					UpdateContent {
-						editor_id: Uuid,
-						entity_id: EntityID,
 						content: String
+					}
+				}
+
+				Entity(EntityEditorEvent)
+				pub enum EntityEditorEvent {
+					General(EntityGeneralEvent)
+					pub enum EntityGeneralEvent {
+						SetShowReverseParentRefs {
+							show_reverse_parent_refs: bool
+						},
+
+						SetShowChangesFromOriginal {
+							show_changes_from_original: bool
+						}
+					}
+
+					Tree(EntityTreeEvent)
+					pub enum EntityTreeEvent {
+						Initialise,
+
+						Select {
+							id: EntityID
+						},
+
+						Create {
+							id: EntityID,
+							content: Box<SubEntity>
+						},
+
+						Delete {
+							id: EntityID
+						},
+
+						Rename {
+							id: EntityID,
+							new_name: String
+						},
+
+						Reparent {
+							id: EntityID,
+							new_parent: Option<EntityID>
+						},
+
+						Copy {
+							id: EntityID
+						},
+
+						Paste {
+							parent_id: String
+						},
+
+						Search {
+							query: String
+						},
+
+						ShowHelpMenu {
+							entity_id: EntityID
+						},
+
+						UseTemplate {
+							parent_id: String,
+							template: CopiedEntityData
+						},
+
+						AddGameBrowserItem {
+							parent_id: String,
+							file: Hash
+						},
+
+						SelectEntityInEditor {
+							entity_id: EntityID
+						},
+
+						MoveEntityToPlayer {
+							entity_id: EntityID
+						},
+
+						RotateEntityAsPlayer {
+							entity_id: EntityID
+						},
+
+						MoveEntityToCamera {
+							entity_id: EntityID
+						},
+
+						RotateEntityAsCamera {
+							entity_id: EntityID
+						},
+
+						RestoreToOriginal {
+							entity_id: EntityID
+						}
+					}
+
+					Monaco(EntityMonacoEvent)
+					pub enum EntityMonacoEvent {
+						UpdateContent {
+							entity_id: EntityID,
+							content: String
+						},
+
+						FollowReference {
+							reference: EntityID
+						},
+
+						OpenFactory {
+							factory: RuntimeID
+						},
+
+						SignalPin {
+							entity_id: EntityID,
+							pin: String,
+							output: bool
+						},
+
+						OpenResourceOverview {
+							resource: RuntimeID
+						}
+					}
+
+					MetaPane(EntityMetaPaneEvent)
+					pub enum EntityMetaPaneEvent {
+						JumpToReference {
+							reference: EntityID
+						},
+
+						SetNotes {
+							entity_id: EntityID,
+							notes: String
+						}
+					}
+
+					Metadata(EntityMetadataEvent)
+					pub enum EntityMetadataEvent {
+						Initialise,
+
+						SetFactory {
+							factory: RuntimeID
+						},
+
+						SetBlueprint {
+							blueprint: RuntimeID
+						},
+
+						SetRootEntity {
+							root_entity: EntityID
+						},
+
+						SetSubType {
+							sub_type: SubType
+						},
+
+						SetExternalScenes {
+							external_scenes: Vec<RuntimeID>
+						}
+					}
+
+					Overrides(EntityOverridesEvent)
+					pub enum EntityOverridesEvent {
+						Initialise,
+
+						UpdatePropertyOverrides {
+							content: String
+						},
+
+						UpdateOverrideDeletes {
+							content: String
+						},
+
+						UpdatePinConnectionOverrides {
+							content: String
+						},
+
+						UpdatePinConnectionOverrideDeletes {
+							content: String
+						}
+					}
+				}
+
+				ResourceOverview(ResourceOverviewEvent)
+				pub enum ResourceOverviewEvent {
+					Initialise,
+
+					FollowDependency {
+						new_hash: RuntimeID
 					},
 
-					FollowReference {
-						editor_id: Uuid,
-						reference: EntityID
+					FollowDependencyInNewTab {
+						hash: RuntimeID
 					},
 
-					OpenFactory {
-						editor_id: Uuid,
-						factory: RuntimeID
+					OpenInEditor,
+
+					ExtractAsQN,
+
+					ExtractAsFile,
+
+					ExtractTEMPAsRT,
+
+					ExtractTBLUAsFile,
+
+					ExtractTBLUAsRT,
+
+					ExtractAsRTGeneric,
+
+					ExtractAsImage,
+
+					ExtractAsWav,
+
+					ExtractMultiWav,
+
+					ExtractSpecificMultiWav {
+						index: u32
 					},
 
-					SignalPin {
-						editor_id: Uuid,
-						entity_id: EntityID,
-						pin: String,
-						output: bool
+					ExtractAsHMLanguages
+				}
+
+				RepositoryPatch(RepositoryPatchEditorEvent)
+				pub enum RepositoryPatchEditorEvent {
+					Initialise,
+
+					CreateRepositoryItem,
+
+					ResetModifications {
+						item: Uuid
 					},
+
+					ModifyItem {
+						item: Uuid,
+						data: String
+					},
+
+					SelectItem {
+						item: Uuid
+					}
+				}
+
+				UnlockablesPatch(UnlockablesPatchEditorEvent)
+				pub enum UnlockablesPatchEditorEvent {
+					Initialise,
+
+					CreateUnlockable,
+
+					ResetModifications {
+						unlockable: Uuid
+					},
+
+					ModifyUnlockable {
+						unlockable: Uuid,
+						data: String
+					},
+
+					SelectUnlockable {
+						unlockable: Uuid
+					}
+				}
+
+				ContentSearchResults(ContentSearchResultsEvent)
+				pub enum ContentSearchResultsEvent {
+					Initialise,
 
 					OpenResourceOverview {
-						editor_id: Uuid,
-						resource: RuntimeID
+						hash: Hash
 					}
-				}),
-
-				MetaPane(pub enum EntityMetaPaneEvent {
-					JumpToReference {
-						editor_id: Uuid,
-						reference: EntityID
-					},
-
-					SetNotes {
-						editor_id: Uuid,
-						entity_id: EntityID,
-						notes: String
-					}
-				}),
-
-				Metadata(pub enum EntityMetadataEvent {
-					Initialise {
-						editor_id: Uuid
-					},
-
-					SetFactory {
-						editor_id: Uuid,
-						factory: RuntimeID
-					},
-
-					SetBlueprint {
-						editor_id: Uuid,
-						blueprint: RuntimeID
-					},
-
-					SetRootEntity {
-						editor_id: Uuid,
-						root_entity: EntityID
-					},
-
-					SetSubType {
-						editor_id: Uuid,
-						sub_type: SubType
-					},
-
-					SetExternalScenes {
-						editor_id: Uuid,
-						external_scenes: Vec<RuntimeID>
-					}
-				}),
-
-				Overrides(pub enum EntityOverridesEvent {
-					Initialise {
-						editor_id: Uuid
-					},
-
-					UpdatePropertyOverrides {
-						editor_id: Uuid,
-						content: String
-					},
-
-					UpdateOverrideDeletes {
-						editor_id: Uuid,
-						content: String
-					},
-
-					UpdatePinConnectionOverrides {
-						editor_id: Uuid,
-						content: String
-					},
-
-					UpdatePinConnectionOverrideDeletes {
-						editor_id: Uuid,
-						content: String
-					}
-				})
-			}),
-
-			ResourceOverview(pub enum ResourceOverviewEvent {
-				Initialise {
-					id: Uuid
-				},
-
-				FollowDependency {
-					id: Uuid,
-					new_hash: RuntimeID
-				},
-
-				FollowDependencyInNewTab {
-					id: Uuid,
-					hash: RuntimeID
-				},
-
-				OpenInEditor {
-					id: Uuid
-				},
-
-				ExtractAsQN {
-					id: Uuid
-				},
-
-				ExtractAsFile {
-					id: Uuid
-				},
-
-				ExtractTEMPAsRT {
-					id: Uuid
-				},
-
-				ExtractTBLUAsFile {
-					id: Uuid
-				},
-
-				ExtractTBLUAsRT {
-					id: Uuid
-				},
-
-				ExtractAsRTGeneric {
-					id: Uuid
-				},
-
-				ExtractAsImage {
-					id: Uuid
-				},
-
-				ExtractAsWav {
-					id: Uuid
-				},
-
-				ExtractMultiWav {
-					id: Uuid
-				},
-
-				ExtractSpecificMultiWav {
-					id: Uuid,
-					index: u32
-				},
-
-				ExtractAsHMLanguages {
-					id: Uuid
 				}
-			}),
+			}
+		}
 
-			RepositoryPatch(pub enum RepositoryPatchEditorEvent {
-				Initialise {
-					id: Uuid
-				},
-
-				CreateRepositoryItem {
-					id: Uuid
-				},
-
-				ResetModifications {
-					id: Uuid,
-					item: Uuid
-				},
-
-				ModifyItem {
-					id: Uuid,
-					item: Uuid,
-					data: String
-				},
-
-				SelectItem {
-					id: Uuid,
-					item: Uuid
-				}
-			}),
-
-			UnlockablesPatch(pub enum UnlockablesPatchEditorEvent {
-				Initialise {
-					id: Uuid
-				},
-
-				CreateUnlockable {
-					id: Uuid
-				},
-
-				ResetModifications {
-					id: Uuid,
-					unlockable: Uuid
-				},
-
-				ModifyUnlockable {
-					id: Uuid,
-					unlockable: Uuid,
-					data: String
-				},
-
-				SelectUnlockable {
-					id: Uuid,
-					unlockable: Uuid
-				}
-			}),
-
-			ContentSearchResults(pub enum ContentSearchResultsEvent {
-				Initialise {
-					id: Uuid
-				},
-
-				OpenResourceOverview {
-					id: Uuid,
-					hash: Hash
-				}
-			})
-		}),
-
-		Global(pub enum GlobalEvent {
+		Global(GlobalEvent)
+		pub enum GlobalEvent {
 			SetSeenAnnouncements(Vec<String>),
 			LoadWorkspace(PathBuf),
 			SelectAndOpenFile,
@@ -781,33 +740,47 @@ strike! {
 			UploadLogAndReport(String),
 			UploadLastPanic,
 			ClearLastPanic
-		}),
+		}
 
-		EditorConnection(pub enum EditorConnectionEvent {
-			// Entity ID, TBLU hash
-			EntitySelected(EntityID, Hash),
+		EditorConnection(EditorConnectionEvent)
+		pub enum EditorConnectionEvent {
+			EntitySelected {
+				id: EntityID,
+				tblu: Hash
+			},
 
-			// Entity ID, TBLU hash, transform
-			EntityTransformUpdated(EntityID, Hash, Transform),
+			EntityTransformUpdated {
+				id: EntityID,
+				tblu: Hash,
+				transform: Transform
+			},
 
-			// Entity ID, TBLU hash, property name, property type, new value
-			EntityPropertyChanged(EntityID, Hash, String, Variant)
-		})
+			EntityPropertyChanged {
+				id: EntityID,
+				tblu: Hash,
+				property_name: String,
+				property_value: Variant
+			}
+		}
 	}
 }
 
-strike! {
-	#[structstruck::each[derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]]
-	#[structstruck::each[serde(rename_all = "camelCase", tag = "type", content = "data")]]
+nesting::nest! {
+	#![derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
+	#![enums(serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type", content = "data"))]
 	pub enum Request {
-		Tool(pub enum ToolRequest {
-			FileBrowser(pub enum FileBrowserRequest {
+		Tool(ToolRequest)
+		pub enum ToolRequest {
+			FileBrowser(FileBrowserRequest)
+			pub enum FileBrowserRequest {
 				Create {
 					path: PathBuf,
 					is_folder: bool
 				},
 
-				Delete(PathBuf),
+				Delete {
+					path: PathBuf
+				},
 
 				Rename {
 					old_path: PathBuf,
@@ -822,7 +795,9 @@ strike! {
 					new_path: PathBuf
 				},
 
-				Select(Option<PathBuf>),
+				Select {
+					path: Option<PathBuf>
+				},
 
 				NewTree {
 					base_path: PathBuf,
@@ -831,10 +806,13 @@ strike! {
 					#[debug(skip)]
 					files: Vec<(PathBuf, bool)>
 				}
-			}),
+			}
 
-			GameBrowser(pub enum GameBrowserRequest {
-				SetEnabled(bool),
+			GameBrowser(GameBrowserRequest)
+			pub enum GameBrowserRequest {
+				SetEnabled {
+					enabled: bool
+				},
 
 				NewTree {
 					game_description: String,
@@ -842,361 +820,353 @@ strike! {
 					#[debug(skip)]
 					entries: Vec<GameBrowserEntry>
 				}
-			}),
+			}
 
-			Settings(pub enum SettingsRequest {
+			Settings(SettingsRequest)
+			pub enum SettingsRequest {
 				Initialise {
 					game_installs: Vec<GameInstall>,
 					settings: AppSettings
 				},
-				ChangeProjectSettings(ProjectSettings)
-			}),
 
-			ContentSearch(pub enum ContentSearchRequest {
-				SetEnabled(bool),
-				SetPartitions(Vec<(String, String)>)
-			})
-		}),
+				ChangeProjectSettings {
+					settings: ProjectSettings
+				}
+			}
 
-		Editor(pub enum EditorRequest {
-			Text(pub enum TextEditorRequest {
-				ReplaceContent {
-					id: Uuid,
-					content: String
+			ContentSearch(ContentSearchRequest)
+			pub enum ContentSearchRequest {
+				SetEnabled {
+					enabled: bool
 				},
 
-				SetFileType {
-					id: Uuid,
-					file_type: TextFileType
-				},
-			}),
+				SetPartitions {
+					/// Name, ID
+					partitions: Vec<(String, String)>
+				}
+			}
+		}
 
-			Entity(pub enum EntityEditorRequest {
-				General(pub enum EntityGeneralRequest {
-					SetIsPatchEditor {
-						editor_id: Uuid,
-						is_patch_editor: bool
-					}
-				}),
+		Editor(EditorRequest)
+		pub struct EditorRequest {
+			pub editor: Uuid,
+			pub data: EditorRequestData
 
-				Tree(pub enum EntityTreeRequest {
-					/// Will trigger a Select event from the tree - ensure this doesn't end up in a loop
-					Select {
-						editor_id: Uuid,
-						id: Option<EntityID>
-					},
-
-					NewTree {
-						editor_id: Uuid,
-
-						/// ID, parent, name, factory, has reverse parent refs
-						#[debug(skip)]
-						#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
-						entities: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
-					},
-
-					/// Instructs the frontend to take the list of new entities, add any new ones and update any ones that already exist (by ID) with the new information.
-					/// This is used for pasting, and for ensuring that icons/parent status/name are updated when a sub-entity is updated.
-					NewItems {
-						editor_id: Uuid,
-
-						/// ID, parent, name, factory, has reverse parent refs
-						#[debug(skip)]
-						#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
-						new_entities: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
-					},
-
-					SearchResults {
-						editor_id: Uuid,
-
-						/// The IDs of the entities matching the query
-						#[debug(skip)]
-						results: Vec<EntityID>
-					},
-
-					ShowHelpMenu {
-						editor_id: Uuid,
-						factory: RuntimeID,
-						#[specta(type = Vec<String>)]
-						input_pins: Vec<EcoString>,
-						#[specta(type = Vec<String>)]
-						output_pins: Vec<EcoString>,
-						default_properties_json: String
-					},
-
-					SetTemplates {
-						editor_id: Uuid,
-						templates: Vec<PastableTemplateCategory>
-					},
-
-					SetEditorConnectionAvailable {
-						editor_id: Uuid,
-						editor_connection_available: bool
-					},
-
-					SetShowDiff {
-						editor_id: Uuid,
-						show_diff: bool
-					},
-
-					SetDiffInfo {
-						editor_id: Uuid,
-						new: Vec<EntityID>,
-						modified: Vec<EntityID>,
-						#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
-						removed: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
-					}
-				}),
-
-				Monaco(pub enum EntityMonacoRequest {
-					DeselectIfSelected {
-						editor_id: Uuid,
-						entity_ids: Vec<EntityID>
-					},
-
+			pub enum EditorRequestData {
+				Text(TextEditorRequest)
+				pub enum TextEditorRequest {
 					ReplaceContent {
-						editor_id: Uuid,
-						entity_id: EntityID,
 						content: String
 					},
 
-					ReplaceContentIfSameEntityID {
-						editor_id: Uuid,
-						entity_id: EntityID,
-						content: String
-					},
-
-					UpdateIntellisense {
-						editor_id: Uuid,
-						entity_id: EntityID,
-						#[specta(type = Vec<(String, Variant, bool)>)]
-						properties: Vec<(EcoString, Variant, bool)>,
-						#[specta(type = Vec<String>)]
-						input_pins: Vec<EcoString>,
-						#[specta(type = Vec<String>)]
-						output_pins: Vec<EcoString>,
-					},
-
-					UpdateDecorationsAndMonacoInfo {
-						editor_id: Uuid,
-						entity_id: EntityID,
-						decorations: Vec<(String, String)>,
-						local_ref_entity_ids: Vec<EntityID>
-					},
-
-					UpdateValidity {
-						editor_id: Uuid,
-						validity: EditorValidity
-					},
-
-					SetEditorConnected {
-						editor_id: Uuid,
-						connected: bool
+					SetFileType {
+						file_type: TextFileType
 					}
-				}),
+				}
 
-				MetaPane(pub enum EntityMetaPaneRequest {
-					SetReverseRefs {
-						editor_id: Uuid,
-						#[specta(type = std::collections::HashMap<EntityID, String>)]
-						entity_names: std::collections::HashMap<EntityID, EcoString>,
-						reverse_refs: Vec<ReverseReference>
-					},
-
-					SetNotes {
-						editor_id: Uuid,
-						entity_id: EntityID,
-
-						#[specta(type = String)]
-						notes: EcoString
+				Entity(EntityEditorRequest)
+				pub enum EntityEditorRequest {
+					General(EntityGeneralRequest)
+					pub enum EntityGeneralRequest {
+						SetIsPatchEditor {
+							is_patch_editor: bool
+						}
 					}
-				}),
 
-				Metadata(pub enum EntityMetadataRequest {
+					Tree(EntityTreeRequest)
+					pub enum EntityTreeRequest {
+						/// Will trigger a Select event from the tree - ensure this doesn't end up in a loop
+						Select {
+							id: Option<EntityID>
+						},
+
+						NewTree {
+							/// ID, parent, name, factory, has reverse parent refs
+							#[debug(skip)]
+							#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
+							entities: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
+						},
+
+						/// Instructs the frontend to take the list of new entities, add any new ones and update any ones that already exist (by ID) with the new information.
+						/// This is used for pasting, and for ensuring that icons/parent status/name are updated when a sub-entity is updated.
+						NewItems {
+							/// ID, parent, name, factory, has reverse parent refs
+							#[debug(skip)]
+							#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
+							new_entities: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
+						},
+
+						SearchResults {
+							/// The IDs of the entities matching the query
+							#[debug(skip)]
+							results: Vec<EntityID>
+						},
+
+						ShowHelpMenu {
+							factory: RuntimeID,
+							#[specta(type = Vec<String>)]
+							input_pins: Vec<EcoString>,
+							#[specta(type = Vec<String>)]
+							output_pins: Vec<EcoString>,
+							default_properties_json: String
+						},
+
+						SetTemplates {
+							#[debug(skip)]
+							templates: Vec<PastableTemplateCategory>
+						},
+
+						SetEditorConnectionAvailable {
+							editor_connection_available: bool
+						},
+
+						SetShowDiff {
+							show_diff: bool
+						},
+
+						SetDiffInfo {
+							new: Vec<EntityID>,
+							modified: Vec<EntityID>,
+							#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
+							removed: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
+						}
+					}
+
+					Monaco(EntityMonacoRequest)
+					pub enum EntityMonacoRequest {
+						DeselectIfSelected {
+							entity_ids: Vec<EntityID>
+						},
+
+						ReplaceContent {
+							entity_id: EntityID,
+							content: String
+						},
+
+						ReplaceContentIfSameEntityID {
+							entity_id: EntityID,
+							content: String
+						},
+
+						UpdateIntellisense {
+							entity_id: EntityID,
+							#[specta(type = Vec<(String, Variant, bool)>)]
+							properties: Vec<(EcoString, Variant, bool)>,
+							#[specta(type = Vec<String>)]
+							input_pins: Vec<EcoString>,
+							#[specta(type = Vec<String>)]
+							output_pins: Vec<EcoString>,
+						},
+
+						UpdateDecorationsAndMonacoInfo {
+							entity_id: EntityID,
+							decorations: Vec<(String, String)>,
+							local_ref_entity_ids: Vec<EntityID>
+						},
+
+						UpdateValidity {
+							validity: EditorValidity
+						},
+
+						SetEditorConnected {
+							connected: bool
+						}
+					}
+
+					MetaPane(EntityMetaPaneRequest)
+					pub enum EntityMetaPaneRequest {
+						SetReverseRefs {
+							#[specta(type = std::collections::HashMap<EntityID, String>)]
+							entity_names: std::collections::HashMap<EntityID, EcoString>,
+							reverse_refs: Vec<ReverseReference>
+						},
+
+						SetNotes {
+							entity_id: EntityID,
+
+							#[specta(type = String)]
+							notes: EcoString
+						}
+					}
+
+					Metadata(EntityMetadataRequest)
+					pub enum EntityMetadataRequest {
+						Initialise {
+							factory: RuntimeID,
+							blueprint: RuntimeID,
+							root_entity: EntityID,
+							sub_type: SubType,
+							external_scenes: Vec<RuntimeID>
+						},
+
+						SetHashModificationAllowed {
+							hash_modification_allowed: bool
+						},
+
+						SetFactory {
+							factory: RuntimeID
+						},
+
+						SetBlueprint {
+							blueprint: RuntimeID
+						},
+
+						UpdateCustomPaths {
+							custom_paths: Vec<String>
+						}
+					}
+
+					Overrides(EntityOverridesRequest)
+					pub enum EntityOverridesRequest {
+						Initialise {
+							property_overrides: String,
+							override_deletes: String,
+							pin_connection_overrides: String,
+							pin_connection_override_deletes: String
+						},
+
+						UpdateDecorations {
+							decorations: Vec<(String, String)>,
+						}
+					}
+				}
+
+				ResourceOverview(ResourceOverviewRequest)
+				pub enum ResourceOverviewRequest {
 					Initialise {
-						editor_id: Uuid,
-						factory: RuntimeID,
-						blueprint: RuntimeID,
-						root_entity: EntityID,
-						sub_type: SubType,
-						external_scenes: Vec<RuntimeID>
-					},
+						hash: Hash,
+						filetype: String,
+						chunk_patch: String,
 
-					SetHashModificationAllowed {
-						editor_id: Uuid,
-						hash_modification_allowed: bool
-					},
+						#[specta(type = Option<String>)]
+						path_or_hint: Option<EcoString>,
 
-					SetFactory {
-						editor_id: Uuid,
-						factory: RuntimeID
-					},
+						/// Hash, type, path/hint, flags, is actually in current game version
+						#[debug(skip)]
+						#[specta(type = Vec<(String, String, Option<String>, ReferenceFlags, bool)>)]
+						dependencies: Vec<(Hash, Option<ResourceType>, Option<EcoString>, ReferenceFlags, bool)>,
 
-					SetBlueprint {
-						editor_id: Uuid,
-						blueprint: RuntimeID
-					},
+						/// Hash, type, path/hint
+						#[debug(skip)]
+						#[specta(type = Vec<(String, String, Option<String>)>)]
+						reverse_dependencies: Vec<(Hash, ResourceType, Option<EcoString>)>,
 
-					UpdateCustomPaths {
-						editor_id: Uuid,
-						custom_paths: Vec<String>
+						changelog: Vec<ResourceChangelogEntry>,
+
+						data: ResourceOverviewData
 					}
-				}),
+				}
 
-				Overrides(pub enum EntityOverridesRequest {
+				RepositoryPatch(RepositoryPatchEditorRequest)
+				pub enum RepositoryPatchEditorRequest {
+					SetRepositoryItems {
+						#[debug(skip)]
+						items: Vec<(Uuid, RepositoryItemInformation)>
+					},
+
+					SetModifiedRepositoryItems {
+						modified: Vec<Uuid>
+					},
+
+					AddNewRepositoryItem {
+						new_item: (Uuid, RepositoryItemInformation)
+					},
+
+					RemoveRepositoryItem {
+						item: Uuid
+					},
+
+					SetMonacoContent {
+						item: Uuid,
+						orig_data: String,
+						data: String
+					},
+
+					DeselectMonaco,
+
+					ModifyItemInformation {
+						item: Uuid,
+						info: RepositoryItemInformation
+					}
+				}
+
+				UnlockablesPatch(UnlockablesPatchEditorRequest)
+				pub enum UnlockablesPatchEditorRequest {
+					SetUnlockables {
+						#[debug(skip)]
+						unlockables: Vec<(Uuid, UnlockableInformation)>
+					},
+
+					SetModifiedUnlockables {
+						modified: Vec<Uuid>
+					},
+
+					AddNewUnlockable {
+						new_unlockable: (Uuid, UnlockableInformation)
+					},
+
+					RemoveUnlockable {
+						unlockable: Uuid
+					},
+
+					SetMonacoContent {
+						unlockable: Uuid,
+						orig_data: String,
+						data: String
+					},
+
+					DeselectMonaco,
+
+					ModifyUnlockableInformation {
+						unlockable: Uuid,
+						info: UnlockableInformation
+					}
+				}
+
+				ContentSearchResults(ContentSearchResultsRequest)
+				pub enum ContentSearchResultsRequest {
 					Initialise {
-						editor_id: Uuid,
-						property_overrides: String,
-						override_deletes: String,
-						pin_connection_overrides: String,
-						pin_connection_override_deletes: String
-					},
-
-					UpdateDecorations {
-						editor_id: Uuid,
-						decorations: Vec<(String, String)>,
+						/// Hash, type, path/hint
+						#[debug(skip)]
+						results: Vec<(String, String, Option<String>)>
 					}
-				})
-			}),
-
-			ResourceOverview(pub enum ResourceOverviewRequest {
-				Initialise {
-					id: Uuid,
-					hash: Hash,
-					filetype: String,
-					chunk_patch: String,
-
-					#[specta(type = Option<String>)]
-					path_or_hint: Option<EcoString>,
-
-					/// Hash, type, path/hint, flags, is actually in current game version
-					#[debug(skip)]
-					#[specta(type = Vec<(String, String, Option<String>, ReferenceFlags, bool)>)]
-					dependencies: Vec<(Hash, Option<ResourceType>, Option<EcoString>, ReferenceFlags, bool)>,
-
-					/// Hash, type, path/hint
-					#[debug(skip)]
-					#[specta(type = Vec<(String, String, Option<String>)>)]
-					reverse_dependencies: Vec<(Hash, ResourceType, Option<EcoString>)>,
-
-					changelog: Vec<ResourceChangelogEntry>,
-
-					data: ResourceOverviewData
 				}
-			}),
+			}
+		}
 
-			RepositoryPatch(pub enum RepositoryPatchEditorRequest {
-				SetRepositoryItems {
-					id: Uuid,
+		Tab(TabRequest)
+		pub struct TabRequest {
+			pub tab: Uuid,
+			pub data: TabRequestData
 
-					#[debug(skip)]
-					items: Vec<(Uuid, RepositoryItemInformation)>
+			pub enum TabRequestData {
+				Create {
+					name: String,
+					editor_type: EditorType
 				},
-
-				SetModifiedRepositoryItems {
-					id: Uuid,
-					modified: Vec<Uuid>
+				Rename {
+					new_name: String
 				},
-
-				AddNewRepositoryItem {
-					id: Uuid,
-					new_item: (Uuid, RepositoryItemInformation)
+				Select,
+				SetUnsaved {
+					unsaved: bool
 				},
+				Remove
+			}
+		}
 
-				RemoveRepositoryItem {
-					id: Uuid,
-					item: Uuid
-				},
-
-				SetMonacoContent {
-					id: Uuid,
-					item: Uuid,
-					orig_data: String,
-					data: String
-				},
-
-				DeselectMonaco {
-					id: Uuid
-				},
-
-				ModifyItemInformation {
-					id: Uuid,
-					item: Uuid,
-					info: RepositoryItemInformation
-				}
-			}),
-
-			UnlockablesPatch(pub enum UnlockablesPatchEditorRequest {
-				SetUnlockables {
-					id: Uuid,
-
-					#[debug(skip)]
-					unlockables: Vec<(Uuid, UnlockableInformation)>
-				},
-
-				SetModifiedUnlockables {
-					id: Uuid,
-					modified: Vec<Uuid>
-				},
-
-				AddNewUnlockable {
-					id: Uuid,
-					new_unlockable: (Uuid, UnlockableInformation)
-				},
-
-				RemoveUnlockable {
-					id: Uuid,
-					unlockable: Uuid
-				},
-
-				SetMonacoContent {
-					id: Uuid,
-					unlockable: Uuid,
-					orig_data: String,
-					data: String
-				},
-
-				DeselectMonaco {
-					id: Uuid
-				},
-
-				ModifyUnlockableInformation {
-					id: Uuid,
-					unlockable: Uuid,
-					info: UnlockableInformation
-				}
-			}),
-
-			ContentSearchResults(pub enum ContentSearchResultsRequest {
-				Initialise {
-					id: Uuid,
-
-					/// Hash, type, path/hint
-					#[debug(skip)]
-					results: Vec<(String, String, Option<String>)>
-				}
-			})
-		}),
-
-		Global(pub enum GlobalRequest {
-			ErrorReport { error: String },
-			SetWindowTitle(String),
-			InitialiseDynamics { dynamics: Dynamics, seen_announcements: Vec<String> },
-			CreateTab {
-				id: Uuid,
-				name: String,
-				editor_type: EditorType
+		Global(GlobalRequest)
+		pub enum GlobalRequest {
+			ErrorReport {
+				error: String
 			},
-			RenameTab {
-				id: Uuid,
-				new_name: String
+			SetWindowTitle {
+				title: String
 			},
-			SelectTab(Uuid),
-			SetTabUnsaved {
-				id: Uuid,
-				unsaved: bool
+			InitialiseDynamics {
+				dynamics: Dynamics,
+				seen_announcements: Vec<String>
 			},
-			RemoveTab(Uuid),
 			ComputeJSONPatchAndSave {
 				base: Value,
 				current: Value,
@@ -1205,6 +1175,6 @@ strike! {
 			},
 			RequestLastPanicUpload,
 			LogUploadRejected
-		})
+		}
 	}
 }

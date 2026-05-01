@@ -18,12 +18,12 @@
 
 		switch (request.type) {
 			case "setReverseRefs":
-				reverseRefs = request.data.reverse_refs
-				entityNames = request.data.entity_names
+				reverseRefs = request.data.reverseRefs
+				entityNames = request.data.entityNames
 				break
 
 			case "setNotes":
-				notesEntityID = request.data.entity_id
+				notesEntityID = request.data.entityId
 				notes = request.data.notes
 				break
 
@@ -40,15 +40,17 @@
 			await event({
 				type: "editor",
 				data: {
-					type: "entity",
+					editor: editorID,
 					data: {
-						type: "metaPane",
+						type: "entity",
 						data: {
-							type: "setNotes",
+							type: "metaPane",
 							data: {
-								editor_id: editorID,
-								entity_id: entityID,
-								notes: value
+								type: "setNotes",
+								data: {
+									entityId: entityID,
+									notes: value
+								}
 							}
 						}
 					}
@@ -80,14 +82,16 @@
 					await event({
 						type: "editor",
 						data: {
-							type: "entity",
+							editor: editorID,
 							data: {
-								type: "metaPane",
+								type: "entity",
 								data: {
-									type: "jumpToReference",
+									type: "metaPane",
 									data: {
-										editor_id: editorID,
-										reference: ref.from
+										type: "jumpToReference",
+										data: {
+											reference: ref.from
+										}
 									}
 								}
 							}

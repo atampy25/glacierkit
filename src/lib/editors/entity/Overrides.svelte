@@ -12,10 +12,10 @@
 
 		switch (request.type) {
 			case "initialise":
-				propertyOverrideEditor.setContent(request.data.property_overrides)
-				overrideDeleteEditor.setContent(request.data.override_deletes)
-				pinConnectionOverrideEditor.setContent(request.data.pin_connection_overrides)
-				pinConnectionOverrideDeleteEditor.setContent(request.data.pin_connection_override_deletes)
+				propertyOverrideEditor.setContent(request.data.propertyOverrides)
+				overrideDeleteEditor.setContent(request.data.overrideDeletes)
+				pinConnectionOverrideEditor.setContent(request.data.pinConnectionOverrides)
+				pinConnectionOverrideDeleteEditor.setContent(request.data.pinConnectionOverrideDeletes)
 				break
 
 			case "updateDecorations":
@@ -35,13 +35,13 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: editorID,
 				data: {
-					type: "overrides",
+					type: "entity",
 					data: {
-						type: "initialise",
+						type: "overrides",
 						data: {
-							editor_id: editorID
+							type: "initialise"
 						}
 					}
 				}

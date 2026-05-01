@@ -48,8 +48,8 @@ use crate::{
 	get_loaded_game_version,
 	languages::get_language_map,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorState, EditorType, GlobalRequest, Hash, Request,
-		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest
+		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
+		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest, TabRequest, TabRequestData
 	},
 	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource, extract_resource_changelog},
 	send_notification, send_request, start_task
@@ -71,699 +71,702 @@ pub async fn initialise_resource_overview(
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::ResourceOverview(ResourceOverviewRequest::Initialise {
-			id,
-			hash: Hash(hash),
-			filetype: filetype.into(),
-			chunk_patch,
-			path_or_hint: hash
-				.get_info()
-				.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
-			dependencies: deps
-				.into_par_iter()
-				.map(|dep| {
-					(
-						Hash(dep.resource),
-						file_types.get(&dep.resource).copied(),
-						dep.resource.get_info().and_then(|x| x.path.or(x.hint)),
-						dep.flags,
-						resource_reverse_dependencies.contains_key(&dep.resource)
-					)
-				})
-				.collect(),
-			reverse_dependencies: resource_reverse_dependencies
-				.get(&hash)
-				.map(|hashes| {
-					hashes
-						.iter()
-						.map(|hash| {
-							(
-								Hash(*hash),
-								*file_types.get(hash).unwrap(),
-								hash.get_info().and_then(|x| x.path.or(x.hint))
-							)
-						})
-						.collect()
-				})
-				.unwrap_or_default(),
-			changelog: extract_resource_changelog(game_files, hash),
-			data: match filetype.as_ref() {
-				"TEMP" => {
-					let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash)?;
+		Request::Editor(EditorRequest {
+			editor: id,
+			data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+				hash: Hash(hash),
+				filetype: filetype.into(),
+				chunk_patch,
+				path_or_hint: hash
+					.get_info()
+					.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
+				dependencies: deps
+					.into_par_iter()
+					.map(|dep| {
+						(
+							Hash(dep.resource),
+							file_types.get(&dep.resource).copied(),
+							dep.resource.get_info().and_then(|x| x.path.or(x.hint)),
+							dep.flags,
+							resource_reverse_dependencies.contains_key(&dep.resource)
+						)
+					})
+					.collect(),
+				reverse_dependencies: resource_reverse_dependencies
+					.get(&hash)
+					.map(|hashes| {
+						hashes
+							.iter()
+							.map(|hash| {
+								(
+									Hash(*hash),
+									*file_types.get(hash).unwrap(),
+									hash.get_info().and_then(|x| x.path.or(x.hint))
+								)
+							})
+							.collect()
+					})
+					.unwrap_or_default(),
+				changelog: extract_resource_changelog(game_files, hash),
+				data: match filetype.as_ref() {
+					"TEMP" => {
+						let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash)?;
 
-					ResourceOverviewData::Entity {
-						blueprint_hash: Hash(entity.blueprint),
-						blueprint_path_or_hint: entity
-							.blueprint
-							.get_info()
-							.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
+						ResourceOverviewData::Entity {
+							blueprint_hash: Hash(entity.blueprint),
+							blueprint_path_or_hint: entity
+								.blueprint
+								.get_info()
+								.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
+						}
 					}
-				}
 
-				"ORES" if hash == "0057C2C3941115CA".parse()? => ResourceOverviewData::Unlockables,
+					"ORES" if hash == "0057C2C3941115CA".parse()? => ResourceOverviewData::Unlockables,
 
-				"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF" | "GIDX"
-				| "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" => {
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF"
+					| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" => {
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-					ResourceOverviewData::GenericRL {
+						ResourceOverviewData::GenericRL {
+							json: {
+								let mut buf = Vec::new();
+								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+								deserialize_generic(
+									game_version,
+									if res_meta.core_info.resource_type == "DSWB" {
+										"WSWB".try_into()?
+									} else {
+										res_meta.core_info.resource_type
+									},
+									&res_data
+								)?
+								.serialize(&mut ser)?;
+
+								if buf.len() < 1024 * 512 {
+									String::from_utf8(buf)?
+								} else {
+									"Too large to preview".into()
+								}
+							}
+						}
+					}
+
+					"GFXI" => {
+						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
+						let temp_file_id = Uuid::new_v4();
+
+						fs::create_dir_all(data_dir.join("temp"))?;
+
+						let (_, res_data) = extract_latest_resource(game_files, hash)?;
+
+						ImageReader::new(Cursor::new(res_data))
+							.with_guessed_format()?
+							.decode()?
+							.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
+
+						ResourceOverviewData::Image {
+							image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+							dds_data: None
+						}
+					}
+
+					"PRIM" => {
+						let (_, res_data) = extract_latest_resource(game_files, hash)?;
+
+						let model = RenderPrimitive::process_data(game_version.into(), res_data)
+							.context("Couldn't process texture data")?;
+
+						// Higher is less detail
+						let preferred_lod = 1;
+
+						// Get only the meshes, we don't need weight metadata for the preview
+						let meshes = model
+							.data
+							.objects
+							.iter()
+							.map(|mesh_obj| match mesh_obj {
+								prim_rs::render_primitive::MeshObject::Normal(mesh) => mesh,
+								prim_rs::render_primitive::MeshObject::Weighted(mesh) => &mesh.prim_mesh,
+								prim_rs::render_primitive::MeshObject::Linked(mesh) => &mesh.prim_mesh
+							})
+							.collect::<Vec<_>>();
+
+						// Get only the meshes for the preferred LOD level
+						let meshes = meshes
+							.iter()
+							.filter(|mesh| mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod));
+
+						let mut previous_vertex_count: usize = 1;
+						let mut bounding_box: [f32; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+
+						let mut obj = String::new();
+
+						for (idx, mesh) in meshes.enumerate() {
+							writeln!(obj, "o object.00{}", idx)?;
+
+							for position in &mesh.sub_mesh.buffers.position {
+								writeln!(obj, "v {} {} {}", position.x, position.y, position.z)?;
+							}
+
+							for vm in &mesh.sub_mesh.buffers.main {
+								writeln!(obj, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
+							}
+
+							for idx in mesh.sub_mesh.indices.chunks(3) {
+								let [idx1, idx2, idx3] = [
+									idx[0] as usize + previous_vertex_count,
+									idx[1] as usize + previous_vertex_count,
+									idx[2] as usize + previous_vertex_count
+								];
+								writeln!(obj, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
+							}
+
+							previous_vertex_count += mesh.sub_mesh.buffers.position.len();
+
+							let bb = mesh.sub_mesh.calc_bb();
+
+							bounding_box[0] = bounding_box[0].min(bb.min.x);
+							bounding_box[1] = bounding_box[1].min(bb.min.y);
+							bounding_box[2] = bounding_box[2].min(bb.min.z);
+
+							bounding_box[3] = bounding_box[3].max(bb.max.x);
+							bounding_box[4] = bounding_box[4].max(bb.max.y);
+							bounding_box[5] = bounding_box[5].max(bb.max.z);
+						}
+
+						ResourceOverviewData::Mesh { obj, bounding_box }
+					}
+
+					"TEXT" => {
+						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
+						let temp_file_id = Uuid::new_v4();
+
+						fs::create_dir_all(data_dir.join("temp"))?;
+
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+
+						let mut texture = TextureMap::process_data(game_version.into(), res_data)
+							.context("Couldn't process texture data")?;
+
+						if let Some(texd_depend) = res_meta.core_info.references.first() {
+							let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
+							let mipblock = MipblockData::from_memory(&texd_data, game_version.into())
+								.context("Couldn't process TEXD data")?;
+							texture.set_mipblock1(mipblock);
+						}
+
+						let tga_data = glacier_texture::convert::create_tga(&texture)
+							.context("Couldn't convert texture to TGA")?;
+
+						let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
+
+						reader.set_format(image::ImageFormat::Tga);
+
+						reader
+							.decode()?
+							.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
+
+						ResourceOverviewData::Image {
+							image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+							dds_data: Some((
+								match texture.texture_type() {
+									TextureType::Colour => "Colour",
+									TextureType::Normal => "Normal",
+									TextureType::Height => "Height",
+									TextureType::CompoundNormal => "Compound Normal",
+									TextureType::Billboard => "Billboard",
+									TextureType::Projection => "Projection",
+									TextureType::Emission => "Emission",
+									TextureType::Cubemap => "Cubemap",
+									TextureType::UNKNOWN512 => "unknown"
+								}
+								.into(),
+								match texture.format() {
+									RenderFormat::R16G16B16A16 => "R16G16B16A16",
+									RenderFormat::R8G8B8A8 => "R8G8B8A8",
+									RenderFormat::R8G8 => "R8G8",
+									RenderFormat::A8 => "A8",
+									RenderFormat::BC1 => "BC1",
+									RenderFormat::BC2 => "BC2",
+									RenderFormat::BC3 => "BC3",
+									RenderFormat::BC4 => "BC4",
+									RenderFormat::BC5 => "BC5",
+									RenderFormat::BC7 => "BC7"
+								}
+								.into()
+							))
+						}
+					}
+
+					"WWEV" => {
+						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
+
+						fs::create_dir_all(data_dir.join("temp"))?;
+
+						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+
+						let mut wav_paths = vec![];
+
+						let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+
+						for object in wwev.non_streamed {
+							let temp_file_id = Uuid::new_v4();
+
+							WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(BufWriter::new(File::create(
+									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+								)?))?;
+
+							wav_paths.push((
+								"Embedded audio".into(),
+								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+							))
+						}
+
+						for object in wwev.streamed {
+							let temp_file_id = Uuid::new_v4();
+
+							let (_, wem_data) = extract_latest_resource(game_files, object.source)?;
+
+							WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(BufWriter::new(File::create(
+									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+								)?))?;
+
+							wav_paths.push((
+								object.source.to_string(),
+								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+							))
+						}
+
+						ResourceOverviewData::MultiAudio {
+							name: wwev.name,
+							wav_paths
+						}
+					}
+
+					"WWES" | "WWEM" => {
+						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
+						let temp_file_id = Uuid::new_v4();
+
+						fs::create_dir_all(data_dir.join("temp"))?;
+
+						let (_, res_data) = extract_latest_resource(game_files, hash)?;
+
+						WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(BufWriter::new(File::create(
+								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+							)?))?;
+
+						ResourceOverviewData::Audio {
+							wav_path: data_dir.join("temp").join(format!("{}.wav", temp_file_id))
+						}
+					}
+
+					"REPO" => ResourceOverviewData::Repository,
+
+					"JSON" => ResourceOverviewData::Json {
+						json: format_json(&String::from_utf8(extract_latest_resource(game_files, hash)?.1)?)?
+					},
+
+					"CLNG" => ResourceOverviewData::HMLanguages {
 						json: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+
+							let clng = {
+								let mut iteration = 0;
+
+								loop {
+									if let Ok::<_, anyhow::Error>(x) = try_block! {
+										let langmap = get_language_map(game_version, iteration)
+											.context("No more alternate language maps available")?;
+
+										let clng = hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
+											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+										clng.convert(
+											&res_data,
+											to_string(
+												&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
+
+											)?
+										)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									} {
+										break x;
+									} else {
+										iteration += 1;
+
+										if get_language_map(game_version, iteration).is_none() {
+											bail!("No more alternate language maps available");
+										}
+									}
+								}
+							};
+
 							let mut buf = Vec::new();
 							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
 							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-							deserialize_generic(
-								game_version,
-								if res_meta.core_info.resource_type == "DSWB" {
-									"WSWB".try_into()?
-								} else {
-									res_meta.core_info.resource_type
-								},
-								&res_data
-							)?
+							clng.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						}
+					},
+
+					"DITL" => ResourceOverviewData::HMLanguages {
+						json: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+
+							let ditl = hmlanguages::ditl::DITL::new(
+								app_state
+									.tonytools_hash_list
+									.load()
+									.as_ref()
+									.context("No TonyTools hash list available")?
+									.deref()
+									.to_owned()
+							)
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							ditl.convert(
+								&res_data,
+								to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
+							)
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 							.serialize(&mut ser)?;
 
-							if buf.len() < 1024 * 512 {
-								String::from_utf8(buf)?
-							} else {
-								"Too large to preview".into()
-							}
+							String::from_utf8(buf)?
 						}
-					}
-				}
+					},
 
-				"GFXI" => {
-					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-					let temp_file_id = Uuid::new_v4();
+					"DLGE" => ResourceOverviewData::HMLanguages {
+						json: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-					fs::create_dir_all(data_dir.join("temp"))?;
+							let dlge = {
+								let mut iteration = 0;
 
-					let (_, res_data) = extract_latest_resource(game_files, hash)?;
+								loop {
+									if let Ok::<_, anyhow::Error>(x) = try_block! {
+										let langmap = get_language_map(game_version, iteration)
+											.context("No more alternate language maps available")?;
 
-					ImageReader::new(Cursor::new(res_data))
-						.with_guessed_format()?
-						.decode()?
-						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
-
-					ResourceOverviewData::Image {
-						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
-						dds_data: None
-					}
-				}
-
-				"PRIM" => {
-					let (_, res_data) = extract_latest_resource(game_files, hash)?;
-
-					let model = RenderPrimitive::process_data(game_version.into(), res_data)
-						.context("Couldn't process texture data")?;
-
-					// Higher is less detail
-					let preferred_lod = 1;
-
-					// Get only the meshes, we don't need weight metadata for the preview
-					let meshes = model
-						.data
-						.objects
-						.iter()
-						.map(|mesh_obj| match mesh_obj {
-							prim_rs::render_primitive::MeshObject::Normal(mesh) => mesh,
-							prim_rs::render_primitive::MeshObject::Weighted(mesh) => &mesh.prim_mesh,
-							prim_rs::render_primitive::MeshObject::Linked(mesh) => &mesh.prim_mesh
-						})
-						.collect::<Vec<_>>();
-
-					// Get only the meshes for the preferred LOD level
-					let meshes = meshes
-						.iter()
-						.filter(|mesh| mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod));
-
-					let mut previous_vertex_count: usize = 1;
-					let mut bounding_box: [f32; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-
-					let mut obj = String::new();
-
-					for (idx, mesh) in meshes.enumerate() {
-						writeln!(obj, "o object.00{}", idx)?;
-
-						for position in &mesh.sub_mesh.buffers.position {
-							writeln!(obj, "v {} {} {}", position.x, position.y, position.z)?;
-						}
-
-						for vm in &mesh.sub_mesh.buffers.main {
-							writeln!(obj, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
-						}
-
-						for idx in mesh.sub_mesh.indices.chunks(3) {
-							let [idx1, idx2, idx3] = [
-								idx[0] as usize + previous_vertex_count,
-								idx[1] as usize + previous_vertex_count,
-								idx[2] as usize + previous_vertex_count
-							];
-							writeln!(obj, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
-						}
-
-						previous_vertex_count += mesh.sub_mesh.buffers.position.len();
-
-						let bb = mesh.sub_mesh.calc_bb();
-
-						bounding_box[0] = bounding_box[0].min(bb.min.x);
-						bounding_box[1] = bounding_box[1].min(bb.min.y);
-						bounding_box[2] = bounding_box[2].min(bb.min.z);
-
-						bounding_box[3] = bounding_box[3].max(bb.max.x);
-						bounding_box[4] = bounding_box[4].max(bb.max.y);
-						bounding_box[5] = bounding_box[5].max(bb.max.z);
-					}
-
-					ResourceOverviewData::Mesh { obj, bounding_box }
-				}
-
-				"TEXT" => {
-					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-					let temp_file_id = Uuid::new_v4();
-
-					fs::create_dir_all(data_dir.join("temp"))?;
-
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
-
-					let mut texture = TextureMap::process_data(game_version.into(), res_data)
-						.context("Couldn't process texture data")?;
-
-					if let Some(texd_depend) = res_meta.core_info.references.first() {
-						let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
-						let mipblock = MipblockData::from_memory(&texd_data, game_version.into())
-							.context("Couldn't process TEXD data")?;
-						texture.set_mipblock1(mipblock);
-					}
-
-					let tga_data =
-						glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?;
-
-					let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
-
-					reader.set_format(image::ImageFormat::Tga);
-
-					reader
-						.decode()?
-						.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
-
-					ResourceOverviewData::Image {
-						image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
-						dds_data: Some((
-							match texture.texture_type() {
-								TextureType::Colour => "Colour",
-								TextureType::Normal => "Normal",
-								TextureType::Height => "Height",
-								TextureType::CompoundNormal => "Compound Normal",
-								TextureType::Billboard => "Billboard",
-								TextureType::Projection => "Projection",
-								TextureType::Emission => "Emission",
-								TextureType::Cubemap => "Cubemap",
-								TextureType::UNKNOWN512 => "unknown"
-							}
-							.into(),
-							match texture.format() {
-								RenderFormat::R16G16B16A16 => "R16G16B16A16",
-								RenderFormat::R8G8B8A8 => "R8G8B8A8",
-								RenderFormat::R8G8 => "R8G8",
-								RenderFormat::A8 => "A8",
-								RenderFormat::BC1 => "BC1",
-								RenderFormat::BC2 => "BC2",
-								RenderFormat::BC3 => "BC3",
-								RenderFormat::BC4 => "BC4",
-								RenderFormat::BC5 => "BC5",
-								RenderFormat::BC7 => "BC7"
-							}
-							.into()
-						))
-					}
-				}
-
-				"WWEV" => {
-					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-
-					fs::create_dir_all(data_dir.join("temp"))?;
-
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
-
-					let mut wav_paths = vec![];
-
-					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
-
-					for object in wwev.non_streamed {
-						let temp_file_id = Uuid::new_v4();
-
-						WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
-							.generate_ogg(BufWriter::new(File::create(
-								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-							)?))?;
-
-						wav_paths.push((
-							"Embedded audio".into(),
-							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-						))
-					}
-
-					for object in wwev.streamed {
-						let temp_file_id = Uuid::new_v4();
-
-						let (_, wem_data) = extract_latest_resource(game_files, object.source)?;
-
-						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
-							.generate_ogg(BufWriter::new(File::create(
-								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-							)?))?;
-
-						wav_paths.push((
-							object.source.to_string(),
-							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-						))
-					}
-
-					ResourceOverviewData::MultiAudio {
-						name: wwev.name,
-						wav_paths
-					}
-				}
-
-				"WWES" | "WWEM" => {
-					let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-					let temp_file_id = Uuid::new_v4();
-
-					fs::create_dir_all(data_dir.join("temp"))?;
-
-					let (_, res_data) = extract_latest_resource(game_files, hash)?;
-
-					WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?.generate_ogg(
-						BufWriter::new(File::create(
-							data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-						)?)
-					)?;
-
-					ResourceOverviewData::Audio {
-						wav_path: data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-					}
-				}
-
-				"REPO" => ResourceOverviewData::Repository,
-
-				"JSON" => ResourceOverviewData::Json {
-					json: format_json(&String::from_utf8(extract_latest_resource(game_files, hash)?.1)?)?
-				},
-
-				"CLNG" => ResourceOverviewData::HMLanguages {
-					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
-
-						let clng = {
-							let mut iteration = 0;
-
-							loop {
-								if let Ok::<_, anyhow::Error>(x) = try_block! {
-									let langmap = get_language_map(game_version, iteration)
-										.context("No more alternate language maps available")?;
-
-									let clng = hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
+										let dlge = hmlanguages::dlge::DLGE::new(
+											app_state
+												.tonytools_hash_list
+												.load()
+												.as_ref()
+												.context("No TonyTools hash list available")?
+												.deref()
+												.to_owned(),
+											game_version.into(),
+											langmap.1.to_owned(),
+											None,
+											false
+										)
 										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-									clng.convert(
-										&res_data,
-										to_string(
-											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
+										dlge.convert(
+											&res_data,
+											to_string(
+												&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
 
-										)?
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-								} {
-									break x;
-								} else {
-									iteration += 1;
+											)?
+										)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									} {
+										break x;
+									} else {
+										iteration += 1;
 
-									if get_language_map(game_version, iteration).is_none() {
-										bail!("No more alternate language maps available");
+										if get_language_map(game_version, iteration).is_none() {
+											bail!("No more alternate language maps available");
+										}
 									}
 								}
-							}
-						};
+							};
 
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						clng.serialize(&mut ser)?;
+							dlge.serialize(&mut ser)?;
 
-						String::from_utf8(buf)?
-					}
-				},
+							String::from_utf8(buf)?
+						}
+					},
 
-				"DITL" => ResourceOverviewData::HMLanguages {
-					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+					"LOCR" => ResourceOverviewData::HMLanguages {
+						json: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let ditl = hmlanguages::ditl::DITL::new(
-							app_state
+							let locr = {
+								let mut iteration = 0;
+
+								loop {
+									if let Ok::<_, anyhow::Error>(x) = try_block! {
+										let langmap = get_language_map(game_version, iteration)
+											.context("No more alternate language maps available")?;
+
+										let locr = hmlanguages::locr::LOCR::new(
+											app_state
+												.tonytools_hash_list
+												.load()
+												.as_ref()
+												.context("No TonyTools hash list available")?
+												.deref()
+												.to_owned(),
+											game_version.into(),
+											langmap.1.to_owned(),
+											langmap.0
+										)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+										locr.convert(
+											&res_data,
+											to_string(
+												&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
+
+											)?
+										)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									} {
+										break x;
+									} else {
+										iteration += 1;
+
+										if get_language_map(game_version, iteration).is_none() {
+											bail!("No more alternate language maps available");
+										}
+									}
+								}
+							};
+
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							locr.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						}
+					},
+
+					"RTLV" => ResourceOverviewData::HMLanguages {
+						json: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+
+							let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								.convert(
+									&res_data,
+									to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+							rtlv.serialize(&mut ser)?;
+
+							String::from_utf8(buf)?
+						}
+					},
+
+					"LINE" => ResourceOverviewData::LocalisedLine {
+						languages: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+
+							let (locr_meta, locr_data) = extract_latest_resource(
+								game_files,
+								res_meta
+									.core_info
+									.references
+									.first()
+									.context("No LOCR dependency on LINE")?
+									.resource
+							)?;
+
+							let locr = {
+								let mut iteration = 0;
+
+								loop {
+									if let Ok::<_, anyhow::Error>(x) = try_block! {
+										let langmap = get_language_map(game_version, iteration)
+											.context("No more alternate language maps available")?;
+
+										let locr = hmlanguages::locr::LOCR::new(
+											app_state
+												.tonytools_hash_list
+												.load()
+												.as_ref()
+												.context("No TonyTools hash list available")?
+												.deref()
+												.to_owned(),
+											game_version.into(),
+											langmap.1.to_owned(),
+											langmap.0
+										)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+										locr.convert(
+											&locr_data,
+											to_string(&RpkgResourceMeta::from_resource_metadata(
+												locr_meta.to_owned(),
+												false
+											))?
+										)
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+									} {
+										break x;
+									} else {
+										iteration += 1;
+
+										if get_language_map(game_version, iteration).is_none() {
+											bail!("No more alternate language maps available");
+										}
+									}
+								}
+							};
+
+							let res_data: [u8; 5] =
+								res_data.try_into().ok().context("Couldn't read LINE data as u32")?;
+
+							let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
+
+							let line_hash = format!("{:0>8X}", line_id);
+
+							let line_str = app_state
 								.tonytools_hash_list
 								.load()
 								.as_ref()
 								.context("No TonyTools hash list available")?
-								.deref()
-								.to_owned()
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+								.lines
+								.get_by_left(&line_id)
+								.cloned();
 
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						ditl.convert(
-							&res_data,
-							to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
-						)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-						.serialize(&mut ser)?;
-
-						String::from_utf8(buf)?
-					}
-				},
-
-				"DLGE" => ResourceOverviewData::HMLanguages {
-					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
-
-						let dlge = {
-							let mut iteration = 0;
-
-							loop {
-								if let Ok::<_, anyhow::Error>(x) = try_block! {
-									let langmap = get_language_map(game_version, iteration)
-										.context("No more alternate language maps available")?;
-
-									let dlge = hmlanguages::dlge::DLGE::new(
-										app_state
-											.tonytools_hash_list
-											.load()
-											.as_ref()
-											.context("No TonyTools hash list available")?
-											.deref()
-											.to_owned(),
-										game_version.into(),
-										langmap.1.to_owned(),
-										None,
-										false
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-									dlge.convert(
-										&res_data,
-										to_string(
-											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
-
-										)?
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-								} {
-									break x;
-								} else {
-									iteration += 1;
-
-									if get_language_map(game_version, iteration).is_none() {
-										bail!("No more alternate language maps available");
-									}
-								}
+							if let Some(line_str) = line_str {
+								locr.languages
+									.into_iter()
+									.filter_map(|(lang, keys)| {
+										if let serde_json::Value::String(val) = keys.get(&line_str)? {
+											Some((lang.to_owned(), val.to_owned()))
+										} else {
+											None
+										}
+									})
+									.collect::<Vec<_>>()
+							} else {
+								locr.languages
+									.into_iter()
+									.filter_map(|(lang, keys)| {
+										if let serde_json::Value::String(val) = keys.get(&line_hash)? {
+											Some((lang.to_owned(), val.to_owned()))
+										} else {
+											None
+										}
+									})
+									.collect::<Vec<_>>()
 							}
-						};
-
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						dlge.serialize(&mut ser)?;
-
-						String::from_utf8(buf)?
-					}
-				},
-
-				"LOCR" => ResourceOverviewData::HMLanguages {
-					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
-
-						let locr = {
-							let mut iteration = 0;
-
-							loop {
-								if let Ok::<_, anyhow::Error>(x) = try_block! {
-									let langmap = get_language_map(game_version, iteration)
-										.context("No more alternate language maps available")?;
-
-									let locr = hmlanguages::locr::LOCR::new(
-										app_state
-											.tonytools_hash_list
-											.load()
-											.as_ref()
-											.context("No TonyTools hash list available")?
-											.deref()
-											.to_owned(),
-										game_version.into(),
-										langmap.1.to_owned(),
-										langmap.0
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-									locr.convert(
-										&res_data,
-										to_string(
-											&RpkgResourceMeta::from_resource_metadata(res_meta.to_owned(), false)
-
-										)?
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-								} {
-									break x;
-								} else {
-									iteration += 1;
-
-									if get_language_map(game_version, iteration).is_none() {
-										bail!("No more alternate language maps available");
-									}
-								}
-							}
-						};
-
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						locr.serialize(&mut ser)?;
-
-						String::from_utf8(buf)?
-					}
-				},
-
-				"RTLV" => ResourceOverviewData::HMLanguages {
-					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
-
-						let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-							.convert(
-								&res_data,
-								to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
-							)
-							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						rtlv.serialize(&mut ser)?;
-
-						String::from_utf8(buf)?
-					}
-				},
-
-				"LINE" => ResourceOverviewData::LocalisedLine {
-					languages: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
-
-						let (locr_meta, locr_data) = extract_latest_resource(
-							game_files,
-							res_meta
-								.core_info
-								.references
-								.first()
-								.context("No LOCR dependency on LINE")?
-								.resource
-						)?;
-
-						let locr = {
-							let mut iteration = 0;
-
-							loop {
-								if let Ok::<_, anyhow::Error>(x) = try_block! {
-									let langmap = get_language_map(game_version, iteration)
-										.context("No more alternate language maps available")?;
-
-									let locr = hmlanguages::locr::LOCR::new(
-										app_state
-											.tonytools_hash_list
-											.load()
-											.as_ref()
-											.context("No TonyTools hash list available")?
-											.deref()
-											.to_owned(),
-										game_version.into(),
-										langmap.1.to_owned(),
-										langmap.0
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-									locr.convert(
-										&locr_data,
-										to_string(&RpkgResourceMeta::from_resource_metadata(
-											locr_meta.to_owned(),
-											false
-										))?
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-								} {
-									break x;
-								} else {
-									iteration += 1;
-
-									if get_language_map(game_version, iteration).is_none() {
-										bail!("No more alternate language maps available");
-									}
-								}
-							}
-						};
-
-						let res_data: [u8; 5] = res_data.try_into().ok().context("Couldn't read LINE data as u32")?;
-
-						let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
-
-						let line_hash = format!("{:0>8X}", line_id);
-
-						let line_str = app_state
-							.tonytools_hash_list
-							.load()
-							.as_ref()
-							.context("No TonyTools hash list available")?
-							.lines
-							.get_by_left(&line_id)
-							.cloned();
-
-						if let Some(line_str) = line_str {
-							locr.languages
-								.into_iter()
-								.filter_map(|(lang, keys)| {
-									if let serde_json::Value::String(val) = keys.get(&line_str)? {
-										Some((lang.to_owned(), val.to_owned()))
-									} else {
-										None
-									}
-								})
-								.collect::<Vec<_>>()
-						} else {
-							locr.languages
-								.into_iter()
-								.filter_map(|(lang, keys)| {
-									if let serde_json::Value::String(val) = keys.get(&line_hash)? {
-										Some((lang.to_owned(), val.to_owned()))
-									} else {
-										None
-									}
-								})
-								.collect::<Vec<_>>()
 						}
-					}
-				},
+					},
 
-				"MATI" => ResourceOverviewData::MaterialInstance {
-					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+					"MATI" => ResourceOverviewData::MaterialInstance {
+						json: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
-							.context("Couldn't parse material instance")?;
+							let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
+								.context("Couldn't parse material instance")?;
 
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						material.serialize(&mut ser)?;
+							material.serialize(&mut ser)?;
 
-						String::from_utf8(buf)?
-					}
-				},
+							String::from_utf8(buf)?
+						}
+					},
 
-				"MATT" => ResourceOverviewData::MaterialEntity {
-					json: {
-						let (matt_meta, matt_data) = extract_latest_resource(game_files, hash)?;
-						let (matb_meta, matb_data) = extract_latest_resource(
-							game_files,
-							matt_meta
-								.core_info
-								.references
-								.get(1)
-								.context("No MATB dependency")?
-								.resource
-						)?;
+					"MATT" => ResourceOverviewData::MaterialEntity {
+						json: {
+							let (matt_meta, matt_data) = extract_latest_resource(game_files, hash)?;
+							let (matb_meta, matb_data) = extract_latest_resource(
+								game_files,
+								matt_meta
+									.core_info
+									.references
+									.get(1)
+									.context("No MATB dependency")?
+									.resource
+							)?;
 
-						let material =
-							MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)
-								.context("Couldn't parse material entity")?;
+							let material = MaterialEntity::parse(
+								&matt_data,
+								&matt_meta.core_info,
+								&matb_data,
+								&matb_meta.core_info
+							)
+							.context("Couldn't parse material entity")?;
 
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						material.serialize(&mut ser)?;
+							material.serialize(&mut ser)?;
 
-						String::from_utf8(buf)?
-					}
-				},
+							String::from_utf8(buf)?
+						}
+					},
 
-				"SDEF" => ResourceOverviewData::SoundDefinitions {
-					json: {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+					"SDEF" => ResourceOverviewData::SoundDefinitions {
+						json: {
+							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game_version)
-							.context("Couldn't parse sound definitions")?;
+							let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game_version)
+								.context("Couldn't parse sound definitions")?;
 
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+							let mut buf = Vec::new();
+							let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+							let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
-						sdef.serialize(&mut ser)?;
+							sdef.serialize(&mut ser)?;
 
-						String::from_utf8(buf)?
-					}
-				},
+							String::from_utf8(buf)?
+						}
+					},
 
-				_ => ResourceOverviewData::Generic
-			}
-		}))
+					_ => ResourceOverviewData::Generic
+				}
+			})
+		})
 	)?;
 }
 
 #[try_fn]
 #[context("Couldn't handle resource overview event")]
-pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOverviewEvent) -> Result<()> {
+pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: ResourceOverviewEvent) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
+	let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+
+	let hash = match editor_state.data {
+		EditorData::ResourceOverview { hash, .. } => hash,
+
+		_ => bail!("Editor {id} is not a resource overview")
+	};
+
 	match event {
-		ResourceOverviewEvent::Initialise { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::Initialise => {
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game_files) = app_state.game_files.load().as_ref()
@@ -787,16 +790,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			finish_task(app, task)?;
 		}
 
-		ResourceOverviewEvent::FollowDependency { id, new_hash } => {
-			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
-
+		ResourceOverviewEvent::FollowDependency { new_hash } => {
 			let hash = match editor_state.data {
 				EditorData::ResourceOverview { ref mut hash, .. } => hash,
 
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
+				_ => bail!("Editor {id} is not a resource overview")
 			};
 
 			*hash = new_hash;
@@ -822,9 +820,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 				send_request(
 					app,
-					Request::Global(GlobalRequest::RenameTab {
-						id,
-						new_name: format!("Resource overview ({new_hash})")
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Rename {
+							new_name: format!("Resource overview ({new_hash})")
+						}
 					})
 				)?;
 			}
@@ -845,29 +845,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::CreateTab {
-					id,
-					name: format!("Resource overview ({hash})"),
-					editor_type: EditorType::ResourceOverview
+				Request::Tab(TabRequest {
+					tab: id,
+					data: TabRequestData::Create {
+						name: format!("Resource overview ({hash})"),
+						editor_type: EditorType::ResourceOverview
+					}
 				})
 			)?;
 		}
 
-		ResourceOverviewEvent::OpenInEditor { id } => {
-			let hash = {
-				let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-				match editor_state.data {
-					EditorData::ResourceOverview { hash, .. } => hash,
-
-					_ => {
-						Err(anyhow!("Editor {} is not a resource overview", id))?;
-						panic!();
-					}
-				}
-				.to_owned()
-			};
-
+		ResourceOverviewEvent::OpenInEditor => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
@@ -875,18 +863,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsFile { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractAsFile => {
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let (metadata, data) = extract_latest_resource(game_files, hash)?;
 
@@ -919,18 +896,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsQN { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractAsQN => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
@@ -956,18 +922,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractTEMPAsRT { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractTEMPAsRT => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
@@ -1011,18 +966,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractTBLUAsFile { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractTBLUAsFile => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
@@ -1060,18 +1004,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractTBLUAsRT { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractTBLUAsRT => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
@@ -1120,18 +1053,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsRTGeneric { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractAsRTGeneric => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
@@ -1168,18 +1090,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsImage { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractAsImage => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{
@@ -1309,18 +1220,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsWav { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractAsWav => {
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1344,18 +1244,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractMultiWav { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractMultiWav => {
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let mut dialog = app.dialog().file().set_title("Extract all WAVs to folder");
 
@@ -1401,18 +1290,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractSpecificMultiWav { id, index } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractSpecificMultiWav { index } => {
 			if let Some(game_files) = app_state.game_files.load().as_ref() {
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1461,18 +1339,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, event: ResourceOver
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsHMLanguages { id } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
-
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { hash, .. } => hash,
-
-				_ => {
-					Err(anyhow!("Editor {} is not a resource overview", id))?;
-					panic!();
-				}
-			};
-
+		ResourceOverviewEvent::ExtractAsHMLanguages => {
 			if let Some(game_files) = app_state.game_files.load().as_ref()
 				&& let Some(install) = app_settings.load().game_install.as_ref()
 			{

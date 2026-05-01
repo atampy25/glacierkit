@@ -2,22 +2,23 @@ use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
+use uuid::Uuid;
 
 use crate::{
 	model::{
-		AppState, EditorData, EditorRequest, EditorState, EntityEditorRequest, EntityMetadataEvent,
-		EntityMetadataRequest, GlobalRequest, Request
+		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EntityEditorRequest, EntityMetadataEvent,
+		EntityMetadataRequest, Request, TabRequest, TabRequestData
 	},
 	send_request
 };
 
 #[try_fn]
 #[context("Couldn't handle entity metadata event")]
-pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {
-		EntityMetadataEvent::Initialise { editor_id } => {
+		EntityMetadataEvent::Initialise => {
 			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -32,27 +33,29 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-					EntityMetadataRequest::Initialise {
-						editor_id: editor_id.to_owned(),
+				Request::Editor(EditorRequest {
+					editor: editor_id.to_owned(),
+					data: EditorRequestData::Entity(EntityEditorRequest::Metadata(EntityMetadataRequest::Initialise {
 						factory: entity.factory.to_owned(),
 						blueprint: entity.blueprint.to_owned(),
 						root_entity: entity.root_entity.to_owned(),
 						sub_type: entity.sub_type.to_owned(),
 						external_scenes: entity.external_scenes.to_owned()
-					}
-				)))
+					}))
+				})
 			)?;
 
 			if let Some(project) = app_state.project.load().as_ref() {
 				send_request(
 					app,
-					Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-						EntityMetadataRequest::UpdateCustomPaths {
-							editor_id: editor_id.to_owned(),
-							custom_paths: project.settings.load().custom_paths.to_owned()
-						}
-					)))
+					Request::Editor(EditorRequest {
+						editor: editor_id.to_owned(),
+						data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
+							EntityMetadataRequest::UpdateCustomPaths {
+								custom_paths: project.settings.load().custom_paths.to_owned()
+							}
+						))
+					})
 				)?;
 			}
 
@@ -60,17 +63,19 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 			// also allow user to modify hash if it's already an entity
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Metadata(
-					EntityMetadataRequest::SetHashModificationAllowed {
-						editor_id,
-						hash_modification_allowed: matches!(editor_state.data, EditorData::QNEntity { .. })
-							|| editor_state.file.is_none()
-					}
-				)))
+				Request::Editor(EditorRequest {
+					editor: editor_id.to_owned(),
+					data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
+						EntityMetadataRequest::SetHashModificationAllowed {
+							hash_modification_allowed: matches!(editor_state.data, EditorData::QNEntity { .. })
+								|| editor_state.file.is_none()
+						}
+					))
+				})
 			)?;
 		}
 
-		EntityMetadataEvent::SetFactory { editor_id, factory } => {
+		EntityMetadataEvent::SetFactory { factory } => {
 			let mut is_patch_editor = false;
 
 			{
@@ -119,14 +124,14 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id,
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		}
 
-		EntityMetadataEvent::SetBlueprint { editor_id, blueprint } => {
+		EntityMetadataEvent::SetBlueprint { blueprint } => {
 			let mut is_patch_editor = false;
 
 			{
@@ -175,14 +180,14 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id,
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		}
 
-		EntityMetadataEvent::SetRootEntity { editor_id, root_entity } => {
+		EntityMetadataEvent::SetRootEntity { root_entity } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -199,14 +204,14 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id,
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		}
 
-		EntityMetadataEvent::SetSubType { editor_id, sub_type } => {
+		EntityMetadataEvent::SetSubType { sub_type } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -223,17 +228,14 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id,
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		}
 
-		EntityMetadataEvent::SetExternalScenes {
-			editor_id,
-			external_scenes
-		} => {
+		EntityMetadataEvent::SetExternalScenes { external_scenes } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -250,9 +252,9 @@ pub async fn handle(app: &AppHandle, event: EntityMetadataEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id,
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		}

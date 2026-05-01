@@ -24,9 +24,9 @@
 			case "initialise":
 				factory = request.data.factory
 				blueprint = request.data.blueprint
-				rootEntity = request.data.root_entity
-				subType = request.data.sub_type
-				externalScenes = request.data.external_scenes
+				rootEntity = request.data.rootEntity
+				subType = request.data.subType
+				externalScenes = request.data.externalScenes
 				break
 
 			case "setFactory":
@@ -38,11 +38,11 @@
 				break
 
 			case "setHashModificationAllowed":
-				hashModificationAllowed = request.data.hash_modification_allowed
+				hashModificationAllowed = request.data.hashModificationAllowed
 				break
 
 			case "updateCustomPaths":
-				customPaths = request.data.custom_paths
+				customPaths = request.data.customPaths
 				break
 
 			default:
@@ -55,13 +55,13 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: editorID,
 				data: {
-					type: "metadata",
+					type: "entity",
 					data: {
-						type: "initialise",
+						type: "metadata",
 						data: {
-							editor_id: editorID
+							type: "initialise"
 						}
 					}
 				}
@@ -75,14 +75,16 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: editorID,
 				data: {
-					type: "metadata",
+					type: "entity",
 					data: {
-						type: "setFactory",
+						type: "metadata",
 						data: {
-							editor_id: editorID,
-							factory: _event.detail
+							type: "setFactory",
+							data: {
+								factory: _event.detail
+							}
 						}
 					}
 				}
@@ -96,14 +98,16 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: editorID,
 				data: {
-					type: "metadata",
+					type: "entity",
 					data: {
-						type: "setBlueprint",
+						type: "metadata",
 						data: {
-							editor_id: editorID,
-							blueprint: _event.detail
+							type: "setBlueprint",
+							data: {
+								blueprint: _event.detail
+							}
 						}
 					}
 				}
@@ -117,14 +121,16 @@
 		await event({
 			type: "editor",
 			data: {
-				type: "entity",
+				editor: editorID,
 				data: {
-					type: "metadata",
+					type: "entity",
 					data: {
-						type: "setRootEntity",
+						type: "metadata",
 						data: {
-							editor_id: editorID,
-							root_entity: _event.detail
+							type: "setRootEntity",
+							data: {
+								rootEntity: _event.detail
+							}
 						}
 					}
 				}
@@ -155,14 +161,16 @@
 				await event({
 					type: "editor",
 					data: {
-						type: "entity",
+						editor: editorID,
 						data: {
-							type: "metadata",
+							type: "entity",
 							data: {
-								type: "setSubType",
+								type: "metadata",
 								data: {
-									editor_id: editorID,
-									sub_type: detail.selectedId
+									type: "setSubType",
+									data: {
+										subType: detail.selectedId
+									}
 								}
 							}
 						}
@@ -179,14 +187,16 @@
 			await event({
 				type: "editor",
 				data: {
-					type: "entity",
+					editor: editorID,
 					data: {
-						type: "metadata",
+						type: "entity",
 						data: {
-							type: "setExternalScenes",
+							type: "metadata",
 							data: {
-								editor_id: editorID,
-								external_scenes: detail
+								type: "setExternalScenes",
+								data: {
+									externalScenes: detail
+								}
 							}
 						}
 					}

@@ -11,6 +11,7 @@
 			"cargo": {
 				"args": ["build", "--manifest-path=./src-tauri/Cargo.toml", "--no-default-features"]
 			},
+			"cwd": "src-tauri",
 			// task for the `beforeDevCommand` if used, must be configured in `.vscode/tasks.json`
 			"preLaunchTask": "ui:dev"
 		},
@@ -21,6 +22,7 @@
 			"cargo": {
 				"args": ["build", "--release", "--manifest-path=./src-tauri/Cargo.toml"]
 			},
+			"cwd": "src-tauri",
 			// task for the `beforeBuildCommand` if used, must be configured in `.vscode/tasks.json`
 			"preLaunchTask": "ui:build"
 		}

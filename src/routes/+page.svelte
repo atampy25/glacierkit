@@ -186,40 +186,49 @@
 
 							case "initialiseDynamics":
 								announcements = request.data.data.dynamics.announcements
-								seenAnnouncements = request.data.data.seen_announcements
+								seenAnnouncements = request.data.data.seenAnnouncements
 								break
 
-							case "createTab":
+							default:
+								request.data satisfies never
+								break
+						}
+						break
+
+					case "tab":
+						switch (request.data.data.type) {
+							case "create":
 								tabs = [
 									...tabs,
 									{
-										id: request.data.data.id,
-										name: request.data.data.name,
+										id: request.data.tab,
+										name: request.data.data.data.name,
 										unsaved: false,
-										editor: getEditor(request.data.data.editor_type)
+										editor: getEditor(request.data.data.data.editorType)
 									}
 								]
 
-								activeTab = request.data.data.id
+								activeTab = request.data.tab
 								break
 
-							case "setTabUnsaved":
-								const id = request.data.data.id
-								tabs.find((a) => a.id === id)!.unsaved = request.data.data.unsaved
+							case "setUnsaved": {
+								const id = request.data.tab
+								tabs.find((a) => a.id === id)!.unsaved = request.data.data.data.unsaved
 								tabs = tabs
 								break
+							}
 
-							case "selectTab":
-								activeTab = request.data.data
+							case "select":
+								activeTab = request.data.tab
 								break
 
-							case "removeTab":
-								const tabId = request.data.data
+							case "remove": {
+								const tabId = request.data.tab
 
 								const tabIndex = tabs.findIndex((a) => a.id === tabId)
 								tabs = tabs.filter((a) => a.id !== tabId)
 
-								if (activeTab === request.data.data) {
+								if (activeTab === tabId) {
 									activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
 								}
 
@@ -231,47 +240,49 @@
 									}
 								})
 								break
+							}
 
-							case "renameTab":
-								const id2 = request.data.data.id
-								tabs.find((a) => a.id === id2)!.name = request.data.data.new_name
+							case "rename": {
+								const id = request.data.tab
+								tabs.find((a) => a.id === id)!.name = request.data.data.data.newName
 								tabs = tabs
 								break
+							}
 
 							default:
-								request.data satisfies never
+								request.data.data satisfies never
 								break
 						}
 						break
 
 					case "editor":
-						switch (request.data.type) {
+						switch (request.data.data.type) {
 							case "text":
-								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
 								break
 
 							case "entity":
-								void tabComponents[request.data.data.data.data.editor_id].handleRequest?.(request.data.data)
+								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
 								break
 
 							case "resourceOverview":
-								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
 								break
 
 							case "repositoryPatch":
-								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
 								break
 
 							case "unlockablesPatch":
-								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
 								break
 
 							case "contentSearchResults":
-								void tabComponents[request.data.data.data.id].handleRequest?.(request.data.data)
+								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
 								break
 
 							default:
-								request.data satisfies never
+								request.data.data satisfies never
 								break
 						}
 						break
@@ -315,7 +326,7 @@
 						okLabel: "Don't Save",
 						cancelLabel: "Cancel",
 						title: "Unsaved changes",
-						type: "warning"
+						kind: "warning"
 					})
 
 					if (!result) {
@@ -528,7 +539,7 @@
 													okLabel: "Don't Save",
 													cancelLabel: "Cancel",
 													title: "Unsaved changes",
-													type: "warning"
+													kind: "warning"
 												})
 
 												if (!result) {
@@ -581,7 +592,7 @@
 														okLabel: "Don't Save",
 														cancelLabel: "Cancel",
 														title: "Unsaved changes",
-														type: "warning"
+														kind: "warning"
 													})
 
 													if (!result) {

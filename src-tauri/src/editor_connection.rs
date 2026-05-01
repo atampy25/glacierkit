@@ -32,8 +32,8 @@ use tryvial::{try_block, try_fn};
 use crate::{
 	Notification, NotificationKind, handle_event,
 	model::{
-		AppState, EditorConnectionEvent, EditorData, EditorRequest, EntityEditorRequest, EntityMonacoRequest,
-		EntityTreeRequest, Event, GlobalRequest, Hash, Request
+		AppState, EditorConnectionEvent, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest,
+		EntityMonacoRequest, EntityTreeRequest, Event, GlobalRequest, Hash, Request
 	},
 	send_notification, send_request
 };
@@ -318,10 +318,10 @@ impl EditorConnection {
 
 						handle_event(
 							&app,
-							Event::EditorConnection(EditorConnectionEvent::EntityTransformUpdated(
-								id.parse().expect("Couldn't parse entity ID"),
-								Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
-								{
+							Event::EditorConnection(EditorConnectionEvent::EntityTransformUpdated {
+								id: id.parse().expect("Couldn't parse entity ID"),
+								tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
+								transform: {
 									let matrix = from_value::<ZVariant>(json!({
 										"$type": transform.property_type,
 										"$val": transform.data
@@ -330,7 +330,7 @@ impl EditorConnection {
 
 									Transform::from_game(matrix.as_ref().expect("Transform was not SMatrix43"), false)
 								}
-							))
+							})
 						);
 					}
 
@@ -341,14 +341,14 @@ impl EditorConnection {
 					} => {
 						handle_event(
 							&app,
-							Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged(
-								id.parse().expect("Couldn't parse entity ID"),
-								Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
-								match property {
+							Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged {
+								id: id.parse().expect("Couldn't parse entity ID"),
+								tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
+								property_name: match property {
 									PropertyID::Unknown(id) => id.to_string(),
 									PropertyID::Known(name) => name
 								},
-								match Variant::from_game(
+								property_value: match Variant::from_game(
 									&from_value::<ZVariant>(json!({
 										"$type": value.property_type,
 										"$val": value.data
@@ -401,7 +401,7 @@ impl EditorConnection {
 										continue;
 									}
 								}
-							))
+							})
 						);
 					}
 
@@ -461,24 +461,24 @@ impl EditorConnection {
 											{
 												send_request(
 													&app,
-													Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-														EntityTreeRequest::SetEditorConnectionAvailable {
-															editor_id: editor.key().to_owned(),
+													Request::Editor(EditorRequest {
+														editor: editor.key().to_owned(),
+														data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SetEditorConnectionAvailable {
 															editor_connection_available: false
-														}
-													)))
+														}))
+													})
 												)?;
 
 												send_request(
 													&app,
-													Request::Editor(EditorRequest::Entity(
-														EntityEditorRequest::Monaco(
+													Request::Editor(EditorRequest {
+														editor: editor.key().to_owned(),
+														data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 															EntityMonacoRequest::SetEditorConnected {
-																editor_id: editor.key().to_owned(),
 																connected: false
 															}
-														)
-													))
+														))
+													})
 												)?;
 											}
 										}
@@ -538,23 +538,23 @@ impl EditorConnection {
 								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
 									send_request(
 										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-											EntityTreeRequest::SetEditorConnectionAvailable {
-												editor_id: editor.key().to_owned(),
+										Request::Editor(EditorRequest {
+											editor: editor.key().to_owned(),
+											data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SetEditorConnectionAvailable {
 												editor_connection_available: false
-											}
-										)))
+											}))
+										})
 									)
 									.expect("Couldn't send data to frontend");
 
 									send_request(
 										&app,
-										Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-											EntityMonacoRequest::SetEditorConnected {
-												editor_id: editor.key().to_owned(),
+										Request::Editor(EditorRequest {
+											editor: editor.key().to_owned(),
+											data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::SetEditorConnected {
 												connected: false
-											}
-										)))
+											}))
+										})
 									)
 									.expect("Couldn't send data to frontend");
 								}
@@ -600,10 +600,10 @@ impl EditorConnection {
 							} => {
 								handle_event(
 									&app,
-									Event::EditorConnection(EditorConnectionEvent::EntitySelected(
-										id.parse().expect("Couldn't parse entity ID"),
-										Hash(tblu.parse().expect("Couldn't parse TBLU hash"))
-									))
+									Event::EditorConnection(EditorConnectionEvent::EntitySelected {
+										id: id.parse().expect("Couldn't parse entity ID"),
+										tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash"))
+									})
 								);
 							}
 
@@ -651,22 +651,24 @@ impl EditorConnection {
 				if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
 					send_request(
 						&self.app,
-						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-							EntityTreeRequest::SetEditorConnectionAvailable {
-								editor_id: editor.key().to_owned(),
-								editor_connection_available: true
-							}
-						)))
+						Request::Editor(EditorRequest {
+							editor: editor.key().to_owned(),
+							data: EditorRequestData::Entity(EntityEditorRequest::Tree(
+								EntityTreeRequest::SetEditorConnectionAvailable {
+									editor_connection_available: true
+								}
+							))
+						})
 					)?;
 
 					send_request(
 						&self.app,
-						Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-							EntityMonacoRequest::SetEditorConnected {
-								editor_id: editor.key().to_owned(),
-								connected: true
-							}
-						)))
+						Request::Editor(EditorRequest {
+							editor: editor.key().to_owned(),
+							data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+								EntityMonacoRequest::SetEditorConnected { connected: true }
+							))
+						})
 					)?;
 				}
 			}

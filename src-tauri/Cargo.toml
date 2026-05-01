@@ -26,7 +26,6 @@ version = "2"
 features = []
 
 [dependencies]
-structstruck = "0.5.1"
 tryvial = "0.2.0"
 anyhow = "1.0.102"
 fn-error-context = "0.2.1"
@@ -78,12 +77,13 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
-specta-typescript = "0.0.9"
+specta-typescript = "0.0.11"
 ordermap = "1.2.0"
 ecow = { version = "0.2.6", features = ["serde"] }
 ww2ogg = "0.1.0"
 schemars = "1.2.1"
 matchers = "0.2.0"
+nesting = "0.1.1"
 
 [dependencies.tokio]
 version = "1.43.0"
@@ -122,11 +122,11 @@ version = "2"
 features = ["protocol-asset", "devtools"]
 
 [dependencies.specta]
-version = "=2.0.0-rc.22"
-features = ["url", "uuid", "export", "indexmap"]
+version = "=2.0.0-rc.24"
+features = ["url", "uuid", "indexmap", "collect"]
 
 [dependencies.tauri-specta]
-version = "=2.0.0-rc.21"
+git = "https://github.com/atampy25/tauri-specta"
 features = ["typescript"]
 
 [dependencies.uuid]

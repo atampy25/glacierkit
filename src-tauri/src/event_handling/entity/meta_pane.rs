@@ -3,38 +3,35 @@ use fn_error_context::context;
 use quickentity_rs::entity::CommentEntity;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
+use uuid::Uuid;
 
 use crate::{
 	model::{
-		AppState, EditorData, EditorRequest, EntityEditorRequest, EntityMetaPaneEvent, EntityTreeRequest,
-		GlobalRequest, Request
+		AppState, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityMetaPaneEvent,
+		EntityTreeRequest, Request, TabRequest, TabRequestData
 	},
 	send_request
 };
 
 #[try_fn]
 #[context("Couldn't handle entity meta pane event")]
-pub async fn handle(app: &AppHandle, event: EntityMetaPaneEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetaPaneEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match event {
-		EntityMetaPaneEvent::JumpToReference { editor_id, reference } => {
+		EntityMetaPaneEvent::JumpToReference { reference } => {
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-					EntityTreeRequest::Select {
-						editor_id,
+				Request::Editor(EditorRequest {
+					editor: editor_id,
+					data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::Select {
 						id: Some(reference)
-					}
-				)))
+					}))
+				})
 			)?;
 		}
 
-		EntityMetaPaneEvent::SetNotes {
-			editor_id,
-			entity_id,
-			notes
-		} => {
+		EntityMetaPaneEvent::SetNotes { entity_id, notes } => {
 			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
 
 			let entity = match editor_state.data {
@@ -59,9 +56,9 @@ pub async fn handle(app: &AppHandle, event: EntityMetaPaneEvent) -> Result<()> {
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id.to_owned(),
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id.to_owned(),
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		}

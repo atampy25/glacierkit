@@ -37,8 +37,9 @@ use crate::{
 	},
 	finish_task, get_loaded_game_version,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorValidity, EntityEditorRequest, EntityGeneralRequest,
-		EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, GlobalRequest, Request
+		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
+		EntityGeneralRequest, EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Request,
+		TabRequest, TabRequestData
 	},
 	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource},
 	send_notification, send_request, start_task
@@ -46,45 +47,37 @@ use crate::{
 
 #[try_fn]
 #[context("Couldn't handle tree event")]
-pub async fn handle(app: &AppHandle, event: EntityTreeEvent) -> Result<()> {
+pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityTreeEvent) -> Result<()> {
 	match event {
-		EntityTreeEvent::Initialise { editor_id } => {
+		EntityTreeEvent::Initialise => {
 			initialise(app, editor_id).await?;
 		}
 
-		EntityTreeEvent::Select { editor_id, id } => {
+		EntityTreeEvent::Select { id } => {
 			select(app, editor_id, id).await?;
 		}
 
-		EntityTreeEvent::Create { editor_id, id, content } => {
-			create(app, editor_id, id, content).await?;
+		EntityTreeEvent::Create { id, content } => {
+			create(app, editor_id, id, *content).await?;
 		}
 
-		EntityTreeEvent::Delete { editor_id, id } => {
+		EntityTreeEvent::Delete { id } => {
 			delete(app, editor_id, id).await?;
 		}
 
-		EntityTreeEvent::Rename {
-			editor_id,
-			id,
-			new_name
-		} => {
+		EntityTreeEvent::Rename { id, new_name } => {
 			rename(app, editor_id, id, new_name).await?;
 		}
 
-		EntityTreeEvent::Reparent {
-			editor_id,
-			id,
-			new_parent
-		} => {
+		EntityTreeEvent::Reparent { id, new_parent } => {
 			reparent(app, editor_id, id, new_parent).await?;
 		}
 
-		EntityTreeEvent::Copy { editor_id, id } => {
+		EntityTreeEvent::Copy { id } => {
 			copy(app, editor_id, id).await?;
 		}
 
-		EntityTreeEvent::Paste { editor_id, parent_id } => {
+		EntityTreeEvent::Paste { parent_id } => {
 			paste(
 				app,
 				editor_id,
@@ -94,51 +87,43 @@ pub async fn handle(app: &AppHandle, event: EntityTreeEvent) -> Result<()> {
 			.await?;
 		}
 
-		EntityTreeEvent::Search { editor_id, query } => {
+		EntityTreeEvent::Search { query } => {
 			search(app, editor_id, query).await?;
 		}
 
-		EntityTreeEvent::ShowHelpMenu { editor_id, entity_id } => {
+		EntityTreeEvent::ShowHelpMenu { entity_id } => {
 			help_menu(app, editor_id, entity_id).await?;
 		}
 
-		EntityTreeEvent::UseTemplate {
-			editor_id,
-			parent_id,
-			template
-		} => {
+		EntityTreeEvent::UseTemplate { parent_id, template } => {
 			paste(app, editor_id, parent_id, template).await?;
 		}
 
-		EntityTreeEvent::AddGameBrowserItem {
-			editor_id,
-			parent_id,
-			file
-		} => {
+		EntityTreeEvent::AddGameBrowserItem { parent_id, file } => {
 			add_game_browser_item(app, editor_id, parent_id, file.0).await?;
 		}
 
-		EntityTreeEvent::SelectEntityInEditor { editor_id, entity_id } => {
+		EntityTreeEvent::SelectEntityInEditor { entity_id } => {
 			select_entity_in_editor(app, editor_id, entity_id).await?;
 		}
 
-		EntityTreeEvent::MoveEntityToPlayer { editor_id, entity_id } => {
+		EntityTreeEvent::MoveEntityToPlayer { entity_id } => {
 			move_entity_to_player(app, editor_id, entity_id).await?;
 		}
 
-		EntityTreeEvent::RotateEntityAsPlayer { editor_id, entity_id } => {
+		EntityTreeEvent::RotateEntityAsPlayer { entity_id } => {
 			rotate_entity_as_player(app, editor_id, entity_id).await?;
 		}
 
-		EntityTreeEvent::MoveEntityToCamera { editor_id, entity_id } => {
+		EntityTreeEvent::MoveEntityToCamera { entity_id } => {
 			move_entity_to_camera(app, editor_id, entity_id).await?;
 		}
 
-		EntityTreeEvent::RotateEntityAsCamera { editor_id, entity_id } => {
+		EntityTreeEvent::RotateEntityAsCamera { entity_id } => {
 			rotate_entity_as_camera(app, editor_id, entity_id).await?;
 		}
 
-		EntityTreeEvent::RestoreToOriginal { editor_id, entity_id } => {
+		EntityTreeEvent::RestoreToOriginal { entity_id } => {
 			restore_to_original(app, editor_id, entity_id).await?;
 		}
 	}
@@ -176,54 +161,54 @@ pub async fn initialise(app: &AppHandle, editor_id: Uuid) -> Result<()> {
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::General(
-			EntityGeneralRequest::SetIsPatchEditor {
-				editor_id: editor_id.to_owned(),
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::General(EntityGeneralRequest::SetIsPatchEditor {
 				is_patch_editor: matches!(editor_state.data, EditorData::QNPatch { .. })
-			}
-		)))
+			}))
+		})
 	)?;
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-			EntityTreeRequest::NewTree {
-				editor_id: editor_id.to_owned(),
-				entities
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewTree { entities }))
+		})
 	)?;
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-			EntityTreeRequest::SetTemplates {
-				editor_id: editor_id.to_owned(),
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SetTemplates {
 				templates: from_slice(include_bytes!("../../../assets/templates.json")).unwrap()
-			}
-		)))
+			}))
+		})
 	)?;
 
 	let editor_connected = app_state.editor_connection.is_connected().await;
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-			EntityTreeRequest::SetEditorConnectionAvailable {
-				editor_id: editor_id.to_owned(),
-				editor_connection_available: editor_connected
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Tree(
+				EntityTreeRequest::SetEditorConnectionAvailable {
+					editor_connection_available: editor_connected
+				}
+			))
+		})
 	)?;
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::SetEditorConnected {
-				editor_id: editor_id.to_owned(),
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::SetEditorConnected {
 				connected: editor_connected
-			}
-		)))
+			}))
+		})
 	)?;
 
 	if let EditorData::QNPatch {
@@ -232,15 +217,13 @@ pub async fn initialise(app: &AppHandle, editor_id: Uuid) -> Result<()> {
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -266,9 +249,9 @@ pub async fn create(app: &AppHandle, editor_id: Uuid, id: EntityID, content: Sub
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id.to_owned(),
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id.to_owned(),
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -278,15 +261,13 @@ pub async fn create(app: &AppHandle, editor_id: Uuid, id: EntityID, content: Sub
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -312,9 +293,9 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -330,13 +311,15 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::ReplaceContentIfSameEntityID {
-				editor_id: editor_id.to_owned(),
-				entity_id: id.to_owned(),
-				content: String::from_utf8(buf)?
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::ReplaceContentIfSameEntityID {
+					entity_id: id.to_owned(),
+					content: String::from_utf8(buf)?
+				}
+			))
+		})
 	)?;
 
 	if let EditorData::QNPatch {
@@ -345,15 +328,13 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -390,23 +371,23 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::ReplaceContent {
-				editor_id: editor_id.to_owned(),
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::ReplaceContent {
 				entity_id: id.to_owned(),
 				content: String::from_utf8(buf)?
-			}
-		)))
+			}))
+		})
 	)?;
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::UpdateValidity {
-				editor_id,
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::UpdateValidity {
 				validity: EditorValidity::Valid
-			}
-		)))
+			}))
+		})
 	)?;
 
 	let reverse_refs = calculate_reverse_references(entity)?
@@ -425,9 +406,9 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
-			EntityMetaPaneRequest::SetReverseRefs {
-				editor_id: editor_id.to_owned(),
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::MetaPane(EntityMetaPaneRequest::SetReverseRefs {
 				entity_names: reverse_refs
 					.iter()
 					.filter(|x| settings.show_reverse_parent_refs || !matches!(x.data, ReverseReferenceData::Parent))
@@ -437,15 +418,15 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					.into_iter()
 					.filter(|x| settings.show_reverse_parent_refs || !matches!(x.data, ReverseReferenceData::Parent))
 					.collect()
-			}
-		)))
+			}))
+		})
 	)?;
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::MetaPane(
-			EntityMetaPaneRequest::SetNotes {
-				editor_id: editor_id.to_owned(),
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::MetaPane(EntityMetaPaneRequest::SetNotes {
 				entity_id: id.to_owned(),
 				notes: entity
 					.comments
@@ -454,8 +435,8 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					.map(|x| x.text.deref())
 					.unwrap_or("")
 					.into()
-			}
-		)))
+			}))
+		})
 	)?;
 
 	finish_task(app, task)?;
@@ -480,15 +461,15 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-				EntityMonacoRequest::UpdateIntellisense {
-					editor_id: editor_id.to_owned(),
+			Request::Editor(EditorRequest {
+				editor: editor_id.to_owned(),
+				data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::UpdateIntellisense {
 					entity_id: id.to_owned(),
 					properties: properties?,
 					input_pins,
 					output_pins
-				}
-			)))
+				}))
+			})
 		)?;
 
 		finish_task(app, task)?;
@@ -508,17 +489,19 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-				EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
-					editor_id: editor_id.to_owned(),
-					entity_id: id.to_owned(),
-					local_ref_entity_ids: decorations
-						.iter()
-						.filter_map(|(x, _)| x.parse::<EntityID>().ok().filter(|x| entity.entities.contains_key(x)))
-						.collect(),
-					decorations
-				}
-			)))
+			Request::Editor(EditorRequest {
+				editor: editor_id.to_owned(),
+				data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+					EntityMonacoRequest::UpdateDecorationsAndMonacoInfo {
+						entity_id: id.to_owned(),
+						local_ref_entity_ids: decorations
+							.iter()
+							.filter_map(|(x, _)| x.parse::<EntityID>().ok().filter(|x| entity.entities.contains_key(x)))
+							.collect(),
+						decorations
+					}
+				))
+			})
 		)?;
 
 		finish_task(app, task)?;
@@ -557,9 +540,9 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -575,13 +558,15 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::ReplaceContentIfSameEntityID {
-				editor_id: editor_id.to_owned(),
-				entity_id: id.to_owned(),
-				content: String::from_utf8(buf)?
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::ReplaceContentIfSameEntityID {
+					entity_id: id.to_owned(),
+					content: String::from_utf8(buf)?
+				}
+			))
+		})
 	)?;
 
 	if let EditorData::QNPatch {
@@ -590,15 +575,13 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -632,7 +615,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 		factory: "[assembly:/dummy]".parse().unwrap(),
 		blueprint: "[assembly:/dummy]".parse().unwrap(),
 		patch: vec![],
-		patch_version: 6
+		patch_version: 7
 	};
 
 	let mut refs_deleted = 0;
@@ -851,20 +834,20 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::DeselectIfSelected {
-				editor_id: editor_id.to_owned(),
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::DeselectIfSelected {
 				entity_ids: entities_to_delete.iter().cloned().collect()
-			}
-		)))
+			}))
+		})
 	)?;
 
 	if let EditorData::QNPatch {
@@ -873,15 +856,13 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -1223,12 +1204,10 @@ pub async fn paste(
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-			EntityTreeRequest::NewItems {
-				editor_id,
-				new_entities
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id,
+			data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems { new_entities }))
+		})
 	)?;
 
 	finish_task(app, task)?;
@@ -1250,9 +1229,9 @@ pub async fn paste(
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -1262,15 +1241,13 @@ pub async fn paste(
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -1296,9 +1273,9 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-			EntityTreeRequest::SearchResults {
-				editor_id,
+		Request::Editor(EditorRequest {
+			editor: editor_id,
+			data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SearchResults {
 				results: entity
 					.entities
 					.par_iter()
@@ -1309,8 +1286,8 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 					})
 					.map(|(id, _)| id.to_owned())
 					.collect()
-			}
-		)))
+			}))
+		})
 	)?;
 
 	finish_task(app, task)?;
@@ -1420,15 +1397,15 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-				EntityTreeRequest::ShowHelpMenu {
-					editor_id,
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::ShowHelpMenu {
 					factory: sub_entity.factory.resource.to_owned(),
 					input_pins: pins.0,
 					output_pins: pins.1,
 					default_properties_json: properties_data_str
-				}
-			)))
+				}))
+			})
 		)?;
 	} else {
 		send_notification(
@@ -1948,9 +1925,9 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-					EntityTreeRequest::NewItems {
-						editor_id: editor_id.to_owned(),
+				Request::Editor(EditorRequest {
+					editor: editor_id.to_owned(),
+					data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems {
 						new_entities: vec![(
 							entity_id.to_owned(),
 							sub_entity.parent.to_owned(),
@@ -1958,17 +1935,17 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							sub_entity.factory.resource.to_owned(),
 							false
 						)]
-					}
-				)))
+					}))
+				})
 			)?;
 
 			entity.entities.insert(entity_id, sub_entity);
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id,
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		} else if file.get_info().context("File not in hash list")?.resource_type == "WWEV" {
@@ -2020,9 +1997,9 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 
 			send_request(
 				app,
-				Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-					EntityTreeRequest::NewItems {
-						editor_id: editor_id.to_owned(),
+				Request::Editor(EditorRequest {
+					editor: editor_id.to_owned(),
+					data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems {
 						new_entities: vec![(
 							entity_id.to_owned(),
 							sub_entity.parent.to_owned(),
@@ -2030,17 +2007,17 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							sub_entity.factory.resource.to_owned(),
 							false
 						)]
-					}
-				)))
+					}))
+				})
 			)?;
 
 			entity.entities.insert(entity_id, sub_entity);
 
 			send_request(
 				app,
-				Request::Global(GlobalRequest::SetTabUnsaved {
-					id: editor_id,
-					unsaved: true
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
 		} else {
@@ -2072,15 +2049,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -2228,9 +2203,9 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -2246,13 +2221,15 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::ReplaceContentIfSameEntityID {
-				editor_id: editor_id.to_owned(),
-				entity_id,
-				content: String::from_utf8(buf)?
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::ReplaceContentIfSameEntityID {
+					entity_id,
+					content: String::from_utf8(buf)?
+				}
+			))
+		})
 	)?;
 
 	finish_task(app, task)?;
@@ -2263,15 +2240,13 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -2392,9 +2367,9 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -2410,13 +2385,15 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::ReplaceContentIfSameEntityID {
-				editor_id: editor_id.to_owned(),
-				entity_id,
-				content: String::from_utf8(buf)?
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::ReplaceContentIfSameEntityID {
+					entity_id,
+					content: String::from_utf8(buf)?
+				}
+			))
+		})
 	)?;
 
 	finish_task(app, task)?;
@@ -2427,15 +2404,13 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -2556,9 +2531,9 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -2574,13 +2549,15 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::ReplaceContentIfSameEntityID {
-				editor_id: editor_id.to_owned(),
-				entity_id,
-				content: String::from_utf8(buf)?
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::ReplaceContentIfSameEntityID {
+					entity_id,
+					content: String::from_utf8(buf)?
+				}
+			))
+		})
 	)?;
 
 	finish_task(app, task)?;
@@ -2591,15 +2568,13 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -2701,9 +2676,9 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -2719,13 +2694,15 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 
 	send_request(
 		app,
-		Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-			EntityMonacoRequest::ReplaceContentIfSameEntityID {
-				editor_id: editor_id.to_owned(),
-				entity_id,
-				content: String::from_utf8(buf)?
-			}
-		)))
+		Request::Editor(EditorRequest {
+			editor: editor_id.to_owned(),
+			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+				EntityMonacoRequest::ReplaceContentIfSameEntityID {
+					entity_id,
+					content: String::from_utf8(buf)?
+				}
+			))
+		})
 	)?;
 
 	finish_task(app, task)?;
@@ -2736,15 +2713,13 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 }
@@ -2801,9 +2776,9 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-				EntityTreeRequest::NewItems {
-					editor_id,
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems {
 					new_entities: vec![(
 						entity_id.to_owned(),
 						sub_entity.parent.to_owned(),
@@ -2811,8 +2786,8 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 						sub_entity.factory.resource.to_owned(),
 						reverse_parent_refs.contains(&entity_id)
 					)]
-				}
-			)))
+				}))
+			})
 		)?;
 
 		let mut buf = Vec::new();
@@ -2823,13 +2798,15 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Monaco(
-				EntityMonacoRequest::ReplaceContentIfSameEntityID {
-					editor_id: editor_id.to_owned(),
-					entity_id: entity_id.to_owned(),
-					content: String::from_utf8(buf)?
-				}
-			)))
+			Request::Editor(EditorRequest {
+				editor: editor_id.to_owned(),
+				data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+					EntityMonacoRequest::ReplaceContentIfSameEntityID {
+						entity_id: entity_id.to_owned(),
+						content: String::from_utf8(buf)?
+					}
+				))
+			})
 		)?;
 
 		if app_state.editor_connection.is_connected().await {
@@ -2902,9 +2879,9 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree(
-				EntityTreeRequest::NewItems {
-					editor_id,
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems {
 					new_entities: vec![(
 						entity_id.to_owned(),
 						sub_entity.parent.to_owned(),
@@ -2912,16 +2889,16 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 						sub_entity.factory.resource.to_owned(),
 						reverse_parent_refs.contains(&entity_id)
 					)]
-				}
-			)))
+				}))
+			})
 		)?;
 	}
 
 	send_request(
 		app,
-		Request::Global(GlobalRequest::SetTabUnsaved {
-			id: editor_id,
-			unsaved: true
+		Request::Tab(TabRequest {
+			tab: editor_id,
+			data: TabRequestData::SetUnsaved { unsaved: true }
 		})
 	)?;
 
@@ -2931,15 +2908,13 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 	{
 		send_request(
 			app,
-			Request::Editor(EditorRequest::Entity(EntityEditorRequest::Tree({
-				let (new, modified, removed) = get_diff_info(base, current);
-				EntityTreeRequest::SetDiffInfo {
-					editor_id,
-					new,
-					modified,
-					removed
-				}
-			})))
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
 		)?;
 	}
 
