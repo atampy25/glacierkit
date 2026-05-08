@@ -125,7 +125,7 @@ features = ["protocol-asset", "devtools"]
 
 [dependencies.specta]
 version = "=2.0.0-rc.24"
-features = ["url", "uuid", "indexmap", "collect"]
+features = ["url", "uuid", "indexmap"]
 
 [dependencies.tauri-specta]
 git = "https://github.com/atampy25/tauri-specta"

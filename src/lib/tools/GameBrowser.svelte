@@ -209,7 +209,7 @@
 							type: "gameBrowser",
 							data: {
 								type: "select",
-								data: selected_node.id
+								data: { resource: selected_node.id }
 							}
 						}
 					})
