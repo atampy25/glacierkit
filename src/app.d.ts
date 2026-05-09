@@ -8,12 +8,6 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
-
-	interface Window {
-		crc: {
-			crc32: (str: string) => number
-		}
-	}
 }
 
 export {}

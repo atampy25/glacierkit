@@ -1512,6 +1512,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"crc@npm:^4.3.2":
+  version: 4.3.2
+  resolution: "crc@npm:4.3.2"
+  peerDependencies:
+    buffer: ">=6.0.3"
+  peerDependenciesMeta:
+    buffer:
+      optional: true
+  checksum: 61b36f9be3ade1bea49bd45a7e59ecbe1c2d75f043425680dcb37ebf753be65517c41bc3d485d63b2016d7c7fa5669854d366775e18fe698c95de27e27c41528
+  languageName: node
+  linkType: hard
+
 "cross-spawn@npm:^7.0.0":
   version: 7.0.3
   resolution: "cross-spawn@npm:7.0.3"
@@ -2826,6 +2838,7 @@ __metadata:
     autoprefixer: "npm:^10.4.16"
     carbon-components-svelte: "npm:^0.82.7"
     carbon-icons-svelte: "npm:^12.4.2"
+    crc: "npm:^4.3.2"
     decimal.js: "npm:^10.4.3"
     env-cmd: "npm:^10.1.0"
     eslint: "npm:^10.3.0"

@@ -4,7 +4,6 @@
 	import "carbon-components-svelte/css/g90.css"
 	import "@fortawesome/fontawesome-free/css/all.min.css"
 	import "@fontsource/fira-code"
-	import "$lib/crc32"
 
 	import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"

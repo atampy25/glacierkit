@@ -65,6 +65,7 @@
 		"autoprefixer": "^10.4.16",
 		"carbon-components-svelte": "^0.82.7",
 		"carbon-icons-svelte": "^12.4.2",
+		"crc": "^4.3.2",
 		"decimal.js": "^10.4.3",
 		"jquery": "^3.7.1",
 		"jstree": "^3.3.16",

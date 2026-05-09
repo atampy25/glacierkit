@@ -5,6 +5,7 @@
 	import { Decimal } from "decimal.js"
 	import { trackEvent } from "$lib/utils"
 	import { help } from "$lib/helpray"
+	import { crc32 } from "crc"
 
 	export async function handleRequest(request: any) {
 		// Text transformer is purely frontend
@@ -57,10 +58,10 @@
 	/>
 	<div class="mt-4">
 		<div class="bx--label">Hex</div>
-		<CodeSnippet code={window.crc.crc32(stringToCalculateLocHash.toUpperCase()).toString(16).toUpperCase()} />
+		<CodeSnippet code={(crc32(stringToCalculateLocHash.toUpperCase()) >>> 0).toString(16).toUpperCase()} />
 		<br />
 		<div class="bx--label">Decimal</div>
-		<CodeSnippet code={window.crc.crc32(stringToCalculateLocHash.toUpperCase()).toString()} />
+		<CodeSnippet code={(crc32(stringToCalculateLocHash.toUpperCase()) >>> 0).toString()} />
 	</div>
 
 	<h4 class="mt-4 mb-2">Hex to decimal</h4>
