@@ -640,11 +640,6 @@
 <div class="h-6 flex items-center gap-4 px-3 bg-neutral-600" use:help={{ title: "Task bar", description: "You can see all currently running background tasks here." }}>
 	{#if tasks.length}
 		{#each tasks as [id, task] (id)}
-</div>
-
-<div class="h-6 flex items-center gap-4 px-3 bg-neutral-600" use:help={{ title: "Task bar", description: "You can see all currently running background tasks here." }}>
-	{#if tasks.length}
-		{#each tasks as [id, task] (id)}
 			<span transition:fade={{ duration: 100 }} animate:flip={{ duration: 250 }}>{task}</span>
 		{/each}
 	{:else}
