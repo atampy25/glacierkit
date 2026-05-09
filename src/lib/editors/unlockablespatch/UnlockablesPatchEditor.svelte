@@ -9,6 +9,8 @@
 	import Add from "carbon-icons-svelte/lib/Add.svelte"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { help } from "$lib/helpray"
+	import { VList } from "virtua/svelte"
+	import { get } from "jquery"
 
 	export let id: string
 
@@ -306,7 +308,7 @@
 					placeholder="Filter..."
 					icon={Filter}
 					size="lg"
-					on:change={searchInput}
+					on:input={searchInput}
 					on:clear={() => {
 						searchQuery = ""
 					}}
@@ -332,152 +334,157 @@
 					}}
 				/>
 			</div>
-			<div class="mt-2 basis-0 flex-grow flex flex-col gap-1 overflow-y-auto">
-				{#each unlockables
-					.filter((a) => searchFilter === "All" || a[1].type === searchFilter)
-					.filter((a) => (searchQuery ? searchQuery.split(" ").every((b) => JSON.stringify(a).toLowerCase().includes(b)) : true))
-					.filter((a) => !modifiedUnlockables.has(a[0])) as [itemId, info] (itemId)}
-					<div
-						class="p-4 bg-neutral-900 flex items-center cursor-pointer break-all mr-2"
-						on:click={async () => {
-							await event({
-								type: "editor",
-								data: {
-									editor: id,
+			<div class="mt-2 basis-0 flex-grow overflow-y-auto">
+				<VList
+					data={unlockables
+						.filter((a) => searchFilter === "All" || a[1].type === searchFilter)
+						.filter((a) => (searchQuery ? searchQuery.split(" ").every((b) => JSON.stringify(a).toLowerCase().includes(b)) : true))
+						.filter((a) => !modifiedUnlockables.has(a[0]))}
+					getKey={(a) => a[0]}
+				>
+					{#snippet children([itemId, info])}
+						<div
+							class="mb-1 p-4 bg-neutral-900 flex items-center cursor-pointer break-all"
+							on:click={async () => {
+								await event({
+									type: "editor",
 									data: {
-										type: "unlockablesPatch",
+										editor: id,
 										data: {
-											type: "selectUnlockable",
-											data: { unlockable: itemId }
+											type: "unlockablesPatch",
+											data: {
+												type: "selectUnlockable",
+												data: { unlockable: itemId }
+											}
 										}
 									}
-								}
-							})
-						}}
-					>
-						{#if info.type === "Access"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-regular fa-star" /> Access
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+								})
+							}}
+						>
+							{#if info.type === "Access"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-regular fa-star" /> Access
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "EvergreenMastery"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-regular fa-star" /> Evergreen Mastery
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "EvergreenMastery"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-regular fa-star" /> Evergreen Mastery
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "AgencyPickup"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-box-open" /> Agency Pickup
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "AgencyPickup"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-box-open" /> Agency Pickup
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "Disguise"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-shirt" /> Disguise
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "Disguise"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-shirt" /> Disguise
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "Gear"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-wrench" /> Gear
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "Gear"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-wrench" /> Gear
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "Weapon"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-gun" /> Weapon
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "Weapon"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-gun" /> Weapon
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "Location"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-location-dot" /> Location
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "Location"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-location-dot" /> Location
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "LoadoutUnlock"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-shapes" /> Loadout Unlock
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "LoadoutUnlock"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-shapes" /> Loadout Unlock
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else if info.type === "Package"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-box" /> Package
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else if info.type === "Package"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-box" /> Package
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{:else}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-regular fa-circle-question" /> Unknown
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.id || "No ID"}
+							{:else}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-regular fa-circle-question" /> Unknown
 								</div>
-								<div class="text-neutral-300">
-									{itemId}
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.id || "No ID"}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
 								</div>
-							</div>
-						{/if}
-					</div>
-				{/each}
+							{/if}
+						</div>
+					{/snippet}
+				</VList>
 			</div>
 		</div>
 	</div>

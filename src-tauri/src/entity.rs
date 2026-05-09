@@ -805,7 +805,7 @@ pub fn get_decorations(
 		decorations.extend(
 			String::from_utf8(mate_data[beginning..mate_data.len() - 1].into())?
 				.split('\x00')
-				.filter(|x| !x.is_empty() && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
+				.filter(|x| x.trim().len() > 2 && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
 				.map(|x| x.trim().to_owned())
 				.tuples()
 				.map(|(prop, friendly)| {

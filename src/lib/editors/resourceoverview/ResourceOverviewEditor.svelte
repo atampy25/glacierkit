@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ReferenceFlags, ResourceChangelogEntry, ResourceOverviewData, ResourceOverviewRequest } from "$lib/bindings"
 	import { event } from "$lib/utils"
-	import { Button, ClickableTile, ContentSwitcher, DataTable, Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tile } from "carbon-components-svelte"
+	import { Button, ClickableTile, ContentSwitcher, DataTable, Search, Switch, Tab, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, Tile } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
@@ -13,22 +13,23 @@
 	import { help } from "$lib/helpray"
 	import MeshPreview from "$lib/components/MeshPreview.svelte"
 	import { Pane, Splitpanes } from "svelte-splitpanes"
-	import { ColumnDependency, SoftwareResource, TrashCan } from "carbon-icons-svelte"
+	import { ColumnDependency, Filter, SoftwareResource, TrashCan } from "carbon-icons-svelte"
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
+	import { VList } from "virtua/svelte"
 
-	export let id: string
+	let { id }: { id: string } = $props()
 
-	let hash = ""
-	let filetype = ""
-	let partition = ""
-	let pathOrHint: string | null = null
-	let dependencies: [string, string, string | null, ReferenceFlags, boolean][] = []
-	let reverseDependencies: [string, string, string | null][] = []
-	let changelog: ResourceChangelogEntry[] = []
-	let data: ResourceOverviewData | null = null
+	let hash = $state("")
+	let filetype = $state("")
+	let partition = $state("")
+	let pathOrHint: string | null = $state(null)
+	let dependencies: [string, string, string | null, ReferenceFlags, boolean][] = $state([])
+	let reverseDependencies: [string, string, string | null][] = $state([])
+	let changelog: ResourceChangelogEntry[] = $state([])
+	let data: ResourceOverviewData | null = $state(null)
 
-	let previewImage: HTMLImageElement | null = null
-	let referenceTab = 0
+	let previewImage: HTMLImageElement | null = $state(null)
+	let referenceTab = $state(0)
 
 	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
 
@@ -68,6 +69,8 @@
 			// 	break
 		}
 	}
+
+	let refSearch = $state("")
 </script>
 
 <div
@@ -745,93 +748,94 @@
 					</div>
 				</Pane>
 				<Pane size={45} class="h-full flex flex-col">
-					<ContentSwitcher class="h-10 pb-2" bind:selectedIndex={referenceTab}>
-						<Switch>
+					<Tabs autoWidth class="mb-2" bind:selected={referenceTab}>
+						<Tab>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0" />
-								<div class="truncate">References</div>
+								<div>References</div>
 							</div>
-						</Switch>
-						<Switch>
+						</Tab>
+						<Tab>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0 -scale-x-100" />
-								<div class="truncate">Reverse references</div>
+								<div>Reverse references</div>
 							</div>
-						</Switch>
-					</ContentSwitcher>
+						</Tab>
+					</Tabs>
+					<div class="mb-2 pr-2">
+						<Search placeholder="Filter..." icon={Filter} size="lg" bind:value={refSearch} />
+					</div>
 					{#if referenceTab == 0}
 						<div
-							class="h-full overflow-y-auto pr-2 flex flex-col gap-2"
+							class="h-full overflow-y-auto pr-2"
 							use:help={{ title: "References", description: "Other resources that this resource depends on, listed in the order stored in the game files." }}
 						>
-							{#each dependencies as [hash, type, path, flags, inGame]}
-								{#if type}
-									<ClickableTile
-										style="min-height: unset"
-										on:click={async (e) => {
-											trackEvent(`Follow reference ${e.ctrlKey ? "in new tab " : "from resource overview"}`)
+							<VList data={dependencies.filter((a) => `${a[0]}.${a[1]}|${a[2]}`.toLowerCase().includes(refSearch.toLowerCase()))} getKey={(a) => a[0]}>
+								{#snippet children([hash, type, path, flags, inGame])}
+									{#if inGame}
+										<ClickableTile
+											style="min-height: unset"
+											class="mb-2"
+											on:click={async (e) => {
+												trackEvent(`Follow reference ${e.ctrlKey ? "in new tab " : "from resource overview"}`)
 
-											await event({
-												type: "editor",
-												data: {
-													editor: id,
+												await event({
+													type: "editor",
 													data: {
-														type: "resourceOverview",
-														data: !e.ctrlKey
-															? {
-																	type: "followDependency",
-																	data: {
-																		newHash: hash
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: !e.ctrlKey
+																? {
+																		type: "followDependency",
+																		data: {
+																			newHash: hash
+																		}
 																	}
-																}
-															: {
-																	type: "followDependencyInNewTab",
-																	data: {
-																		hash
+																: {
+																		type: "followDependencyInNewTab",
+																		data: {
+																			hash
+																		}
 																	}
-																}
+														}
 													}
-												}
-											})
-										}}
-									>
-										<div class="text-base -mt-1"
-											><span class="font-bold">{hash}.{type}</span>
-											{flags.type ? flags.type[0].toUpperCase() + flags.type.slice(1) : "Install"}{flags.acquired ? ", acquired" : ""}{flags.languageCode
-												? `, language ${flags.languageCode}`
-												: ""}</div
+												})
+											}}
 										>
-										<div class="break-all">{path || "No path"}</div>
-										{#if !inGame}
-											<div class="text-base">Not present in game files</div>
-										{/if}
-									</ClickableTile>
-								{:else}
-									<div class="bg-[#303030] p-3">
-										<div class="text-base -mt-1"
-											><span class="font-bold">{hash}</span>
-											{flags.type ? flags.type[0].toUpperCase() + flags.type.slice(1) : "Install"}{flags.acquired ? ", acquired" : ""}{flags.languageCode
-												? `, language ${flags.languageCode}`
-												: ""}</div
-										>
-										<div class="break-all">Unknown resource</div>
-										{#if !inGame}
-											<div class="text-base">Not present in game files</div>
-										{/if}
-									</div>
-								{/if}
-							{/each}
+											<div class="text-base -mt-1"
+												><span class="font-bold">{hash}.{type}</span>
+												{flags.type ? flags.type[0].toUpperCase() + flags.type.slice(1) : "Install"}{flags.acquired ? ", acquired" : ""}{flags.languageCode
+													? `, language ${flags.languageCode}`
+													: ""}</div
+											>
+											<div class="break-all">{path || "No path"}</div>
+										</ClickableTile>
+									{:else}
+										<div class="bg-[#303030] p-3 mb-2">
+											<div class="text-base -mt-1"
+												><span class="font-bold">{hash}</span>
+												{flags.type ? flags.type[0].toUpperCase() + flags.type.slice(1) : "Install"}{flags.acquired ? ", acquired" : ""}{flags.languageCode
+													? `, language ${flags.languageCode}`
+													: ""}</div
+											>
+											<div class="break-all">Unknown resource</div>
+											{#if !inGame}
+												<div class="text-base">Not present in game files</div>
+											{/if}
+										</div>
+									{/if}
+								{/snippet}
+							</VList>
 						</div>
 					{/if}
 					{#if referenceTab == 1}
-						<div
-							class="h-full overflow-y-auto pr-2 flex flex-col gap-2"
-							use:help={{ title: "Reverse references", description: "Other resources that depend upon this resource, sorted alphabetically." }}
-						>
-							{#each reverseDependencies as [hash, type, path]}
-								{#if type}
+						<div class="h-full overflow-y-auto pr-2" use:help={{ title: "Reverse references", description: "Other resources that depend upon this resource, sorted alphabetically." }}>
+							<VList data={reverseDependencies.filter((a) => `${a[0]}.${a[1]}|${a[2]}`.toLowerCase().includes(refSearch.toLowerCase()))}>
+								{#snippet children([hash, type, path])}
 									<ClickableTile
 										style="min-height: unset"
+										class="mb-2"
 										on:click={async (e) => {
 											trackEvent(`Follow reverse reference ${e.ctrlKey ? "in new tab " : "from resource overview"}`)
 
@@ -864,13 +868,8 @@
 										>
 										<div class="break-all">{path || "No path"}</div>
 									</ClickableTile>
-								{:else}
-									<div class="bg-[#303030] p-3">
-										<div class="font-bold text-base -mt-1">{hash}</div>
-										<div class="break-all">Unknown resource</div>
-									</div>
-								{/if}
-							{/each}
+								{/snippet}
+							</VList>
 						</div>
 					{/if}
 				</Pane>

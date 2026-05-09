@@ -9,7 +9,7 @@
 	import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
 	import { listen } from "@tauri-apps/api/event"
-	import { beforeUpdate, onDestroy } from "svelte"
+	import { onDestroy } from "svelte"
 	import { flip } from "svelte/animate"
 	import { fade, fly } from "svelte/transition"
 	import type { Property, Request } from "$lib/bindings"
@@ -27,8 +27,10 @@
 	import { relaunch } from "@tauri-apps/plugin-process"
 	import { event } from "$lib/utils"
 
-	let tasks: [string, string][] = []
-	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = []
+	let { children } = $props()
+
+	let tasks: [string, string][] = $state([])
+	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = $state([])
 
 	let destroyFunc = { run: () => {} }
 	onDestroy(() => {
@@ -47,174 +49,295 @@
 
 	let hasListened = false
 
-	beforeUpdate(async () => {
+	$effect.pre(() => {
 		if (!hasListened) {
 			hasListened = true
+			;(async () => {
+				const detachConsole = await attachConsole()
 
-			const detachConsole = await attachConsole()
+				const unlistenStartTask = await listen("start-task", ({ payload: task }: { payload: [string, string] }) => {
+					tasks = [...tasks, task]
+				})
 
-			const unlistenStartTask = await listen("start-task", ({ payload: task }: { payload: [string, string] }) => {
-				tasks = [...tasks, task]
-			})
+				const unlistenFinishTask = await listen("finish-task", ({ payload: task }: { payload: string }) => {
+					tasks = tasks.filter((a) => a[0] !== task)
+				})
 
-			const unlistenFinishTask = await listen("finish-task", ({ payload: task }: { payload: string }) => {
-				tasks = tasks.filter((a) => a[0] !== task)
-			})
+				const unlistedNotification = await listen("send-notification", ({ payload: notification }: { payload: (typeof notifications)[number] }) => {
+					notifications = [...notifications, notification]
+					setTimeout(() => {
+						notifications = notifications.filter((a) => a[0] !== notification[0])
+					}, 6000)
+				})
 
-			const unlistedNotification = await listen("send-notification", ({ payload: notification }: { payload: (typeof notifications)[number] }) => {
-				notifications = [...notifications, notification]
-				setTimeout(() => {
-					notifications = notifications.filter((a) => a[0] !== notification[0])
-				}, 6000)
-			})
+				const unlistenRequest = await listen("request", ({ payload: request }: { payload: Request }) => {
+					if (request.type === "global") {
+						if (request.data.type === "setWindowTitle") {
+							console.log("Layout handling request", request)
 
-			const unlistenRequest = await listen("request", ({ payload: request }: { payload: Request }) => {
-				if (request.type === "global") {
-					if (request.data.type === "setWindowTitle") {
-						console.log("Layout handling request", request)
+							getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
+							windowTitle = request.data.data.title
+						}
 
-						getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
-						windowTitle = request.data.data.title
+						if (request.data.type === "errorReport") {
+							console.log("Layout handling request", request)
+
+							void trackEvent("Error", { error: request.data.data.error })
+
+							errorModalError = request.data.data.error
+							errorModalOpen = true
+							tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
+						}
+
+						// Because rfc6902 is the only patch creation library which properly handles arrays
+						if (request.data.type === "computeJSONPatchAndSave") {
+							console.log("Layout handling request", request)
+
+							const patch = createPatch(request.data.data.base, request.data.data.current)
+
+							void writeTextFile(
+								request.data.data.savePath,
+								JSON.stringify({
+									file: request.data.data.fileAndType[0],
+									type: request.data.data.fileAndType[1],
+									patch
+								})
+							)
+						}
+
+						if (request.data.type === "requestLastPanicUpload") {
+							console.log("Layout handling request", request)
+
+							lastPanicModalOpen = true
+						}
+
+						if (request.data.type === "logUploadRejected") {
+							console.log("Layout handling request", request)
+
+							logUploadRejectedModalOpen = true
+						}
+
+						if (request.data.type === "setEnums") {
+							console.log("Layout handling request", request)
+
+							Object.assign(enums, request.data.data.enums)
+						}
 					}
+				})
 
-					if (request.data.type === "errorReport") {
-						console.log("Layout handling request", request)
+				destroyFunc.run = () => {
+					unlistenStartTask()
+					unlistenFinishTask()
+					unlistedNotification()
+					unlistenRequest()
+					detachConsole()
+				}
 
-						void trackEvent("Error", { error: request.data.data.error })
+				getCurrentWebviewWindow().show()
 
-						errorModalError = request.data.data.error
-						errorModalOpen = true
-						tasks = [...tasks.filter((a) => a[0] !== "error"), ["error", "App unstable, please backup current files on disk, save work and restart"]]
-					}
-
-					// Because rfc6902 is the only patch creation library which properly handles arrays
-					if (request.data.type === "computeJSONPatchAndSave") {
-						console.log("Layout handling request", request)
-
-						const patch = createPatch(request.data.data.base, request.data.data.current)
-
-						void writeTextFile(
-							request.data.data.savePath,
-							JSON.stringify({
-								file: request.data.data.fileAndType[0],
-								type: request.data.data.fileAndType[1],
-								patch
-							})
-						)
-					}
-
-					if (request.data.type === "requestLastPanicUpload") {
-						console.log("Layout handling request", request)
-
-						lastPanicModalOpen = true
-					}
-
-					if (request.data.type === "logUploadRejected") {
-						console.log("Layout handling request", request)
-
-						logUploadRejectedModalOpen = true
-					}
-
-					if (request.data.type === "setEnums") {
-						console.log("Layout handling request", request)
-
-						Object.assign(enums, request.data.data.enums)
+				self.MonacoEnvironment = {
+					getWorker: function (_moduleId: any, label: string) {
+						if (label === "json") {
+							return new jsonWorker()
+						} else {
+							return new editorWorker()
+						}
 					}
 				}
-			})
 
-			destroyFunc.run = () => {
-				unlistenStartTask()
-				unlistenFinishTask()
-				unlistedNotification()
-				unlistenRequest()
-				detachConsole()
-			}
+				monaco.editor.defineTheme("theme", {
+					base: "vs-dark",
+					inherit: true,
+					rules: [{ token: "keyword.json", foreground: "b5cea8" }],
+					colors: {}
+				})
 
-			getCurrentWebviewWindow().show()
+				let manifestSchema = {}
 
-			self.MonacoEnvironment = {
-				getWorker: function (_moduleId: any, label: string) {
-					if (label === "json") {
-						return new jsonWorker()
-					} else {
-						return new editorWorker()
-					}
+				try {
+					manifestSchema = await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
+				} catch (e) {
+					info(`Couldn't get manifest schema: ${String(e)}, ${e.stack}`)
 				}
-			}
 
-			monaco.editor.defineTheme("theme", {
-				base: "vs-dark",
-				inherit: true,
-				rules: [{ token: "keyword.json", foreground: "b5cea8" }],
-				colors: {}
-			})
-
-			let manifestSchema = {}
-
-			try {
-				manifestSchema = await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
-			} catch (e) {
-				info(`Couldn't get manifest schema: ${String(e)}, ${e.stack}`)
-			}
-
-			monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-				validate: true,
-				enableSchemaRequest: true,
-				schemas: [
-					{
-						uri: "monaco-schema://manifest",
-						fileMatch: ["*manifest*"],
-						schema: manifestSchema
-					},
-					{
-						uri: "monaco-schema://qn-subentity",
-						fileMatch: ["*subentity*"],
-						schema: {}
-					}
-				]
-			})
-
-			monaco.languages.registerColorProvider("json", {
-				provideColorPresentations: (model, colorInfo) => {
-					const color = colorInfo.color
-
-					const r = Math.round(color.red * 255)
-						.toString(16)
-						.padStart(2, "0")
-
-					const g = Math.round(color.green * 255)
-						.toString(16)
-						.padStart(2, "0")
-
-					const b = Math.round(color.blue * 255)
-						.toString(16)
-						.padStart(2, "0")
-
-					const a = Math.round(color.alpha * 255)
-						.toString(16)
-						.padStart(2, "0")
-
-					// startLineNumber is 1-indexed so this gets the line just before the line with the colour value
-					const includeAlpha = model.getLinesContent()[colorInfo.range.startLineNumber - 2].includes("SColorRGBA")
-
-					return [
+				monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+					validate: true,
+					enableSchemaRequest: true,
+					schemas: [
 						{
-							label: `#${r}${g}${b}${includeAlpha ? a : ""}`
+							uri: "monaco-schema://manifest",
+							fileMatch: ["*manifest*"],
+							schema: manifestSchema
+						},
+						{
+							uri: "monaco-schema://qn-subentity",
+							fileMatch: ["*subentity*"],
+							schema: {}
 						}
 					]
-				},
+				})
 
-				provideDocumentColors: (model) => {
-					try {
-						const data = JSON.parse(model.getValue())
+				monaco.languages.registerColorProvider("json", {
+					provideColorPresentations: (model, colorInfo) => {
+						const color = colorInfo.color
 
-						const colours: monaco.languages.IColorInformation[] = []
+						const r = Math.round(color.red * 255)
+							.toString(16)
+							.padStart(2, "0")
 
-						if (Array.isArray(data)) {
-							for (const item of data) {
-								if (item.properties) {
-									for (const propertyData of Object.values(item.properties) as Property[]) {
+						const g = Math.round(color.green * 255)
+							.toString(16)
+							.padStart(2, "0")
+
+						const b = Math.round(color.blue * 255)
+							.toString(16)
+							.padStart(2, "0")
+
+						const a = Math.round(color.alpha * 255)
+							.toString(16)
+							.padStart(2, "0")
+
+						// startLineNumber is 1-indexed so this gets the line just before the line with the colour value
+						const includeAlpha = model.getLinesContent()[colorInfo.range.startLineNumber - 2].includes("SColorRGBA")
+
+						return [
+							{
+								label: `#${r}${g}${b}${includeAlpha ? a : ""}`
+							}
+						]
+					},
+
+					provideDocumentColors: (model) => {
+						try {
+							const data = JSON.parse(model.getValue())
+
+							const colours: monaco.languages.IColorInformation[] = []
+
+							if (Array.isArray(data)) {
+								for (const item of data) {
+									if (item.properties) {
+										for (const propertyData of Object.values(item.properties) as Property[]) {
+											if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
+												const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+												const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+												const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+
+												for (const [lineNo, line] of model.getLinesContent().entries()) {
+													const char = line.indexOf(propertyData.value)
+
+													if (char !== -1) {
+														colours.push({
+															color: {
+																red: r / 255,
+																green: g / 255,
+																blue: b / 255,
+																alpha: 1
+															},
+															range: {
+																startLineNumber: lineNo + 1,
+																endLineNumber: lineNo + 1,
+																startColumn: char + 1,
+																endColumn: char + 1 + 7
+															}
+														})
+													}
+												}
+											}
+
+											if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
+												const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+												const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+												const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+												const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
+
+												for (const [lineNo, line] of model.getLinesContent().entries()) {
+													const char = line.indexOf(propertyData.value)
+
+													if (char !== -1) {
+														colours.push({
+															color: {
+																red: r / 255,
+																green: g / 255,
+																blue: b / 255,
+																alpha: a / 255
+															},
+															range: {
+																startLineNumber: lineNo + 1,
+																endLineNumber: lineNo + 1,
+																startColumn: char + 1,
+																endColumn: char + 1 + 9
+															}
+														})
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+
+							if (data.properties) {
+								for (const propertyData of Object.values(data.properties) as Property[]) {
+									if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
+										const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+										const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+										const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+
+										for (const [lineNo, line] of model.getLinesContent().entries()) {
+											const char = line.indexOf(propertyData.value)
+
+											if (char !== -1) {
+												colours.push({
+													color: {
+														red: r / 255,
+														green: g / 255,
+														blue: b / 255,
+														alpha: 1
+													},
+													range: {
+														startLineNumber: lineNo + 1,
+														endLineNumber: lineNo + 1,
+														startColumn: char + 1,
+														endColumn: char + 1 + 7
+													}
+												})
+											}
+										}
+									}
+
+									if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
+										const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
+										const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
+										const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+										const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
+
+										for (const [lineNo, line] of model.getLinesContent().entries()) {
+											const char = line.indexOf(propertyData.value)
+
+											if (char !== -1) {
+												colours.push({
+													color: {
+														red: r / 255,
+														green: g / 255,
+														blue: b / 255,
+														alpha: a / 255
+													},
+													range: {
+														startLineNumber: lineNo + 1,
+														endLineNumber: lineNo + 1,
+														startColumn: char + 1,
+														endColumn: char + 1 + 9
+													}
+												})
+											}
+										}
+									}
+								}
+							}
+
+							if (data.platformSpecificProperties) {
+								for (const platformData of Object.values(data.platformSpecificProperties) as Record<string, Property>[]) {
+									for (const propertyData of Object.values(platformData)) {
 										if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
 											const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
 											const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
@@ -272,199 +395,80 @@
 									}
 								}
 							}
-						}
 
-						if (data.properties) {
-							for (const propertyData of Object.values(data.properties) as Property[]) {
-								if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
-									const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
-									const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
-									const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
+							const uniqueColours: monaco.languages.IColorInformation[] = []
 
-									for (const [lineNo, line] of model.getLinesContent().entries()) {
-										const char = line.indexOf(propertyData.value)
-
-										if (char !== -1) {
-											colours.push({
-												color: {
-													red: r / 255,
-													green: g / 255,
-													blue: b / 255,
-													alpha: 1
-												},
-												range: {
-													startLineNumber: lineNo + 1,
-													endLineNumber: lineNo + 1,
-													startColumn: char + 1,
-													endColumn: char + 1 + 7
-												}
-											})
-										}
-									}
-								}
-
-								if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
-									const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
-									const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
-									const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
-									const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
-
-									for (const [lineNo, line] of model.getLinesContent().entries()) {
-										const char = line.indexOf(propertyData.value)
-
-										if (char !== -1) {
-											colours.push({
-												color: {
-													red: r / 255,
-													green: g / 255,
-													blue: b / 255,
-													alpha: a / 255
-												},
-												range: {
-													startLineNumber: lineNo + 1,
-													endLineNumber: lineNo + 1,
-													startColumn: char + 1,
-													endColumn: char + 1 + 9
-												}
-											})
-										}
-									}
+							for (const colour of colours) {
+								if (
+									!uniqueColours.some(
+										(a) =>
+											a.range.startColumn === colour.range.startColumn && a.range.endColumn === colour.range.endColumn && a.range.startLineNumber === colour.range.startLineNumber
+									)
+								) {
+									uniqueColours.push(colour)
 								}
 							}
+
+							return uniqueColours
+						} catch {
+							return []
 						}
-
-						if (data.platformSpecificProperties) {
-							for (const platformData of Object.values(data.platformSpecificProperties) as Record<string, Property>[]) {
-								for (const propertyData of Object.values(platformData)) {
-									if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
-										const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
-										const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
-										const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
-
-										for (const [lineNo, line] of model.getLinesContent().entries()) {
-											const char = line.indexOf(propertyData.value)
-
-											if (char !== -1) {
-												colours.push({
-													color: {
-														red: r / 255,
-														green: g / 255,
-														blue: b / 255,
-														alpha: 1
-													},
-													range: {
-														startLineNumber: lineNo + 1,
-														endLineNumber: lineNo + 1,
-														startColumn: char + 1,
-														endColumn: char + 1 + 7
-													}
-												})
-											}
-										}
-									}
-
-									if (propertyData.type === "SColorRGBA" && typeof propertyData.value === "string" && propertyData.value.length === 9) {
-										const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
-										const g = parseInt(propertyData.value.slice(1).slice(2, 4), 16)
-										const b = parseInt(propertyData.value.slice(1).slice(4, 6), 16)
-										const a = parseInt(propertyData.value.slice(1).slice(6, 8), 16)
-
-										for (const [lineNo, line] of model.getLinesContent().entries()) {
-											const char = line.indexOf(propertyData.value)
-
-											if (char !== -1) {
-												colours.push({
-													color: {
-														red: r / 255,
-														green: g / 255,
-														blue: b / 255,
-														alpha: a / 255
-													},
-													range: {
-														startLineNumber: lineNo + 1,
-														endLineNumber: lineNo + 1,
-														startColumn: char + 1,
-														endColumn: char + 1 + 9
-													}
-												})
-											}
-										}
-									}
-								}
-							}
-						}
-
-						const uniqueColours: monaco.languages.IColorInformation[] = []
-
-						for (const colour of colours) {
-							if (
-								!uniqueColours.some(
-									(a) => a.range.startColumn === colour.range.startColumn && a.range.endColumn === colour.range.endColumn && a.range.startLineNumber === colour.range.startLineNumber
-								)
-							) {
-								uniqueColours.push(colour)
-							}
-						}
-
-						return uniqueColours
-					} catch {
-						return []
 					}
+				})
+
+				try {
+					updateManifest = await check()
+
+					if (updateManifest) {
+						const currentVersion = await getVersion()
+
+						const commits = await (
+							await fetch("https://api.github.com/repos/atampy25/glacierkit/commits", {
+								headers: {
+									Accept: "application/vnd.github.v3+json"
+								}
+							})
+						).json()
+
+						commits.reverse()
+
+						const prevVersionCommit = await (
+							await fetch(`https://api.github.com/repos/atampy25/glacierkit/commits/${currentVersion}`, {
+								headers: {
+									Accept: "application/vnd.github.v3+json"
+								}
+							})
+						).json()
+
+						// Exclude last version commit and its post-update commit
+						commitsSinceLastVersion = commits
+							.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2)
+							.map((a: { commit: { message: string } }) => a.commit.message)
+							.filter((a: string) => a !== "Post-update")
+
+						updateModalOpen = true
+					}
+				} catch (e) {
+					info(`Ignoring error in update checking: ${String(e)}, ${e.stack}`)
 				}
-			})
-
-			try {
-				updateManifest = await check()
-
-				if (updateManifest) {
-					const currentVersion = await getVersion()
-
-					const commits = await (
-						await fetch("https://api.github.com/repos/atampy25/glacierkit/commits", {
-							headers: {
-								Accept: "application/vnd.github.v3+json"
-							}
-						})
-					).json()
-
-					commits.reverse()
-
-					const prevVersionCommit = await (
-						await fetch(`https://api.github.com/repos/atampy25/glacierkit/commits/${currentVersion}`, {
-							headers: {
-								Accept: "application/vnd.github.v3+json"
-							}
-						})
-					).json()
-
-					// Exclude last version commit and its post-update commit
-					commitsSinceLastVersion = commits
-						.slice(commits.findIndex((a: { sha: string }) => a.sha === prevVersionCommit.sha) + 2)
-						.map((a: { commit: { message: string } }) => a.commit.message)
-						.filter((a: string) => a !== "Post-update")
-
-					updateModalOpen = true
-				}
-			} catch (e) {
-				info(`Ignoring error in update checking: ${String(e)}, ${e.stack}`)
-			}
+			})()
 		}
 	})
 
-	let windowTitle = ""
+	let windowTitle = $state("")
 
-	let errorModalOpen = false
-	let errorModalError = ""
+	let errorModalOpen = $state(false)
+	let errorModalError = $state("")
 
-	let helpRayActive = false
+	let helpRayActive = $state(false)
 
-	let updateModalOpen = false
-	let updateManifest: Update | null = null
-	let commitsSinceLastVersion: string[] = []
+	let updateModalOpen = $state(false)
+	let updateManifest: Update | null = $state(null)
+	let commitsSinceLastVersion: string[] = $state([])
 
-	let lastPanicModalOpen = false
+	let lastPanicModalOpen = $state(false)
 
-	let logUploadRejectedModalOpen = false
+	let logUploadRejectedModalOpen = $state(false)
 </script>
 
 <ComposedModal
@@ -584,7 +588,7 @@
 	<div data-tauri-drag-region class="flex flex-row items-center justify-end text-white">
 		<div
 			class="h-full p-3.5 hover:bg-neutral-700 active:bg-neutral-600"
-			on:click={() => {
+			onclick={() => {
 				helpRayActive = !helpRayActive
 				if (helpRayActive) {
 					trackEvent("Activate help ray")
@@ -601,7 +605,7 @@
 		</div>
 		<div
 			class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600"
-			on:click={() => getCurrentWebviewWindow().minimize()}
+			onclick={() => getCurrentWebviewWindow().minimize()}
 			use:help={{ title: "Minimise", description: "Minimise the application." }}
 		>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -610,7 +614,7 @@
 		</div>
 		<div
 			class="h-full p-4 hover:bg-neutral-700 active:bg-neutral-600"
-			on:click={() => getCurrentWebviewWindow().toggleMaximize()}
+			onclick={() => getCurrentWebviewWindow().toggleMaximize()}
 			use:help={{ title: "Maximise", description: "Maximise the application." }}
 		>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -621,7 +625,7 @@
 				/>
 			</svg>
 		</div>
-		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" on:click={() => getCurrentWebviewWindow().close()} use:help={{ title: "Close", description: "Close the application." }}>
+		<div class="h-full p-4 hover:bg-red-600 active:bg-red-700" onclick={() => getCurrentWebviewWindow().close()} use:help={{ title: "Close", description: "Close the application." }}>
 			<svg fill="none" stroke="currentColor" width="16px" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 			</svg>
@@ -630,7 +634,12 @@
 </header>
 
 <div class="w-full h-mid">
-	<slot />
+	{@render children()}
+</div>
+
+<div class="h-6 flex items-center gap-4 px-3 bg-neutral-600" use:help={{ title: "Task bar", description: "You can see all currently running background tasks here." }}>
+	{#if tasks.length}
+		{#each tasks as [id, task] (id)}
 </div>
 
 <div class="h-6 flex items-center gap-4 px-3 bg-neutral-600" use:help={{ title: "Task bar", description: "You can see all currently running background tasks here." }}>

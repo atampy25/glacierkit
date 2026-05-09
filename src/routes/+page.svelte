@@ -8,7 +8,7 @@
 	import GameBrowser from "$lib/tools/GameBrowser.svelte"
 	import ToolButton from "$lib/components/ToolButton.svelte"
 	import { Button, ToastNotification } from "carbon-components-svelte"
-	import { beforeUpdate, onDestroy } from "svelte"
+	import { onDestroy } from "svelte"
 	import { listen } from "@tauri-apps/api/event"
 	import type { Announcement, EditorType, Request } from "$lib/bindings"
 	import { Splitpanes, Pane } from "svelte-splitpanes"
@@ -58,11 +58,11 @@
 		"You can open a file from outside of your current project by pressing CTRL-O."
 	]
 
-	let hint = hints[Math.floor(Math.random() * hints.length)]
+	let hint = $state(hints[Math.floor(Math.random() * hints.length)])
 
-	let announcements: Announcement[] = []
+	let announcements: Announcement[] = $state([])
 
-	let seenAnnouncements: string[] = []
+	let seenAnnouncements: string[] = $state([])
 
 	const tools = {
 		FileBrowser: {
@@ -92,9 +92,9 @@
 		}
 	} as const
 
-	let selectedTool: keyof typeof tools = "FileBrowser"
+	let selectedTool: keyof typeof tools = $state("FileBrowser")
 
-	const toolComponents: Record<keyof typeof tools, { handleRequest: (request: any) => Promise<void> }> = ({} as unknown as null)!
+	const toolComponents: Record<keyof typeof tools, { handleRequest: (request: any) => Promise<void> }> = $state(({} as unknown as null)!)
 
 	function getEditor(editorType: EditorType) {
 		switch (editorType.type) {
@@ -131,11 +131,11 @@
 		name: string
 		editor: ReturnType<typeof getEditor>
 		unsaved: boolean
-	}[] = []
+	}[] = $state([])
 
-	const tabComponents: Record<string, { handleRequest: (request: any) => Promise<void> }> = {}
+	const tabComponents: Record<string, { handleRequest: (request: any) => Promise<void> }> = $state({})
 
-	let activeTab: string | null = null
+	let activeTab: string | null = $state(null)
 
 	let destroyFunc = { run: () => {} }
 	onDestroy(() => {
@@ -144,156 +144,158 @@
 
 	let hasListened = false
 
-	beforeUpdate(async () => {
+	$effect.pre(() => {
 		if (!hasListened) {
 			hasListened = true
+			;(async () => {
+				const unlisten = await listen("request", ({ payload: request }: { payload: Request }) => {
+					switch (request.type) {
+						case "tool":
+							switch (request.data.type) {
+								case "fileBrowser":
+									void toolComponents.FileBrowser.handleRequest?.(request.data.data)
+									break
 
-			const unlisten = await listen("request", ({ payload: request }: { payload: Request }) => {
-				switch (request.type) {
-					case "tool":
-						switch (request.data.type) {
-							case "fileBrowser":
-								void toolComponents.FileBrowser.handleRequest?.(request.data.data)
-								break
+								case "settings":
+									void toolComponents.Settings.handleRequest?.(request.data.data)
+									break
 
-							case "settings":
-								void toolComponents.Settings.handleRequest?.(request.data.data)
-								break
+								case "gameBrowser":
+									void toolComponents.GameBrowser.handleRequest?.(request.data.data)
+									break
 
-							case "gameBrowser":
-								void toolComponents.GameBrowser.handleRequest?.(request.data.data)
-								break
+								case "contentSearch":
+									void toolComponents.ContentSearch.handleRequest?.(request.data.data)
+									break
 
-							case "contentSearch":
-								void toolComponents.ContentSearch.handleRequest?.(request.data.data)
-								break
-
-							default:
-								request.data satisfies never
-								break
-						}
-						break
-
-					case "global":
-						switch (request.data.type) {
-							case "errorReport":
-							case "setWindowTitle":
-							case "computeJSONPatchAndSave":
-							case "requestLastPanicUpload":
-							case "logUploadRejected":
-								// Handled by +layout.svelte
-								break
-
-							case "initialiseDynamics":
-								announcements = request.data.data.dynamics.announcements
-								seenAnnouncements = request.data.data.seenAnnouncements
-								break
-
-							default:
-								request.data satisfies never
-								break
-						}
-						break
-
-					case "tab":
-						switch (request.data.data.type) {
-							case "create":
-								tabs = [
-									...tabs,
-									{
-										id: request.data.tab,
-										name: request.data.data.data.name,
-										unsaved: false,
-										editor: getEditor(request.data.data.data.editorType)
-									}
-								]
-
-								activeTab = request.data.tab
-								break
-
-							case "setUnsaved": {
-								const id = request.data.tab
-								tabs.find((a) => a.id === id)!.unsaved = request.data.data.data.unsaved
-								tabs = tabs
-								break
+								default:
+									request.data satisfies never
+									break
 							}
+							break
 
-							case "select":
-								activeTab = request.data.tab
-								break
+						case "global":
+							switch (request.data.type) {
+								case "errorReport":
+								case "setWindowTitle":
+								case "computeJSONPatchAndSave":
+								case "requestLastPanicUpload":
+								case "logUploadRejected":
+								case "setEnums":
+									// Handled by +layout.svelte
+									break
 
-							case "remove": {
-								const tabId = request.data.tab
+								case "initialiseDynamics":
+									announcements = request.data.data.dynamics.announcements
+									seenAnnouncements = request.data.data.seenAnnouncements
+									break
 
-								const tabIndex = tabs.findIndex((a) => a.id === tabId)
-								tabs = tabs.filter((a) => a.id !== tabId)
+								default:
+									request.data satisfies never
+									break
+							}
+							break
 
-								if (activeTab === tabId) {
-									activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
+						case "tab":
+							switch (request.data.data.type) {
+								case "create":
+									tabs = [
+										...tabs,
+										{
+											id: request.data.tab,
+											name: request.data.data.data.name,
+											unsaved: false,
+											editor: getEditor(request.data.data.data.editorType)
+										}
+									]
+
+									activeTab = request.data.tab
+									break
+
+								case "setUnsaved": {
+									const id = request.data.tab
+									tabs.find((a) => a.id === id)!.unsaved = request.data.data.data.unsaved
+									tabs = tabs
+									break
 								}
 
-								void event({
-									type: "global",
-									data: {
-										type: "selectTab",
-										data: activeTab
+								case "select":
+									activeTab = request.data.tab
+									break
+
+								case "remove": {
+									const tabId = request.data.tab
+
+									const tabIndex = tabs.findIndex((a) => a.id === tabId)
+									tabs = tabs.filter((a) => a.id !== tabId)
+
+									if (activeTab === tabId) {
+										activeTab = tabs.at(Math.max(tabIndex - 1, 0))?.id || null
 									}
-								})
-								break
+
+									void event({
+										type: "global",
+										data: {
+											type: "selectTab",
+											data: activeTab
+										}
+									})
+									break
+								}
+
+								case "rename": {
+									const id = request.data.tab
+									tabs.find((a) => a.id === id)!.name = request.data.data.data.newName
+									tabs = tabs
+									break
+								}
+
+								default:
+									request.data.data satisfies never
+									break
 							}
+							break
 
-							case "rename": {
-								const id = request.data.tab
-								tabs.find((a) => a.id === id)!.name = request.data.data.data.newName
-								tabs = tabs
-								break
+						case "editor":
+							switch (request.data.data.type) {
+								case "text":
+									void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
+									break
+
+								case "entity":
+									void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
+									break
+
+								case "resourceOverview":
+									void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
+									break
+
+								case "repositoryPatch":
+									void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
+									break
+
+								case "unlockablesPatch":
+									void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
+									break
+
+								case "contentSearchResults":
+									void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
+									break
+
+								default:
+									request.data.data satisfies never
+									break
 							}
+							break
 
-							default:
-								request.data.data satisfies never
-								break
-						}
-						break
+						default:
+							request satisfies never
+							break
+					}
+				})
 
-					case "editor":
-						switch (request.data.data.type) {
-							case "text":
-								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
-								break
-
-							case "entity":
-								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
-								break
-
-							case "resourceOverview":
-								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
-								break
-
-							case "repositoryPatch":
-								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
-								break
-
-							case "unlockablesPatch":
-								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
-								break
-
-							case "contentSearchResults":
-								void tabComponents[request.data.editor].handleRequest?.(request.data.data.data)
-								break
-
-							default:
-								request.data.data satisfies never
-								break
-						}
-						break
-
-					default:
-						request satisfies never
-						break
-				}
-			})
-
-			destroyFunc.run = unlisten
+				destroyFunc.run = unlisten
+			})()
 		}
 	})
 </script>
@@ -493,7 +495,7 @@
 				<div class="w-full h-full bg-[#202020]">
 					{#each typedEntries(tools) as [toolID, tool] (toolID)}
 						<div class="w-full h-full" class:hidden={selectedTool !== toolID}>
-							<svelte:component this={tool.component} bind:this={toolComponents[toolID]} />
+							<tool.component bind:this={toolComponents[toolID]} />
 						</div>
 					{/each}
 				</div>
@@ -517,7 +519,9 @@
 								<div
 									class="select-none h-full pl-4 pr-1 flex gap-2 items-center justify-center cursor-pointer border-solid border-b-white"
 									class:border-b={activeTab === tab.id}
-									on:click|self={async () => {
+									onclick={async (e) => {
+										if (e.target !== e.currentTarget) return
+
 										if (activeTab !== tab.id) {
 											activeTab = tab.id
 
@@ -530,7 +534,7 @@
 											})
 										}
 									}}
-									on:mousedown={async (e) => {
+									onmousedown={async (e) => {
 										if (e.button === 1) {
 											e.preventDefault()
 
@@ -662,10 +666,9 @@
 										{/each}
 									</div>
 								{/if}
-								<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 								<div
 									class="mt-8 mx-16 flex gap-2 items-center text-neutral-300 cursor-pointer leading-snug"
-									on:click={() => {
+									onclick={() => {
 										hint = hints[(hints.indexOf(hint) + 1) % hints.length]
 									}}
 									use:help={{ title: "Hint", description: "A (hopefully) helpful hint." }}><Idea size={20} />{hint}</div

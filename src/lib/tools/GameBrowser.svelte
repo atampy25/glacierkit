@@ -251,6 +251,8 @@
 	}
 
 	async function refreshTree() {
+		if (!tree) return
+
 		tree.settings!.core.data = []
 
 		const addedFolders = new Set()

@@ -9,6 +9,7 @@
 	import Add from "carbon-icons-svelte/lib/Add.svelte"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { help } from "$lib/helpray"
+	import { VList } from "virtua/svelte"
 
 	export let id: string
 
@@ -363,7 +364,7 @@
 					placeholder="Filter..."
 					icon={Filter}
 					size="lg"
-					on:change={searchInput}
+					on:input={searchInput}
 					on:clear={() => {
 						searchQuery = ""
 					}}
@@ -396,221 +397,226 @@
 					}}
 				/>
 			</div>
-			<div class="mt-2 basis-0 flex-grow flex flex-col gap-1 overflow-y-auto">
-				{#each repositoryItems
-					.filter((a) => searchFilter === "All" || a[1].type === searchFilter)
-					.filter((a) => (searchQuery ? searchQuery.split(" ").every((b) => JSON.stringify(a).toLowerCase().includes(b)) : true))
-					.filter((a) => !modifiedRepositoryItems.has(a[0])) as [itemId, info] (itemId)}
-					<div
-						class="p-4 bg-neutral-900 flex items-center cursor-pointer break-all mr-2"
-						on:click={async () => {
-							await event({
-								type: "editor",
-								data: {
-									editor: id,
+			<div class="mt-2 basis-0 flex-grow overflow-y-auto">
+				<VList
+					data={repositoryItems
+						.filter((a) => searchFilter === "All" || a[1].type === searchFilter)
+						.filter((a) => (searchQuery ? searchQuery.split(" ").every((b) => JSON.stringify(a).toLowerCase().includes(b)) : true))
+						.filter((a) => !modifiedRepositoryItems.has(a[0]))}
+					getKey={(a) => a[0]}
+				>
+					{#snippet children([itemId, info])}
+						<div
+							class="mb-1 p-4 bg-neutral-900 flex items-center cursor-pointer break-all"
+							on:click={async () => {
+								await event({
+									type: "editor",
 									data: {
-										type: "repositoryPatch",
+										editor: id,
 										data: {
-											type: "selectItem",
-											data: { item: itemId }
+											type: "repositoryPatch",
+											data: {
+												type: "selectItem",
+												data: { item: itemId }
+											}
 										}
 									}
-								}
-							})
-						}}
-					>
-						{#if info.type === "NPC"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-regular fa-user" /> NPC
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
+								})
+							}}
+						>
+							{#if info.type === "NPC"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-regular fa-user" /> NPC
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "Item"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-wrench" /> Item
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "Weapon"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-gun" /> Weapon
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "Outfit"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-shirt" /> Outfit
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "AmmoBehaviour"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-gun" /> Ammo Behaviour
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "AmmoConfig"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-gun" /> Ammo Config
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "MagazineConfig"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-gun" /> Magazine Config
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.size} / {info.data.tags.join(", ")}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "DifficultyParameter"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-gear" /> Difficulty Param
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "MapArea"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-location-dot" /> Map Area
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "MasteryItem"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-regular fa-star" /> Mastery Item
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "Modifier"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-cog" /> Modifier
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.kind}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "Setpiece"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-shapes" /> Setpiece
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.traits.join(", ")}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "WeaponConfig"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-gun" /> Weapon Config
 								</div>
 								<div class="text-neutral-300">
 									{itemId}
 								</div>
-							</div>
-						{:else if info.type === "Item"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-wrench" /> Item
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
+							{:else if info.type === "ScoreMultiplier"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-chart-simple" /> Score Multiplier
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "ItemBundle"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-shapes" /> Item Bundle
+								</div>
+								<div>
+									<div class="text-lg font-bold">
+										{info.data.name}
+									</div>
+									<div class="text-neutral-300">
+										{itemId}
+									</div>
+								</div>
+							{:else if info.type === "ItemList"}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-solid fa-list" /> Item List
 								</div>
 								<div class="text-neutral-300">
 									{itemId}
 								</div>
-							</div>
-						{:else if info.type === "Weapon"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-gun" /> Weapon
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
+							{:else}
+								<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
+									<i class="fa-regular fa-circle-question" /> Unknown
 								</div>
 								<div class="text-neutral-300">
 									{itemId}
 								</div>
-							</div>
-						{:else if info.type === "Outfit"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-shirt" /> Outfit
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "AmmoBehaviour"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-gun" /> Ammo Behaviour
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "AmmoConfig"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-gun" /> Ammo Config
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "MagazineConfig"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-gun" /> Magazine Config
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.size} / {info.data.tags.join(", ")}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "DifficultyParameter"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-gear" /> Difficulty Param
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "MapArea"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-location-dot" /> Map Area
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "MasteryItem"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-regular fa-star" /> Mastery Item
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "Modifier"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-cog" /> Modifier
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.kind}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "Setpiece"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-shapes" /> Setpiece
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.traits.join(", ")}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "WeaponConfig"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-gun" /> Weapon Config
-							</div>
-							<div class="text-neutral-300">
-								{itemId}
-							</div>
-						{:else if info.type === "ScoreMultiplier"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-chart-simple" /> Score Multiplier
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "ItemBundle"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-shapes" /> Item Bundle
-							</div>
-							<div>
-								<div class="text-lg font-bold">
-									{info.data.name}
-								</div>
-								<div class="text-neutral-300">
-									{itemId}
-								</div>
-							</div>
-						{:else if info.type === "ItemList"}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-solid fa-list" /> Item List
-							</div>
-							<div class="text-neutral-300">
-								{itemId}
-							</div>
-						{:else}
-							<div class="my-1 flex gap-2 flex-shrink-0 w-[30%] mr-2">
-								<i class="fa-regular fa-circle-question" /> Unknown
-							</div>
-							<div class="text-neutral-300">
-								{itemId}
-							</div>
-						{/if}
-					</div>
-				{/each}
+							{/if}
+						</div>
+					{/snippet}
+				</VList>
 			</div>
 		</div>
 	</div>

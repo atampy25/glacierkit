@@ -75,7 +75,7 @@
 	/>
 	<div class="mt-4">
 		<div class="bx--label">Decimal</div>
-		<CodeSnippet code={new Decimal("0x" + (hexToDecimal || "0").toLowerCase()).toString()} />
+		<CodeSnippet code={new Decimal("0x" + (hexToDecimal && hexToDecimal.match(/^[0-9A-Fa-f]+$/) ? hexToDecimal : "0").toLowerCase()).toString()} />
 	</div>
 
 	<h4 class="mt-4 mb-2">Decimal to hex</h4>
@@ -90,6 +90,6 @@
 	/>
 	<div class="mt-4">
 		<div class="bx--label">Hex</div>
-		<CodeSnippet code={new Decimal(decimalToHex || "0").toHex().slice(2).toUpperCase()} />
+		<CodeSnippet code={new Decimal(decimalToHex && decimalToHex.match(/^[0-9]+$/) ? decimalToHex : "0").toHex().slice(2).toUpperCase()} />
 	</div>
 </div>

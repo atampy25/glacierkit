@@ -27,16 +27,16 @@
 		}
 	}
 
-	let allPartitions: [string, string][] = []
+	let allPartitions: [string, string][] = $state([])
 
-	let enabled = false
-	let searchQuery = ""
-	let searchEntities = false
-	let searchRL = false
-	let searchText = false
-	let searchQN = false
-	let searchLocalisation = false
-	let searchPartitions: Record<string, boolean> = {}
+	let enabled = $state(false)
+	let searchQuery = $state("")
+	let searchEntities = $state(false)
+	let searchRL = $state(false)
+	let searchText = $state(false)
+	let searchQN = $state(false)
+	let searchLocalisation = $state(false)
+	let searchPartitions: Record<string, boolean> = $state({})
 </script>
 
 <div
