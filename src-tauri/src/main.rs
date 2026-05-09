@@ -222,6 +222,112 @@ async fn main() {
 				.build()
 		)
 		.invoke_handler(specta.invoke_handler())
+		.register_asynchronous_uri_scheme_protocol("editor-asset", |ctx, req, res| {
+			let app_state = ctx.app_handle().state::<AppState>();
+
+			if let Some(host) = req.uri().host()
+				&& let Ok(editor) = host.parse::<Uuid>()
+				&& let Ok(asset) = req.uri().path().trim_start_matches('/').parse::<Uuid>()
+				&& let Some(editor) = app_state.editor_states.get(&editor)
+				&& let Some(asset) = editor.assets.get(&asset)
+			{
+				let resp = tauri::http::Response::builder()
+					.version(tauri::http::Version::HTTP_3)
+					.header("Access-Control-Allow-Origin", "*")
+					.header("Accept-Ranges", "bytes");
+
+				let ranges = req
+					.headers()
+					.get("range")
+					.and_then(|x| x.to_str().ok())
+					.and_then(|x| x.strip_prefix("bytes="))
+					.map(|x| {
+						x.split(',')
+							.filter_map(|part| {
+								let mut split = part.trim().split('-');
+								let start = split.next()?.parse::<usize>().ok()?;
+								let end = split
+									.next()
+									.and_then(|x| x.parse::<usize>().ok())
+									.unwrap_or(asset.1.len() - 1);
+								if start > end || end >= asset.1.len() {
+									return None;
+								}
+								Some((start, end))
+							})
+							.collect::<Vec<_>>()
+					});
+
+				match *req.method() {
+					tauri::http::Method::HEAD => {
+						if let Some(ranges) = ranges
+							&& ranges.len() == 1
+						{
+							let (start, end) = ranges[0];
+							res.respond(
+								resp.status(206)
+									.header("Content-Range", format!("bytes {}-{}/{}", start, end, asset.1.len()))
+									.header("Content-Length", end - start + 1)
+									.body(&[])
+									.unwrap()
+							)
+						} else {
+							res.respond(
+								resp.header("Content-Type", asset.0.as_str())
+									.header("Content-Length", asset.1.len())
+									.body(&[])
+									.unwrap()
+							)
+						}
+					}
+
+					tauri::http::Method::GET => {
+						if let Some(ranges) = ranges
+							&& ranges.len() == 1
+						{
+							let (start, end) = ranges[0];
+							res.respond(
+								resp.status(206)
+									.header("Content-Range", format!("bytes {}-{}/{}", start, end, asset.1.len()))
+									.header("Content-Length", end - start + 1)
+									.body(asset.1[start..=end].to_vec())
+									.unwrap()
+							)
+						} else {
+							res.respond(
+								resp.header("Content-Type", asset.0.as_str())
+									.header("Content-Length", asset.1.len())
+									.body(asset.1.to_vec())
+									.unwrap()
+							)
+						}
+					}
+
+					tauri::http::Method::OPTIONS => res.respond(
+						resp.header("Allow", "GET, HEAD, OPTIONS")
+							.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+							.body(&[])
+							.unwrap()
+					),
+
+					_ => res.respond(
+						tauri::http::Response::builder()
+							.version(tauri::http::Version::HTTP_3)
+							.status(405)
+							.body(&[])
+							.unwrap()
+					)
+				}
+			} else {
+				res.respond(
+					tauri::http::Response::builder()
+						.version(tauri::http::Version::HTTP_3)
+						.status(404)
+						.body(&[])
+						.unwrap()
+				);
+			}
+		})
 		.setup(|app| {
 			LOG_DIR.set(app.path().app_log_dir().expect("Couldn't get log dir"));
 
@@ -428,7 +534,8 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						id.to_owned(),
 						EditorState {
 							file: None,
-							data: EditorData::ResourceOverview { hash: hash.0 }
+							data: EditorData::ResourceOverview { hash: hash.0 },
+							..Default::default()
 						}
 					);
 

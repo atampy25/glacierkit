@@ -150,7 +150,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) 
 						id.to_owned(),
 						EditorState {
 							file: None,
-							data: EditorData::ResourceOverview { hash: resource }
+							data: EditorData::ResourceOverview { hash: resource },
+							..Default::default()
 						}
 					);
 
@@ -503,7 +504,8 @@ pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 						file: None,
 						data: EditorData::ResourceOverview {
 							hash: factory.to_owned()
-						}
+						},
+						..Default::default()
 					}
 				);
 

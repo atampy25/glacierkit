@@ -121,7 +121,7 @@ features = ["derive"]
 
 [dependencies.tauri]
 version = "2"
-features = ["protocol-asset", "devtools"]
+features = ["devtools"]
 
 [dependencies.specta]
 version = "=2.0.0-rc.24"
@@ -178,6 +178,3 @@ fork = "0.7.0"
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-updater = "2"
-
-[features]
-custom-protocol = ["tauri/custom-protocol"]

@@ -544,7 +544,8 @@ pub fn start_content_search(
 			id.to_owned(),
 			EditorState {
 				file: None,
-				data: EditorData::ContentSearchResults { results }
+				data: EditorData::ContentSearchResults { results },
+				..Default::default()
 			}
 		);
 

@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 use dashmap::DashMap;
-use ecow::EcoString;
+use ecow::{EcoString, EcoVec};
 use hashbrown::HashMap;
 use hitman_commons::{
 	game_detection::GameInstall,
@@ -68,10 +68,22 @@ pub struct AppState {
 	pub editor_connection: EditorConnection
 }
 
-#[derive(Debug)]
 pub struct EditorState {
 	pub file: Option<PathBuf>,
-	pub data: EditorData
+	pub data: EditorData,
+
+	// For the frontend to access without costly serialisation/deserialisation; ID -> (MIME type, data)
+	pub assets: DashMap<Uuid, (EcoString, EcoVec<u8>)>
+}
+
+impl Default for EditorState {
+	fn default() -> Self {
+		Self {
+			file: None,
+			data: EditorData::Nil,
+			assets: DashMap::new()
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -268,20 +280,19 @@ pub enum ResourceOverviewData {
 		json: String
 	},
 	Image {
-		image_path: PathBuf,
+		asset_id: Uuid,
 		dds_data: Option<(String, String)>
 	},
 	Audio {
-		wav_path: PathBuf
+		asset_id: Uuid
 	},
 	Mesh {
-		#[debug(skip)]
-		obj: String,
+		asset_id: Uuid,
 		bounding_box: [f32; 6]
 	},
 	MultiAudio {
 		name: String,
-		wav_paths: Vec<(String, PathBuf)>
+		audios: Vec<(String, Uuid)>
 	},
 	Repository,
 	Unlockables,

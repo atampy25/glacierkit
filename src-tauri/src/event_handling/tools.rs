@@ -786,7 +786,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					id.to_owned(),
 					EditorState {
 						file: None,
-						data: EditorData::ResourceOverview { hash: resource.0 }
+						data: EditorData::ResourceOverview { hash: resource.0 },
+						..Default::default()
 					}
 				);
 

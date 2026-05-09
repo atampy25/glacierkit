@@ -1,13 +1,13 @@
 use std::{
-	fmt::Write,
 	fs::{self, File},
-	io::{BufWriter, Cursor},
+	io::{BufWriter, Cursor, Write},
 	ops::Deref,
 	sync::Arc
 };
 
 use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
+use ecow::EcoVec;
 use fn_error_context::context;
 use glacier_texture::{
 	enums::{RenderFormat, TextureType},
@@ -154,20 +154,26 @@ pub async fn initialise_resource_overview(
 					}
 
 					"GFXI" => {
-						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-						let temp_file_id = Uuid::new_v4();
-
-						fs::create_dir_all(data_dir.join("temp"))?;
+						let asset_id = Uuid::new_v4();
 
 						let (_, res_data) = extract_latest_resource(game_files, hash)?;
+
+						let mut image_data = vec![];
 
 						ImageReader::new(Cursor::new(res_data))
 							.with_guessed_format()?
 							.decode()?
-							.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
+							.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
+
+						app_state
+							.editor_states
+							.get(&id)
+							.context("No such editor")?
+							.assets
+							.insert(asset_id, ("image/webp".into(), image_data.into()));
 
 						ResourceOverviewData::Image {
-							image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+							asset_id,
 							dds_data: None
 						}
 					}
@@ -201,7 +207,7 @@ pub async fn initialise_resource_overview(
 						let mut previous_vertex_count: usize = 1;
 						let mut bounding_box: [f32; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
-						let mut obj = String::new();
+						let mut obj = EcoVec::new();
 
 						for (idx, mesh) in meshes.enumerate() {
 							writeln!(obj, "o object.00{}", idx)?;
@@ -236,14 +242,20 @@ pub async fn initialise_resource_overview(
 							bounding_box[5] = bounding_box[5].max(bb.max.z);
 						}
 
-						ResourceOverviewData::Mesh { obj, bounding_box }
+						let asset_id = Uuid::new_v4();
+
+						app_state
+							.editor_states
+							.get(&id)
+							.context("No such editor")?
+							.assets
+							.insert(asset_id, ("model/obj".into(), obj));
+
+						ResourceOverviewData::Mesh { asset_id, bounding_box }
 					}
 
 					"TEXT" => {
-						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-						let temp_file_id = Uuid::new_v4();
-
-						fs::create_dir_all(data_dir.join("temp"))?;
+						let asset_id = Uuid::new_v4();
 
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
@@ -264,12 +276,21 @@ pub async fn initialise_resource_overview(
 
 						reader.set_format(image::ImageFormat::Tga);
 
+						let mut image_data = vec![];
+
 						reader
 							.decode()?
-							.save(data_dir.join("temp").join(format!("{}.png", temp_file_id)))?;
+							.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
+
+						app_state
+							.editor_states
+							.get(&id)
+							.context("No such editor")?
+							.assets
+							.insert(asset_id, ("image/webp".into(), image_data.into()));
 
 						ResourceOverviewData::Image {
-							image_path: data_dir.join("temp").join(format!("{}.png", temp_file_id)),
+							asset_id,
 							dds_data: Some((
 								match texture.texture_type() {
 									TextureType::Colour => "Colour",
@@ -301,68 +322,74 @@ pub async fn initialise_resource_overview(
 					}
 
 					"WWEV" => {
-						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-
-						fs::create_dir_all(data_dir.join("temp"))?;
-
 						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
 
-						let mut wav_paths = vec![];
+						let mut audios = vec![];
 
 						let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
 
 						for object in wwev.non_streamed {
-							let temp_file_id = Uuid::new_v4();
+							let asset_id = Uuid::new_v4();
+
+							let mut wav_data = EcoVec::new();
 
 							WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
-								.generate_ogg(BufWriter::new(File::create(
-									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-								)?))?;
+								.generate_ogg(&mut wav_data)?;
 
-							wav_paths.push((
-								"Embedded audio".into(),
-								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-							))
+							app_state
+								.editor_states
+								.get(&id)
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("audio/wav".into(), wav_data));
+
+							audios.push(("Embedded audio".into(), asset_id))
 						}
 
 						for object in wwev.streamed {
-							let temp_file_id = Uuid::new_v4();
+							let asset_id = Uuid::new_v4();
 
 							let (_, wem_data) = extract_latest_resource(game_files, object.source)?;
 
-							WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
-								.generate_ogg(BufWriter::new(File::create(
-									data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-								)?))?;
+							let mut wav_data = EcoVec::new();
 
-							wav_paths.push((
-								object.source.to_string(),
-								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-							))
+							WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(&mut wav_data)?;
+
+							app_state
+								.editor_states
+								.get(&id)
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("audio/wav".into(), wav_data));
+
+							audios.push((object.source.to_string(), asset_id))
 						}
 
 						ResourceOverviewData::MultiAudio {
 							name: wwev.name,
-							wav_paths
+							audios
 						}
 					}
 
 					"WWES" | "WWEM" => {
-						let data_dir = app.path().app_data_dir().expect("Couldn't get data dir");
-						let temp_file_id = Uuid::new_v4();
-
-						fs::create_dir_all(data_dir.join("temp"))?;
+						let asset_id = Uuid::new_v4();
 
 						let (_, res_data) = extract_latest_resource(game_files, hash)?;
 
-						WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
-							.generate_ogg(BufWriter::new(File::create(
-								data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-							)?))?;
+						let mut wav_data = EcoVec::new();
 
-						ResourceOverviewData::Audio {
-							wav_path: data_dir.join("temp").join(format!("{}.wav", temp_file_id))
-						}
+						WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(&mut wav_data)?;
+
+						app_state
+							.editor_states
+							.get(&id)
+							.context("No such editor")?
+							.assets
+							.insert(asset_id, ("audio/wav".into(), wav_data));
+
+						ResourceOverviewData::Audio { asset_id }
 					}
 
 					"REPO" => ResourceOverviewData::Repository,
@@ -757,9 +784,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
-
-	let hash = match editor_state.data {
+	let hash = match app_state.editor_states.get(&id).context("No such editor")?.data {
 		EditorData::ResourceOverview { hash, .. } => hash,
 
 		_ => bail!("Editor {id} is not a resource overview")
@@ -791,13 +816,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::FollowDependency { new_hash } => {
-			let hash = match editor_state.data {
-				EditorData::ResourceOverview { ref mut hash, .. } => hash,
+			match app_state.editor_states.get_mut(&id).context("No such editor")?.data {
+				EditorData::ResourceOverview { ref mut hash, .. } => {
+					*hash = new_hash;
+				}
 
 				_ => bail!("Editor {id} is not a resource overview")
 			};
-
-			*hash = new_hash;
 
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
@@ -810,7 +835,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 					app,
 					&app_state,
 					id,
-					*hash,
+					new_hash,
 					game_files,
 					get_loaded_game_version(app, install)?,
 					resource_reverse_dependencies,
@@ -839,7 +864,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				id.to_owned(),
 				EditorState {
 					file: None,
-					data: EditorData::ResourceOverview { hash }
+					data: EditorData::ResourceOverview { hash },
+					..Default::default()
 				}
 			);
 

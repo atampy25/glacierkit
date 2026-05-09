@@ -104,7 +104,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 
 				let EditorState {
 					data: EditorData::QNPatch { settings, current, .. },
-					file: None
+					file: None,
+					assets
 				} = state
 				else {
 					unreachable!();
@@ -117,7 +118,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 							settings,
 							entity: current
 						},
-						file: None
+						file: None,
+						assets
 					}
 				);
 			}
@@ -160,7 +162,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 
 				let EditorState {
 					data: EditorData::QNPatch { settings, current, .. },
-					file: None
+					file: None,
+					assets
 				} = state
 				else {
 					unreachable!();
@@ -173,7 +176,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 							settings,
 							entity: current
 						},
-						file: None
+						file: None,
+						assets
 					}
 				);
 			}

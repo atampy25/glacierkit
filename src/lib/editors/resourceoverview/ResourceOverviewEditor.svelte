@@ -1,36 +1,11 @@
 <script lang="ts">
 	import type { ReferenceFlags, ResourceChangelogEntry, ResourceOverviewData, ResourceOverviewRequest } from "$lib/bindings"
 	import { event } from "$lib/utils"
-	import {
-		Accordion,
-		AccordionItem,
-		Button,
-		ButtonSet,
-		ClickableTile,
-		ContentSwitcher,
-		DataTable,
-		ExpandableTile,
-		ImageLoader,
-		ListItem,
-		OrderedList,
-		StructuredList,
-		StructuredListBody,
-		StructuredListCell,
-		StructuredListRow,
-		Switch,
-		Table,
-		TableBody,
-		TableCell,
-		TableHead,
-		TableHeader,
-		TableRow,
-		Tile
-	} from "carbon-components-svelte"
+	import { Button, ClickableTile, ContentSwitcher, DataTable, Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tile } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
 	import { trackEvent } from "$lib/utils"
-	import { convertFileSrc } from "@tauri-apps/api/core"
 	import WaveformPlayer from "$lib/components/WaveformPlayer.svelte"
 	import MultiWaveformPlayer from "$lib/components/MultiWaveformPlayer.svelte"
 	import Monaco from "./Monaco.svelte"
@@ -38,9 +13,8 @@
 	import { help } from "$lib/helpray"
 	import MeshPreview from "$lib/components/MeshPreview.svelte"
 	import { Pane, Splitpanes } from "svelte-splitpanes"
-	import { ColumnDependency, IbmDataProductExchange, SoftwareResource, TrashCan } from "carbon-icons-svelte"
+	import { ColumnDependency, SoftwareResource, TrashCan } from "carbon-icons-svelte"
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
-	import { platform } from "@tauri-apps/plugin-os"
 
 	export let id: string
 
@@ -53,7 +27,7 @@
 	let changelog: ResourceChangelogEntry[] = []
 	let data: ResourceOverviewData | null = null
 
-	let previewImage: any = null
+	let previewImage: HTMLImageElement | null = null
 	let referenceTab = 0
 
 	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
@@ -154,20 +128,20 @@
 											on:load={() => {
 												previewImage = previewImage
 											}}
-											src={convertFileSrc(data.data.image_path)}
+											src="editor-asset://{id}/{data.data.asset_id}"
 											alt="Resource preview"
 										/>
 									{:else if data.type === "Mesh"}
 										<div class="h-[30vh]">
-											<MeshPreview obj={data.data.obj} boundingBox={data.data.bounding_box} />
+											<MeshPreview src="editor-asset://{id}/{data.data.asset_id}" boundingBox={data.data.bounding_box} />
 										</div>
 									{:else if data.type === "Audio"}
-										<WaveformPlayer src={convertFileSrc(data.data.wav_path)} />
+										<WaveformPlayer src="editor-asset://{id}/{data.data.asset_id}" />
 									{:else if data.type === "MultiAudio"}
 										<div class="text-neutral-400 mb-2">{data.data.name}</div>
-										{#if data.data.wav_paths.length}
+										{#if data.data.audios.length}
 											<MultiWaveformPlayer
-												src={data.data.wav_paths.map((a) => [a[0], convertFileSrc(a[1])])}
+												src={data.data.audios.map((a) => [a[0], `editor-asset://${id}/${a[1]}`])}
 												on:download={async ({ detail }) => {
 													trackEvent("Extract specific audio from WWEV file as WAV")
 

@@ -1458,20 +1458,20 @@ export type ResourceOverviewData =
 	| {
 			type: "Image"
 			data: {
-				image_path: string
+				asset_id: string
 				dds_data: [string, string] | null
 			}
 	  }
 	| {
 			type: "Audio"
 			data: {
-				wav_path: string
+				asset_id: string
 			}
 	  }
 	| {
 			type: "Mesh"
 			data: {
-				obj: string
+				asset_id: string
 				bounding_box: [number, number, number, number, number, number]
 			}
 	  }
@@ -1479,7 +1479,7 @@ export type ResourceOverviewData =
 			type: "MultiAudio"
 			data: {
 				name: string
-				wav_paths: [string, string][]
+				audios: [string, string][]
 			}
 	  }
 	| { type: "Repository" }

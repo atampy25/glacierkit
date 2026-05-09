@@ -4,7 +4,7 @@
 	import { OBJLoader } from "three/addons/loaders/OBJLoader.js"
 	import { DEG2RAD } from "three/src/math/MathUtils.js"
 
-	export let obj = ""
+	export let src = ""
 	export let boundingBox: [number, number, number, number, number, number] = [-1, -1, -1, 0, 0, 0]
 
 	const center = getCenter(boundingBox)
@@ -34,12 +34,9 @@
 
 	<T.AmbientLight color={0xaaaaaa} />
 
-	<T
-		is={new OBJLoader().parse(obj)}
-		position={[-center[0] * scaleFactor, -center[2] * scaleFactor, center[1] * scaleFactor]}
-		rotation={[-90 * DEG2RAD, 0, 0]}
-		scale={[scaleFactor, scaleFactor, scaleFactor]}
-	>
-		<T.MeshPhongMaterial color={0xe7e7e7ff} />
-	</T>
+	{#await new OBJLoader().loadAsync(src) then obj}
+		<T is={obj} position={[-center[0] * scaleFactor, -center[2] * scaleFactor, center[1] * scaleFactor]} rotation={[-90 * DEG2RAD, 0, 0]} scale={[scaleFactor, scaleFactor, scaleFactor]}>
+			<T.MeshPhongMaterial color={0xe7e7e7ff} />
+		</T>
+	{/await}
 </Canvas>

@@ -116,7 +116,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						data: EditorData::QNEntity {
 							entity: Box::new(entity),
 							settings: Default::default()
-						}
+						},
+						..Default::default()
 					}
 				);
 
@@ -176,7 +177,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								base: Box::new(base),
 								current: Box::new(entity),
 								settings: Default::default()
-							}
+							},
+							..Default::default()
 						}
 					);
 
@@ -225,7 +227,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.context("Couldn't read file")?
 								.replace("\r\n", "\n"),
 							file_type: file_type.to_owned()
-						}
+						},
+						..Default::default()
 					}
 				);
 
@@ -253,7 +256,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.context("Couldn't read file")?
 								.replace("\r\n", "\n"),
 							file_type: TextFileType::PlainText
-						}
+						},
+						..Default::default()
 					}
 				);
 
@@ -283,7 +287,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.context("Couldn't read file")?
 								.replace("\r\n", "\n"),
 							file_type: TextFileType::Markdown
-						}
+						},
+						..Default::default()
 					}
 				);
 
@@ -333,7 +338,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								base: from_value(base)?,
 								current: repository,
 								patch_type: JsonPatchType::MergePatch
-							}
+							},
+							..Default::default()
 						}
 					);
 
@@ -430,7 +436,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								base: from_value(base)?,
 								current: unlockables,
 								patch_type: JsonPatchType::MergePatch
-							}
+							},
+							..Default::default()
 						}
 					);
 
@@ -511,7 +518,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 										base: from_value(base)?,
 										current: repository,
 										patch_type: JsonPatchType::JsonPatch
-									}
+									},
+									..Default::default()
 								}
 							);
 
@@ -621,7 +629,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 										base: from_value(base)?,
 										current: unlockables,
 										patch_type: JsonPatchType::JsonPatch
-									}
+									},
+									..Default::default()
 								}
 							);
 
@@ -664,7 +673,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 										.context("Couldn't read file")?
 										.replace("\r\n", "\n"),
 									file_type: TextFileType::Json
-								}
+								},
+								..Default::default()
 							}
 						);
 
@@ -696,7 +706,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.context("Couldn't read file")?
 								.replace("\r\n", "\n"),
 							file_type: TextFileType::Json
-						}
+						},
+						..Default::default()
 					}
 				);
 
@@ -723,7 +734,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					id.to_owned(),
 					EditorState {
 						file: Some(path.to_owned()),
-						data: EditorData::Nil
+						data: EditorData::Nil,
+						..Default::default()
 					}
 				);
 
@@ -1142,7 +1154,8 @@ pub async fn open_in_editor(
 						base: Box::new(entity.to_owned()),
 						current: Box::new(entity),
 						settings: Default::default()
-					}
+					},
+					..Default::default()
 				}
 			);
 
@@ -1179,7 +1192,8 @@ pub async fn open_in_editor(
 						base: repository.to_owned(),
 						current: repository,
 						patch_type: JsonPatchType::MergePatch
-					}
+					},
+					..Default::default()
 				}
 			);
 
@@ -1216,7 +1230,8 @@ pub async fn open_in_editor(
 						base: unlockables.to_owned(),
 						current: unlockables,
 						patch_type: JsonPatchType::MergePatch
-					}
+					},
+					..Default::default()
 				}
 			);
 

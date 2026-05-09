@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Button } from "carbon-components-svelte"
 	import { createEventDispatcher, onDestroy, onMount } from "svelte"
-	import { v4 } from "uuid"
 	import WaveSurfer from "wavesurfer.js"
 	import Hover from "wavesurfer.js/dist/plugins/hover.esm.js"
 	import Play from "carbon-icons-svelte/lib/Play.svelte"
