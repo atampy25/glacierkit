@@ -27,8 +27,8 @@
 		},
 		"shortDescription": "",
 		"linux": {
-			"deb": {
-				"depends": []
+			"appimage": {
+				"bundleMediaFramework": true
 			}
 		},
 		"createUpdaterArtifacts": "v1Compatible"

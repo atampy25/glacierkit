@@ -3,7 +3,21 @@
 	import "../treeview.css"
 	import "carbon-components-svelte/css/g90.css"
 	import "@fortawesome/fontawesome-free/css/all.min.css"
-	import "@fontsource/fira-code"
+	import "@fontsource-variable/fira-code/wght.css"
+	import "@fontsource/ibm-plex-sans/100.css"
+	import "@fontsource/ibm-plex-sans/100-italic.css"
+	import "@fontsource/ibm-plex-sans/200.css"
+	import "@fontsource/ibm-plex-sans/200-italic.css"
+	import "@fontsource/ibm-plex-sans/300.css"
+	import "@fontsource/ibm-plex-sans/300-italic.css"
+	import "@fontsource/ibm-plex-sans/400.css"
+	import "@fontsource/ibm-plex-sans/400-italic.css"
+	import "@fontsource/ibm-plex-sans/500.css"
+	import "@fontsource/ibm-plex-sans/500-italic.css"
+	import "@fontsource/ibm-plex-sans/600.css"
+	import "@fontsource/ibm-plex-sans/600-italic.css"
+	import "@fontsource/ibm-plex-sans/700.css"
+	import "@fontsource/ibm-plex-sans/700-italic.css"
 
 	import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 	import { ComposedModal, ModalBody, ModalFooter, ModalHeader, SkipToContent, ToastNotification } from "carbon-components-svelte"
@@ -762,11 +776,11 @@
 	}
 
 	:global(code) {
-		font-family: "Fira Code", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace;
+		font-family: "Fira Code Variable", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace;
 	}
 
 	:global(.bx--snippet code) {
-		font-family: "Fira Code", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
+		font-family: "Fira Code Variable", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
 	}
 
 	:global(.bx--toast-notification__caption) {
@@ -774,7 +788,7 @@
 	}
 
 	:global(.code-font) {
-		font-family: "Fira Code", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
+		font-family: "Fira Code Variable", "IBM Plex Mono", "Menlo", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", Courier, monospace !important;
 	}
 
 	:global(.no-menu-spacing .bx--list-box__menu-item__option) {

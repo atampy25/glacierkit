@@ -117,7 +117,7 @@
 				enabled: true
 			},
 			automaticLayout: true,
-			fontFamily: "Fira Code",
+			fontFamily: "Fira Code Variable",
 			fontLigatures: true,
 			colorDecorators: true
 		})

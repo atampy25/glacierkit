@@ -146,10 +146,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fontsource/fira-code@npm:^5.0.16":
-  version: 5.0.16
-  resolution: "@fontsource/fira-code@npm:5.0.16"
-  checksum: 00f97a8343a61acefc55e502e6c97bd407ced646e2b8e326a366a4a38487b2943fe091ab00aead4d3bb75062f480739f3a2150c4754c51638d36d31b484526c8
+"@fontsource-variable/fira-code@npm:^5.2.7":
+  version: 5.2.7
+  resolution: "@fontsource-variable/fira-code@npm:5.2.7"
+  checksum: 0fdf3e1816266f460fc697de9464e399185cce88615618930efd33bc3ce1149d53177bd5c179473395b0d69c684c0c24e1996eb615289a6aa3eecea773093abd
+  languageName: node
+  linkType: hard
+
+"@fontsource/ibm-plex-sans@npm:^5.2.8":
+  version: 5.2.8
+  resolution: "@fontsource/ibm-plex-sans@npm:5.2.8"
+  checksum: 3cdb45d9dd54f9b4ec0d5912215bbc5ef5a89cea99cc28d46fa5cf6ebee457f94183f42be5994b61b6cdacec0fe67d697b6642678823dc0cc7e7b58180e86211
   languageName: node
   linkType: hard
 
@@ -2800,7 +2807,8 @@ __metadata:
   dependencies:
     "@aptabase/tauri": "npm:^0.4.1"
     "@floating-ui/dom": "npm:^1.6.5"
-    "@fontsource/fira-code": "npm:^5.0.16"
+    "@fontsource-variable/fira-code": "npm:^5.2.7"
+    "@fontsource/ibm-plex-sans": "npm:^5.2.8"
     "@fortawesome/fontawesome-free": "npm:^6.5.1"
     "@jhubbardsf/svelte-sortablejs": "npm:^1.1.0"
     "@sveltejs/adapter-static": "npm:^3.0.10"
