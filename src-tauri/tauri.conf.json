@@ -41,6 +41,9 @@
 		"updater": {
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5OEYzQTUzNUZCODZBNUMKUldSY2FyaGZVenFQS2JydmlWbHhndGo2WXFEZExmVzEvQXJRYk9PekRjb0NoY01RRnBUdEMvNHgK",
 			"endpoints": ["https://raw.githubusercontent.com/atampy25/glacierkit/master/updates.json"]
+		},
+		"fs": {
+			"requireLiteralLeadingDot": false
 		}
 	},
 	"app": {

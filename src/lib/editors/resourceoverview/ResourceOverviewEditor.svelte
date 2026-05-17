@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ReferenceFlags, ResourceChangelogEntry, ResourceOverviewData, ResourceOverviewRequest } from "$lib/bindings"
 	import { event } from "$lib/utils"
-	import { Button, ClickableTile, ContentSwitcher, DataTable, Search, Switch, Tab, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, Tile } from "carbon-components-svelte"
+	import { Button, ClickableTile, DataTable, Search, Tab, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, Tile } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Edit from "carbon-icons-svelte/lib/Edit.svelte"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
@@ -16,6 +16,7 @@
 	import { ColumnDependency, Filter, SoftwareResource, TrashCan } from "carbon-icons-svelte"
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
 	import { VList } from "virtua/svelte"
+	import { platform } from "@tauri-apps/plugin-os"
 
 	let { id }: { id: string } = $props()
 
@@ -131,20 +132,23 @@
 											on:load={() => {
 												previewImage = previewImage
 											}}
-											src="editor-asset://{id}/{data.data.asset_id}"
+											src="{platform() === 'windows' ? 'http://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
 											alt="Resource preview"
 										/>
 									{:else if data.type === "Mesh"}
 										<div class="h-[30vh]">
-											<MeshPreview src="editor-asset://{id}/{data.data.asset_id}" boundingBox={data.data.bounding_box} />
+											<MeshPreview
+												src="{platform() === 'windows' ? 'http://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
+												boundingBox={data.data.bounding_box}
+											/>
 										</div>
 									{:else if data.type === "Audio"}
-										<WaveformPlayer src="editor-asset://{id}/{data.data.asset_id}" />
+										<WaveformPlayer src="{platform() === 'windows' ? 'http://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}" />
 									{:else if data.type === "MultiAudio"}
 										<div class="text-neutral-400 mb-2">{data.data.name}</div>
 										{#if data.data.audios.length}
 											<MultiWaveformPlayer
-												src={data.data.audios.map((a) => [a[0], `editor-asset://${id}/${a[1]}`])}
+												src={data.data.audios.map((a) => [a[0], `${platform() === "windows" ? "http://editor-asset.localhost" : "editor-asset:/"}/${id}/${a[1]}`])}
 												on:download={async ({ detail }) => {
 													trackEvent("Extract specific audio from WWEV file as WAV")
 

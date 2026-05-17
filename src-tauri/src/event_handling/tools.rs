@@ -119,7 +119,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 									pin_connection_override_deletes: vec![],
 									external_scenes: vec![],
 									sub_type: SubType::Scene,
-									quickentity_version: 3.1,
+									quickentity_version: 3.2,
 									extra_factory_references: vec![],
 									extra_blueprint_references: vec![],
 									comments: vec![]
