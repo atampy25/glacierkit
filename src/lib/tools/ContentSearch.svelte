@@ -39,6 +39,7 @@
 	let searchLocalisation = $state(false)
 	let searchPartitions: Record<string, boolean> = $state({})
 
+	let searchEntitiesAndQN = $derived(searchQN && searchEntities)
 	let isAnySearchPartitionFalse = $derived(Object.values(searchPartitions).some(v => v === false))
 	let isAllSearchPartitionFalse = $derived(Object.values(searchPartitions).every(v => v === false))
 </script>
@@ -59,7 +60,11 @@
 			</div>
 			<div class="mb-4">
 				<Checkbox labelText="Search entities" bind:checked={searchEntities} />
+				{#if searchEntities}
+					<div class="ml-6 mt-1">
 				<Checkbox labelText="Use QuickEntity format" bind:checked={searchQN} />
+					</div>
+				{/if}
 				<Checkbox labelText="Search BIN1 files" bind:checked={searchRL} />
 				<Checkbox labelText="Search textual files (JSON, REPO, ORES)" bind:checked={searchText} />
 				<Checkbox labelText="Search localisation" bind:checked={searchLocalisation} />
