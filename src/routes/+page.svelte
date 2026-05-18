@@ -311,8 +311,8 @@
 		}
 	})
 
-	let toolPaneWidth = 20
-	let previousPaneWidth = 20
+	let toolPaneWidth = $state(20)
+	let previousPaneWidth = $state(20)
 
 	function handleSnapEase(event: CustomEvent<{
 		size: number
