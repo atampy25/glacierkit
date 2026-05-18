@@ -56,6 +56,33 @@ use crate::{
 };
 
 #[try_fn]
+#[context("Couldn't open resource overview for {resource}")]
+pub async fn open_resource_overview(app: &AppHandle, resource: RuntimeID) -> Result<()> {
+	let app_state = app.state::<AppState>();
+	let id = Uuid::new_v4();
+
+	app_state.editor_states.insert(
+		id.to_owned(),
+		EditorState {
+			file: None,
+			data: EditorData::ResourceOverview { hash: resource },
+			..Default::default()
+		}
+	);
+
+	send_request(
+		app,
+		Request::Tab(TabRequest {
+			tab: id,
+			data: TabRequestData::Create {
+				name: format!("Resource overview ({resource})"),
+				editor_type: EditorType::ResourceOverview
+			}
+		})
+	)?;
+}
+
+#[try_fn]
 #[context("Couldn't initialise resource overview {id}")]
 pub async fn initialise_resource_overview(
 	app: &AppHandle,
@@ -858,27 +885,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::FollowDependencyInNewTab { hash, .. } => {
-			let id = Uuid::new_v4();
-
-			app_state.editor_states.insert(
-				id.to_owned(),
-				EditorState {
-					file: None,
-					data: EditorData::ResourceOverview { hash },
-					..Default::default()
-				}
-			);
-
-			send_request(
-				app,
-				Request::Tab(TabRequest {
-					tab: id,
-					data: TabRequestData::Create {
-						name: format!("Resource overview ({hash})"),
-						editor_type: EditorType::ResourceOverview
-					}
-				})
-			)?;
+			open_resource_overview(app, hash).await?;
 		}
 
 		ResourceOverviewEvent::OpenInEditor => {

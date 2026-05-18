@@ -17,13 +17,13 @@ use crate::{
 		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
 		is_valid_entity_factory, reverse_parent_refs_set
 	},
+	event_handling::resource_overview::open_resource_overview,
 	finish_task,
 	general::open_in_editor,
 	get_loaded_game_version,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, EditorValidity,
-		EntityEditorRequest, EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, Request, TabRequest,
-		TabRequestData
+		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
+		EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, Request, TabRequest, TabRequestData
 	},
 	rpkg::extract_latest_overview_info,
 	send_notification, send_request, start_task
@@ -144,27 +144,7 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) 
 		EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
 			if let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref() {
 				if resource_reverse_dependencies.contains_key(&resource) {
-					let id = Uuid::new_v4();
-
-					app_state.editor_states.insert(
-						id.to_owned(),
-						EditorState {
-							file: None,
-							data: EditorData::ResourceOverview { hash: resource },
-							..Default::default()
-						}
-					);
-
-					send_request(
-						app,
-						Request::Tab(TabRequest {
-							tab: id,
-							data: TabRequestData::Create {
-								name: format!("Resource overview ({resource})"),
-								editor_type: EditorType::ResourceOverview
-							}
-						})
-					)?;
+					open_resource_overview(app, resource).await?;
 				} else {
 					send_notification(
 						app,
@@ -496,29 +476,7 @@ pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 			if filetype == "TEMP" {
 				open_in_editor(app, game_files, install, factory).await?;
 			} else {
-				let id = Uuid::new_v4();
-
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: None,
-						data: EditorData::ResourceOverview {
-							hash: factory.to_owned()
-						},
-						..Default::default()
-					}
-				);
-
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: format!("Resource overview ({factory})"),
-							editor_type: EditorType::ResourceOverview
-						}
-					})
-				)?;
+				open_resource_overview(app, factory).await?;
 			}
 		} else {
 			send_notification(

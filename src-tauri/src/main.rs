@@ -31,29 +31,13 @@ use std::{
 
 use anyhow::{Context, Error, Result, anyhow, bail};
 use arc_swap::ArcSwap;
-use biome::format_json;
 use dashmap::DashMap;
-use editor_connection::EditorConnection;
-use entity::get_diff_info;
-use event_handling::{
-	repository_patch::handle_repository_patch_event, resource_overview::handle_resource_overview_event,
-	tools::handle_tool_event, unlockables_patch::handle_unlockables_patch_event
-};
 use fn_error_context::context;
-use general::open_file;
 use hashbrown::HashMap;
-use hitman_commons::game_detection::detect_installs;
-use hitman_commons::{game::GameVersion, hash_list::HASH_LIST};
+use hitman_commons::{game::GameVersion, game_detection::detect_installs, hash_list::HASH_LIST};
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{LevelFilter, info, trace};
-use model::{
-	AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent, EditorData,
-	EditorEventData, EditorRequest, EditorRequestData, EditorState, EditorType, EntityEditorRequest,
-	EntityMetadataRequest, EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent,
-	GlobalRequest, JsonPatchType, Project, ProjectSettings, Request, SettingsRequest, TabRequest, TabRequestData,
-	TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
-};
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
 use quickentity_rs::{entity::Property, generate_patch, variant::Variant};
@@ -67,6 +51,26 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
+
+use crate::{
+	biome::format_json,
+	editor_connection::EditorConnection,
+	entity::get_diff_info,
+	event_handling::{
+		repository_patch::handle_repository_patch_event,
+		resource_overview::{handle_resource_overview_event, open_resource_overview},
+		tools::handle_tool_event,
+		unlockables_patch::handle_unlockables_patch_event
+	},
+	general::open_file,
+	model::{
+		AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent,
+		EditorData, EditorEventData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityMetadataRequest,
+		EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
+		Project, ProjectSettings, Request, SettingsRequest, TabRequest, TabRequestData, TextEditorEvent,
+		TextEditorRequest, TextFileType, ToolRequest
+	}
+};
 
 pub const HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
@@ -528,27 +532,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				}
 
 				ContentSearchResultsEvent::OpenResourceOverview { hash, .. } => {
-					let id = Uuid::new_v4();
-
-					app_state.editor_states.insert(
-						id.to_owned(),
-						EditorState {
-							file: None,
-							data: EditorData::ResourceOverview { hash: hash.0 },
-							..Default::default()
-						}
-					);
-
-					send_request(
-						&app,
-						Request::Tab(TabRequest {
-							tab: id,
-							data: TabRequestData::Create {
-								name: format!("Resource overview ({})", hash.0),
-								editor_type: EditorType::ResourceOverview
-							}
-						})
-					)?;
+					open_resource_overview(&app, hash.0).await?;
 				}
 			}
 		},
