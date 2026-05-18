@@ -30,7 +30,7 @@
 	let data: ResourceOverviewData | null = $state(null)
 
 	let previewImage: HTMLImageElement | null = $state(null)
-	let referenceTab = $state(dependencies.length ? 0 : 1)
+	let referenceTab = $state(0)
 
 	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
 
@@ -62,6 +62,7 @@
 				reverseDependencies = request.data.reverseDependencies
 				changelog = request.data.changelog
 				data = request.data.data
+				referenceTab = !dependencies.length && reverseDependencies.length ? 1 : 0
 				break
 
 			// No exhaustivity check, only one request type
@@ -761,17 +762,17 @@
 					</div>
 				</Pane>
 				<Pane size={45} class="h-full flex flex-col">
-					<Tabs autoWidth class="mb-2" bind:selected={referenceTab}>
+					<Tabs autoWidth class="mb-2 overflow-hidden" bind:selected={referenceTab}>
 						<Tab disabled={dependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0" />
-								<div>References</div>
+								<div>References ({dependencies.length})</div>
 							</div>
 						</Tab>
 						<Tab disabled={reverseDependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0 -scale-x-100" />
-								<div>Reverse references</div>
+								<div>Reverse references ({reverseDependencies.length})</div>
 							</div>
 						</Tab>
 					</Tabs>

@@ -496,6 +496,7 @@
 	theme="g90"
 	tokens={{
     "interactive-01": "#0E8C75",
+	"interactive-04": "#42BEA5",
     "hover-primary": "#11A78B",
     "active-primary": "#0D826C",
   }}
