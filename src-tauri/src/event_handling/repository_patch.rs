@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result, bail};
 use fn_error_context::context;
-use hashbrown::HashMap;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
@@ -197,7 +198,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 
 	match event {
 		RepositoryPatchEditorEvent::Initialise => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Loading repository items")?;
 
@@ -242,7 +243,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 		}
 
 		RepositoryPatchEditorEvent::CreateRepositoryItem => {
-			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Creating repository item")?;
 
@@ -299,7 +300,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 		}
 
 		RepositoryPatchEditorEvent::ResetModifications { item } => {
-			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Resetting changes")?;
 
@@ -366,7 +367,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 		}
 
 		RepositoryPatchEditorEvent::ModifyItem { item, data } => {
-			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Saving repository item")?;
 
@@ -434,7 +435,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 		}
 
 		RepositoryPatchEditorEvent::SelectItem { item } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Selecting repository item")?;
 

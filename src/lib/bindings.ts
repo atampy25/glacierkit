@@ -1465,7 +1465,7 @@ export type ResourceOverviewData =
 	| {
 			type: "Audio"
 			data: {
-				asset_id: string
+				asset_id: string | null
 			}
 	  }
 	| {
@@ -1479,7 +1479,7 @@ export type ResourceOverviewData =
 			type: "MultiAudio"
 			data: {
 				name: string
-				audios: [string, string][]
+				audios: [string, string | null][]
 			}
 	  }
 	| { type: "Repository" }
@@ -1537,10 +1537,10 @@ export type ResourceOverviewEvent =
 	| { type: "extractTBLUAsRT" }
 	| { type: "extractAsRTGeneric" }
 	| { type: "extractAsImage" }
-	| { type: "extractAsWav" }
-	| { type: "extractMultiWav" }
+	| { type: "extractAsOgg" }
+	| { type: "extractMultiOgg" }
 	| {
-			type: "extractSpecificMultiWav"
+			type: "extractSpecificMultiOgg"
 			data: {
 				index: number
 			}

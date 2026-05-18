@@ -1,11 +1,12 @@
-use std::ops::Deref;
+use std::{
+	collections::{HashMap, HashSet},
+	ops::Deref
+};
 
 use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
-use arc_swap::ArcSwap;
 use ecow::EcoString;
 use fn_error_context::context;
-use hashbrown::{HashMap, HashSet};
 use hitman_bin1::game::h3::{ZSpatialEntity_ERoomBehaviour, ZVariant};
 use hitman_commons::{
 	game::GameVersion,
@@ -35,13 +36,12 @@ use crate::{
 		check_local_references_exist, get_decorations, get_diff_info, get_recursive_children, is_valid_entity_factory,
 		random_entity_id, reverse_parent_refs_set, visit_variant_mut
 	},
-	finish_task, get_loaded_game_version,
+	finish_task,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
+		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
 		EntityGeneralRequest, EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Request,
 		TabRequest, TabRequestData
 	},
-	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource},
 	send_notification, send_request, start_task
 };
 
@@ -134,7 +134,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityTreeEvent) ->
 pub async fn initialise(app: &AppHandle, editor_id: Uuid) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+	let editor_state = app_state
+		.editor_states
+		.get(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref entity, .. } => entity,
@@ -233,7 +237,11 @@ pub async fn initialise(app: &AppHandle, editor_id: Uuid) -> Result<()> {
 pub async fn create(app: &AppHandle, editor_id: Uuid, id: EntityID, content: SubEntity) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -277,7 +285,11 @@ pub async fn create(app: &AppHandle, editor_id: Uuid, id: EntityID, content: Sub
 pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: String) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -342,10 +354,13 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 #[try_fn]
 #[context("Couldn't handle select event")]
 pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+	let editor_state = app_state
+		.editor_states
+		.get(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref entity, .. } => entity,
@@ -441,20 +456,14 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	finish_task(app, task)?;
 
-	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(file_types) = app_state.file_types.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-		&& let Some(repository) = app_state.repository.load().as_ref()
+	if let Some(game) = app_state.game.load().as_ref()
 		&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
 	{
-		let game_version = get_loaded_game_version(app, install)?;
-
 		let task = start_task(app, format!("Gathering intellisense data for {}", id))?;
 
 		let (properties, pins) = rayon::join(
-			|| intellisense.get_properties(game_files, &app_state.cached_entities, game_version, entity, id, true),
-			|| intellisense.get_pins(game_files, &app_state.cached_entities, game_version, entity, id, false)
+			|| game.intellisense().get_properties(game, entity, id, true),
+			|| game.intellisense().get_pins(game, entity, id, false)
 		);
 
 		let (input_pins, output_pins) = pins?;
@@ -477,11 +486,7 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 		let task = start_task(app, format!("Computing decorations for {}", id))?;
 
 		let decorations = get_decorations(
-			game_files,
-			file_types,
-			&app_state.cached_entities,
-			repository,
-			game_version,
+			game,
 			tonytools_hash_list,
 			entity.entities.get(&id).context("No such entity")?,
 			entity
@@ -524,7 +529,11 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent: Option<EntityID>) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -593,7 +602,11 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	let task = start_task(app, format!("Deleting entity {}", id))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -874,7 +887,11 @@ pub async fn copy(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()> 
 
 	let task = start_task(app, format!("Copying entity {} and its children", id))?;
 
-	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+	let editor_state = app_state
+		.editor_states
+		.get(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref entity, .. } => entity,
@@ -929,7 +946,11 @@ pub async fn paste(
 		)
 	)?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -1259,7 +1280,11 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 
 	let task = start_task(app, format!("Searching for {}", query))?;
 
-	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+	let editor_state = app_state
+		.editor_states
+		.get(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref entity, .. } => entity,
@@ -1296,12 +1321,15 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 #[try_fn]
 #[context("Couldn't handle help menu event")]
 pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Showing help menu for {}", entity_id))?;
 
-	let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+	let editor_state = app_state
+		.editor_states
+		.get(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref entity, .. } => entity,
@@ -1315,61 +1343,25 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 
 	let sub_entity = entity.entities.get(&entity_id).context("No such entity")?;
 
-	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
-		let game_version = get_loaded_game_version(app, install)?;
-
+	if let Some(game) = app_state.game.load().as_ref() {
 		let (properties, pins) = if sub_entity
 			.factory
 			.resource
 			.get_info()
 			.is_some_and(|entry| entry.resource_type == "TEMP")
 		{
-			let underlying_entity = extract_entity(
-				game_files,
-				&app_state.cached_entities,
-				game_version,
-				sub_entity.factory.resource
-			)?;
+			let underlying_entity = game.extract_entity(sub_entity.factory.resource)?;
 
 			(
-				intellisense.get_properties(
-					game_files,
-					&app_state.cached_entities,
-					game_version,
-					&underlying_entity,
-					underlying_entity.root_entity,
-					false
-				)?,
-				intellisense.get_pins(
-					game_files,
-					&app_state.cached_entities,
-					game_version,
-					&underlying_entity,
-					underlying_entity.root_entity,
-					false
-				)?
+				game.intellisense()
+					.get_properties(game, &underlying_entity, underlying_entity.root_entity, false)?,
+				game.intellisense()
+					.get_pins(game, &underlying_entity, underlying_entity.root_entity, false)?
 			)
 		} else {
 			(
-				intellisense.get_properties(
-					game_files,
-					&app_state.cached_entities,
-					game_version,
-					entity,
-					entity_id,
-					true
-				)?,
-				intellisense.get_pins(
-					game_files,
-					&app_state.cached_entities,
-					game_version,
-					entity,
-					entity_id,
-					true
-				)?
+				game.intellisense().get_properties(game, entity, entity_id, true)?,
+				game.intellisense().get_pins(game, entity, entity_id, true)?
 			)
 		};
 
@@ -1424,12 +1416,15 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 #[try_fn]
 #[context("Couldn't handle game browser add event")]
 pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: String, file: RuntimeID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Adding {}", file))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -1441,19 +1436,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 		}
 	};
 
-	if let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
-		let game_version = get_loaded_game_version(app, install)?;
-
+	if let Some(game) = app_state.game.load().as_ref() {
 		if is_valid_entity_factory(file.get_info().context("File not in hash list")?.resource_type) {
 			let entity_id = random_entity_id();
 
 			let sub_entity = match file.get_info().context("File not in hash list")?.resource_type.as_ref() {
 				"TEMP" => {
-					let (temp_meta, temp_data) = extract_latest_resource(game_files, file)?;
+					let (temp_meta, temp_data) = game.extract_latest_resource(file)?;
 
-					let blueprint_index_in_resource_header = match game_version {
+					let blueprint_index_in_resource_header = match game.version() {
 						GameVersion::H1 => {
 							hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
 								.context("Couldn't deserialise factory")?
@@ -1516,9 +1507,9 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"CPPT" => {
-					let (cppt_meta, cppt_data) = extract_latest_resource(game_files, file)?;
+					let (cppt_meta, cppt_data) = game.extract_latest_resource(file)?;
 
-					let blueprint_index_in_resource_header = match game_version {
+					let blueprint_index_in_resource_header = match game.version() {
 						GameVersion::H1 => {
 							hitman_bin1::deserialize::<hitman_bin1::game::h1::SCppEntity>(&cppt_data)
 								.context("Couldn't deserialise CPPT")?
@@ -1581,7 +1572,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"ASET" => {
-					let blueprint = extract_latest_metadata(game_files, file)?
+					let blueprint = game
+						.extract_latest_metadata(file)?
 						.core_info
 						.references
 						.into_iter()
@@ -1625,7 +1617,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"UICT" => {
-					let blueprint = extract_latest_metadata(game_files, file)?
+					let blueprint = game
+						.extract_latest_metadata(file)?
 						.core_info
 						.references
 						.into_iter()
@@ -1669,16 +1662,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"MATT" => {
-					let blueprint = extract_latest_metadata(game_files, file)?
+					let blueprint = game
+						.extract_latest_metadata(file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
-							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource)?
-									.core_info
-									.resource_type == "MATB"
-							)
+							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "MATB")
 						})?
 						.context("No blueprint dependency found")?
 						.resource;
@@ -1719,15 +1709,14 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"WSWT" => {
-					let blueprint = extract_latest_metadata(game_files, file)?
+					let blueprint = game
+						.extract_latest_metadata(file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
 							anyhow::Ok({
-								let x = extract_latest_metadata(game_files, dep.resource)?
-									.core_info
-									.resource_type;
+								let x = game.extract_latest_metadata(dep.resource)?.core_info.resource_type;
 
 								x == "WSWB" || x == "DSWB"
 							})
@@ -1771,16 +1760,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"ECPT" => {
-					let blueprint = extract_latest_metadata(game_files, file)?
+					let blueprint = game
+						.extract_latest_metadata(file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
-							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource)?
-									.core_info
-									.resource_type == "ECPB"
-							)
+							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "ECPB")
 						})?
 						.context("No blueprint dependency found")?
 						.resource;
@@ -1821,16 +1807,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"AIBX" => {
-					let blueprint = extract_latest_metadata(game_files, file)?
+					let blueprint = game
+						.extract_latest_metadata(file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
-							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource)?
-									.core_info
-									.resource_type == "AIBB"
-							)
+							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "AIBB")
 						})?
 						.context("No blueprint dependency found")?
 						.resource;
@@ -1871,16 +1854,13 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				}
 
 				"WSGT" => {
-					let blueprint = extract_latest_metadata(game_files, file)?
+					let blueprint = game
+						.extract_latest_metadata(file)?
 						.core_info
 						.references
 						.into_iter()
 						.try_find(|dep| {
-							anyhow::Ok(
-								extract_latest_metadata(game_files, dep.resource)?
-									.core_info
-									.resource_type == "WSGB"
-							)
+							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "WSGB")
 						})?
 						.context("No blueprint dependency found")?
 						.resource;
@@ -1949,7 +1929,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				})
 			)?;
 		} else if file.get_info().context("File not in hash list")?.resource_type == "WWEV" {
-			let (wwev_meta, wwev_data) = extract_latest_resource(game_files, file)?;
+			let (wwev_meta, wwev_data) = game.extract_latest_resource(file)?;
 
 			let wwev = WwiseEvent::parse(&wwev_data, &wwev_meta.core_info)?;
 
@@ -2067,7 +2047,11 @@ pub async fn select_entity_in_editor(app: &AppHandle, editor_id: Uuid, entity_id
 
 	let task = start_task(app, format!("Selecting {} in editor", entity_id))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2090,12 +2074,15 @@ pub async fn select_entity_in_editor(app: &AppHandle, editor_id: Uuid, entity_id
 #[try_fn]
 #[context("Couldn't handle move entity to player event")]
 pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Moving {} to player position", entity_id))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2162,18 +2149,10 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 		)
 		.await?;
 
-	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-		&& intellisense
-			.get_properties(
-				game_files,
-				&app_state.cached_entities,
-				get_loaded_game_version(app, install)?,
-				entity,
-				entity_id,
-				true
-			)?
+	if let Some(game) = app_state.game.load().as_ref()
+		&& game
+			.intellisense()
+			.get_properties(game, entity, entity_id, true)?
 			.into_iter()
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
@@ -2254,12 +2233,15 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 #[try_fn]
 #[context("Couldn't handle rotate entity as player event")]
 pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Adjusting {} to player rotation", entity_id))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2326,18 +2308,10 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 		)
 		.await?;
 
-	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-		&& intellisense
-			.get_properties(
-				game_files,
-				&app_state.cached_entities,
-				get_loaded_game_version(app, install)?,
-				entity,
-				entity_id,
-				true
-			)?
+	if let Some(game) = app_state.game.load().as_ref()
+		&& game
+			.intellisense()
+			.get_properties(game, entity, entity_id, true)?
 			.into_iter()
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
@@ -2418,12 +2392,15 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 #[try_fn]
 #[context("Couldn't handle move entity to camera event")]
 pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Moving {} to camera position", entity_id))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2490,18 +2467,10 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 		)
 		.await?;
 
-	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-		&& intellisense
-			.get_properties(
-				game_files,
-				&app_state.cached_entities,
-				get_loaded_game_version(app, install)?,
-				entity,
-				entity_id,
-				true
-			)?
+	if let Some(game) = app_state.game.load().as_ref()
+		&& game
+			.intellisense()
+			.get_properties(game, entity, entity_id, true)?
 			.into_iter()
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
@@ -2582,12 +2551,15 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 #[try_fn]
 #[context("Couldn't handle rotate entity as camera event")]
 pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Adjusting {} to camera rotation", entity_id))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -2635,18 +2607,10 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 		)
 		.await?;
 
-	if let Some(intellisense) = app_state.intellisense.load().as_ref()
-		&& let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-		&& intellisense
-			.get_properties(
-				game_files,
-				&app_state.cached_entities,
-				get_loaded_game_version(app, install)?,
-				entity,
-				entity_id,
-				true
-			)?
+	if let Some(game) = app_state.game.load().as_ref()
+		&& game
+			.intellisense()
+			.get_properties(game, entity, entity_id, true)?
 			.into_iter()
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
@@ -2727,12 +2691,15 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 #[try_fn]
 #[context("Couldn't handle restore to original event")]
 pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Reverting {} to original state", entity_id))?;
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let EditorData::QNPatch {
 		ref base,
@@ -2832,22 +2799,13 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 			}
 
 			// Set any removed properties back to their default values
-			if let Some(intellisense) = app_state.intellisense.load().as_ref()
-				&& let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
+			if let Some(game) = app_state.game.load().as_ref() {
 				for (property, val) in prev_props {
 					if !sub_entity.properties.contains_key(&property)
 						&& SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x)
-						&& let Some((_, def_val, _)) = intellisense
-							.get_properties(
-								game_files,
-								&app_state.cached_entities,
-								get_loaded_game_version(app, install)?,
-								current,
-								entity_id,
-								false
-							)?
+						&& let Some((_, def_val, _)) = game
+							.intellisense()
+							.get_properties(game, current, entity_id, false)?
 							.into_iter()
 							.find(|(name, _, _)| *name == property)
 					{

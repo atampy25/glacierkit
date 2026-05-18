@@ -21,7 +21,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityGeneralEvent)
 		EntityGeneralEvent::SetShowReverseParentRefs {
 			show_reverse_parent_refs
 		} => {
-			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state
+				.editor_states
+				.get_mut(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let settings = match editor_state.data {
 				EditorData::QNEntity { ref mut settings, .. } => settings,
@@ -39,7 +43,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityGeneralEvent)
 		EntityGeneralEvent::SetShowChangesFromOriginal {
 			show_changes_from_original
 		} => {
-			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state
+				.editor_states
+				.get_mut(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let settings = match editor_state.data {
 				EditorData::QNEntity { ref mut settings, .. } => settings,

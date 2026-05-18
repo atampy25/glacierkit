@@ -143,14 +143,21 @@
 											/>
 										</div>
 									{:else if data.type === "Audio"}
-										<WaveformPlayer src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}" />
+										{#if data.data.asset_id}
+											<WaveformPlayer src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}" />
+										{:else}
+											<div class="text-lg">This audio object is in an unsupported format (likely MIDI).</div>
+										{/if}
 									{:else if data.type === "MultiAudio"}
 										<div class="text-neutral-400 mb-2">{data.data.name}</div>
 										{#if data.data.audios.length}
 											<MultiWaveformPlayer
-												src={data.data.audios.map((a) => [a[0], `${platform() === "windows" ? "https://editor-asset.localhost" : "editor-asset:/"}/${id}/${a[1]}`])}
+												src={data.data.audios.map((a) => [
+													a[0],
+													a[1] ? `${platform() === "windows" ? "https://editor-asset.localhost" : "editor-asset:/"}/${id}/${a[1]}` : null
+												])}
 												on:download={async ({ detail }) => {
-													trackEvent("Extract specific audio from WWEV file as WAV")
+													trackEvent("Extract specific audio from WWEV file")
 
 													await event({
 														type: "editor",
@@ -159,7 +166,7 @@
 															data: {
 																type: "resourceOverview",
 																data: {
-																	type: "extractSpecificMultiWav",
+																	type: "extractSpecificMultiOgg",
 																	data: {
 																		index: detail
 																	}
@@ -355,25 +362,27 @@
 											}}>Extract file</Button
 										>
 									{:else if data.type === "Audio"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract audio file as WAV")
+										{#if data.data.asset_id}
+											<Button
+												icon={DocumentExport}
+												on:click={async () => {
+													trackEvent("Extract audio file as OGG")
 
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
+													await event({
+														type: "editor",
 														data: {
-															type: "resourceOverview",
+															editor: id,
 															data: {
-																type: "extractAsWav"
+																type: "resourceOverview",
+																data: {
+																	type: "extractAsOgg"
+																}
 															}
 														}
-													}
-												})
-											}}>Extract as WAV</Button
-										>
+													})
+												}}>Extract as OGG</Button
+											>
+										{/if}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -397,7 +406,7 @@
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
-												trackEvent("Extract WWEV file as WAVs")
+												trackEvent("Extract WWEV file as OGGs")
 
 												await event({
 													type: "editor",
@@ -406,12 +415,12 @@
 														data: {
 															type: "resourceOverview",
 															data: {
-																type: "extractMultiWav"
+																type: "extractMultiOgg"
 															}
 														}
 													}
 												})
-											}}>Extract all as WAVs</Button
+											}}>Extract all as OGGs</Button
 										>
 										<Button
 											icon={DocumentExport}

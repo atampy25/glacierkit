@@ -32,7 +32,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetaPaneEvent
 		}
 
 		EntityMetaPaneEvent::SetNotes { entity_id, notes } => {
-			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state
+				.editor_states
+				.get_mut(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,

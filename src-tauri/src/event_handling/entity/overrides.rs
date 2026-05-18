@@ -1,5 +1,4 @@
 use anyhow::{Context, Result, anyhow};
-use arc_swap::ArcSwap;
 use fn_error_context::context;
 use itertools::Itertools;
 use quickentity_rs::{entity::Entity, variant::Variant};
@@ -11,9 +10,9 @@ use uuid::Uuid;
 
 use crate::{
 	entity::{get_ref_decoration, visit_variant},
-	finish_task, get_loaded_game_version,
+	finish_task,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityOverridesEvent,
+		AppState, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityOverridesEvent,
 		EntityOverridesRequest, Request, TabRequest, TabRequestData
 	},
 	send_request, start_task
@@ -23,27 +22,15 @@ use crate::{
 #[context("Couldn't get overrides decorations for {}", entity.factory)]
 pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Entity) -> Result<()> {
 	let app_state = app.state::<AppState>();
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 
-	if let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-		&& let Some(repository) = app_state.repository.load().as_ref()
-	{
-		let game_version = get_loaded_game_version(app, install)?;
-
+	if let Some(game) = app_state.game.load().as_ref() {
 		let task = start_task(app, "Updating override decorations")?;
 
 		let mut decorations = vec![];
 
 		for property_override in entity.property_overrides.iter() {
 			for reference in property_override.entities.iter() {
-				if let Some(decoration) = get_ref_decoration(
-					game_files,
-					&app_state.cached_entities,
-					game_version,
-					entity,
-					Some(reference)
-				) {
+				if let Some(decoration) = get_ref_decoration(game, entity, Some(reference)) {
 					decorations.push(decoration);
 				}
 			}
@@ -51,19 +38,13 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 			for property_data in property_override.properties.values() {
 				visit_variant(property_data, &mut |val| match val {
 					Variant::Ref(val) => {
-						if let Some(decoration) = get_ref_decoration(
-							game_files,
-							&app_state.cached_entities,
-							game_version,
-							entity,
-							val.as_ref()
-						) {
+						if let Some(decoration) = get_ref_decoration(game, entity, val.as_ref()) {
 							decorations.push(decoration);
 						}
 					}
 
 					Variant::Uuid(uuid) => {
-						if let Some(repo_item) = repository.iter().find(|x| x.id == *uuid)
+						if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
 							&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 						{
 							decorations
@@ -77,57 +58,30 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 		}
 
 		for reference in entity.override_deletes.iter() {
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				&app_state.cached_entities,
-				game_version,
-				entity,
-				Some(reference)
-			) {
+			if let Some(decoration) = get_ref_decoration(game, entity, Some(reference)) {
 				decorations.push(decoration);
 			}
 		}
 
 		for pin_connection_override in entity.pin_connection_overrides.iter() {
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				&app_state.cached_entities,
-				game_version,
-				entity,
-				Some(&pin_connection_override.from_entity)
-			) {
+			if let Some(decoration) = get_ref_decoration(game, entity, Some(&pin_connection_override.from_entity)) {
 				decorations.push(decoration);
 			}
 
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				&app_state.cached_entities,
-				game_version,
-				entity,
-				Some(&pin_connection_override.to_entity)
-			) {
+			if let Some(decoration) = get_ref_decoration(game, entity, Some(&pin_connection_override.to_entity)) {
 				decorations.push(decoration);
 			}
 		}
 
 		for pin_connection_override_delete in entity.pin_connection_override_deletes.iter() {
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				&app_state.cached_entities,
-				game_version,
-				entity,
-				Some(&pin_connection_override_delete.from_entity)
-			) {
+			if let Some(decoration) =
+				get_ref_decoration(game, entity, Some(&pin_connection_override_delete.from_entity))
+			{
 				decorations.push(decoration);
 			}
 
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				&app_state.cached_entities,
-				game_version,
-				entity,
-				Some(&pin_connection_override_delete.to_entity)
-			) {
+			if let Some(decoration) = get_ref_decoration(game, entity, Some(&pin_connection_override_delete.to_entity))
+			{
 				decorations.push(decoration);
 			}
 		}
@@ -155,7 +109,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 
 	match event {
 		EntityOverridesEvent::Initialise => {
-			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+			let editor_state = app_state
+				.editor_states
+				.get(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref entity, .. } => entity,
@@ -218,7 +176,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 		}
 
 		EntityOverridesEvent::UpdatePropertyOverrides { content } => {
-			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state
+				.editor_states
+				.get_mut(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -248,7 +210,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 		}
 
 		EntityOverridesEvent::UpdateOverrideDeletes { content } => {
-			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state
+				.editor_states
+				.get_mut(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -278,7 +244,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 		}
 
 		EntityOverridesEvent::UpdatePinConnectionOverrides { content } => {
-			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state
+				.editor_states
+				.get_mut(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -308,7 +278,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 		}
 
 		EntityOverridesEvent::UpdatePinConnectionOverrideDeletes { content } => {
-			let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+			let mut editor_state = app_state
+				.editor_states
+				.get_mut(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref mut entity, .. } => entity,

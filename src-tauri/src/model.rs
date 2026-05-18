@@ -1,9 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
-use dashmap::DashMap;
 use ecow::{EcoString, EcoVec};
-use hashbrown::HashMap;
 use hitman_commons::{
 	game_detection::GameInstall,
 	metadata::{ReferenceFlags, ResourceType, RuntimeID}
@@ -14,16 +12,16 @@ use quickentity_rs::{
 	entity::{Entity, EntityID, Ref, SubEntity, SubType},
 	variant::{Transform, Variant}
 };
-use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
 use uuid::Uuid;
+use whirlwind::ShardMap;
 
 use crate::{
 	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
-	intellisense::Intellisense,
+	game::Game,
 	ores_repo::{RepositoryItem, RepositoryItemInformation, UnlockableInformation, UnlockableItem}
 };
 
@@ -54,16 +52,12 @@ pub struct AppState {
 	pub project: ArcSwapOption<Project>,
 	pub tonytools_hash_list: ArcSwapOption<tonytools::hashlist::HashList>,
 	pub fs_watcher: ArcSwapOption<notify_debouncer_full::Debouncer<RecommendedWatcher, FileIdMap>>,
-	pub editor_states: Arc<DashMap<Uuid, EditorState>>,
-	pub game_files: ArcSwapOption<PartitionManager>,
+	pub editor_states: Arc<ShardMap<Uuid, EditorState>>,
 
-	/// Resource -> Resources which depend on it
-	pub resource_reverse_dependencies: ArcSwapOption<HashMap<RuntimeID, Vec<RuntimeID>>>,
-	pub file_types: ArcSwapOption<HashMap<RuntimeID, ResourceType>>,
+	/// Synchronises removals to prevent tasks trying to access the data of an editor that has been closed
+	pub editor_removal: Arc<ShardMap<Uuid, tokio::sync::RwLock<()>>>,
 
-	pub cached_entities: Arc<DashMap<RuntimeID, Entity>>,
-	pub repository: ArcSwapOption<Vec<RepositoryItem>>,
-	pub intellisense: ArcSwapOption<Intellisense>,
+	pub game: ArcSwapOption<Game>,
 
 	pub editor_connection: EditorConnection
 }
@@ -72,8 +66,8 @@ pub struct EditorState {
 	pub file: Option<PathBuf>,
 	pub data: EditorData,
 
-	// For the frontend to access without costly serialisation/deserialisation; ID -> (MIME type, data)
-	pub assets: DashMap<Uuid, (EcoString, EcoVec<u8>)>
+	/// For the frontend to access without costly serialisation/deserialisation; ID -> (MIME type, data)
+	pub assets: ShardMap<Uuid, (EcoString, EcoVec<u8>)>
 }
 
 impl Default for EditorState {
@@ -81,7 +75,7 @@ impl Default for EditorState {
 		Self {
 			file: None,
 			data: EditorData::Nil,
-			assets: DashMap::new()
+			assets: ShardMap::new()
 		}
 	}
 }
@@ -102,7 +96,7 @@ pub enum EditorData {
 	},
 	QNPatch {
 		settings: EphemeralQNSettings,
-		base: Box<Entity>,
+		base: Arc<Entity>,
 		current: Box<Entity>
 	},
 	RepositoryPatch {
@@ -284,7 +278,7 @@ pub enum ResourceOverviewData {
 		dds_data: Option<(String, String)>
 	},
 	Audio {
-		asset_id: Uuid
+		asset_id: Option<Uuid>
 	},
 	Mesh {
 		asset_id: Uuid,
@@ -292,7 +286,7 @@ pub enum ResourceOverviewData {
 	},
 	MultiAudio {
 		name: String,
-		audios: Vec<(String, Uuid)>
+		audios: Vec<(String, Option<Uuid>)>
 	},
 	Repository,
 	Unlockables,
@@ -678,11 +672,11 @@ nesting::nest! {
 
 					ExtractAsImage,
 
-					ExtractAsWav,
+					ExtractAsOgg,
 
-					ExtractMultiWav,
+					ExtractMultiOgg,
 
-					ExtractSpecificMultiWav {
+					ExtractSpecificMultiOgg {
 						index: u32
 					},
 

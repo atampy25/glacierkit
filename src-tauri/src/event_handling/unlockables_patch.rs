@@ -99,7 +99,7 @@ pub async fn handle_unlockables_patch_event(
 
 	match event {
 		UnlockablesPatchEditorEvent::Initialise => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Loading unlockables")?;
 
@@ -142,7 +142,7 @@ pub async fn handle_unlockables_patch_event(
 		}
 
 		UnlockablesPatchEditorEvent::CreateUnlockable => {
-			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Creating unlockable")?;
 
@@ -211,7 +211,7 @@ pub async fn handle_unlockables_patch_event(
 		}
 
 		UnlockablesPatchEditorEvent::ResetModifications { unlockable } => {
-			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Resetting changes")?;
 
@@ -276,7 +276,7 @@ pub async fn handle_unlockables_patch_event(
 		}
 
 		UnlockablesPatchEditorEvent::ModifyUnlockable { unlockable, data } => {
-			let mut editor_state = app_state.editor_states.get_mut(&id).context("No such editor")?;
+			let mut editor_state = app_state.editor_states.get_mut(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Saving unlockable")?;
 
@@ -351,7 +351,7 @@ pub async fn handle_unlockables_patch_event(
 		}
 
 		UnlockablesPatchEditorEvent::SelectUnlockable { unlockable } => {
-			let editor_state = app_state.editor_states.get(&id).context("No such editor")?;
+			let editor_state = app_state.editor_states.get(&id).await.context("No such editor")?;
 
 			let task = start_task(app, "Selecting unlockable")?;
 

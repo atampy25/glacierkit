@@ -1,10 +1,9 @@
+use std::collections::{HashMap, HashSet};
+
 use anyhow::{Context, Result, anyhow, bail};
-use dashmap::DashMap;
 use ecow::EcoString;
 use fn_error_context::context;
-use hashbrown::{HashMap, HashSet};
 use hitman_commons::{
-	game::GameVersion,
 	metadata::{ResourceType, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
@@ -16,7 +15,6 @@ use quickentity_rs::{
 };
 use rand::{rng, seq::IndexedRandom};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rpkg_rs::resource::partition_manager::PartitionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use specta::Type;
@@ -24,12 +22,7 @@ use tonytools::hmlanguages;
 use tryvial::{try_block, try_fn};
 use velcro::vec;
 
-use crate::{
-	languages::get_language_map,
-	model::EditorValidity,
-	ores_repo::RepositoryItem,
-	rpkg::{extract_entity, extract_latest_metadata, extract_latest_resource}
-};
+use crate::{game::Game, languages::get_language_map, model::EditorValidity};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -470,20 +463,14 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	EditorValidity::Valid
 }
 
-pub fn get_ref_decoration(
-	game_files: &PartitionManager,
-	cached_entities: &DashMap<RuntimeID, Entity>,
-	game_version: GameVersion,
-	entity: &Entity,
-	reference: Option<&Ref>
-) -> Option<(String, String)> {
+pub fn get_ref_decoration(game: &Game, entity: &Entity, reference: Option<&Ref>) -> Option<(String, String)> {
 	if let Some(ent) = reference.and_then(Ref::as_local) {
 		Some((ent.to_string(), entity.entities.get(&ent)?.name.to_string()))
 	} else if let Some(entity_ref) = reference
 		&& let Some(external_scene) = entity_ref.external_scene
 	{
 		Some((entity_ref.entity_id.to_string(), {
-			extract_entity(game_files, cached_entities, game_version, external_scene)
+			game.extract_entity(external_scene)
 				.ok()?
 				.entities
 				.get(&entity_ref.entity_id)?
@@ -498,15 +485,13 @@ pub fn get_ref_decoration(
 #[try_fn]
 #[context("Couldn't get decoration for LINE {}", line)]
 pub fn get_line_decoration(
-	game_files: &PartitionManager,
-	game_version: GameVersion,
+	game: &Game,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	line: RuntimeID
 ) -> Result<Option<String>> {
-	let (res_meta, res_data) = extract_latest_resource(game_files, line)?;
+	let (res_meta, res_data) = game.extract_latest_resource(line)?;
 
-	let (locr_meta, locr_data) = extract_latest_resource(
-		game_files,
+	let (locr_meta, locr_data) = game.extract_latest_resource(
 		res_meta
 			.core_info
 			.references
@@ -521,11 +506,11 @@ pub fn get_line_decoration(
 		loop {
 			if let Ok::<_, anyhow::Error>(x) = try_block! {
 				let langmap =
-					get_language_map(game_version, iteration).context("No more alternate language maps available")?;
+					get_language_map(game.version(), iteration).context("No more alternate language maps available")?;
 
 				let locr = hmlanguages::locr::LOCR::new(
 					tonytools_hash_list.to_owned(),
-					game_version.into(),
+					game.version().into(),
 					langmap.1.to_owned(),
 					langmap.0
 				)
@@ -541,7 +526,7 @@ pub fn get_line_decoration(
 			} else {
 				iteration += 1;
 
-				if get_language_map(game_version, iteration).is_none() {
+				if get_language_map(game.version(), iteration).is_none() {
 					bail!("No more alternate language maps available");
 				}
 			}
@@ -578,24 +563,14 @@ pub fn get_line_decoration(
 #[try_fn]
 #[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
 pub fn get_decorations(
-	game_files: &PartitionManager,
-	file_types: &HashMap<RuntimeID, ResourceType>,
-	cached_entities: &DashMap<RuntimeID, Entity>,
-	repository: &[RepositoryItem],
-	game_version: GameVersion,
+	game: &Game,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	sub_entity: &SubEntity,
 	entity: &Entity
 ) -> Result<Vec<(String, String)>> {
 	let mut decorations = vec![];
 
-	if let Some(decoration) = get_ref_decoration(
-		game_files,
-		cached_entities,
-		game_version,
-		entity,
-		sub_entity.parent.as_ref()
-	) {
+	if let Some(decoration) = get_ref_decoration(game, entity, sub_entity.parent.as_ref()) {
 		decorations.push(decoration);
 	}
 
@@ -617,19 +592,15 @@ pub fn get_decorations(
 	for property_data in sub_entity.properties.values() {
 		visit_variant(&property_data.value, &mut |val| match val {
 			Variant::Ref(val) => {
-				if let Some(decoration) =
-					get_ref_decoration(game_files, cached_entities, game_version, entity, val.as_ref())
-				{
+				if let Some(decoration) = get_ref_decoration(game, entity, val.as_ref()) {
 					decorations.push(decoration);
 				}
 			}
 
 			Variant::Resource(Some(reference)) => {
 				let res = reference.resource;
-				if file_types.get(&res).is_some_and(|x| x == "LINE") {
-					if let Ok(Some(decoration)) =
-						get_line_decoration(game_files, game_version, tonytools_hash_list, res)
-					{
+				if game.resource_type(res).is_some_and(|x| x == "LINE") {
+					if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
 						decorations.push((res.to_string(), decoration));
 					}
 				} else if res.get_path().is_none()
@@ -641,7 +612,7 @@ pub fn get_decorations(
 			}
 
 			Variant::Uuid(uuid) => {
-				if let Some(repo_item) = repository.iter().find(|x| x.id == *uuid)
+				if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
 					&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 				{
 					decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
@@ -656,19 +627,15 @@ pub fn get_decorations(
 		for property_data in properties.values() {
 			visit_variant(&property_data.value, &mut |val| match val {
 				Variant::Ref(val) => {
-					if let Some(decoration) =
-						get_ref_decoration(game_files, cached_entities, game_version, entity, val.as_ref())
-					{
+					if let Some(decoration) = get_ref_decoration(game, entity, val.as_ref()) {
 						decorations.push(decoration);
 					}
 				}
 
 				Variant::Resource(Some(reference)) => {
 					let res = reference.resource;
-					if file_types.get(&res).is_some_and(|x| x == "LINE") {
-						if let Ok(Some(decoration)) =
-							get_line_decoration(game_files, game_version, tonytools_hash_list, res)
-						{
+					if game.resource_type(res).is_some_and(|x| x == "LINE") {
+						if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
 							decorations.push((res.to_string(), decoration));
 						}
 					} else if res.get_path().is_none()
@@ -680,7 +647,7 @@ pub fn get_decorations(
 				}
 
 				Variant::Uuid(uuid) => {
-					if let Some(repo_item) = repository.iter().find(|x| x.id == *uuid)
+					if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
 						&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 					{
 						decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
@@ -697,9 +664,7 @@ pub fn get_decorations(
 			for reference in trigger_entities {
 				let reference = &reference.entity_ref;
 
-				if let Some(decoration) =
-					get_ref_decoration(game_files, cached_entities, game_version, entity, Some(reference))
-				{
+				if let Some(decoration) = get_ref_decoration(game, entity, Some(reference)) {
 					decorations.push(decoration);
 				}
 			}
@@ -715,13 +680,7 @@ pub fn get_decorations(
 			for reference in propagate_entities {
 				let reference = reference.entity_id;
 
-				if let Some(decoration) = get_ref_decoration(
-					game_files,
-					cached_entities,
-					game_version,
-					entity,
-					Some(&Ref::local(reference))
-				) {
+				if let Some(decoration) = get_ref_decoration(game, entity, Some(&Ref::local(reference))) {
 					decorations.push(decoration);
 				}
 			}
@@ -730,13 +689,7 @@ pub fn get_decorations(
 
 	for aliases in sub_entity.property_aliases.values() {
 		for alias_data in aliases {
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				cached_entities,
-				game_version,
-				entity,
-				Some(&Ref::local(alias_data.original_entity))
-			) {
+			if let Some(decoration) = get_ref_decoration(game, entity, Some(&Ref::local(alias_data.original_entity))) {
 				decorations.push(decoration);
 			}
 		}
@@ -744,57 +697,43 @@ pub fn get_decorations(
 
 	for exposed_entity in sub_entity.exposed_entities.values() {
 		for reference in &exposed_entity.refers_to {
-			if let Some(decoration) =
-				get_ref_decoration(game_files, cached_entities, game_version, entity, Some(reference))
-			{
+			if let Some(decoration) = get_ref_decoration(game, entity, Some(reference)) {
 				decorations.push(decoration);
 			}
 		}
 	}
 
 	for referenced_entity in sub_entity.exposed_interfaces.values() {
-		if let Some(decoration) = get_ref_decoration(
-			game_files,
-			cached_entities,
-			game_version,
-			entity,
-			Some(&Ref::local(*referenced_entity))
-		) {
+		if let Some(decoration) = get_ref_decoration(game, entity, Some(&Ref::local(*referenced_entity))) {
 			decorations.push(decoration);
 		}
 	}
 
 	for member_of in sub_entity.subsets.values() {
 		for parental_entity in member_of {
-			if let Some(decoration) = get_ref_decoration(
-				game_files,
-				cached_entities,
-				game_version,
-				entity,
-				Some(&Ref::local(parental_entity.to_owned()))
-			) {
+			if let Some(decoration) = get_ref_decoration(game, entity, Some(&Ref::local(parental_entity.to_owned()))) {
 				decorations.push(decoration);
 			}
 		}
 	}
 
-	if sub_entity
-		.factory
-		.resource
-		.get_info()
-		.is_some_and(|entry| entry.resource_type == "MATT")
-		&& let Some(mati) = extract_latest_metadata(game_files, sub_entity.factory.resource)?
+	if game
+		.resource_type(sub_entity.factory.resource)
+		.is_some_and(|ty| ty == "MATT")
+		&& let Some(mati) = game
+			.extract_latest_metadata(sub_entity.factory.resource)?
 			.core_info
 			.references
 			.into_iter()
 			.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "MATI"))
-		&& let Some(mate) = extract_latest_metadata(game_files, mati.resource)?
+		&& let Some(mate) = game
+			.extract_latest_metadata(mati.resource)?
 			.core_info
 			.references
 			.into_iter()
 			.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "MATE"))
 	{
-		let mate_data = extract_latest_resource(game_files, mate.resource)?.1;
+		let mate_data = game.extract_latest_resource(mate.resource)?.1;
 
 		let mut beginning = mate_data.len() - 1;
 		while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {

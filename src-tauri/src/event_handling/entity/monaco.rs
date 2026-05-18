@@ -1,12 +1,11 @@
 use anyhow::{Context, Result, anyhow};
-use arc_swap::ArcSwap;
 use fn_error_context::context;
-use hashbrown::HashMap;
 use hitman_commons::metadata::RuntimeID;
 use itertools::Itertools;
 use log::debug;
 use quickentity_rs::entity::EntityID;
 use serde_json::from_str;
+use std::collections::HashMap;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -20,12 +19,10 @@ use crate::{
 	event_handling::resource_overview::open_resource_overview,
 	finish_task,
 	general::open_in_editor,
-	get_loaded_game_version,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
-		EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, Request, TabRequest, TabRequestData
+		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest, EntityMonacoEvent,
+		EntityMonacoRequest, EntityTreeRequest, Request, TabRequest, TabRequestData
 	},
-	rpkg::extract_latest_overview_info,
 	send_notification, send_request, start_task
 };
 
@@ -123,7 +120,11 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) 
 		}
 
 		EntityMonacoEvent::SignalPin { entity_id, pin, output } => {
-			let editor_state = app_state.editor_states.get(&editor_id).context("No such editor")?;
+			let editor_state = app_state
+				.editor_states
+				.get(&editor_id)
+				.await
+				.context("No such editor")?;
 
 			let entity = match editor_state.data {
 				EditorData::QNEntity { ref entity, .. } => entity,
@@ -142,8 +143,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) 
 		}
 
 		EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
-			if let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref() {
-				if resource_reverse_dependencies.contains_key(&resource) {
+			if let Some(game) = app_state.game.load().as_ref() {
+				if game.resource_exists(resource) {
 					open_resource_overview(app, resource).await?;
 				} else {
 					send_notification(
@@ -172,10 +173,13 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) 
 #[try_fn]
 #[context("Couldn't handle update content event")]
 pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityID, content: String) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let mut editor_state = app_state.editor_states.get_mut(&editor_id).context("No such editor")?;
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
 
 	let entity = match editor_state.data {
 		EditorData::QNEntity { ref mut entity, .. } => entity,
@@ -277,20 +281,13 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 						})
 					)?;
 
-					if let Some(game_files) = app_state.game_files.load().as_ref()
-						&& let Some(install) = app_settings.load().game_install.as_ref()
-						&& let Some(file_types) = app_state.file_types.load().as_ref()
-						&& let Some(repository) = app_state.repository.load().as_ref()
+					if let Some(game) = app_state.game.load().as_ref()
 						&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
 					{
 						let task = start_task(app, "Updating decorations")?;
 
 						let decorations = get_decorations(
-							game_files,
-							file_types,
-							&app_state.cached_entities,
-							repository,
-							get_loaded_game_version(app, install)?,
+							game,
 							tonytools_hash_list,
 							entity.entities.get(&entity_id).context("No such entity")?,
 							entity
@@ -350,22 +347,13 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 						}
 
 						// Set any removed properties back to their default values
-						if let Some(intellisense) = app_state.intellisense.load().as_ref()
-							&& let Some(game_files) = app_state.game_files.load().as_ref()
-							&& let Some(install) = app_settings.load().game_install.as_ref()
-						{
+						if let Some(game) = app_state.game.load().as_ref() {
 							for (property, val) in prev_props {
 								if !sub_entity.properties.contains_key(&property)
 									&& SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x)
-									&& let Some((_, def_val, _)) = intellisense
-										.get_properties(
-											game_files,
-											&app_state.cached_entities,
-											get_loaded_game_version(app, install)?,
-											entity,
-											entity_id,
-											false
-										)?
+									&& let Some((_, def_val, _)) = game
+										.intellisense()
+										.get_properties(game, entity, entity_id, false)?
 										.into_iter()
 										.find(|(name, _, _)| *name == property)
 								{
@@ -466,15 +454,12 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 #[try_fn]
 #[context("Couldn't handle open factory event")]
 pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	if let Some(install) = app_settings.load().game_install.as_ref()
-		&& let Some(game_files) = app_state.game_files.load().as_deref()
-	{
-		if let Ok((filetype, _, _)) = extract_latest_overview_info(game_files, factory) {
+	if let Some(game) = app_state.game.load().as_deref() {
+		if let Ok((filetype, _, _)) = game.extract_latest_overview_info(factory) {
 			if filetype == "TEMP" {
-				open_in_editor(app, game_files, install, factory).await?;
+				open_in_editor(app, game, factory).await?;
 			} else {
 				open_resource_overview(app, factory).await?;
 			}

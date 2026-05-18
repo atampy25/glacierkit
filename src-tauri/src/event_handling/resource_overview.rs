@@ -1,12 +1,10 @@
 use std::{
 	fs::{self, File},
 	io::{BufWriter, Cursor, Write},
-	ops::Deref,
-	sync::Arc
+	ops::Deref
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use arc_swap::ArcSwap;
 use ecow::EcoVec;
 use fn_error_context::context;
 use glacier_texture::{
@@ -14,21 +12,17 @@ use glacier_texture::{
 	mipblock::MipblockData,
 	texture_map::TextureMap
 };
-use hashbrown::HashMap;
-use hitman_commons::{
-	game::GameVersion,
-	metadata::{ResourceType, RuntimeID},
-	rpkg_tool::RpkgResourceMeta
-};
+use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	sdef::SoundDefinitions,
 	wwev::WwiseEvent
 };
 use image::{ImageFormat, ImageReader};
+use optivorbis::{OggToOgg, Remuxer};
 use prim_rs::render_primitive::RenderPrimitive;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rpkg_rs::{GlacierResource, resource::partition_manager::PartitionManager};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rpkg_rs::GlacierResource;
 use serde::Serialize;
 use serde_json::{json, to_string, to_vec};
 use tauri::{AppHandle, Manager, State};
@@ -44,14 +38,13 @@ use crate::{
 	bin1::deserialize_generic,
 	biome::format_json,
 	finish_task,
+	game::Game,
 	general::open_in_editor,
-	get_loaded_game_version,
 	languages::get_language_map,
 	model::{
-		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
+		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
 		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest, TabRequest, TabRequestData
 	},
-	rpkg::{extract_entity, extract_latest_overview_info, extract_latest_resource, extract_resource_changelog},
 	send_notification, send_request, start_task
 };
 
@@ -61,14 +54,17 @@ pub async fn open_resource_overview(app: &AppHandle, resource: RuntimeID) -> Res
 	let app_state = app.state::<AppState>();
 	let id = Uuid::new_v4();
 
-	app_state.editor_states.insert(
-		id.to_owned(),
-		EditorState {
-			file: None,
-			data: EditorData::ResourceOverview { hash: resource },
-			..Default::default()
-		}
-	);
+	app_state
+		.editor_states
+		.insert(
+			id.to_owned(),
+			EditorState {
+				file: None,
+				data: EditorData::ResourceOverview { hash: resource },
+				..Default::default()
+			}
+		)
+		.await;
 
 	send_request(
 		app,
@@ -89,12 +85,9 @@ pub async fn initialise_resource_overview(
 	app_state: &State<'_, AppState>,
 	id: Uuid,
 	hash: RuntimeID,
-	game_files: &PartitionManager,
-	game_version: GameVersion,
-	resource_reverse_dependencies: &Arc<HashMap<RuntimeID, Vec<RuntimeID>>>,
-	file_types: &Arc<HashMap<RuntimeID, ResourceType>>
+	game: &Game
 ) -> Result<()> {
-	let (filetype, chunk_patch, deps) = extract_latest_overview_info(game_files, hash)?;
+	let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
 
 	send_request(
 		app,
@@ -112,32 +105,32 @@ pub async fn initialise_resource_overview(
 					.map(|dep| {
 						(
 							Hash(dep.resource),
-							file_types.get(&dep.resource).copied(),
+							game.resource_type(dep.resource),
 							dep.resource.get_info().and_then(|x| x.path.or(x.hint)),
 							dep.flags,
-							resource_reverse_dependencies.contains_key(&dep.resource)
+							game.resource_exists(dep.resource)
 						)
 					})
 					.collect(),
-				reverse_dependencies: resource_reverse_dependencies
-					.get(&hash)
+				reverse_dependencies: game
+					.resource_reverse_references(hash)
 					.map(|hashes| {
 						hashes
 							.iter()
-							.map(|hash| {
+							.map(|&hash| {
 								(
-									Hash(*hash),
-									*file_types.get(hash).unwrap(),
+									Hash(hash),
+									game.resource_type(hash).unwrap(),
 									hash.get_info().and_then(|x| x.path.or(x.hint))
 								)
 							})
 							.collect()
 					})
 					.unwrap_or_default(),
-				changelog: extract_resource_changelog(game_files, hash),
+				changelog: game.extract_resource_changelog(hash),
 				data: match filetype.as_ref() {
 					"TEMP" => {
-						let entity = extract_entity(game_files, &app_state.cached_entities, game_version, hash)?;
+						let entity = game.extract_entity(hash)?;
 
 						ResourceOverviewData::Entity {
 							blueprint_hash: Hash(entity.blueprint),
@@ -152,7 +145,7 @@ pub async fn initialise_resource_overview(
 
 					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF"
 					| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" => {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 						ResourceOverviewData::GenericRL {
 							json: {
@@ -161,7 +154,7 @@ pub async fn initialise_resource_overview(
 								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
 
 								deserialize_generic(
-									game_version,
+									game.version(),
 									if res_meta.core_info.resource_type == "DSWB" {
 										"WSWB".try_into()?
 									} else {
@@ -183,7 +176,7 @@ pub async fn initialise_resource_overview(
 					"GFXI" => {
 						let asset_id = Uuid::new_v4();
 
-						let (_, res_data) = extract_latest_resource(game_files, hash)?;
+						let (_, res_data) = game.extract_latest_resource(hash)?;
 
 						let mut image_data = vec![];
 
@@ -195,9 +188,11 @@ pub async fn initialise_resource_overview(
 						app_state
 							.editor_states
 							.get(&id)
+							.await
 							.context("No such editor")?
 							.assets
-							.insert(asset_id, ("image/webp".into(), image_data.into()));
+							.insert(asset_id, ("image/webp".into(), image_data.into()))
+							.await;
 
 						ResourceOverviewData::Image {
 							asset_id,
@@ -206,9 +201,9 @@ pub async fn initialise_resource_overview(
 					}
 
 					"PRIM" => {
-						let (_, res_data) = extract_latest_resource(game_files, hash)?;
+						let (_, res_data) = game.extract_latest_resource(hash)?;
 
-						let model = RenderPrimitive::process_data(game_version.into(), res_data)
+						let model = RenderPrimitive::process_data(game.version().into(), res_data)
 							.context("Couldn't process texture data")?;
 
 						// Higher is less detail
@@ -274,9 +269,11 @@ pub async fn initialise_resource_overview(
 						app_state
 							.editor_states
 							.get(&id)
+							.await
 							.context("No such editor")?
 							.assets
-							.insert(asset_id, ("model/obj".into(), obj));
+							.insert(asset_id, ("model/obj".into(), obj))
+							.await;
 
 						ResourceOverviewData::Mesh { asset_id, bounding_box }
 					}
@@ -284,14 +281,14 @@ pub async fn initialise_resource_overview(
 					"TEXT" => {
 						let asset_id = Uuid::new_v4();
 
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-						let mut texture = TextureMap::process_data(game_version.into(), res_data)
+						let mut texture = TextureMap::process_data(game.version().into(), res_data)
 							.context("Couldn't process texture data")?;
 
 						if let Some(texd_depend) = res_meta.core_info.references.first() {
-							let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
-							let mipblock = MipblockData::from_memory(&texd_data, game_version.into())
+							let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
+							let mipblock = MipblockData::from_memory(&texd_data, game.version().into())
 								.context("Couldn't process TEXD data")?;
 							texture.set_mipblock1(mipblock);
 						}
@@ -312,9 +309,11 @@ pub async fn initialise_resource_overview(
 						app_state
 							.editor_states
 							.get(&id)
+							.await
 							.context("No such editor")?
 							.assets
-							.insert(asset_id, ("image/webp".into(), image_data.into()));
+							.insert(asset_id, ("image/webp".into(), image_data.into()))
+							.await;
 
 						ResourceOverviewData::Image {
 							asset_id,
@@ -349,48 +348,72 @@ pub async fn initialise_resource_overview(
 					}
 
 					"WWEV" => {
-						let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 						let mut audios = vec![];
 
 						let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
 
-						for object in wwev.non_streamed {
-							let asset_id = Uuid::new_v4();
+						for (name, data) in wwev
+							.non_streamed
+							.into_par_iter()
+							.map(|object| {
+								if object.data.starts_with(b"RIFF") {
+									let mut ogg_data = vec![];
 
-							let mut wav_data = EcoVec::new();
+									WwiseRiffVorbis::new(
+										Cursor::new(object.data),
+										CodebookLibrary::aotuv_codebooks()?
+									)?
+									.generate_ogg(&mut ogg_data)?;
 
-							WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
-								.generate_ogg(&mut wav_data)?;
+									let mut optimised_ogg = EcoVec::new();
 
-							app_state
-								.editor_states
-								.get(&id)
-								.context("No such editor")?
-								.assets
-								.insert(asset_id, ("audio/wav".into(), wav_data));
+									OggToOgg::new_with_defaults()
+										.remux(&mut Cursor::new(ogg_data), &mut optimised_ogg)?;
 
-							audios.push(("Embedded audio".into(), asset_id))
-						}
+									Ok(("Embedded audio".into(), Some(optimised_ogg)))
+								} else {
+									Ok(("Embedded audio".into(), None))
+								}
+							})
+							.chain(wwev.streamed.into_par_iter().map(|object| {
+								let (_, wem_data) = game.extract_latest_resource(object.source)?;
 
-						for object in wwev.streamed {
-							let asset_id = Uuid::new_v4();
+								if wem_data.starts_with(b"RIFF") {
+									let mut ogg_data = vec![];
 
-							let (_, wem_data) = extract_latest_resource(game_files, object.source)?;
+									WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+										.generate_ogg(&mut ogg_data)?;
 
-							let mut wav_data = EcoVec::new();
+									let mut optimised_ogg = EcoVec::new();
 
-							WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
-								.generate_ogg(&mut wav_data)?;
+									OggToOgg::new_with_defaults()
+										.remux(&mut Cursor::new(ogg_data), &mut optimised_ogg)?;
 
-							app_state
-								.editor_states
-								.get(&id)
-								.context("No such editor")?
-								.assets
-								.insert(asset_id, ("audio/wav".into(), wav_data));
+									Ok((object.source.to_string(), Some(optimised_ogg)))
+								} else {
+									Ok((object.source.to_string(), None))
+								}
+							}))
+							.collect::<Result<Vec<_>>>()?
+						{
+							if let Some(data) = data {
+								let asset_id = Uuid::new_v4();
 
-							audios.push((object.source.to_string(), asset_id))
+								app_state
+									.editor_states
+									.get(&id)
+									.await
+									.context("No such editor")?
+									.assets
+									.insert(asset_id, ("audio/ogg".into(), data))
+									.await;
+
+								audios.push((name, Some(asset_id)));
+							} else {
+								audios.push((name, None));
+							}
 						}
 
 						ResourceOverviewData::MultiAudio {
@@ -402,42 +425,54 @@ pub async fn initialise_resource_overview(
 					"WWES" | "WWEM" => {
 						let asset_id = Uuid::new_v4();
 
-						let (_, res_data) = extract_latest_resource(game_files, hash)?;
+						let (_, res_data) = game.extract_latest_resource(hash)?;
 
-						let mut wav_data = EcoVec::new();
+						if res_data.starts_with(b"RIFF") {
+							let mut ogg_data = EcoVec::new();
 
-						WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
-							.generate_ogg(&mut wav_data)?;
+							WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(&mut ogg_data)?;
 
-						app_state
-							.editor_states
-							.get(&id)
-							.context("No such editor")?
-							.assets
-							.insert(asset_id, ("audio/wav".into(), wav_data));
+							let mut optimised_ogg = EcoVec::new();
 
-						ResourceOverviewData::Audio { asset_id }
+							OggToOgg::new_with_defaults().remux(&mut Cursor::new(ogg_data), &mut optimised_ogg)?;
+
+							app_state
+								.editor_states
+								.get(&id)
+								.await
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("audio/ogg".into(), optimised_ogg))
+								.await;
+
+							ResourceOverviewData::Audio {
+								asset_id: Some(asset_id)
+							}
+						} else {
+							ResourceOverviewData::Audio { asset_id: None }
+						}
 					}
 
 					"REPO" => ResourceOverviewData::Repository,
 
 					"JSON" => ResourceOverviewData::Json {
-						json: format_json(&String::from_utf8(extract_latest_resource(game_files, hash)?.1)?)?
+						json: format_json(&String::from_utf8(game.extract_latest_resource(hash)?.1)?)?
 					},
 
 					"CLNG" => ResourceOverviewData::HMLanguages {
 						json: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 							let clng = {
 								let mut iteration = 0;
 
 								loop {
 									if let Ok::<_, anyhow::Error>(x) = try_block! {
-										let langmap = get_language_map(game_version, iteration)
+										let langmap = get_language_map(game.version(), iteration)
 											.context("No more alternate language maps available")?;
 
-										let clng = hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
+										let clng = hmlanguages::clng::CLNG::new(game.version().into(), langmap.1.to_owned())
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 										clng.convert(
@@ -453,7 +488,7 @@ pub async fn initialise_resource_overview(
 									} else {
 										iteration += 1;
 
-										if get_language_map(game_version, iteration).is_none() {
+										if get_language_map(game.version(), iteration).is_none() {
 											bail!("No more alternate language maps available");
 										}
 									}
@@ -472,7 +507,7 @@ pub async fn initialise_resource_overview(
 
 					"DITL" => ResourceOverviewData::HMLanguages {
 						json: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 							let ditl = hmlanguages::ditl::DITL::new(
 								app_state
@@ -502,14 +537,14 @@ pub async fn initialise_resource_overview(
 
 					"DLGE" => ResourceOverviewData::HMLanguages {
 						json: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 							let dlge = {
 								let mut iteration = 0;
 
 								loop {
 									if let Ok::<_, anyhow::Error>(x) = try_block! {
-										let langmap = get_language_map(game_version, iteration)
+										let langmap = get_language_map(game.version(), iteration)
 											.context("No more alternate language maps available")?;
 
 										let dlge = hmlanguages::dlge::DLGE::new(
@@ -520,7 +555,7 @@ pub async fn initialise_resource_overview(
 												.context("No TonyTools hash list available")?
 												.deref()
 												.to_owned(),
-											game_version.into(),
+											game.version().into(),
 											langmap.1.to_owned(),
 											None,
 											false
@@ -540,7 +575,7 @@ pub async fn initialise_resource_overview(
 									} else {
 										iteration += 1;
 
-										if get_language_map(game_version, iteration).is_none() {
+										if get_language_map(game.version(), iteration).is_none() {
 											bail!("No more alternate language maps available");
 										}
 									}
@@ -559,14 +594,14 @@ pub async fn initialise_resource_overview(
 
 					"LOCR" => ResourceOverviewData::HMLanguages {
 						json: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 							let locr = {
 								let mut iteration = 0;
 
 								loop {
 									if let Ok::<_, anyhow::Error>(x) = try_block! {
-										let langmap = get_language_map(game_version, iteration)
+										let langmap = get_language_map(game.version(), iteration)
 											.context("No more alternate language maps available")?;
 
 										let locr = hmlanguages::locr::LOCR::new(
@@ -577,7 +612,7 @@ pub async fn initialise_resource_overview(
 												.context("No TonyTools hash list available")?
 												.deref()
 												.to_owned(),
-											game_version.into(),
+											game.version().into(),
 											langmap.1.to_owned(),
 											langmap.0
 										)
@@ -596,7 +631,7 @@ pub async fn initialise_resource_overview(
 									} else {
 										iteration += 1;
 
-										if get_language_map(game_version, iteration).is_none() {
+										if get_language_map(game.version(), iteration).is_none() {
 											bail!("No more alternate language maps available");
 										}
 									}
@@ -615,9 +650,9 @@ pub async fn initialise_resource_overview(
 
 					"RTLV" => ResourceOverviewData::HMLanguages {
 						json: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-							let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
+							let rtlv = hmlanguages::rtlv::RTLV::new(game.version().into(), None)
 								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 								.convert(
 									&res_data,
@@ -637,10 +672,9 @@ pub async fn initialise_resource_overview(
 
 					"LINE" => ResourceOverviewData::LocalisedLine {
 						languages: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-							let (locr_meta, locr_data) = extract_latest_resource(
-								game_files,
+							let (locr_meta, locr_data) = game.extract_latest_resource(
 								res_meta
 									.core_info
 									.references
@@ -654,7 +688,7 @@ pub async fn initialise_resource_overview(
 
 								loop {
 									if let Ok::<_, anyhow::Error>(x) = try_block! {
-										let langmap = get_language_map(game_version, iteration)
+										let langmap = get_language_map(game.version(), iteration)
 											.context("No more alternate language maps available")?;
 
 										let locr = hmlanguages::locr::LOCR::new(
@@ -665,7 +699,7 @@ pub async fn initialise_resource_overview(
 												.context("No TonyTools hash list available")?
 												.deref()
 												.to_owned(),
-											game_version.into(),
+											game.version().into(),
 											langmap.1.to_owned(),
 											langmap.0
 										)
@@ -684,7 +718,7 @@ pub async fn initialise_resource_overview(
 									} else {
 										iteration += 1;
 
-										if get_language_map(game_version, iteration).is_none() {
+										if get_language_map(game.version(), iteration).is_none() {
 											bail!("No more alternate language maps available");
 										}
 									}
@@ -735,7 +769,7 @@ pub async fn initialise_resource_overview(
 
 					"MATI" => ResourceOverviewData::MaterialInstance {
 						json: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 							let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
 								.context("Couldn't parse material instance")?;
@@ -752,9 +786,8 @@ pub async fn initialise_resource_overview(
 
 					"MATT" => ResourceOverviewData::MaterialEntity {
 						json: {
-							let (matt_meta, matt_data) = extract_latest_resource(game_files, hash)?;
-							let (matb_meta, matb_data) = extract_latest_resource(
-								game_files,
+							let (matt_meta, matt_data) = game.extract_latest_resource(hash)?;
+							let (matb_meta, matb_data) = game.extract_latest_resource(
 								matt_meta
 									.core_info
 									.references
@@ -783,9 +816,9 @@ pub async fn initialise_resource_overview(
 
 					"SDEF" => ResourceOverviewData::SoundDefinitions {
 						json: {
-							let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-							let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game_version)
+							let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game.version())
 								.context("Couldn't parse sound definitions")?;
 
 							let mut buf = Vec::new();
@@ -808,10 +841,9 @@ pub async fn initialise_resource_overview(
 #[try_fn]
 #[context("Couldn't handle resource overview event")]
 pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: ResourceOverviewEvent) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	let hash = match app_state.editor_states.get(&id).context("No such editor")?.data {
+	let hash = match app_state.editor_states.get(&id).await.context("No such editor")?.data {
 		EditorData::ResourceOverview { hash, .. } => hash,
 
 		_ => bail!("Editor {id} is not a resource overview")
@@ -821,29 +853,21 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		ResourceOverviewEvent::Initialise => {
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
-				&& let Some(file_types) = app_state.file_types.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				initialise_resource_overview(
-					app,
-					&app_state,
-					id,
-					hash,
-					game_files,
-					get_loaded_game_version(app, install)?,
-					resource_reverse_dependencies,
-					file_types
-				)
-				.await?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				initialise_resource_overview(app, &app_state, id, hash, game).await?;
 			}
 
 			finish_task(app, task)?;
 		}
 
 		ResourceOverviewEvent::FollowDependency { new_hash } => {
-			match app_state.editor_states.get_mut(&id).context("No such editor")?.data {
+			match app_state
+				.editor_states
+				.get_mut(&id)
+				.await
+				.context("No such editor")?
+				.data
+			{
 				EditorData::ResourceOverview { ref mut hash, .. } => {
 					*hash = new_hash;
 				}
@@ -853,22 +877,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
-				&& let Some(file_types) = app_state.file_types.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				initialise_resource_overview(
-					app,
-					&app_state,
-					id,
-					new_hash,
-					game_files,
-					get_loaded_game_version(app, install)?,
-					resource_reverse_dependencies,
-					file_types
-				)
-				.await?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				initialise_resource_overview(app, &app_state, id, new_hash, game).await?;
 
 				send_request(
 					app,
@@ -889,16 +899,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::OpenInEditor => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				open_in_editor(app, game_files, install, hash).await?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				open_in_editor(app, game, hash).await?;
 			}
 		}
 
 		ResourceOverviewEvent::ExtractAsFile => {
-			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let (metadata, data) = extract_latest_resource(game_files, hash)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (metadata, data) = game.extract_latest_resource(hash)?;
 
 				let file_type = hash
 					.get_info()
@@ -930,15 +938,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::ExtractAsQN => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				let entity_json = to_vec(&*extract_entity(
-					game_files,
-					&app_state.cached_entities,
-					get_loaded_game_version(app, install)?,
-					hash
-				)?)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let entity_json = to_vec(&*game.extract_entity(hash)?)?;
 
 				let mut dialog = app.dialog().file().set_title("Extract entity");
 
@@ -956,12 +957,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::ExtractTEMPAsRT => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				let (metadata, data) = extract_latest_resource(game_files, hash)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (metadata, data) = game.extract_latest_resource(hash)?;
 
-				let data = match get_loaded_game_version(app, install)? {
+				let data = match game.version() {
 					GameVersion::H1 => to_vec(
 						&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&data)
 							.context("Couldn't deserialise factory")?
@@ -1000,19 +999,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::ExtractTBLUAsFile => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				let (metadata, data) = extract_latest_resource(
-					game_files,
-					extract_entity(
-						game_files,
-						&app_state.cached_entities,
-						get_loaded_game_version(app, install)?,
-						hash
-					)?
-					.blueprint
-				)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (metadata, data) = game.extract_latest_resource(game.extract_entity(hash)?.blueprint)?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1038,17 +1026,10 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::ExtractTBLUAsRT => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				let game_version = get_loaded_game_version(app, install)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (metadata, data) = game.extract_latest_resource(game.extract_entity(hash)?.blueprint)?;
 
-				let (metadata, data) = extract_latest_resource(
-					game_files,
-					extract_entity(game_files, &app_state.cached_entities, game_version, hash)?.blueprint
-				)?;
-
-				let data = match game_version {
+				let data = match game.version() {
 					GameVersion::H1 => to_vec(
 						&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
@@ -1087,10 +1068,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::ExtractAsRTGeneric => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1109,7 +1088,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 					fs::write(
 						path.as_path().context("Invalid path")?,
 						to_vec(&deserialize_generic(
-							get_loaded_game_version(app, install)?,
+							game.version(),
 							res_meta.core_info.resource_type,
 							&res_data
 						)?)?
@@ -1124,10 +1103,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		}
 
 		ResourceOverviewEvent::ExtractAsImage => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1195,18 +1172,14 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						}
 
 						"TEXT" => {
-							let mut texture =
-								TextureMap::process_data(get_loaded_game_version(app, install)?.into(), res_data)
-									.context("Couldn't process texture data")?;
+							let mut texture = TextureMap::process_data(game.version().into(), res_data)
+								.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
-								let (_, texd_data) = extract_latest_resource(game_files, texd_depend.resource)?;
+								let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
 
-								let mip_block = MipblockData::from_memory(
-									&texd_data,
-									get_loaded_game_version(app, install)?.into()
-								)
-								.context("Couldn't process TEXD data")?;
+								let mip_block = MipblockData::from_memory(&texd_data, game.version().into())
+									.context("Couldn't process TEXD data")?;
 								texture.set_mipblock1(mip_block);
 							}
 
@@ -1253,8 +1226,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			}
 		}
 
-		ResourceOverviewEvent::ExtractAsWav => {
-			if let Some(game_files) = app_state.game_files.load().as_ref() {
+		ResourceOverviewEvent::ExtractAsOgg => {
+			if let Some(game) = app_state.game.load().as_ref() {
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
@@ -1262,123 +1235,190 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.wav", hash.to_hash()))
-					.add_filter("WAV file", &["wav"])
+					.set_file_name(format!("{}.ogg", hash.to_hash()))
+					.add_filter("OGG file", &["ogg"])
 					.blocking_save_file()
 				{
-					let (_, res_data) = extract_latest_resource(game_files, hash)?;
+					let (_, res_data) = game.extract_latest_resource(hash)?;
 
-					WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?.generate_ogg(
-						BufWriter::new(File::create(
-							path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
-						)?)
-					)?;
+					WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
+						.generate_ogg(BufWriter::new(File::create(path.as_path().context("Invalid path")?)?))?;
 				}
 			}
 		}
 
-		ResourceOverviewEvent::ExtractMultiWav => {
-			if let Some(game_files) = app_state.game_files.load().as_ref() {
-				let mut dialog = app.dialog().file().set_title("Extract all WAVs to folder");
+		ResourceOverviewEvent::ExtractMultiOgg => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let mut dialog = app.dialog().file().set_title("Extract all OGGs to folder");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
 				if let Some(path) = dialog.blocking_pick_folder() {
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+					let task = start_task(app, format!("Extracting {hash} as OGGs"))?;
+
+					let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
 
-					let mut idx = 0;
+					let non_streamed_count = wwev.non_streamed.len();
 
-					for object in wwev.non_streamed {
-						WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
-							.generate_ogg(BufWriter::new(File::create(
-								path.as_path()
-									.context("Invalid path")?
-									.join(format!("{}.wav", idx))
-									.to_string_lossy()
-									.as_ref()
-							)?))?;
+					wwev.non_streamed
+						.into_par_iter()
+						.enumerate()
+						.try_for_each(|(idx, object)| {
+							if object.data.starts_with(b"RIFF") {
+								let mut ogg_data = vec![];
 
-						idx += 1;
-					}
+								WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
+									.generate_ogg(&mut ogg_data)?;
 
-					for object in wwev.streamed {
-						let (_, wem_data) = extract_latest_resource(game_files, object.source)?;
+								OggToOgg::new_with_defaults().remux(
+									&mut Cursor::new(ogg_data),
+									&mut BufWriter::new(File::create(
+										path.as_path().context("Invalid path")?.join(format!(
+											"{}~{}.ogg",
+											hash.to_hash(),
+											idx
+										))
+									)?)
+								)?;
+							} else {
+								fs::write(
+									path.as_path().context("Invalid path")?.join(format!(
+										"{}~{}.wem",
+										hash.to_hash(),
+										idx
+									)),
+									object.data
+								)?;
+							}
 
-						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
-							.generate_ogg(BufWriter::new(File::create(
-								path.as_path()
-									.context("Invalid path")?
-									.join(format!("{}.wav", idx))
-									.to_string_lossy()
-									.as_ref()
-							)?))?;
+							anyhow::Ok(())
+						})?;
 
-						idx += 1;
-					}
+					wwev.streamed
+						.into_par_iter()
+						.enumerate()
+						.try_for_each(|(idx, object)| {
+							let (_, wem_data) = game.extract_latest_resource(object.source)?;
+
+							if wem_data.starts_with(b"RIFF") {
+								let mut ogg_data = vec![];
+
+								WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+									.generate_ogg(&mut ogg_data)?;
+
+								OggToOgg::new_with_defaults().remux(
+									&mut Cursor::new(ogg_data),
+									&mut BufWriter::new(File::create(
+										path.as_path().context("Invalid path")?.join(format!(
+											"{}~{}.ogg",
+											hash.to_hash(),
+											non_streamed_count + idx
+										))
+									)?)
+								)?;
+							} else {
+								fs::write(
+									path.as_path().context("Invalid path")?.join(format!(
+										"{}~{}.wem",
+										hash.to_hash(),
+										non_streamed_count + idx
+									)),
+									wem_data
+								)?;
+							}
+
+							anyhow::Ok(())
+						})?;
+
+					finish_task(app, task)?;
 				}
 			}
 		}
 
-		ResourceOverviewEvent::ExtractSpecificMultiWav { index } => {
-			if let Some(game_files) = app_state.game_files.load().as_ref() {
+		ResourceOverviewEvent::ExtractSpecificMultiOgg { index } => {
+			if let Some(game) = app_state.game.load().as_ref() {
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
 				if let Some(project) = app_state.project.load().as_ref() {
 					dialog = dialog.set_directory(&project.path);
 				}
 
-				if let Some(path) = dialog
-					.set_file_name(format!("{}~{}.wav", hash.to_hash(), index))
-					.add_filter("WAV file", &["wav"])
-					.blocking_save_file()
-				{
-					let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+				let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
 
-					if index < wwev.non_streamed.len() as u32 {
-						WwiseRiffVorbis::new(
-							Cursor::new(
-								&wwev
-									.non_streamed
-									.get(index as usize)
-									.context("No such audio object")?
-									.data
-							),
-							CodebookLibrary::aotuv_codebooks()?
-						)?
-						.generate_ogg(BufWriter::new(File::create(
-							path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
-						)?))?;
+				if index < wwev.non_streamed.len() as u32 {
+					let object = wwev.non_streamed.get(index as usize).context("No such audio object")?;
+					if object.data.starts_with(b"RIFF") {
+						if let Some(path) = dialog
+							.set_file_name(format!("{}~{}.ogg", hash.to_hash(), index))
+							.add_filter("OGG file", &["ogg"])
+							.blocking_save_file()
+						{
+							let mut ogg_data = vec![];
+
+							WwiseRiffVorbis::new(Cursor::new(&object.data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(&mut ogg_data)?;
+
+							OggToOgg::new_with_defaults().remux(
+								&mut Cursor::new(ogg_data),
+								&mut BufWriter::new(File::create(path.as_path().context("Invalid path")?)?)
+							)?;
+						}
 					} else {
-						let wwem_hash = wwev
-							.streamed
-							.get(index as usize - wwev.non_streamed.len())
-							.context("No such audio object")?
-							.source;
+						if let Some(path) = dialog
+							.set_file_name(format!("{}~{}.wem", hash.to_hash(), index))
+							.add_filter("WEM file", &["wem"])
+							.blocking_save_file()
+						{
+							fs::write(path.as_path().context("Invalid path")?, &object.data)?;
+						}
+					}
+				} else {
+					let wwem_hash = wwev
+						.streamed
+						.get(index as usize - wwev.non_streamed.len())
+						.context("No such audio object")?
+						.source;
 
-						let (_, wem_data) = extract_latest_resource(game_files, wwem_hash)?;
+					let (_, wem_data) = game.extract_latest_resource(wwem_hash)?;
 
-						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
-							.generate_ogg(BufWriter::new(File::create(
-								path.as_path().context("Invalid path")?.to_string_lossy().as_ref()
-							)?))?;
+					if wem_data.starts_with(b"RIFF") {
+						if let Some(path) = dialog
+							.set_file_name(format!("{}~{}.ogg", hash.to_hash(), index))
+							.add_filter("OGG file", &["ogg"])
+							.blocking_save_file()
+						{
+							let mut ogg_data = vec![];
+
+							WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(&mut ogg_data)?;
+
+							OggToOgg::new_with_defaults().remux(
+								&mut Cursor::new(ogg_data),
+								&mut BufWriter::new(File::create(path.as_path().context("Invalid path")?)?)
+							)?;
+						}
+					} else {
+						if let Some(path) = dialog
+							.set_file_name(format!("{}~{}.wem", hash.to_hash(), index))
+							.add_filter("WEM file", &["wem"])
+							.blocking_save_file()
+						{
+							fs::write(path.as_path().context("Invalid path")?, wem_data)?;
+						}
 					}
 				}
 			}
 		}
 
 		ResourceOverviewEvent::ExtractAsHMLanguages => {
-			if let Some(game_files) = app_state.game_files.load().as_ref()
-				&& let Some(install) = app_settings.load().game_install.as_ref()
-			{
-				let game_version = get_loaded_game_version(app, install)?;
-
-				let (res_meta, res_data) = extract_latest_resource(game_files, hash)?;
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1410,11 +1450,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 									loop {
 										if let Ok::<_, anyhow::Error>(x) = try_block! {
-											let langmap = get_language_map(game_version, iteration)
+											let langmap = get_language_map(game.version(), iteration)
 												.context("No more alternate language maps available")?;
 
 											let clng =
-												hmlanguages::clng::CLNG::new(game_version.into(), langmap.1.to_owned())
+												hmlanguages::clng::CLNG::new(game.version().into(), langmap.1.to_owned())
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 											clng.convert(
@@ -1433,7 +1473,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 										} else {
 											iteration += 1;
 
-											if get_language_map(game_version, iteration).is_none() {
+											if get_language_map(game.version(), iteration).is_none() {
 												bail!("No more alternate language maps available");
 											}
 										}
@@ -1481,7 +1521,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 									loop {
 										if let Ok::<_, anyhow::Error>(x) = try_block! {
-											let langmap = get_language_map(game_version, iteration)
+											let langmap = get_language_map(game.version(), iteration)
 												.context("No more alternate language maps available")?;
 
 											let dlge = hmlanguages::dlge::DLGE::new(
@@ -1492,7 +1532,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 													.context("No TonyTools hash list available")?
 													.deref()
 													.to_owned(),
-												game_version.into(),
+												game.version().into(),
 												langmap.1.to_owned(),
 												None,
 												false
@@ -1515,7 +1555,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 										} else {
 											iteration += 1;
 
-											if get_language_map(game_version, iteration).is_none() {
+											if get_language_map(game.version(), iteration).is_none() {
 												bail!("No more alternate language maps available");
 											}
 										}
@@ -1537,7 +1577,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 									loop {
 										if let Ok::<_, anyhow::Error>(x) = try_block! {
-											let langmap = get_language_map(game_version, iteration)
+											let langmap = get_language_map(game.version(), iteration)
 												.context("No more alternate language maps available")?;
 
 											let locr = hmlanguages::locr::LOCR::new(
@@ -1548,7 +1588,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 													.context("No TonyTools hash list available")?
 													.deref()
 													.to_owned(),
-												game_version.into(),
+												game.version().into(),
 												langmap.1.to_owned(),
 												langmap.0
 											)
@@ -1570,7 +1610,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 										} else {
 											iteration += 1;
 
-											if get_language_map(game_version, iteration).is_none() {
+											if get_language_map(game.version(), iteration).is_none() {
 												bail!("No more alternate language maps available");
 											}
 										}
@@ -1587,7 +1627,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 							}
 
 							"RTLV" => {
-								let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
+								let rtlv = hmlanguages::rtlv::RTLV::new(game.version().into(), None)
 									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
 									.convert(
 										&res_data,

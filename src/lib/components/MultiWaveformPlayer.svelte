@@ -9,7 +9,7 @@
 	import SkipBack from "carbon-icons-svelte/lib/SkipBack.svelte"
 	import Download from "carbon-icons-svelte/lib/Download.svelte"
 
-	export let src: [string, string][]
+	export let src: [string, string | null][]
 
 	let container: HTMLDivElement
 	let wavesurfer: WaveSurfer = null!
@@ -37,7 +37,7 @@
 			container,
 			waveColor: "#dddddd",
 			progressColor: "#aaaaaa",
-			url: src[playerIdx][1],
+			url: src[playerIdx][1] || undefined,
 			plugins: [
 				Hover.create({
 					lineColor: "#888888",
@@ -80,7 +80,9 @@
 		} else {
 			// Valid input
 			playerIdx = newIndex - 1
-			wavesurfer.load(src[playerIdx][1])
+			if (src[playerIdx][1]) {
+				wavesurfer.load(src[playerIdx][1])
+			}
 			isPlaying = false
 		}
 	}
@@ -106,7 +108,10 @@
 	$: displayedIndex = (playerIdx + 1).toString()
 </script>
 
-<div class="mb-2" bind:this={container}></div>
+<div class="mb-2" class:hidden={!src[playerIdx][1]} bind:this={container}></div>
+{#if !src[playerIdx][1]}
+	<div class="mb-2 min-h-[128px]">This audio object is in an unsupported format (likely MIDI).</div>
+{/if}
 {#if wavesurfer}
 	<div class="flex flex-wrap gap-4 items-center">
 		<Button
@@ -129,7 +134,9 @@
 					playerIdx = src.length - 1
 				}
 
-				wavesurfer.load(src[playerIdx][1])
+				if (src[playerIdx][1]) {
+					wavesurfer.load(src[playerIdx][1]!)
+				}
 				isPlaying = false
 			}}
 		/>
@@ -144,7 +151,9 @@
 					playerIdx = 0
 				}
 
-				wavesurfer.load(src[playerIdx][1])
+				if (src[playerIdx][1]) {
+					wavesurfer.load(src[playerIdx][1]!)
+				}
 				isPlaying = false
 			}}
 		/>

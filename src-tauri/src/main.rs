@@ -11,30 +11,31 @@ pub mod biome;
 pub mod editor_connection;
 pub mod entity;
 pub mod event_handling;
+pub mod game;
 pub mod general;
 pub mod intellisense;
 pub mod languages;
 pub mod model;
 pub mod ores_repo;
-pub mod rpkg;
 pub mod show_in_folder;
 
 use std::{
 	backtrace::{Backtrace, BacktraceStatus},
 	cell::Cell,
+	collections::HashMap,
 	fmt::Write,
 	fs,
 	path::{Path, PathBuf},
+	pin::pin,
 	sync::Arc,
 	time::{Duration, SystemTime, UNIX_EPOCH}
 };
 
 use anyhow::{Context, Error, Result, anyhow, bail};
 use arc_swap::ArcSwap;
-use dashmap::DashMap;
 use fn_error_context::context;
-use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, game_detection::detect_installs, hash_list::HASH_LIST};
+use futures_util::StreamExt;
+use hitman_commons::game_detection::detect_installs;
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{LevelFilter, info, trace};
@@ -51,6 +52,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
+use whirlwind::ShardMap;
 
 use crate::{
 	biome::format_json,
@@ -223,114 +225,118 @@ async fn main() {
 				.level_for("tauri_plugin_aptabase", LevelFilter::Off)
 				.level_for("quickentity_rs", LevelFilter::Off)
 				.level_for("mio", LevelFilter::Off)
+				.level_for("optivorbis", LevelFilter::Off)
 				.build()
 		)
 		.invoke_handler(specta.invoke_handler())
 		.register_asynchronous_uri_scheme_protocol("editor-asset", |ctx, req, res| {
-			let app_state = ctx.app_handle().state::<AppState>();
+			let app = ctx.app_handle().to_owned();
 
-			if let Some(host) = req.uri().host()
-				&& let Ok(editor) = host.parse::<Uuid>()
-				&& let Ok(asset) = req.uri().path().trim_start_matches('/').parse::<Uuid>()
-				&& let Some(editor) = app_state.editor_states.get(&editor)
-				&& let Some(asset) = editor.assets.get(&asset)
-			{
-				let resp = tauri::http::Response::builder()
-					.version(tauri::http::Version::HTTP_3)
-					.header("Access-Control-Allow-Origin", "*")
-					.header("Accept-Ranges", "bytes");
+			async_runtime::spawn(async move {
+				let app_state = app.state::<AppState>();
+				if let Some(host) = req.uri().host()
+					&& let Ok(editor) = host.parse::<Uuid>()
+					&& let Ok(asset) = req.uri().path().trim_start_matches('/').parse::<Uuid>()
+					&& let Some(editor) = app_state.editor_states.get(&editor).await
+					&& let Some(asset) = editor.assets.get(&asset).await
+				{
+					let resp = tauri::http::Response::builder()
+						.version(tauri::http::Version::HTTP_3)
+						.header("Access-Control-Allow-Origin", "*")
+						.header("Accept-Ranges", "bytes");
 
-				let ranges = req
-					.headers()
-					.get("range")
-					.and_then(|x| x.to_str().ok())
-					.and_then(|x| x.strip_prefix("bytes="))
-					.map(|x| {
-						x.split(',')
-							.filter_map(|part| {
-								let mut split = part.trim().split('-');
-								let start = split.next()?.parse::<usize>().ok()?;
-								let end = split
-									.next()
-									.and_then(|x| x.parse::<usize>().ok())
-									.unwrap_or(asset.1.len() - 1);
-								if start > end || end >= asset.1.len() {
-									return None;
-								}
-								Some((start, end))
-							})
-							.collect::<Vec<_>>()
-					});
+					let ranges = req
+						.headers()
+						.get("range")
+						.and_then(|x| x.to_str().ok())
+						.and_then(|x| x.strip_prefix("bytes="))
+						.map(|x| {
+							x.split(',')
+								.filter_map(|part| {
+									let mut split = part.trim().split('-');
+									let start = split.next()?.parse::<usize>().ok()?;
+									let end = split
+										.next()
+										.and_then(|x| x.parse::<usize>().ok())
+										.unwrap_or(asset.1.len() - 1);
+									if start > end || end >= asset.1.len() {
+										return None;
+									}
+									Some((start, end))
+								})
+								.collect::<Vec<_>>()
+						});
 
-				match *req.method() {
-					tauri::http::Method::HEAD => {
-						if let Some(ranges) = ranges
-							&& ranges.len() == 1
-						{
-							let (start, end) = ranges[0];
-							res.respond(
-								resp.status(206)
-									.header("Content-Range", format!("bytes {}-{}/{}", start, end, asset.1.len()))
-									.header("Content-Length", end - start + 1)
-									.body(&[])
-									.unwrap()
-							)
-						} else {
-							res.respond(
-								resp.header("Content-Type", asset.0.as_str())
-									.header("Content-Length", asset.1.len())
-									.body(&[])
-									.unwrap()
-							)
+					match *req.method() {
+						tauri::http::Method::HEAD => {
+							if let Some(ranges) = ranges
+								&& ranges.len() == 1
+							{
+								let (start, end) = ranges[0];
+								res.respond(
+									resp.status(206)
+										.header("Content-Range", format!("bytes {}-{}/{}", start, end, asset.1.len()))
+										.header("Content-Length", end - start + 1)
+										.body(&[])
+										.unwrap()
+								)
+							} else {
+								res.respond(
+									resp.header("Content-Type", asset.0.as_str())
+										.header("Content-Length", asset.1.len())
+										.body(&[])
+										.unwrap()
+								)
+							}
 						}
-					}
 
-					tauri::http::Method::GET => {
-						if let Some(ranges) = ranges
-							&& ranges.len() == 1
-						{
-							let (start, end) = ranges[0];
-							res.respond(
-								resp.status(206)
-									.header("Content-Range", format!("bytes {}-{}/{}", start, end, asset.1.len()))
-									.header("Content-Length", end - start + 1)
-									.body(asset.1[start..=end].to_vec())
-									.unwrap()
-							)
-						} else {
-							res.respond(
-								resp.header("Content-Type", asset.0.as_str())
-									.header("Content-Length", asset.1.len())
-									.body(asset.1.to_vec())
-									.unwrap()
-							)
+						tauri::http::Method::GET => {
+							if let Some(ranges) = ranges
+								&& ranges.len() == 1
+							{
+								let (start, end) = ranges[0];
+								res.respond(
+									resp.status(206)
+										.header("Content-Range", format!("bytes {}-{}/{}", start, end, asset.1.len()))
+										.header("Content-Length", end - start + 1)
+										.body(asset.1[start..=end].to_vec())
+										.unwrap()
+								)
+							} else {
+								res.respond(
+									resp.header("Content-Type", asset.0.as_str())
+										.header("Content-Length", asset.1.len())
+										.body(asset.1.to_vec())
+										.unwrap()
+								)
+							}
 						}
+
+						tauri::http::Method::OPTIONS => res.respond(
+							resp.header("Allow", "GET, HEAD, OPTIONS")
+								.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+								.body(&[])
+								.unwrap()
+						),
+
+						_ => res.respond(
+							tauri::http::Response::builder()
+								.version(tauri::http::Version::HTTP_3)
+								.status(405)
+								.body(&[])
+								.unwrap()
+						)
 					}
-
-					tauri::http::Method::OPTIONS => res.respond(
-						resp.header("Allow", "GET, HEAD, OPTIONS")
-							.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
-							.body(&[])
-							.unwrap()
-					),
-
-					_ => res.respond(
+				} else {
+					res.respond(
 						tauri::http::Response::builder()
 							.version(tauri::http::Version::HTTP_3)
-							.status(405)
+							.status(404)
 							.body(&[])
 							.unwrap()
-					)
+					);
 				}
-			} else {
-				res.respond(
-					tauri::http::Response::builder()
-						.version(tauri::http::Version::HTTP_3)
-						.status(404)
-						.body(&[])
-						.unwrap()
-				);
-			}
+			});
 		})
 		.setup(|app| {
 			LOG_DIR.set(app.path().app_log_dir().expect("Couldn't get log dir"));
@@ -341,17 +347,22 @@ async fn main() {
 
 			let app_data_path = app.path().app_data_dir().expect("Couldn't get data dir");
 
-			let mut invalid = true;
-			if let Ok(read) = fs::read(app_data_path.join("settings.json"))
-				&& let Ok(settings) = from_slice::<AppSettings>(&read)
-			{
-				invalid = false;
-				app.manage(ArcSwap::new(settings.into()));
-			}
-
 			let game_installs = detect_installs().expect("Couldn't detect game installs");
 
-			if invalid {
+			if let Ok(read) = fs::read(app_data_path.join("settings.json"))
+				&& let Ok(mut settings) = from_slice::<AppSettings>(&read)
+			{
+				// Check if the game install is still valid
+				if settings
+					.game_install
+					.as_ref()
+					.is_some_and(|x| !game_installs.iter().any(|y| y.path == *x))
+				{
+					settings.game_install = None;
+				}
+
+				app.manage(ArcSwap::new(settings.into()));
+			} else {
 				let settings = AppSettings::default();
 				fs::create_dir_all(&app_data_path).expect("Couldn't create app data dir");
 				fs::write(
@@ -359,21 +370,6 @@ async fn main() {
 					to_vec(&settings).expect("Couldn't serialise default app settings")
 				)
 				.expect("Couldn't write default app settings");
-				app.manage(ArcSwap::new(settings.into()));
-			}
-
-			// Check if the game install is still valid
-			if app
-				.state::<ArcSwap<AppSettings>>()
-				.load()
-				.game_install
-				.as_ref()
-				.is_some_and(|x| !game_installs.iter().any(|y| y.path == *x))
-			{
-				let mut settings = (*app.state::<ArcSwap<AppSettings>>().load_full()).to_owned();
-
-				settings.game_install = None;
-
 				app.manage(ArcSwap::new(settings.into()));
 			}
 
@@ -385,10 +381,6 @@ async fn main() {
 
 			info!("Removed temp folder");
 
-			let _ = fs::read(app_data_path.join("hash_list.sml"))
-				.ok()
-				.and_then(|x| HASH_LIST.load_compressed(&x).ok());
-
 			app.manage(AppState {
 				game_installs,
 				project: None.into(),
@@ -397,13 +389,9 @@ async fn main() {
 					.and_then(|x| tonytools::hashlist::HashList::load(&x).ok().map(|x| x.into()))
 					.into(),
 				fs_watcher: None.into(),
-				editor_states: DashMap::new().into(),
-				game_files: None.into(),
-				resource_reverse_dependencies: None.into(),
-				file_types: None.into(),
-				cached_entities: DashMap::new().into(),
-				repository: None.into(),
-				intellisense: None.into(),
+				editor_states: ShardMap::new().into(),
+				editor_removal: ShardMap::new().into(),
+				game: None.into(),
 				editor_connection: EditorConnection::new(app.handle().clone())
 			});
 
@@ -435,107 +423,135 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 			handle_tool_event(&app, event).await?;
 		}
 
-		Event::Editor(event) => match event.data {
-			EditorEventData::Text(data) => match data {
-				TextEditorEvent::Initialise => {
-					let editor_state = app_state.editor_states.get(&event.editor).context("No such editor")?;
+		Event::Editor(event) => {
+			let lock = if let Some(lock) = app_state.editor_removal.get(&event.editor).await {
+				lock
+			} else if app_state.editor_states.contains_key(&event.editor).await {
+				app_state
+					.editor_removal
+					.insert(event.editor.to_owned(), Default::default())
+					.await;
 
-					let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
-						Err(anyhow!("Editor {} is not a text editor", event.editor))?;
-						panic!();
-					};
+				app_state.editor_removal.get(&event.editor).await.unwrap()
+			} else {
+				trace!("Received event for non-existent editor {}", event.editor);
+				return Ok(());
+			};
 
-					send_request(
-						&app,
-						Request::Editor(EditorRequest {
-							editor: event.editor,
-							data: EditorRequestData::Text(TextEditorRequest::ReplaceContent { content })
-						})
-					)?;
+			let _guard = lock.read().await;
+			match event.data {
+				EditorEventData::Text(data) => match data {
+					TextEditorEvent::Initialise => {
+						let editor_state = app_state
+							.editor_states
+							.get(&event.editor)
+							.await
+							.context("No such editor")?;
 
-					send_request(
-						&app,
-						Request::Editor(EditorRequest {
-							editor: event.editor,
-							data: EditorRequestData::Text(TextEditorRequest::SetFileType { file_type })
-						})
-					)?;
-				}
-
-				TextEditorEvent::UpdateContent { content } => {
-					let mut editor_state = app_state
-						.editor_states
-						.get_mut(&event.editor)
-						.context("No such editor")?;
-
-					let EditorData::Text {
-						file_type,
-						content: old_content
-					} = editor_state.data.to_owned()
-					else {
-						Err(anyhow!("Editor {} is not a text editor", event.editor))?;
-						panic!();
-					};
-
-					if content != old_content {
-						editor_state.data = EditorData::Text { content, file_type };
+						let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
+							Err(anyhow!("Editor {} is not a text editor", event.editor))?;
+							panic!();
+						};
 
 						send_request(
 							&app,
-							Request::Tab(TabRequest {
-								tab: event.editor,
-								data: TabRequestData::SetUnsaved { unsaved: true }
+							Request::Editor(EditorRequest {
+								editor: event.editor,
+								data: EditorRequestData::Text(TextEditorRequest::ReplaceContent { content })
+							})
+						)?;
+
+						send_request(
+							&app,
+							Request::Editor(EditorRequest {
+								editor: event.editor,
+								data: EditorRequestData::Text(TextEditorRequest::SetFileType { file_type })
 							})
 						)?;
 					}
-				}
-			},
 
-			EditorEventData::Entity(data) => {
-				event_handling::entity::handle(&app, event.editor, data).await?;
-			}
+					TextEditorEvent::UpdateContent { content } => {
+						let mut editor_state = app_state
+							.editor_states
+							.get_mut(&event.editor)
+							.await
+							.context("No such editor")?;
 
-			EditorEventData::ResourceOverview(data) => {
-				handle_resource_overview_event(&app, event.editor, data).await?;
-			}
-
-			EditorEventData::RepositoryPatch(data) => {
-				handle_repository_patch_event(&app, event.editor, data).await?;
-			}
-
-			EditorEventData::UnlockablesPatch(data) => {
-				handle_unlockables_patch_event(&app, event.editor, data).await?;
-			}
-
-			EditorEventData::ContentSearchResults(data) => match data {
-				ContentSearchResultsEvent::Initialise => {
-					let editor_state = app_state.editor_states.get(&event.editor).context("No such editor")?;
-
-					let results = match editor_state.data {
-						EditorData::ContentSearchResults { ref results, .. } => results,
-
-						_ => {
-							Err(anyhow!("Editor {} is not a content search results page", event.editor))?;
+						let EditorData::Text {
+							file_type,
+							content: old_content
+						} = editor_state.data.to_owned()
+						else {
+							Err(anyhow!("Editor {} is not a text editor", event.editor))?;
 							panic!();
-						}
-					};
+						};
 
-					send_request(
-						&app,
-						Request::Editor(EditorRequest {
-							editor: event.editor,
-							data: EditorRequestData::ContentSearchResults(ContentSearchResultsRequest::Initialise {
-								results: results.to_owned()
-							})
-						})
-					)?;
+						if content != old_content {
+							editor_state.data = EditorData::Text { content, file_type };
+
+							send_request(
+								&app,
+								Request::Tab(TabRequest {
+									tab: event.editor,
+									data: TabRequestData::SetUnsaved { unsaved: true }
+								})
+							)?;
+						}
+					}
+				},
+
+				EditorEventData::Entity(data) => {
+					event_handling::entity::handle(&app, event.editor, data).await?;
 				}
 
-				ContentSearchResultsEvent::OpenResourceOverview { hash, .. } => {
-					open_resource_overview(&app, hash.0).await?;
+				EditorEventData::ResourceOverview(data) => {
+					handle_resource_overview_event(&app, event.editor, data).await?;
+				}
+
+				EditorEventData::RepositoryPatch(data) => {
+					handle_repository_patch_event(&app, event.editor, data).await?;
+				}
+
+				EditorEventData::UnlockablesPatch(data) => {
+					handle_unlockables_patch_event(&app, event.editor, data).await?;
+				}
+
+				EditorEventData::ContentSearchResults(data) => match data {
+					ContentSearchResultsEvent::Initialise => {
+						let editor_state = app_state
+							.editor_states
+							.get(&event.editor)
+							.await
+							.context("No such editor")?;
+
+						let results = match editor_state.data {
+							EditorData::ContentSearchResults { ref results, .. } => results,
+
+							_ => {
+								Err(anyhow!("Editor {} is not a content search results page", event.editor))?;
+								panic!();
+							}
+						};
+
+						send_request(
+							&app,
+							Request::Editor(EditorRequest {
+								editor: event.editor,
+								data: EditorRequestData::ContentSearchResults(
+									ContentSearchResultsRequest::Initialise {
+										results: results.to_owned()
+									}
+								)
+							})
+						)?;
+					}
+
+					ContentSearchResultsEvent::OpenResourceOverview { hash, .. } => {
+						open_resource_overview(&app, hash.0).await?;
+					}
 				}
 			}
-		},
+		}
 
 		Event::Global(event) => match event {
 			GlobalEvent::SetSeenAnnouncements(seen_announcements) => {
@@ -593,19 +609,22 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					fs::write(path.join("project.json"), to_vec(&settings)?)?;
 				}
 
-				for editor in app.state::<AppState>().editor_states.iter() {
-					if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
-						send_request(
-							&app,
-							Request::Editor(EditorRequest {
-								editor: editor.key().to_owned(),
-								data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
-									EntityMetadataRequest::UpdateCustomPaths {
-										custom_paths: settings.custom_paths.to_owned()
-									}
-								))
-							})
-						)?;
+				let mut editor_states = pin!(app_state.editor_states.stream_shards());
+				while let Some(shard) = editor_states.next().await {
+					for (id, editor) in shard.iter() {
+						if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
+							send_request(
+								&app,
+								Request::Editor(EditorRequest {
+									editor: id.to_owned(),
+									data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
+										EntityMetadataRequest::UpdateCustomPaths {
+											custom_paths: settings.custom_paths.to_owned()
+										}
+									))
+								})
+							)?;
+						}
 					}
 				}
 
@@ -836,6 +855,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					if let Some(file) = app_state
 						.editor_states
 						.get(&tab)
+						.await
 						.context("No such editor")?
 						.file
 						.as_ref()
@@ -856,26 +876,37 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 			}
 
 			GlobalEvent::RemoveTab(tab) => {
-				let (_, old) = app_state.editor_states.remove(&tab).context("No such editor")?;
+				let task = start_task(&app, "Closing tab")?;
 
-				if old.file.is_some() {
+				trace!("Waiting to remove editor {}", tab);
+				if let Some(lock) = app_state.editor_removal.get(&tab).await {
+					let _guard = lock.write().await;
+					trace!("Removing editor {}", tab);
+					let old = app_state.editor_states.remove(&tab).await.context("No such editor")?;
+
+					if old.file.is_some() {
+						send_request(
+							&app,
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+						)?;
+					}
+
 					send_request(
 						&app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+						Request::Tab(TabRequest {
+							tab: tab.to_owned(),
+							data: TabRequestData::Remove
+						})
 					)?;
 				}
 
-				send_request(
-					&app,
-					Request::Tab(TabRequest {
-						tab,
-						data: TabRequestData::Remove
-					})
-				)?;
+				let _ = app_state.editor_removal.remove(&tab).await;
+
+				finish_task(&app, task)?;
 			}
 
 			GlobalEvent::SaveTab(tab) => {
-				let mut editor = app_state.editor_states.get_mut(&tab).context("No such editor")?;
+				let mut editor = app_state.editor_states.get_mut(&tab).await.context("No such editor")?;
 
 				let task = start_task(
 					&app,
@@ -1485,38 +1516,46 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 		Event::EditorConnection(event) => match event {
 			EditorConnectionEvent::EntitySelected { id, tblu } => {
-				for editor in app.state::<AppState>().editor_states.iter() {
-					let entity = match editor.data {
-						EditorData::QNEntity { ref entity, .. } => entity,
-						EditorData::QNPatch { ref current, .. } => current,
+				let mut editor_states = pin!(app_state.editor_states.stream_shards());
+				while let Some(shard) = editor_states.next().await {
+					for (editor_id, editor) in shard.iter() {
+						let entity = match editor.data {
+							EditorData::QNEntity { ref entity, .. } => entity,
+							EditorData::QNPatch { ref current, .. } => current,
 
-						_ => continue
-					};
+							_ => continue
+						};
 
-					if entity.blueprint == tblu.0 {
-						send_request(
-							&app,
-							Request::Editor(EditorRequest {
-								editor: editor.key().to_owned(),
-								data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::Select {
-									id: entity.entities.contains_key(&id).then_some(id.to_owned())
-								}))
-							})
-						)?;
+						if entity.blueprint == tblu.0 {
+							send_request(
+								&app,
+								Request::Editor(EditorRequest {
+									editor: editor_id.to_owned(),
+									data: EditorRequestData::Entity(EntityEditorRequest::Tree(
+										EntityTreeRequest::Select {
+											id: entity.entities.contains_key(&id).then_some(id.to_owned())
+										}
+									))
+								})
+							)?;
+						}
 					}
 				}
 			}
 
 			EditorConnectionEvent::EntityTransformUpdated { id, tblu, transform } => {
 				let mut qn_editors = vec![];
-				for editor in app_state.editor_states.iter() {
-					if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-						qn_editors.push(editor.key().to_owned());
+				let mut editor_states = pin!(app_state.editor_states.stream_shards());
+				while let Some(shard) = editor_states.next().await {
+					for (id, editor) in shard.iter() {
+						if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+							qn_editors.push(id.to_owned());
+						}
 					}
 				}
 
 				for editor_id in qn_editors {
-					let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+					let mut editor_state = app_state.editor_states.get_mut(&editor_id).await.unwrap();
 					let entity = match editor_state.data {
 						EditorData::QNEntity { ref mut entity, .. } => entity,
 						EditorData::QNPatch { ref mut current, .. } => current,
@@ -1573,7 +1612,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							send_request(
 								&app,
 								Request::Editor(EditorRequest {
-									editor: editor_id,
+									editor: editor_id.to_owned(),
 									data: EditorRequestData::Entity(EntityEditorRequest::Tree({
 										let (new, modified, removed) = get_diff_info(base, current);
 										EntityTreeRequest::SetDiffInfo { new, modified, removed }
@@ -1592,14 +1631,17 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				property_value
 			} => {
 				let mut qn_editors = vec![];
-				for editor in app_state.editor_states.iter() {
-					if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-						qn_editors.push(editor.key().to_owned());
+				let mut editor_states = pin!(app_state.editor_states.stream_shards());
+				while let Some(shard) = editor_states.next().await {
+					for (id, editor) in shard.iter() {
+						if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+							qn_editors.push(id.to_owned());
+						}
 					}
 				}
 
 				for editor_id in qn_editors {
-					let mut editor_state = app_state.editor_states.get_mut(&editor_id).unwrap();
+					let mut editor_state = app_state.editor_states.get_mut(&editor_id).await.unwrap();
 					let entity = match editor_state.data {
 						EditorData::QNEntity { ref mut entity, .. } => entity,
 						EditorData::QNPatch { ref mut current, .. } => current,
@@ -1608,19 +1650,10 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					};
 
 					if entity.blueprint == tblu.0 && entity.entities.contains_key(&id) {
-						let post_init = if let Some(intellisense) = app_state.intellisense.load().as_ref()
-							&& let Some(game_files) = app_state.game_files.load().as_ref()
-							&& let Some(install) = app_settings.load().game_install.as_ref()
-						{
-							if let Some((_, _, post_init)) = intellisense
-								.get_properties(
-									game_files,
-									&app_state.cached_entities,
-									get_loaded_game_version(&app, install)?,
-									entity,
-									id,
-									true
-								)?
+						let post_init = if let Some(game) = app_state.game.load().as_ref() {
+							if let Some((_, _, post_init)) = game
+								.intellisense()
+								.get_properties(game, entity, id, true)?
 								.into_iter()
 								.find(|(name, _, _)| *name == property_name)
 							{
@@ -1682,7 +1715,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							send_request(
 								&app,
 								Request::Editor(EditorRequest {
-									editor: editor_id,
+									editor: editor_id.to_owned(),
 									data: EditorRequestData::Entity(EntityEditorRequest::Tree({
 										let (new, modified, removed) = get_diff_info(base, current);
 										EntityTreeRequest::SetDiffInfo { new, modified, removed }
@@ -1737,17 +1770,6 @@ fn event(app: AppHandle, event: Event) {
 				.expect("Couldn't send error report to frontend");
 		}
 	});
-}
-
-#[try_fn]
-#[context("Couldn't get loaded game version for {:?}", install)]
-pub fn get_loaded_game_version(app: &AppHandle, install: &PathBuf) -> Result<GameVersion> {
-	app.state::<AppState>()
-		.game_installs
-		.iter()
-		.try_find(|x| anyhow::Ok(x.path == *install))?
-		.context("No such game install")?
-		.version
 }
 
 #[try_fn]

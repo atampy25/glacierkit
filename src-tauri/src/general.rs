@@ -1,18 +1,10 @@
-use std::{
-	fs,
-	path::{Path, PathBuf},
-	sync::{Arc, atomic::Ordering},
-	time::Duration
-};
+use std::{fs, path::Path, sync::atomic::Ordering, time::Duration};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
-use dashmap::DashMap;
 use ecow::eco_format;
 use fn_error_context::context;
-use glacier_ini::IniFileSystem;
-use hashbrown::HashMap;
-use hitman_commons::{game::GameVersion, hash_list::HASH_LIST, metadata::RuntimeID};
+use hitman_commons::{hash_list::HASH_LIST, metadata::RuntimeID};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -21,10 +13,6 @@ use quickentity_rs::{
 	entity::{CommentEntity, Entity},
 	patch::Patch
 };
-use rayon::iter::{
-	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator
-};
-use rpkg_rs::resource::{partition_manager::PartitionManager, pdefs::PackageDefinitionSource};
 use serde_json::{Value, from_slice, from_str, from_value, to_value};
 use tauri::{AppHandle, Manager, async_runtime};
 use tauri_plugin_aptabase::EventTracker;
@@ -37,15 +25,14 @@ use crate::{
 	HASH_LIST_ENDPOINT, HASH_LIST_VERSION_ENDPOINT, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT,
 	TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
 	event_handling::{entity::monaco::ENUMS, resource_overview::initialise_resource_overview},
-	finish_task, get_loaded_game_version,
-	intellisense::Intellisense,
+	finish_task,
+	game::Game,
 	model::{
 		AppSettings, AppState, ContentSearchRequest, EditorData, EditorState, EditorType, FileBrowserRequest,
 		GameBrowserRequest, GlobalRequest, JsonPatchType, Request, SettingsRequest, TabRequest, TabRequestData,
 		TextFileType, ToolRequest
 	},
 	ores_repo::{RepositoryItem, UnlockableItem},
-	rpkg::{extract_entity, extract_latest_resource},
 	send_notification, send_request, start_task
 };
 
@@ -53,7 +40,6 @@ use crate::{
 #[context("Couldn't open file")]
 pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 	let app_state = app.state::<AppState>();
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 
 	let path = path.as_ref();
 
@@ -65,13 +51,15 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 		)
 	)?;
 
-	let existing = {
-		app_state
-			.editor_states
-			.iter()
-			.find(|x| x.file.as_ref().is_some_and(|x| x == path))
-			.map(|x| x.key().to_owned())
-	};
+	let mut existing = None;
+	for id in app_state.editor_states.keys().await {
+		if let Some(editor) = app_state.editor_states.get(&id).await
+			&& let Some(file) = editor.file.as_ref()
+			&& file == path
+		{
+			existing = Some(id);
+		}
+	}
 
 	if let Some(existing) = existing {
 		send_request(
@@ -113,17 +101,20 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				}
 				entity.comments = comments;
 
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: Some(path.to_owned()),
-						data: EditorData::QNEntity {
-							entity: Box::new(entity),
-							settings: Default::default()
-						},
-						..Default::default()
-					}
-				);
+				app_state
+					.editor_states
+					.insert(
+						id.to_owned(),
+						EditorState {
+							file: Some(path.to_owned()),
+							data: EditorData::QNEntity {
+								entity: entity.into(),
+								settings: Default::default()
+							},
+							..Default::default()
+						}
+					)
+					.await;
 
 				send_request(
 					app,
@@ -140,21 +131,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"entity.patch.json" => {
 				let id = Uuid::new_v4();
 
-				if let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(install) = app_settings.load().game_install.as_ref()
-				{
+				if let Some(game) = app_state.game.load().as_ref() {
 					let patch: Patch =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
 
-					let mut entity = extract_entity(
-						game_files,
-						&app_state.cached_entities,
-						get_loaded_game_version(app, install)?,
-						patch.factory
-					)?
-					.to_owned();
-
-					let base = entity.to_owned();
+					let base = game.extract_entity(patch.factory)?;
+					let mut entity = (*base).to_owned();
 
 					apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
@@ -173,18 +155,21 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					}
 					entity.comments = comments;
 
-					app_state.editor_states.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::QNPatch {
-								base: Box::new(base),
-								current: Box::new(entity),
-								settings: Default::default()
-							},
-							..Default::default()
-						}
-					);
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::QNPatch {
+									base,
+									current: entity.into(),
+									settings: Default::default()
+								},
+								..Default::default()
+							}
+						)
+						.await;
 
 					send_request(
 						app,
@@ -222,19 +207,22 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					TextFileType::Json
 				};
 
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: Some(path.to_owned()),
-						data: EditorData::Text {
-							content: fs::read_to_string(path)
-								.context("Couldn't read file")?
-								.replace("\r\n", "\n"),
-							file_type: file_type.to_owned()
-						},
-						..Default::default()
-					}
-				);
+				app_state
+					.editor_states
+					.insert(
+						id.to_owned(),
+						EditorState {
+							file: Some(path.to_owned()),
+							data: EditorData::Text {
+								content: fs::read_to_string(path)
+									.context("Couldn't read file")?
+									.replace("\r\n", "\n"),
+								file_type: file_type.to_owned()
+							},
+							..Default::default()
+						}
+					)
+					.await;
 
 				send_request(
 					app,
@@ -251,19 +239,22 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"txt" => {
 				let id = Uuid::new_v4();
 
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: Some(path.to_owned()),
-						data: EditorData::Text {
-							content: fs::read_to_string(path)
-								.context("Couldn't read file")?
-								.replace("\r\n", "\n"),
-							file_type: TextFileType::PlainText
-						},
-						..Default::default()
-					}
-				);
+				app_state
+					.editor_states
+					.insert(
+						id.to_owned(),
+						EditorState {
+							file: Some(path.to_owned()),
+							data: EditorData::Text {
+								content: fs::read_to_string(path)
+									.context("Couldn't read file")?
+									.replace("\r\n", "\n"),
+								file_type: TextFileType::PlainText
+							},
+							..Default::default()
+						}
+					)
+					.await;
 
 				send_request(
 					app,
@@ -282,19 +273,22 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"md" => {
 				let id = Uuid::new_v4();
 
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: Some(path.to_owned()),
-						data: EditorData::Text {
-							content: fs::read_to_string(path)
-								.context("Couldn't read file")?
-								.replace("\r\n", "\n"),
-							file_type: TextFileType::Markdown
-						},
-						..Default::default()
-					}
-				);
+				app_state
+					.editor_states
+					.insert(
+						id.to_owned(),
+						EditorState {
+							file: Some(path.to_owned()),
+							data: EditorData::Text {
+								content: fs::read_to_string(path)
+									.context("Couldn't read file")?
+									.replace("\r\n", "\n"),
+								file_type: TextFileType::Markdown
+							},
+							..Default::default()
+						}
+					)
+					.await;
 
 				send_request(
 					app,
@@ -313,16 +307,16 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"repository.json" => {
 				let id = Uuid::new_v4();
 
-				if let Some(cached_repository) = app_state.repository.load().as_ref() {
+				if let Some(game) = app_state.game.load().as_ref() {
 					let mut repository = to_value(
-						cached_repository
+						game.repository()
 							.iter()
 							.cloned()
 							.map(|x| (x.id, x.data))
 							.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
 					)?;
 
-					let base = to_value(cached_repository)?;
+					let base = to_value(game.repository())?;
 
 					let patch: Value =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
@@ -334,18 +328,21 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						.map(|(id, data)| RepositoryItem { id, data })
 						.collect();
 
-					app_state.editor_states.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::RepositoryPatch {
-								base: from_value(base)?,
-								current: repository,
-								patch_type: JsonPatchType::MergePatch
-							},
-							..Default::default()
-						}
-					);
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::RepositoryPatch {
+									base: from_value(base)?,
+									current: repository,
+									patch_type: JsonPatchType::MergePatch
+								},
+								..Default::default()
+							}
+						)
+						.await;
 
 					send_request(
 						app,
@@ -379,10 +376,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"unlockables.json" => {
 				let id = Uuid::new_v4();
 
-				if let Some(game_files) = app_state.game_files.load().as_ref() {
+				if let Some(game) = app_state.game.load().as_ref() {
 					let mut unlockables = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+							&game
+								.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
+								.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -405,7 +404,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					)?;
 
 					let base = from_str::<Value>(&parse_json_ores(
-						&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+						&game
+							.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
+							.1
 					)?)?;
 
 					let patch: Value =
@@ -432,18 +433,21 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						})
 						.collect();
 
-					app_state.editor_states.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::UnlockablesPatch {
-								base: from_value(base)?,
-								current: unlockables,
-								patch_type: JsonPatchType::MergePatch
-							},
-							..Default::default()
-						}
-					);
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::UnlockablesPatch {
+									base: from_value(base)?,
+									current: unlockables,
+									patch_type: JsonPatchType::MergePatch
+								},
+								..Default::default()
+							}
+						)
+						.await;
 
 					send_request(
 						app,
@@ -487,16 +491,16 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					.context("Type key was not string")?
 				{
 					"REPO" => {
-						if let Some(cached_repository) = app_state.repository.load().as_ref() {
+						if let Some(game) = app_state.game.load().as_ref() {
 							let mut repository = to_value(
-								cached_repository
+								game.repository()
 									.iter()
 									.cloned()
 									.map(|x| (x.id, x.data))
 									.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
 							)?;
 
-							let base = to_value(cached_repository)?;
+							let base = to_value(game.repository())?;
 
 							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 								.context("Invalid JSON")?;
@@ -514,18 +518,21 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.map(|(id, data)| RepositoryItem { id, data })
 								.collect();
 
-							app_state.editor_states.insert(
-								id.to_owned(),
-								EditorState {
-									file: Some(path.to_owned()),
-									data: EditorData::RepositoryPatch {
-										base: from_value(base)?,
-										current: repository,
-										patch_type: JsonPatchType::JsonPatch
-									},
-									..Default::default()
-								}
-							);
+							app_state
+								.editor_states
+								.insert(
+									id.to_owned(),
+									EditorState {
+										file: Some(path.to_owned()),
+										data: EditorData::RepositoryPatch {
+											base: from_value(base)?,
+											current: repository,
+											patch_type: JsonPatchType::JsonPatch
+										},
+										..Default::default()
+									}
+								)
+								.await;
 
 							send_request(
 								app,
@@ -566,10 +573,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					{
 						let id = Uuid::new_v4();
 
-						if let Some(game_files) = app_state.game_files.load().as_ref() {
+						if let Some(game) = app_state.game.load().as_ref() {
 							let mut unlockables = to_value(
 								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-									&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+									&game
+										.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
+										.1
 								)?)?
 								.into_iter()
 								.map(|x| {
@@ -592,7 +601,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							)?;
 
 							let base = from_str::<Value>(&parse_json_ores(
-								&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+								&game
+									.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
+									.1
 							)?)?;
 
 							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
@@ -625,18 +636,21 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								})
 								.collect();
 
-							app_state.editor_states.insert(
-								id.to_owned(),
-								EditorState {
-									file: Some(path.to_owned()),
-									data: EditorData::UnlockablesPatch {
-										base: from_value(base)?,
-										current: unlockables,
-										patch_type: JsonPatchType::JsonPatch
-									},
-									..Default::default()
-								}
-							);
+							app_state
+								.editor_states
+								.insert(
+									id.to_owned(),
+									EditorState {
+										file: Some(path.to_owned()),
+										data: EditorData::UnlockablesPatch {
+											base: from_value(base)?,
+											current: unlockables,
+											patch_type: JsonPatchType::JsonPatch
+										},
+										..Default::default()
+									}
+								)
+								.await;
 
 							send_request(
 								app,
@@ -668,19 +682,22 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					}
 
 					_ => {
-						app_state.editor_states.insert(
-							id.to_owned(),
-							EditorState {
-								file: Some(path.to_owned()),
-								data: EditorData::Text {
-									content: fs::read_to_string(path)
-										.context("Couldn't read file")?
-										.replace("\r\n", "\n"),
-									file_type: TextFileType::Json
-								},
-								..Default::default()
-							}
-						);
+						app_state
+							.editor_states
+							.insert(
+								id.to_owned(),
+								EditorState {
+									file: Some(path.to_owned()),
+									data: EditorData::Text {
+										content: fs::read_to_string(path)
+											.context("Couldn't read file")?
+											.replace("\r\n", "\n"),
+										file_type: TextFileType::Json
+									},
+									..Default::default()
+								}
+							)
+							.await;
 
 						send_request(
 							app,
@@ -701,19 +718,22 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"dlge.json" | "locr.json" | "rtlv.json" | "clng.json" | "ditl.json" | "material.json" | "contract.json" => {
 				let id = Uuid::new_v4();
 
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: Some(path.to_owned()),
-						data: EditorData::Text {
-							content: fs::read_to_string(path)
-								.context("Couldn't read file")?
-								.replace("\r\n", "\n"),
-							file_type: TextFileType::Json
-						},
-						..Default::default()
-					}
-				);
+				app_state
+					.editor_states
+					.insert(
+						id.to_owned(),
+						EditorState {
+							file: Some(path.to_owned()),
+							data: EditorData::Text {
+								content: fs::read_to_string(path)
+									.context("Couldn't read file")?
+									.replace("\r\n", "\n"),
+								file_type: TextFileType::Json
+							},
+							..Default::default()
+						}
+					)
+					.await;
 
 				send_request(
 					app,
@@ -734,14 +754,17 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				let id = Uuid::new_v4();
 
-				app_state.editor_states.insert(
-					id.to_owned(),
-					EditorState {
-						file: Some(path.to_owned()),
-						data: EditorData::Nil,
-						..Default::default()
-					}
-				);
+				app_state
+					.editor_states
+					.insert(
+						id.to_owned(),
+						EditorState {
+							file: Some(path.to_owned()),
+							data: EditorData::Nil,
+							..Default::default()
+						}
+					)
+					.await;
 
 				send_request(
 					app,
@@ -775,16 +798,6 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 				.collect()
 		})
 	)?;
-
-	if let Ok(req) = reqwest::get("https://hitman-resources.netlify.app/glacierkit/dynamics.json").await {
-		send_request(
-			app,
-			Request::Global(GlobalRequest::InitialiseDynamics {
-				dynamics: req.json().await.context("Couldn't deserialise dynamics response")?,
-				seen_announcements: app_settings.load().seen_announcements.to_owned()
-			})
-		)?;
-	}
 
 	let selected_install_info = app_settings
 		.load()
@@ -833,6 +846,12 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 
 	let task = start_task(app, "Acquiring latest hash list")?;
 
+	let app_data_dir = app.path().app_data_dir().context("Couldn't get data dir")?;
+
+	let _ = fs::read(app_data_dir.join("hash_list.sml"))
+		.ok()
+		.and_then(|x| HASH_LIST.load_compressed(&x).ok());
+
 	let current_version = HASH_LIST.version.load(Ordering::SeqCst);
 
 	if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await
@@ -849,13 +868,7 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 		{
 			HASH_LIST.load_compressed(&data)?;
 
-			fs::write(
-				app.path()
-					.app_data_dir()
-					.context("Couldn't get app data dir")?
-					.join("hash_list.sml"),
-				data
-			)?;
+			fs::write(app_data_dir.join("hash_list.sml"), data)?;
 		}
 	}
 
@@ -883,13 +896,7 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 			let tonytools_hash_list =
 				tonytools::hashlist::HashList::load(&data).map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-			fs::write(
-				app.path()
-					.app_data_dir()
-					.context("Couldn't get app data dir")?
-					.join("tonytools_hash_list.hmla"),
-				data
-			)?;
+			fs::write(app_data_dir.join("tonytools_hash_list.hmla"), data)?;
 
 			app_state.tonytools_hash_list.store(Some(tonytools_hash_list.into()));
 		}
@@ -898,6 +905,16 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 	finish_task(app, task)?;
 
 	load_game_files(app).await?;
+
+	if let Ok(req) = reqwest::get("https://hitman-resources.netlify.app/glacierkit/dynamics.json").await {
+		send_request(
+			app,
+			Request::Global(GlobalRequest::InitialiseDynamics {
+				dynamics: req.json().await.context("Couldn't deserialise dynamics response")?,
+				seen_announcements: app_settings.load().seen_announcements.to_owned()
+			})
+		)?;
+	}
 
 	let app = app.clone();
 	async_runtime::spawn(async move {
@@ -923,263 +940,36 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	let app_state = app.state::<AppState>();
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 
-	app_state.game_files.store(None);
-	app_state.resource_reverse_dependencies.store(None);
-	app_state.intellisense.store(None);
-	app_state.repository.store(None);
-	app_state.cached_entities.clear();
-
 	if let Some(path) = app_settings.load().game_install.as_ref() {
-		let task = start_task(app, "Loading game files")?;
-
-		let thumbs = IniFileSystem::from_path(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
-
-		let thumbs = thumbs
-			.root()
-			.sections()
-			.get("application")
-			.context("Couldn't get application section")?;
-
-		let (Some(proj_path), Some(relative_runtime_path)) = (
-			thumbs.options().get("PROJECT_PATH"),
-			thumbs.options().get("RUNTIME_PATH")
-		) else {
-			bail!("thumbs.dat was missing required properties");
-		};
-
-		// Workaround for the Linux filesystem.
-		// The relative_runtime_path will in most cases be "runtime", while the folder is actually called "Runtime"
-		// Windows doesn't care about the mismatched casing, UNIX does :(
-		let relative_runtime_path_uppercased = relative_runtime_path
-			.char_indices()
-			.map(|(idx, ch)| if idx == 0 { ch.to_ascii_uppercase() } else { ch })
-			.collect::<String>();
-
-		let runtime_path = [relative_runtime_path, &relative_runtime_path_uppercased]
-			.iter()
-			.flat_map(|folder| path.join(proj_path.replace('\\', "/")).join(folder).canonicalize())
-			.find(|joined_path| joined_path.exists())
-			.context("Couldn't find valid runtime folder")?;
-
-		let mut partitions = match get_loaded_game_version(app, path)? {
-			GameVersion::H1 => PackageDefinitionSource::HM2016(fs::read(runtime_path.join("packagedefinition.txt"))?)
-				.read()
-				.context("Couldn't read packagedefinition")?,
-
-			GameVersion::H2 => PackageDefinitionSource::HM2(fs::read(runtime_path.join("packagedefinition.txt"))?)
-				.read()
-				.context("Couldn't read packagedefinition")?,
-
-			GameVersion::H3 => PackageDefinitionSource::HM3(fs::read(runtime_path.join("packagedefinition.txt"))?)
-				.read()
-				.context("Couldn't read packagedefinition")?
-		};
-
-		if !app_settings.load().extract_modded_files {
-			for partition in &mut partitions {
-				partition.set_max_patch_level(9);
-			}
-		}
-
-		finish_task(app, task)?;
-
-		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
-
-		let mut last_index = 0;
-		let mut last_progress = 0;
-		let mut loading_task = start_task(app, format!("Loading {} (0%)", partition_names[last_index]))?;
-
-		let mut partition_manager =
-			PartitionManager::new(runtime_path.clone(), &PackageDefinitionSource::Custom(partitions))
-				.context("Couldn't create partition manager")?;
-
-		partition_manager
-			.mount_partitions(|cur_partition, state| {
-				if cur_partition < partition_names.len() {
-					if cur_partition != last_index {
-						last_index = cur_partition;
-						last_progress = 0;
-
-						finish_task(app, loading_task).expect("Couldn't send data to frontend");
-						loading_task = start_task(app, format!("Loading {} (0%)", partition_names[last_index]))
-							.expect("Couldn't send data to frontend");
-					}
-
-					let progress = ((state.install_progress * 10.0).round() * 10.0) as u8;
-					if progress != last_progress {
-						last_progress = progress;
-
-						finish_task(app, loading_task).expect("Couldn't send data to frontend");
-						loading_task = start_task(
-							app,
-							format!("Loading {} ({}%)", partition_names[last_index], last_progress)
-						)
-						.expect("Couldn't send data to frontend");
-					}
-				}
-			})
-			.context("Couldn't mount partitions")?;
-
-		finish_task(app, loading_task)?;
-		let task = start_task(app, "Caching reverse references")?;
-
-		let mut reverse_dependencies: DashMap<RuntimeID, Vec<RuntimeID>> = DashMap::new();
-
-		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
-		let resources = partition_manager
-			.partitions
-			.par_iter()
-			.rev()
-			.flat_map(|partition| {
-				partition.latest_resources().into_par_iter().map(|(resource, _)| {
-					(
-						RuntimeID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
-						resource.references()
-					)
-				})
-			})
-			.collect::<HashMap<_, _>>();
-
-		reverse_dependencies
-			.try_reserve(resources.len())
-			.map_err(|e| anyhow!("Reserve error: {e:?}"))?;
-
-		reverse_dependencies.par_extend(resources.par_keys().map(|&x| (x, Default::default())));
-
-		resources
-			.into_par_iter()
-			.flat_map(|(resource_id, resource_references)| {
-				resource_references.par_iter().map(move |(reference_id, _)| {
-					(
-						(*reference_id).try_into().expect("Invalid ID in game files"),
-						resource_id
-					)
-				})
-			})
-			.for_each(|(key, value)| {
-				if let Some(mut x) = reverse_dependencies.get_mut(&key) {
-					x.push(value);
-				}
-			});
-
-		send_request(
-			app,
-			Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetPartitions {
-				partitions: partition_manager
-					.partitions
-					.iter()
-					.map(|x| {
-						(
-							x.partition_info().name.as_deref().unwrap_or("<unnamed>").to_owned(),
-							x.partition_info().id.to_string()
-						)
-					})
-					.collect()
-			}))
-		)?;
-
-		app_state.file_types.store(Some(Arc::new(
-			partition_manager
-				.partitions
-				.par_iter()
-				.rev()
-				.flat_map(|partition| {
-					partition.latest_resources().into_par_iter().map(|(resource, _)| {
-						(
-							RuntimeID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
-							resource
-								.data_type()
-								.try_into()
-								.expect("Invalid resource type in game files")
-						)
-					})
-				})
-				.collect()
-		)));
-
-		app_state.game_files.store(Some(partition_manager.into()));
-
-		app_state.resource_reverse_dependencies.store(Some(
-			reverse_dependencies
-				.into_par_iter()
-				.map(|(x, mut y)| {
-					(x, {
-						y.sort_unstable();
-						y.into_iter().dedup().collect()
-					})
-				})
-				.collect::<HashMap<_, _>>()
-				.into()
-		));
-
-		finish_task(app, task)?;
+		app_state.game.store(Some(Game::load(app, path)?.into()));
+	} else {
+		app_state.game.store(None);
 	}
 
 	send_request(
 		app,
 		Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::SetEnabled {
-			enabled: app_settings.load().game_install.is_some()
+			enabled: app_state.game.load().is_some()
 		}))
 	)?;
 
 	send_request(
 		app,
 		Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetEnabled {
-			enabled: app_settings.load().game_install.is_some()
+			enabled: app_state.game.load().is_some()
 		}))
 	)?;
 
-	if let Some(file_types) = app_state.file_types.load().as_ref() {
-		let task = start_task(app, "Setting up intellisense")?;
-
-		app_state.intellisense.store(Some(
-			Intellisense {
-				cppt_properties: DashMap::new().into(),
-				cppt_pins: from_slice(include_bytes!("../assets/pins.json")).unwrap(),
-				matt_properties: DashMap::new().into(),
-				file_types: file_types.clone()
-			}
-			.into()
-		));
-
-		finish_task(app, task)?
-	};
-
-	if let Some(game_files) = app_state.game_files.load().as_ref() {
-		let task = start_task(app, "Caching repository")?;
-
-		app_state.repository.store(Some(
-			from_slice::<Vec<RepositoryItem>>(
-				&extract_latest_resource(game_files, "00204D1AFD76AB13".parse::<RuntimeID>()?)?.1
-			)?
-			.into()
-		));
-
-		finish_task(app, task)?;
-	}
-
-	if let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
-		&& let Some(file_types) = app_state.file_types.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
+	if let Some(game) = app_state.game.load().as_ref() {
 		let task = start_task(app, "Refreshing editors")?;
 
-		for editor in app_state.editor_states.iter_mut() {
-			if let EditorData::ResourceOverview { hash } = editor.data {
+		for editor in app_state.editor_states.keys().await {
+			if let Some(editor) = app_state.editor_states.get(&editor).await
+				&& let EditorData::ResourceOverview { hash } = editor.data
+			{
 				let task = start_task(app, format!("Refreshing resource overview for {}", hash))?;
 
-				initialise_resource_overview(
-					app,
-					&app_state,
-					editor.key().to_owned(),
-					hash,
-					game_files,
-					get_loaded_game_version(app, install)?,
-					resource_reverse_dependencies,
-					file_types
-				)
-				.await?;
+				initialise_resource_overview(app, &app_state, editor.key().to_owned(), hash, game).await?;
 
 				finish_task(app, task)?;
 			}
@@ -1192,25 +982,14 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 /// Only available for entities, the repository and unlockables currently
 #[try_fn]
 #[context("Couldn't open {hash} in editor")]
-pub async fn open_in_editor(
-	app: &AppHandle,
-	game_files: &PartitionManager,
-	install: &PathBuf,
-	hash: RuntimeID
-) -> Result<()> {
+pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match hash.get_info().context("Not in hash list")?.resource_type.as_ref() {
 		"TEMP" => {
 			let task = start_task(app, format!("Loading entity {}", hash))?;
 
-			let entity = extract_entity(
-				game_files,
-				&app_state.cached_entities,
-				get_loaded_game_version(app, install)?,
-				hash
-			)?
-			.to_owned();
+			let entity = game.extract_entity(hash)?.to_owned();
 
 			let default_tab_name = format!(
 				"{} ({})",
@@ -1241,18 +1020,21 @@ pub async fn open_in_editor(
 
 			let id = Uuid::new_v4();
 
-			app_state.editor_states.insert(
-				id.to_owned(),
-				EditorState {
-					file: None,
-					data: EditorData::QNPatch {
-						base: Box::new(entity.to_owned()),
-						current: Box::new(entity),
-						settings: Default::default()
-					},
-					..Default::default()
-				}
-			);
+			app_state
+				.editor_states
+				.insert(
+					id.to_owned(),
+					EditorState {
+						file: None,
+						data: EditorData::QNPatch {
+							current: Box::new((*entity).to_owned()),
+							base: entity,
+							settings: Default::default()
+						},
+						..Default::default()
+					}
+				)
+				.await;
 
 			send_request(
 				app,
@@ -1273,24 +1055,23 @@ pub async fn open_in_editor(
 
 			let id = Uuid::new_v4();
 
-			let repository: Vec<RepositoryItem> = if let Some(x) = app_state.repository.load().as_ref() {
-				x.par_iter().cloned().collect()
-			} else {
-				from_slice(&extract_latest_resource(game_files, "00204D1AFD76AB13".parse::<RuntimeID>()?)?.1)?
-			};
+			let repository: Vec<RepositoryItem> = game.repository().to_owned();
 
-			app_state.editor_states.insert(
-				id.to_owned(),
-				EditorState {
-					file: None,
-					data: EditorData::RepositoryPatch {
-						base: repository.to_owned(),
-						current: repository,
-						patch_type: JsonPatchType::MergePatch
-					},
-					..Default::default()
-				}
-			);
+			app_state
+				.editor_states
+				.insert(
+					id.to_owned(),
+					EditorState {
+						file: None,
+						data: EditorData::RepositoryPatch {
+							base: repository.to_owned(),
+							current: repository,
+							patch_type: JsonPatchType::MergePatch
+						},
+						..Default::default()
+					}
+				)
+				.await;
 
 			send_request(
 				app,
@@ -1314,21 +1095,26 @@ pub async fn open_in_editor(
 			let id = Uuid::new_v4();
 
 			let unlockables: Vec<UnlockableItem> = from_str(&parse_json_ores(
-				&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+				&game
+					.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
+					.1
 			)?)?;
 
-			app_state.editor_states.insert(
-				id.to_owned(),
-				EditorState {
-					file: None,
-					data: EditorData::UnlockablesPatch {
-						base: unlockables.to_owned(),
-						current: unlockables,
-						patch_type: JsonPatchType::MergePatch
-					},
-					..Default::default()
-				}
-			);
+			app_state
+				.editor_states
+				.insert(
+					id.to_owned(),
+					EditorState {
+						file: None,
+						data: EditorData::UnlockablesPatch {
+							base: unlockables.to_owned(),
+							current: unlockables,
+							patch_type: JsonPatchType::MergePatch
+						},
+						..Default::default()
+					}
+				)
+				.await;
 
 			send_request(
 				app,

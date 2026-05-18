@@ -88,7 +88,7 @@
 						if (request.data.type === "setWindowTitle") {
 							console.log("Layout handling request", request)
 
-							getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data}`)
+							getCurrentWebviewWindow().setTitle(`GlacierKit - ${request.data.data.title}`)
 							windowTitle = request.data.data.title
 						}
 

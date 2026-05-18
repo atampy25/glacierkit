@@ -6,7 +6,6 @@ use ecow::eco_format;
 use fn_error_context::context;
 use hitman_commons::{
 	game::GameVersion,
-	hash_list::HASH_LIST,
 	metadata::{ResourceReference, RuntimeID}
 };
 use hitman_formats::ores::parse_json_ores;
@@ -18,7 +17,7 @@ use quickentity_rs::{
 	generate_patch,
 	patch::Patch
 };
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value, to_vec};
 use tauri::{AppHandle, Manager};
@@ -34,13 +33,11 @@ use crate::{
 	event_handling::{content_search::start_content_search, resource_overview::open_resource_overview},
 	finish_task,
 	general::{initialise_app, load_game_files, open_file, open_in_editor},
-	get_loaded_game_version,
 	model::{
 		AppSettings, AppState, ContentSearchEvent, FileBrowserEvent, GameBrowserEntry, GameBrowserEvent,
 		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SettingsEvent, ToolEvent, ToolRequest
 	},
 	ores_repo::UnlockableItem,
-	rpkg::{extract_entity, extract_latest_resource},
 	send_notification, send_request, start_task
 };
 
@@ -178,9 +175,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.collect_vec()
 					.join(".");
 
-				if let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(install) = app_settings.load().game_install.as_ref()
-				{
+				if let Some(game) = app_state.game.load().as_ref() {
 					match extension.as_ref() {
 						"entity.json" => {
 							let mut entity: Entity = from_slice(&fs::read(&path).context("Couldn't read file")?)
@@ -201,9 +196,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							}
 							entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
 
-							let (fac, fac_meta, blu, blu_meta) =
-								convert_to_game(&entity, get_loaded_game_version(app, install)?)
-									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+							let (fac, fac_meta, blu, blu_meta) = convert_to_game(&entity, game.version())
+								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 							let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
@@ -226,13 +220,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
 								.context("Invalid entity")?;
 
-							let mut entity = extract_entity(
-								game_files,
-								&app_state.cached_entities,
-								get_loaded_game_version(app, install)?,
-								patch.factory
-							)?
-							.to_owned();
+							let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
 
 							let base = entity.to_owned();
 
@@ -254,9 +242,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							}
 							entity.comments = vec![];
 
-							let (fac, fac_meta, blu, blu_meta) =
-								convert_to_game(&entity, get_loaded_game_version(app, install)?)
-									.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+							let (fac, fac_meta, blu, blu_meta) = convert_to_game(&entity, game.version())
+								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 							let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
@@ -302,9 +289,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::ConvertEntityToPatch { path } => {
-				if let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(install) = app_settings.load().game_install.as_ref()
-				{
+				if let Some(game) = app_state.game.load().as_ref() {
 					let mut entity: Entity =
 						from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
 
@@ -323,12 +308,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					}
 					entity.comments = comments;
 
-					let game_version = get_loaded_game_version(app, install)?;
-
 					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
-					let (temp_meta, temp_data) = extract_latest_resource(game_files, entity.factory)?;
+					let (temp_meta, temp_data) = game.extract_latest_resource(entity.factory)?;
 
-					let factory = deserialize_modern_factory(game_version, &temp_data)?;
+					let factory = deserialize_modern_factory(game.version(), &temp_data)?;
 
 					let blueprint_hash = temp_meta
 						.core_info
@@ -337,9 +320,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						.context("Blueprint referenced in factory does not exist in dependencies")?
 						.resource;
 
-					let (tblu_meta, tblu_data) = extract_latest_resource(game_files, blueprint_hash)?;
+					let (tblu_meta, tblu_data) = game.extract_latest_resource(blueprint_hash)?;
 
-					let blueprint = deserialize_modern_blueprint(game_version, &tblu_data)?;
+					let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data)?;
 
 					let base = convert_to_qn(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
 						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
@@ -386,16 +369,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				let patch: Patch =
 					from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
 
-				if let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(install) = app_settings.load().game_install.as_ref()
-				{
-					let mut entity = extract_entity(
-						game_files,
-						&app_state.cached_entities,
-						get_loaded_game_version(app, install)?,
-						patch.factory
-					)?
-					.to_owned();
+				if let Some(game) = app_state.game.load().as_ref() {
+					let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
 
 					apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
@@ -461,9 +436,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.context("Type key was not string")?
 					== "REPO"
 				{
-					if let Some(cached_repository) = app_state.repository.load().as_ref() {
+					if let Some(game) = app_state.game.load().as_ref() {
 						let mut current = to_value(
-							cached_repository
+							game.repository()
 								.iter()
 								.cloned()
 								.map(|x| (x.id, x.data))
@@ -537,9 +512,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::ConvertRepoPatchToJsonPatch { path } => {
-				if let Some(cached_repository) = app_state.repository.load().as_ref() {
+				if let Some(game) = app_state.game.load().as_ref() {
 					let mut current = to_value(
-						cached_repository
+						game.repository()
 							.iter()
 							.cloned()
 							.map(|x| (x.id, x.data))
@@ -605,10 +580,12 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.context("File key was not string")?
 					== "0057C2C3941115CA"
 				{
-					if let Some(game_files) = app_state.game_files.load().as_ref() {
+					if let Some(game) = app_state.game.load().as_ref() {
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-								&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+								&game
+									.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
+									.1
 							)?)?
 							.into_iter()
 							.map(|x| {
@@ -697,10 +674,12 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::ConvertUnlockablesPatchToJsonPatch { path } => {
-				if let Some(game_files) = app_state.game_files.load().as_ref() {
+				if let Some(game) = app_state.game.load().as_ref() {
 					let mut current = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&extract_latest_resource(game_files, "0057C2C3941115CA".parse::<RuntimeID>()?)?.1
+							&game
+								.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
+								.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -781,16 +760,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			GameBrowserEvent::Search { query, filter } => {
 				let task = start_task(app, format!("Searching game files for {}", query))?;
 
-				if let Some(install) = app_settings.load().game_install.as_ref()
-					&& let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(resource_reverse_dependencies) = app_state.resource_reverse_dependencies.load().as_ref()
-				{
-					let install = app_state
-						.game_installs
-						.iter()
-						.find(|x| x.path == *install)
-						.context("No such game install")?;
-
+				if let Some(game) = app_state.game.load().as_ref() {
 					let filter_includes: &[&str] = match filter {
 						SearchFilter::All => &[],
 						SearchFilter::Templates => {
@@ -809,45 +779,46 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::NewTree {
 							game_description: format!(
 								"{} ({})",
-								match install.version {
+								match game.version() {
 									GameVersion::H1 => "HITMAN™",
 									GameVersion::H2 => "HITMAN 2",
 									GameVersion::H3 => "HITMAN 3"
 								},
-								install.platform
+								game.platform()
 							),
 							entries: {
 								if matches!(filter, SearchFilter::All) {
-									HASH_LIST
-										.entries
-										.load()
-										.par_iter()
-										.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-										.filter(|(hash, entry)| {
-											query_terms.iter().all(|&y| {
-												let mut s = format!(
+									game.all_resources()
+										.par_bridge()
+										.filter(|&id| {
+											let mut s = if let Some(info) = id.get_info() {
+												format!(
 													"{}{}{}.{}",
-													entry.path.as_deref().unwrap_or(""),
-													entry.hint.as_deref().unwrap_or(""),
-													hash.to_hash(),
-													entry.resource_type
-												);
-
-												s.make_ascii_lowercase();
-
-												s.contains(y)
-											})
+													info.path.as_deref().unwrap_or(""),
+													info.hint.as_deref().unwrap_or(""),
+													id.to_hash(),
+													info.resource_type
+												)
+											} else {
+												format!("{}.{}", id.to_hash(), game.resource_type(id).unwrap())
+											};
+											s.make_ascii_lowercase();
+											query_terms.iter().all(|&y| s.contains(y))
 										})
-										.map(|(&hash, entry)| GameBrowserEntry {
-											hash: Hash(hash),
-											path: entry.path.to_owned(),
-											hint: entry.hint.to_owned(),
-											filetype: entry.resource_type,
+										.map(|id| GameBrowserEntry {
+											hash: Hash(id),
+											path: id.get_info().and_then(|i| i.path),
+											hint: id.get_info().and_then(|i| i.hint),
+											filetype: game.resource_type(id).unwrap(),
 											partition: {
-												let rrid = RuntimeResourceID::from(hash);
+												let rrid = RuntimeResourceID::from(id);
 
-												let partition =
-													game_files.partitions.iter().find(|x| x.contains(&rrid)).unwrap();
+												let partition = game
+													.partition_manager()
+													.partitions
+													.iter()
+													.find(|x| x.contains(&rrid))
+													.unwrap();
 
 												(
 													partition.partition_info().id.to_string(),
@@ -861,37 +832,41 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 										})
 										.collect()
 								} else {
-									HASH_LIST
-										.entries
-										.load()
-										.par_iter()
-										.filter(|(hash, _)| resource_reverse_dependencies.contains_key(*hash))
-										.filter(|(_, entry)| filter_includes.iter().any(|&x| entry.resource_type == x))
-										.filter(|(hash, entry)| {
-											query_terms.iter().all(|&y| {
-												let mut s = format!(
-													"{}{}{}.{}",
-													entry.path.as_deref().unwrap_or(""),
-													entry.hint.as_deref().unwrap_or(""),
-													hash.to_hash(),
-													entry.resource_type
-												);
-
-												s.make_ascii_lowercase();
-
-												s.contains(y)
-											})
+									game.all_resources()
+										.par_bridge()
+										.filter(|&id| {
+											let ty = game.resource_type(id).unwrap();
+											filter_includes.iter().any(|&x| ty == x)
 										})
-										.map(|(&hash, entry)| GameBrowserEntry {
-											hash: Hash(hash),
-											path: entry.path.to_owned(),
-											hint: entry.hint.to_owned(),
-											filetype: entry.resource_type,
+										.filter(|&id| {
+											let mut s = if let Some(info) = id.get_info() {
+												format!(
+													"{}{}{}.{}",
+													info.path.as_deref().unwrap_or(""),
+													info.hint.as_deref().unwrap_or(""),
+													id.to_hash(),
+													info.resource_type
+												)
+											} else {
+												format!("{}.{}", id.to_hash(), game.resource_type(id).unwrap())
+											};
+											s.make_ascii_lowercase();
+											query_terms.iter().all(|&y| s.contains(y))
+										})
+										.map(|id| GameBrowserEntry {
+											hash: Hash(id),
+											path: id.get_info().and_then(|i| i.path),
+											hint: id.get_info().and_then(|i| i.hint),
+											filetype: game.resource_type(id).unwrap(),
 											partition: {
-												let rrid = RuntimeResourceID::from(hash);
+												let rrid = RuntimeResourceID::from(id);
 
-												let partition =
-													game_files.partitions.iter().find(|x| x.contains(&rrid)).unwrap();
+												let partition = game
+													.partition_manager()
+													.partitions
+													.iter()
+													.find(|x| x.contains(&rrid))
+													.unwrap();
 
 												(
 													partition.partition_info().id.to_string(),
@@ -914,10 +889,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			GameBrowserEvent::OpenInEditor { resource } => {
-				if let Some(game_files) = app_state.game_files.load().as_ref()
-					&& let Some(install) = app_settings.load().game_install.as_ref()
-				{
-					open_in_editor(app, game_files, install, resource.0).await?;
+				if let Some(game) = app_state.game.load().as_ref() {
+					open_in_editor(app, game, resource.0).await?;
 				}
 			}
 		},
@@ -1008,7 +981,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				use_qn_format,
 				partitions_to_search
 			} => {
-				start_content_search(app, query, resource_types, use_qn_format, partitions_to_search)?;
+				start_content_search(app, query, resource_types, use_qn_format, partitions_to_search).await?;
 			}
 		}
 	}

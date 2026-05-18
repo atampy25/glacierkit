@@ -35,6 +35,16 @@
 					parents: parsedInner.parents,
 					name: name.match(/^\[(.*)\]\..*$/)![1]
 				}
+			} else if (name.match(new RegExp(`^\\[.*${RegExp.escape(type)}\\]\\(.*\\)${RegExp.escape(type)}$`))) {
+				return {
+					parents: parsedInner.parents,
+					name: `[${name.match(/^\[(.*)\]\(.*\)..*$/)![1]}](${params})`
+				}
+			} else if ([".wwisebank", ".gfx", ".wes"].some((a) => name.endsWith(`]${a}`))) {
+				return {
+					parents: parsedInner.parents,
+					name: name.match(/^\[(.*)\]\..*$/)![1]
+				}
 			} else if ([".class", ".aspect", ".brick", ".entity", ".entitytemplate"].some((ty) => name.endsWith(`${ty}].entitytype`))) {
 				return {
 					parents: parsedInner.parents,
@@ -580,6 +590,6 @@
 	{/if}
 
 	<div class="flex-grow overflow-y-auto">
-		<div class="w-full h-full" id={elemID} />
+		<div class="w-full h-full" id={elemID}></div>
 	</div>
 </div>

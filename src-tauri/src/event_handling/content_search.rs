@@ -1,9 +1,12 @@
-use std::{io::Write, ops::Deref, time::Instant};
+use std::{
+	collections::{HashMap, HashSet},
+	io::Write,
+	ops::Deref,
+	time::Instant
+};
 
 use anyhow::{Context, Result, anyhow};
-use arc_swap::ArcSwap;
 use fn_error_context::context;
-use hashbrown::{HashMap, HashSet};
 use hitman_commons::{
 	game::GameVersion,
 	metadata::{ResourceMetadata, RuntimeID},
@@ -21,35 +24,30 @@ use uuid::Uuid;
 
 use crate::{
 	bin1::{deserialize_generic_writer, deserialize_modern_blueprint, deserialize_modern_factory},
-	finish_task, get_loaded_game_version,
+	finish_task,
 	languages::get_language_map,
-	model::{AppSettings, AppState, EditorData, EditorState, EditorType, Request, TabRequest, TabRequestData},
-	rpkg::extract_latest_resource,
+	model::{AppState, EditorData, EditorState, EditorType, Request, TabRequest, TabRequestData},
 	send_request, start_task
 };
 
 #[try_fn]
 #[context("Couldn't perform content search")]
-pub fn start_content_search(
+pub async fn start_content_search(
 	app: &AppHandle,
 	query: String,
 	filetypes: Vec<String>,
 	use_qn_format: bool,
 	partitions_to_search: Vec<String>
 ) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
 	let pattern = matchers::Pattern::new(&format!("{query}(?s:.)*")).context("Invalid regex")?;
 
 	let filetypes = filetypes.into_iter().collect::<HashSet<String>>();
 
-	if let Some(game_files) = app_state.game_files.load().as_ref()
-		&& let Some(install) = app_settings.load().game_install.as_ref()
-	{
-		let game_version = get_loaded_game_version(app, install)?;
-
-		let resources = game_files
+	if let Some(game) = app_state.game.load().as_ref() {
+		let resources = game
+			.partition_manager()
 			.partitions
 			.iter()
 			.filter(|x| partitions_to_search.contains(&x.partition_info().id.to_string()))
@@ -93,7 +91,7 @@ pub fn start_content_search(
 												ResourceMetadata::try_from(*resource_info).ok()?
 											);
 
-											let factory = deserialize_modern_factory(game_version, &temp_data).ok()?;
+											let factory = deserialize_modern_factory(game.version(), &temp_data).ok()?;
 
 											let blueprint_hash = &temp_meta
 												.references
@@ -107,7 +105,7 @@ pub fn start_content_search(
 												ResourceMetadata::try_from(partition.get_resource_info(&tblu_rrid).ok()?).ok()?
 											);
 
-											let blueprint = deserialize_modern_blueprint(game_version, &tblu_data).ok()?;
+											let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data).ok()?;
 
 											let entity =
 												convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
@@ -117,7 +115,7 @@ pub fn start_content_search(
 										} else {
 											let temp_data = partition.read_resource(resource_id).ok()?;
 
-											match game_version {
+											match game.version() {
 												GameVersion::H1 => to_writer(
 														&mut matcher,
 														&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data).ok()?
@@ -145,7 +143,7 @@ pub fn start_content_search(
 									let _: Option<_> = try_block! {
 										let tblu_data = partition.read_resource(resource_id).ok()?;
 
-										match game_version {
+										match game.version() {
 											GameVersion::H1 => to_writer(
 													&mut matcher,
 													&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&tblu_data).ok()?
@@ -172,7 +170,7 @@ pub fn start_content_search(
 
 									let _: Option<_> = try_block! {
 										deserialize_generic_writer(
-											game_version,
+											game.version(),
 											if filetype == "DSWB" {
 												"WSWB".try_into().ok()?
 											} else {
@@ -209,11 +207,11 @@ pub fn start_content_search(
 
 											loop {
 												if let Ok::<_, anyhow::Error>(x) = try_block! {
-													let langmap = get_language_map(game_version, iteration)
+													let langmap = get_language_map(game.version(), iteration)
 														.context("No more alternate language maps available")?;
 
 													let clng = hmlanguages::clng::CLNG::new(
-														game_version.into(),
+														game.version().into(),
 														langmap.1.to_owned()
 													)
 													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
@@ -225,7 +223,7 @@ pub fn start_content_search(
 												} else {
 													iteration += 1;
 
-													if get_language_map(game_version, iteration).is_none() {
+													if get_language_map(game.version(), iteration).is_none() {
 														None?;
 													}
 												}
@@ -275,7 +273,7 @@ pub fn start_content_search(
 
 											loop {
 												if let Ok::<_, anyhow::Error>(x) = try_block! {
-													let langmap = get_language_map(game_version, iteration)
+													let langmap = get_language_map(game.version(), iteration)
 														.context("No more alternate language maps available")?;
 
 													let dlge = hmlanguages::dlge::DLGE::new(
@@ -286,7 +284,7 @@ pub fn start_content_search(
 															.context("No hash list available")?
 															.deref()
 															.to_owned(),
-														game_version.into(),
+														game.version().into(),
 														langmap.1.to_owned(),
 														None,
 														false
@@ -300,7 +298,7 @@ pub fn start_content_search(
 												} else {
 													iteration += 1;
 
-													if get_language_map(game_version, iteration).is_none() {
+													if get_language_map(game.version(), iteration).is_none() {
 														None?;
 													}
 												}
@@ -327,7 +325,7 @@ pub fn start_content_search(
 
 											loop {
 												if let Ok::<_, anyhow::Error>(x) = try_block! {
-													let langmap = get_language_map(game_version, iteration)
+													let langmap = get_language_map(game.version(), iteration)
 														.context("No more alternate language maps available")?;
 
 													let locr = hmlanguages::locr::LOCR::new(
@@ -338,7 +336,7 @@ pub fn start_content_search(
 															.context("No hash list available")?
 															.deref()
 															.to_owned(),
-														game_version.into(),
+														game.version().into(),
 														langmap.1.to_owned(),
 														langmap.0
 													)
@@ -351,7 +349,7 @@ pub fn start_content_search(
 												} else {
 													iteration += 1;
 
-													if get_language_map(game_version, iteration).is_none() {
+													if get_language_map(game.version(), iteration).is_none() {
 														None?;
 													}
 												}
@@ -373,7 +371,7 @@ pub fn start_content_search(
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let rtlv = hmlanguages::rtlv::RTLV::new(game_version.into(), None)
+										let rtlv = hmlanguages::rtlv::RTLV::new(game.version().into(), None)
 											.map_err(|x| anyhow!("TonyTools error: {x:?}"))
 											.ok()?
 											.convert(&res_data, to_string(&res_meta).ok()?)
@@ -395,18 +393,16 @@ pub fn start_content_search(
 											partition.read_resource(resource_id).ok()?
 										);
 
-										let (locr_meta, locr_data) = extract_latest_resource(
-											game_files,
-											res_meta.hash_reference_data.first()?.hash
-										)
-										.ok()?;
+										let (locr_meta, locr_data) = game
+											.extract_latest_resource(res_meta.hash_reference_data.first()?.hash)
+											.ok()?;
 
 										let locr = {
 											let mut iteration = 0;
 
 											loop {
 												if let Ok::<_, anyhow::Error>(x) = try_block! {
-													let langmap = get_language_map(game_version, iteration)
+													let langmap = get_language_map(game.version(), iteration)
 														.context("No more alternate language maps available")?;
 
 													let locr = hmlanguages::locr::LOCR::new(
@@ -417,7 +413,7 @@ pub fn start_content_search(
 															.context("No hash list available")?
 															.deref()
 															.to_owned(),
-														game_version.into(),
+														game.version().into(),
 														langmap.1.to_owned(),
 														langmap.0
 													)
@@ -436,7 +432,7 @@ pub fn start_content_search(
 												} else {
 													iteration += 1;
 
-													if get_language_map(game_version, iteration).is_none() {
+													if get_language_map(game.version(), iteration).is_none() {
 														None?;
 													}
 												}
@@ -540,14 +536,17 @@ pub fn start_content_search(
 
 		let id = Uuid::new_v4();
 
-		app_state.editor_states.insert(
-			id.to_owned(),
-			EditorState {
-				file: None,
-				data: EditorData::ContentSearchResults { results },
-				..Default::default()
-			}
-		);
+		app_state
+			.editor_states
+			.insert(
+				id.to_owned(),
+				EditorState {
+					file: None,
+					data: EditorData::ContentSearchResults { results },
+					..Default::default()
+				}
+			)
+			.await;
 
 		send_request(
 			app,

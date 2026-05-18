@@ -1,4 +1,5 @@
 use std::{
+	pin::pin,
 	sync::{
 		Arc,
 		atomic::{AtomicBool, Ordering}
@@ -454,56 +455,48 @@ impl EditorConnection {
 								Message::Close(_) => {
 									sender.write().await.take();
 
-									if let Err::<_, Error>(e) = try_block! {
-										for editor in app.state::<AppState>().editor_states.iter() {
+									let app_state = app.state::<AppState>();
+									let mut editor_states = pin!(app_state.editor_states.stream_shards());
+									while let Some(shard) = editor_states.next().await {
+										for (id, editor) in shard.iter() {
 											if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } =
 												editor.data
 											{
-												send_request(
+												let _ = send_request(
 													&app,
 													Request::Editor(EditorRequest {
-														editor: editor.key().to_owned(),
-														data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SetEditorConnectionAvailable {
-															editor_connection_available: false
-														}))
+														editor: id.to_owned(),
+														data: EditorRequestData::Entity(EntityEditorRequest::Tree(
+															EntityTreeRequest::SetEditorConnectionAvailable {
+																editor_connection_available: false
+															}
+														))
 													})
-												)?;
+												);
 
-												send_request(
+												let _ = send_request(
 													&app,
 													Request::Editor(EditorRequest {
-														editor: editor.key().to_owned(),
+														editor: id.to_owned(),
 														data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 															EntityMonacoRequest::SetEditorConnected {
 																connected: false
 															}
 														))
 													})
-												)?;
+												);
 											}
 										}
-
-										send_notification(
-											&app,
-											Notification {
-												kind: NotificationKind::Info,
-												title: "Disconnected from ZHMModSDK editor".into(),
-												subtitle: "Editor integration features will no longer be available."
-													.into()
-											}
-										)?;
-									} {
-										send_request(
-											&app,
-											Request::Global(GlobalRequest::ErrorReport {
-												error: format!(
-													"{:?}",
-													e.context("Editor connection message handling error")
-												)
-											})
-										)
-										.expect("Couldn't send error report to frontend");
 									}
+
+									let _ = send_notification(
+										&app,
+										Notification {
+											kind: NotificationKind::Info,
+											title: "Disconnected from ZHMModSDK editor".into(),
+											subtitle: "Editor integration features will no longer be available.".into()
+										}
+									);
 								}
 
 								_ => {
@@ -534,29 +527,35 @@ impl EditorConnection {
 						Err(_) => {
 							sender.write().await.take();
 
-							for editor in app.state::<AppState>().editor_states.iter() {
-								if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-									send_request(
-										&app,
-										Request::Editor(EditorRequest {
-											editor: editor.key().to_owned(),
-											data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SetEditorConnectionAvailable {
-												editor_connection_available: false
-											}))
-										})
-									)
-									.expect("Couldn't send data to frontend");
+							let app_state = app.state::<AppState>();
+							let mut editor_states = pin!(app_state.editor_states.stream_shards());
+							while let Some(shard) = editor_states.next().await {
+								for (id, editor) in shard.iter() {
+									if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+										send_request(
+											&app,
+											Request::Editor(EditorRequest {
+												editor: id.to_owned(),
+												data: EditorRequestData::Entity(EntityEditorRequest::Tree(
+													EntityTreeRequest::SetEditorConnectionAvailable {
+														editor_connection_available: false
+													}
+												))
+											})
+										)
+										.expect("Couldn't send data to frontend");
 
-									send_request(
-										&app,
-										Request::Editor(EditorRequest {
-											editor: editor.key().to_owned(),
-											data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::SetEditorConnected {
-												connected: false
-											}))
-										})
-									)
-									.expect("Couldn't send data to frontend");
+										send_request(
+											&app,
+											Request::Editor(EditorRequest {
+												editor: id.to_owned(),
+												data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+													EntityMonacoRequest::SetEditorConnected { connected: false }
+												))
+											})
+										)
+										.expect("Couldn't send data to frontend");
+									}
 								}
 							}
 
@@ -647,29 +646,33 @@ impl EditorConnection {
 			self.wait_for_event(|evt| matches!(evt, SDKEditorEvent::Welcome))
 				.await?;
 
-			for editor in self.app.state::<AppState>().editor_states.iter() {
-				if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-					send_request(
-						&self.app,
-						Request::Editor(EditorRequest {
-							editor: editor.key().to_owned(),
-							data: EditorRequestData::Entity(EntityEditorRequest::Tree(
-								EntityTreeRequest::SetEditorConnectionAvailable {
-									editor_connection_available: true
-								}
-							))
-						})
-					)?;
+			let app_state = self.app.state::<AppState>();
+			let mut editor_states = pin!(app_state.editor_states.stream_shards());
+			while let Some(shard) = editor_states.next().await {
+				for (id, editor) in shard.iter() {
+					if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+						send_request(
+							&self.app,
+							Request::Editor(EditorRequest {
+								editor: id.to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Tree(
+									EntityTreeRequest::SetEditorConnectionAvailable {
+										editor_connection_available: true
+									}
+								))
+							})
+						)?;
 
-					send_request(
-						&self.app,
-						Request::Editor(EditorRequest {
-							editor: editor.key().to_owned(),
-							data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
-								EntityMonacoRequest::SetEditorConnected { connected: true }
-							))
-						})
-					)?;
+						send_request(
+							&self.app,
+							Request::Editor(EditorRequest {
+								editor: id.to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+									EntityMonacoRequest::SetEditorConnected { connected: true }
+								))
+							})
+						)?;
+					}
 				}
 			}
 
