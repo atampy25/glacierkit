@@ -44,7 +44,7 @@
 		"The Help menu shows the default property values of a template or module, as well as the input and output pins it accepts. You can access it by right-clicking any entity in the tree.",
 		"Changes that you make externally to your project folder are automatically synced to the Files panel in GlacierKit.",
 		"Press Ctrl-Space to trigger intellisense in JSON editors - this can show you what properties are available and what their default values are.",
-		'Right-click an entity\'s "factory" field and press "Open factory in new tab" or click on it and press F12 to quickly inspect its underlying template.',
+		'Right-click an entity\'s "factory" field and press "Open factory in new tab", or click on it and press F12, to quickly inspect its underlying template.',
 		'You can visualise a ZCurve by right-clicking the property\'s name and pressing "Visualise curve".',
 		'You can follow entity references by right-clicking the entity ID and pressing "Follow reference", or by pressing F12.',
 		"Press F1 in any JSON editor to access the Command Palette, which lets you perform common operations like transforming text to lowercase/uppercase, or deleting duplicate lines.",
@@ -55,7 +55,8 @@
 		"Many kinds of file can be previewed directly in the Resource Overview, including textures and sound files.",
 		"Separate multiple search terms with spaces to find only items which match all of the search terms.",
 		"Installing the ZHMModSDK and its Editor mod will allow you to modify entity positions and properties visually and in real time, and sync these with GlacierKit.",
-		"You can open a file from outside of your current project by pressing CTRL-O."
+		"You can open a file from outside of your current project by pressing CTRL-O.",
+		"Select the help icon at the top right of the window and hover over any UI element to see a tooltip explaining what it does."
 	]
 
 	let hint = $state(hints[Math.floor(Math.random() * hints.length)])
@@ -68,27 +69,32 @@
 		FileBrowser: {
 			name: "Files",
 			icon: Folders,
-			component: FileBrowser
+			component: FileBrowser,
+			helptext: "Browse and manage files in your project."
 		},
 		GameBrowser: {
 			name: "Game content",
 			icon: Box,
-			component: GameBrowser
+			component: GameBrowser,
+			helptext: "Browse game files and content, and drag templates into the File Browser to create new files."
 		},
 		ContentSearch: {
 			name: "Advanced search",
 			icon: Search,
-			component: ContentSearch
+			component: ContentSearch,
+			helptext: "Search inside resources across the currently selected game."
 		},
 		TextTransformer: {
 			name: "Text tools",
 			icon: TextSelection,
-			component: TextTransformer
+			component: TextTransformer,
+			helptext: "Perform various operations on text, such as generating UUIDs and calculating hashes."
 		},
 		Settings: {
 			name: "Settings",
 			icon: SettingsIcon,
-			component: Settings
+			component: Settings,
+			helptext: "Configure GlacierKit and project settings."
 		}
 	} as const
 
@@ -486,6 +492,7 @@
 				}}
 				selected={selectedTool === toolID}
 				tooltip={tool.name}
+				helptext={tool.helptext}
 			/>
 		{/each}
 	</div>

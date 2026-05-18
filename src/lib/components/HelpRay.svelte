@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { computePosition, shift, flip, offset } from "@floating-ui/dom"
-	import { createEventDispatcher, onDestroy, onMount } from "svelte"
+	import { throttle } from "lodash"
 
-	const dispatch = createEventDispatcher()
+	let { enabled = $bindable() }: { enabled: boolean } = $props()
 
-	export let enabled = false
+	let tooltipElem: HTMLDivElement | null = $state(null)
+	let tooltipData: { title: string; description: string } | null = $state(null)
 
-	let tooltipElem: HTMLDivElement
-	let tooltipData: { title: string; description: string } | null = null
+	let tooltipTop = $state(visualViewport?.height || 0)
+	let tooltipLeft = $state(visualViewport?.width || 0)
 
-	let tooltipTop = visualViewport?.height || 0
-	let tooltipLeft = visualViewport?.width || 0
+	const handler: (evt: { clientX: number; clientY: number }) => void = ({ clientX, clientY }) => {
+		if (!enabled) return
 
-	const handler: (evt: { clientX: number; clientY: number }) => void = async ({ clientX, clientY }) => {
 		let element = document.elementFromPoint(clientX, clientY)
 		let helpData = element?.getAttribute("data-helpray") || null
 
@@ -42,34 +42,29 @@
 			}
 		}
 
-		;({ x: tooltipLeft, y: tooltipTop } = await computePosition(virtualEl, tooltipElem, {
-			placement: "right-start",
-			middleware: [offset({ mainAxis: 10, alignmentAxis: 10 }), flip(), shift()]
-		}))
-	}
-
-	document.addEventListener("mousemove", handler)
-
-	onDestroy(() => {
-		document.removeEventListener("mousemove", handler)
-	})
-
-	$: if (enabled) {
-		document.body.style.cursor = "help"
-	} else {
-		document.body.style.removeProperty("cursor")
+		if (tooltipElem) {
+			void computePosition(virtualEl, tooltipElem, {
+				placement: "right-start",
+				middleware: [offset({ mainAxis: 10, alignmentAxis: 10 }), flip(), shift()]
+			}).then(({ x, y }) => {
+				tooltipLeft = x
+				tooltipTop = y
+			})
+		}
 	}
 </script>
 
 <svelte:window
-	on:keydown={(e) => {
+	onkeydown={(e) => {
 		if (e.key === "Escape") {
 			enabled = false
 		}
 	}}
 />
 
-<div class="absolute top-0 left-0 h-screen w-screen bg-opacity-20 bg-black pointer-events-none transition-opacity {enabled ? 'opacity-100' : 'opacity-0'}" style="z-index: 9999" />
+<svelte:document class:cursor-help={enabled} onmousemove={handler} />
+
+<div class="absolute top-0 left-0 h-screen w-screen bg-opacity-20 bg-black pointer-events-none transition-opacity {enabled ? 'opacity-100' : 'opacity-0'}" style="z-index: 9999"></div>
 
 <div bind:this={tooltipElem} class="absolute bg-[#505050] p-4 transition-opacity max-w-md" style="z-index: 99999; top: {tooltipTop}px; left: {tooltipLeft}px; opacity: {enabled ? '1' : '0'}">
 	{#if tooltipData}

@@ -1,19 +1,20 @@
-use std::{fs, time::Duration};
+use std::{fs, sync::atomic::Ordering, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use ecow::eco_format;
 use fn_error_context::context;
-use hitman_commons::game::GameVersion;
-use hitman_commons::hash_list::HASH_LIST;
-use hitman_commons::metadata::{ResourceReference, RuntimeID};
+use hitman_commons::{
+	game::GameVersion,
+	hash_list::HASH_LIST,
+	metadata::{ResourceReference, RuntimeID}
+};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use quickentity_rs::entity::EntityID;
 use quickentity_rs::{
 	apply_patch, convert_to_game, convert_to_qn,
-	entity::{CommentEntity, Entity, SubEntity, SubType},
+	entity::{CommentEntity, Entity, EntityID, SubEntity, SubType},
 	generate_patch,
 	patch::Patch
 };
@@ -27,26 +28,23 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
-use crate::bin1::{deserialize_modern_blueprint, deserialize_modern_factory};
-use crate::event_handling::entity::monaco::ENUMS;
-use crate::model::Hash;
-use crate::ores_repo::UnlockableItem;
-use crate::rpkg::extract_latest_resource;
-use crate::{Notification, NotificationKind, send_notification};
 use crate::{
+	HASH_LIST_ENDPOINT, HASH_LIST_VERSION_ENDPOINT, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT,
+	TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
+	bin1::{deserialize_modern_blueprint, deserialize_modern_factory},
 	convert_json_patch_to_merge_patch,
+	event_handling::{content_search::start_content_search, entity::monaco::ENUMS},
+	finish_task,
+	general::{load_game_files, open_file, open_in_editor},
+	get_loaded_game_version,
 	model::{
 		AppSettings, AppState, ContentSearchEvent, EditorData, EditorState, EditorType, FileBrowserEvent,
-		GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalRequest, Request, SearchFilter, SettingsEvent,
-		SettingsRequest, TabRequest, TabRequestData, ToolEvent, ToolRequest
-	}
-};
-use crate::{event_handling::content_search::start_content_search, send_request};
-use crate::{finish_task, start_task};
-use crate::{general::open_in_editor, rpkg::extract_entity};
-use crate::{
-	general::{load_game_files, open_file},
-	get_loaded_game_version
+		GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter,
+		SettingsEvent, SettingsRequest, TabRequest, TabRequestData, ToolEvent, ToolRequest
+	},
+	ores_repo::UnlockableItem,
+	rpkg::{extract_entity, extract_latest_resource},
+	send_notification, send_request, start_task
 };
 
 #[try_fn]
@@ -1013,6 +1011,72 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				{
 					send_request(app, Request::Global(GlobalRequest::RequestLastPanicUpload))?;
 				}
+
+				let task = start_task(app, "Acquiring latest hash list")?;
+
+				let current_version = HASH_LIST.version.load(Ordering::SeqCst);
+
+				if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await
+					&& let Ok(data) = data.text().await
+				{
+					let new_version = data
+						.trim()
+						.parse::<u32>()
+						.context("Online hash list version wasn't a number")?;
+
+					if current_version < new_version
+						&& let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await
+						&& let Ok(data) = data.bytes().await
+					{
+						HASH_LIST.load_compressed(&data)?;
+
+						fs::write(
+							app.path()
+								.app_data_dir()
+								.context("Couldn't get app data dir")?
+								.join("hash_list.sml"),
+							data
+						)?;
+					}
+				}
+
+				let current_version = app_state
+					.tonytools_hash_list
+					.load()
+					.as_ref()
+					.map(|x| x.version)
+					.unwrap_or(0);
+
+				if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_VERSION_ENDPOINT).await
+					&& let Ok(data) = data.text().await
+				{
+					let new_version = from_str::<Value>(&data)
+						.context("Couldn't parse online version data as JSON")?
+						.get("version")
+						.context("No version key in online version data")?
+						.as_u64()
+						.context("Online hash list version wasn't a number")? as u32;
+
+					if current_version < new_version
+						&& let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_ENDPOINT).await
+						&& let Ok(data) = data.bytes().await
+					{
+						let tonytools_hash_list = tonytools::hashlist::HashList::load(&data)
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+						fs::write(
+							app.path()
+								.app_data_dir()
+								.context("Couldn't get app data dir")?
+								.join("tonytools_hash_list.hmla"),
+							data
+						)?;
+
+						app_state.tonytools_hash_list.store(Some(tonytools_hash_list.into()));
+					}
+				}
+
+				finish_task(app, task)?;
 
 				load_game_files(app).await?;
 

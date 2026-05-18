@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { help } from "$lib/helpray"
 	import type { ComponentType, SvelteComponent } from "svelte"
 
 	export let tooltip = ""
 	export let icon: ComponentType<SvelteComponent>
 	export let selected = false
+	export let helptext: string | null = null
 
 	export let id = "tooltip-" + Math.random().toString(36)
 
@@ -33,6 +35,7 @@
 	on:focus={() => {
 		hidden = false
 	}}
+	use:help={{ title: tooltip, description: helptext || "A tool." }}
 >
 	<span {id} class="bx--assistive-text">{tooltip}</span>
 	<svelte:component this={icon} size={22} />

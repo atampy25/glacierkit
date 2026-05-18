@@ -132,23 +132,23 @@
 											on:load={() => {
 												previewImage = previewImage
 											}}
-											src="{platform() === 'windows' ? 'http://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
+											src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
 											alt="Resource preview"
 										/>
 									{:else if data.type === "Mesh"}
 										<div class="h-[30vh]">
 											<MeshPreview
-												src="{platform() === 'windows' ? 'http://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
+												src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
 												boundingBox={data.data.bounding_box}
 											/>
 										</div>
 									{:else if data.type === "Audio"}
-										<WaveformPlayer src="{platform() === 'windows' ? 'http://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}" />
+										<WaveformPlayer src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}" />
 									{:else if data.type === "MultiAudio"}
 										<div class="text-neutral-400 mb-2">{data.data.name}</div>
 										{#if data.data.audios.length}
 											<MultiWaveformPlayer
-												src={data.data.audios.map((a) => [a[0], `${platform() === "windows" ? "http://editor-asset.localhost" : "editor-asset:/"}/${id}/${a[1]}`])}
+												src={data.data.audios.map((a) => [a[0], `${platform() === "windows" ? "https://editor-asset.localhost" : "editor-asset:/"}/${id}/${a[1]}`])}
 												on:download={async ({ detail }) => {
 													trackEvent("Extract specific audio from WWEV file as WAV")
 

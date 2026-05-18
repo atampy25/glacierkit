@@ -21,6 +21,46 @@
 		}
 	}
 
+	function parsePath(path: string): {
+		parents: string[]
+		name: string
+	} {
+		if (path.startsWith("[")) {
+			const [_, inner, params, filetype] = /^\[(.*)\](?:\((.*)\))?(\..*)?$/.exec(path)!
+			const parsedInner = parsePath(inner)
+			const type = filetype ? filetype.replace(/^\.pc_/, ".") : ""
+			const name = `[${parsedInner.name}]` + (params ? `(${params})` : "") + type
+			if (name.endsWith(`${type}]${type}`)) {
+				return {
+					parents: parsedInner.parents,
+					name: name.match(/^\[(.*)\]\..*$/)![1]
+				}
+			} else if ([".class", ".aspect", ".brick", ".entity", ".entitytemplate"].some((ty) => name.endsWith(`${ty}].entitytype`))) {
+				return {
+					parents: parsedInner.parents,
+					name: name.match(/^\[(.*)\]\..*$/)![1]
+				}
+			} else if ([".class", ".aspect", ".brick", ".entity", ".entitytemplate"].some((ty) => name.endsWith(`${ty}].entityblueprint`))) {
+				return {
+					parents: parsedInner.parents,
+					name: name.match(/^\[(.*)\]\..*$/)![1] + " (blueprint)"
+				}
+			} else {
+				return {
+					parents: parsedInner.parents,
+					name
+				}
+			}
+		} else {
+			const parents = path.split("/")
+
+			return {
+				parents: parents.slice(0, -1),
+				name: parents.at(-1)!
+			}
+		}
+	}
+
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
 			core: {
@@ -275,14 +315,9 @@
 			}
 
 			if (entry.path) {
-				const path = /\[(.*)\](?:\.pc_|\(.*\)\.pc_)/.exec(entry.path)![1]
-				const params = /\[.*\]\((.*)\)\.pc_/.exec(entry.path)?.[1]
-				const platformType = "." + /\[.*\](?:\.pc_|\(.*\)\.pc_)(.*)/.exec(entry.path)?.[1]
+				const parsedPath = parsePath(entry.path)
 
-				for (const pathSection of path
-					.split("/")
-					.map((_, ind, arr) => arr.slice(0, ind + 1).join("/"))
-					.slice(0, -1)) {
+				for (const pathSection of parsedPath.parents.map((_, i, arr) => arr.slice(0, i + 1).join("/"))) {
 					if (!addedFolders.has(separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection)) {
 						tree.settings!.core.data.push({
 							id: separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection,
@@ -306,7 +341,7 @@
 
 				tree.settings!.core.data.push({
 					id: entry.hash,
-					parent: separatePartitions ? `${entry.partition[0]}-${path.split("/").slice(0, -1).join("/")}` : path.split("/").slice(0, -1).join("/"),
+					parent: separatePartitions ? `${entry.partition[0]}-${parsedPath.parents.join("/")}` : parsedPath.parents.join("/"),
 					icon: `${
 						{
 							TEMP: "fa-solid fa-cubes-stacked",
@@ -353,22 +388,7 @@
 							WSGB: "fa-regular fa-square"
 						}[entry.filetype] || "fa-regular fa-file"
 					}`,
-					text: (
-						(params ? `[${path.split("/").at(-1)}](${params})` : path.split("/").at(-1)) +
-						((platformType === ".entitytype" &&
-							(path.endsWith(".class") ||
-								path.endsWith(".aspect") ||
-								path.endsWith(".brick") ||
-								path.endsWith(".entity") ||
-								path.endsWith(".entitytype") ||
-								path.endsWith(".entitytemplate"))) ||
-						platformType === ".wwisebank" ||
-						platformType === ".gfx" ||
-						platformType === ".wes" ||
-						path.endsWith(platformType)
-							? ""
-							: platformType)
-					).replace(/\.entityblueprint$/g, " (blueprint)"),
+					text: parsedPath.name,
 					folder: false,
 					path: entry.path,
 					filetype: entry.filetype
@@ -473,11 +493,11 @@
 	let separatePartitions = false
 	let entries: GameBrowserEntry[] = []
 
-	$: separatePartitions,
+	$: (separatePartitions,
 		(async () => {
 			await refreshTree()
 			await trackEvent("Search game files", { filter: searchFilter, separate_partitions: String(separatePartitions) })
-		})()
+		})())
 </script>
 
 <div
