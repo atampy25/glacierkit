@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { event } from "$lib/utils"
+	import { event, showInFolder } from "$lib/utils"
 	import type { GameInstall, SettingsRequest } from "$lib/bindings"
 	import { capitalize } from "lodash"
 	import { Checkbox, RadioTile, TileGroup, TooltipIcon } from "carbon-components-svelte"
@@ -197,7 +197,7 @@
 									icon={ArrowUpRight}
 									on:click={async (e) => {
           								e.stopPropagation();
-									 	await event({ type: "global", data: { type: "openInExplorer", data: gameInstall.path } })
+										await showInFolder(gameInstall.path)
         							}}
 								/>
 							</div>
