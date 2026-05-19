@@ -114,6 +114,7 @@ dependencies = [
 	"biome_parser",
 	"biome_rowan",
 	"biome_unicode_table",
+	"dashmap",
 	"debounced",
 	"derive_more",
 	"ecow",
@@ -140,6 +141,7 @@ dependencies = [
 	"ordermap",
 	"os_info",
 	"papaya",
+	"percent-encoding",
 	"prim-rs",
 	"quickentity-rs",
 	"rand 0.10.1",
@@ -1104,10 +1106,10 @@ dependencies = ["darling_core 0.23.0", "quote", "syn 2.0.117"]
 
 [[package]]
 name = "dashmap"
-version = "6.1.0"
+version = "6.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
-dependencies = ["cfg-if", "crossbeam-utils", "hashbrown 0.14.5", "lock_api", "once_cell", "parking_lot_core"]
+checksum = "e6361d5c062261c78a176addb82d4c821ae42bed6089de0e12603cd25de2059c"
+dependencies = ["cfg-if", "crossbeam-utils", "hashbrown 0.14.5", "lock_api", "once_cell", "parking_lot_core", "rayon"]
 
 [[package]]
 name = "data-encoding"

@@ -1,8 +1,7 @@
 use std::{
 	collections::{HashMap, HashSet},
 	io::Write,
-	ops::Deref,
-	time::Instant
+	ops::Deref
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -27,7 +26,7 @@ use crate::{
 	finish_task,
 	languages::get_language_map,
 	model::{AppState, EditorData, EditorState, EditorType, Request, TabRequest, TabRequestData},
-	send_request, start_task
+	send_request, start_progress, start_task, task_progress
 };
 
 #[try_fn]
@@ -66,10 +65,7 @@ pub async fn start_content_search(
 
 		let total_resources = resources.len();
 
-		let mut progress_task = start_task(app, format!("Searching game files for \"{query}\": 0%"))?;
-		let mut last_percent = 0;
-
-		let start_time = Instant::now();
+		let mut task = start_progress(app, format!("Searching game files for \"{query}\""))?;
 
 		for (progress, chunk) in resources.into_iter().chunks(1000).into_iter().enumerate() {
 			matching_ids.par_extend(
@@ -80,10 +76,10 @@ pub async fn start_content_search(
 						let filetype = resource_info.data_type();
 
 						if filetypes.contains(&filetype) {
+							let mut matcher = pattern.matcher();
+
 							match filetype.as_ref() {
 								"TEMP" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										if use_qn_format {
 											let (temp_data, temp_meta) = (
@@ -133,13 +129,9 @@ pub async fn start_content_search(
 											}
 										}
 									};
-
-									matcher.is_matched()
 								}
 
 								"TBLU" if !use_qn_format => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										let tblu_data = partition.read_resource(resource_id).ok()?;
 
@@ -160,14 +152,10 @@ pub async fn start_content_search(
 												).ok()?,
 										}
 									};
-
-									matcher.is_matched()
 								}
 
 								"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM"
 								| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "ORES" | "DSWB" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										deserialize_generic_writer(
 											game.version(),
@@ -181,21 +169,13 @@ pub async fn start_content_search(
 										)
 										.ok()?;
 									};
-
-									matcher.is_matched()
 								}
 
 								"JSON" | "REPO" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! { matcher.write_all(&partition.read_resource(resource_id).ok()?).ok()?; };
-
-									matcher.is_matched()
 								}
 
 								"CLNG" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
@@ -232,13 +212,9 @@ pub async fn start_content_search(
 
 										to_writer(&mut matcher, &clng).ok()?;
 									};
-
-									matcher.is_matched()
 								}
 
 								"DITL" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
@@ -255,13 +231,9 @@ pub async fn start_content_search(
 											&ditl.convert(&res_data, to_string(&res_meta).ok()?).ok()?
 										).ok()?;
 									};
-
-									matcher.is_matched()
 								}
 
 								"DLGE" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
@@ -307,13 +279,9 @@ pub async fn start_content_search(
 
 										to_writer(&mut matcher, &dlge).ok()?;
 									};
-
-									matcher.is_matched()
 								}
 
 								"LOCR" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
@@ -358,13 +326,9 @@ pub async fn start_content_search(
 
 										to_writer(&mut matcher, &locr).ok()?;
 									};
-
-									matcher.is_matched()
 								}
 
 								"RTLV" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
@@ -380,13 +344,9 @@ pub async fn start_content_search(
 
 										to_writer(&mut matcher, &rtlv).ok()?;
 									};
-
-									matcher.is_matched()
 								}
 
 								"LINE" => {
-									let mut matcher = pattern.matcher();
-
 									let _: Option<_> = try_block! {
 										let (res_meta, res_data) = (
 											RpkgResourceMeta::try_from(*resource_info).ok()?,
@@ -485,12 +445,12 @@ pub async fn start_content_search(
 											).ok()?;
 										}
 									};
-
-									matcher.is_matched()
 								}
 
-								_ => false
+								_ => {}
 							}
+
+							matcher.is_matched()
 						} else {
 							false
 						}
@@ -498,30 +458,11 @@ pub async fn start_content_search(
 					.map(|(x, _)| RuntimeID::try_from(x).unwrap())
 			);
 
-			let percent = ((((progress * 1000) as f32) / (total_resources as f32)) * 100.0).round() as u8;
-			if percent != last_percent {
-				last_percent = percent;
-
-				finish_task(app, progress_task)?;
-
-				let secs_remaining = ((Instant::now() - start_time).as_secs_f32() / ((progress * 1000) as f32)
-					* ((total_resources - (progress * 1000)) as f32)) as u64;
-
-				progress_task = start_task(
-					app,
-					format!(
-						"Searching game files for \"{}\": {}%, {}{} remaining",
-						query,
-						last_percent,
-						hrtime::from_sec(secs_remaining),
-						if secs_remaining <= 60 { "s" } else { "" }
-					)
-				)?;
-			}
+			task_progress(app, task, ((progress * 1000) as f32) / (total_resources as f32))?;
 		}
 
-		finish_task(app, progress_task)?;
-		progress_task = start_task(app, format!("Preparing search results for \"{}\"", query))?;
+		finish_task(app, task)?;
+		task = start_task(app, format!("Preparing search results for \"{}\"", query))?;
 
 		let results = matching_ids
 			.into_iter()
@@ -559,6 +500,6 @@ pub async fn start_content_search(
 			})
 		)?;
 
-		finish_task(app, progress_task)?;
+		finish_task(app, task)?;
 	}
 }

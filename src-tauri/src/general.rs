@@ -844,67 +844,76 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 		send_request(app, Request::Global(GlobalRequest::RequestLastPanicUpload))?;
 	}
 
-	let task = start_task(app, "Acquiring latest hash list")?;
+	let res = tokio::spawn({
+		let app = app.clone();
+		async move {
+			let task = start_task(&app, "Acquiring latest hash list")?;
 
-	let app_data_dir = app.path().app_data_dir().context("Couldn't get data dir")?;
+			let app_data_dir = app.path().app_data_dir().context("Couldn't get data dir")?;
 
-	let _ = fs::read(app_data_dir.join("hash_list.sml"))
-		.ok()
-		.and_then(|x| HASH_LIST.load_compressed(&x).ok());
+			let _ = fs::read(app_data_dir.join("hash_list.sml"))
+				.ok()
+				.and_then(|x| HASH_LIST.load_compressed(&x).ok());
 
-	let current_version = HASH_LIST.version.load(Ordering::SeqCst);
+			let current_version = HASH_LIST.version.load(Ordering::SeqCst);
 
-	if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await
-		&& let Ok(data) = data.text().await
-	{
-		let new_version = data
-			.trim()
-			.parse::<u32>()
-			.context("Online hash list version wasn't a number")?;
+			if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await
+				&& let Ok(data) = data.text().await
+			{
+				let new_version = data
+					.trim()
+					.parse::<u32>()
+					.context("Online hash list version wasn't a number")?;
 
-		if current_version < new_version
-			&& let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await
-			&& let Ok(data) = data.bytes().await
-		{
-			HASH_LIST.load_compressed(&data)?;
+				if current_version < new_version
+					&& let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await
+					&& let Ok(data) = data.bytes().await
+				{
+					HASH_LIST.load_compressed(&data)?;
 
-			fs::write(app_data_dir.join("hash_list.sml"), data)?;
+					fs::write(app_data_dir.join("hash_list.sml"), data)?;
+				}
+			}
+
+			let app_state = app.state::<AppState>();
+			let current_version = app_state
+				.tonytools_hash_list
+				.load()
+				.as_ref()
+				.map(|x| x.version)
+				.unwrap_or(0);
+
+			if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_VERSION_ENDPOINT).await
+				&& let Ok(data) = data.text().await
+			{
+				let new_version = from_str::<Value>(&data)
+					.context("Couldn't parse online version data as JSON")?
+					.get("version")
+					.context("No version key in online version data")?
+					.as_u64()
+					.context("Online hash list version wasn't a number")? as u32;
+
+				if current_version < new_version
+					&& let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_ENDPOINT).await
+					&& let Ok(data) = data.bytes().await
+				{
+					let tonytools_hash_list =
+						tonytools::hashlist::HashList::load(&data).map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+					fs::write(app_data_dir.join("tonytools_hash_list.hmla"), data)?;
+
+					app_state.tonytools_hash_list.store(Some(tonytools_hash_list.into()));
+				}
+			}
+
+			finish_task(&app, task)?;
+
+			anyhow::Ok(())
 		}
-	}
-
-	let current_version = app_state
-		.tonytools_hash_list
-		.load()
-		.as_ref()
-		.map(|x| x.version)
-		.unwrap_or(0);
-
-	if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_VERSION_ENDPOINT).await
-		&& let Ok(data) = data.text().await
-	{
-		let new_version = from_str::<Value>(&data)
-			.context("Couldn't parse online version data as JSON")?
-			.get("version")
-			.context("No version key in online version data")?
-			.as_u64()
-			.context("Online hash list version wasn't a number")? as u32;
-
-		if current_version < new_version
-			&& let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_ENDPOINT).await
-			&& let Ok(data) = data.bytes().await
-		{
-			let tonytools_hash_list =
-				tonytools::hashlist::HashList::load(&data).map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-			fs::write(app_data_dir.join("tonytools_hash_list.hmla"), data)?;
-
-			app_state.tonytools_hash_list.store(Some(tonytools_hash_list.into()));
-		}
-	}
-
-	finish_task(app, task)?;
+	});
 
 	load_game_files(app).await?;
+	res.await??;
 
 	if let Ok(req) = reqwest::get("https://hitman-resources.netlify.app/glacierkit/dynamics.json").await {
 		send_request(

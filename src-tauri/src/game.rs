@@ -1,12 +1,8 @@
-use std::{
-	collections::{BTreeSet, HashMap},
-	fs,
-	path::Path,
-	sync::Arc
-};
+use std::{collections::HashMap, fs, path::Path, sync::Arc};
 
 use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
+use dashmap::{DashMap, DashSet};
 use glacier_ini::IniFileSystem;
 use hitman_commons::{
 	game::{GamePlatform, GameVersion},
@@ -34,7 +30,7 @@ use crate::{
 		ToolRequest
 	},
 	ores_repo::RepositoryItem,
-	send_request, start_task
+	send_request, start_progress, start_task, task_progress
 };
 
 pub struct Game {
@@ -116,8 +112,7 @@ impl Game {
 		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
 
 		let mut last_index = 0;
-		let mut last_progress = 0;
-		let mut loading_task = start_task(app, format!("Loading {} (0%)", partition_names[last_index]))?;
+		let mut task = start_progress(app, format!("Loading {}", partition_names[last_index]))?;
 
 		let mut partition_manager =
 			PartitionManager::new(runtime_path.clone(), &PackageDefinitionSource::Custom(partitions))
@@ -128,24 +123,13 @@ impl Game {
 				if cur_partition < partition_names.len() {
 					if cur_partition != last_index {
 						last_index = cur_partition;
-						last_progress = 0;
 
-						finish_task(app, loading_task).expect("Couldn't send data to frontend");
-						loading_task = start_task(app, format!("Loading {} (0%)", partition_names[last_index]))
+						finish_task(app, task).expect("Couldn't send data to frontend");
+						task = start_progress(app, format!("Loading {}", partition_names[last_index]))
 							.expect("Couldn't send data to frontend");
 					}
 
-					let progress = ((state.install_progress * 10.0).round() * 10.0) as u8;
-					if progress != last_progress {
-						last_progress = progress;
-
-						finish_task(app, loading_task).expect("Couldn't send data to frontend");
-						loading_task = start_task(
-							app,
-							format!("Loading {} ({}%)", partition_names[last_index], last_progress)
-						)
-						.expect("Couldn't send data to frontend");
-					}
+					task_progress(app, task, state.install_progress).expect("Couldn't send data to frontend");
 				}
 			})
 			.context("Couldn't mount partitions")?;
@@ -166,7 +150,7 @@ impl Game {
 			}))
 		)?;
 
-		finish_task(app, loading_task)?;
+		finish_task(app, task)?;
 		let task = start_task(app, "Caching reverse references")?;
 
 		let file_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>> = partition_manager
@@ -186,11 +170,16 @@ impl Game {
 			})
 			.collect();
 
+		let resource_reverse_references: DashMap<RuntimeID, Vec<RuntimeID>, BuildIdentityHasher<u64>> =
+			DashMap::with_capacity_and_hasher(file_types.len(), BuildIdentityHasher::default());
+
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
-		let mut refs = partition_manager
+		let seen_resources: DashSet<RuntimeID, BuildIdentityHasher<u64>> =
+			DashSet::with_capacity_and_hasher(file_types.len(), BuildIdentityHasher::default());
+
+		partition_manager
 			.partitions
 			.par_iter()
-			.rev()
 			.flat_map(|partition| {
 				partition.latest_resources().into_par_iter().map(|(resource, _)| {
 					(
@@ -199,31 +188,18 @@ impl Game {
 					)
 				})
 			})
-			.collect::<HashMap<_, _>>()
-			.into_par_iter()
-			.flat_map(|(resource_id, resource_references)| {
-				resource_references.par_iter().map(move |(reference_id, _)| {
-					(
-						(*reference_id).try_into().expect("Invalid ID in game files"),
-						resource_id
-					)
-				})
-			})
-			.collect::<BTreeSet<_>>()
-			.into_iter()
-			.peekable();
+			.for_each(|(resource_id, resource_references)| {
+				if seen_resources.insert(resource_id) {
+					for (reference_id, _) in resource_references {
+						resource_reverse_references
+							.entry(RuntimeID::try_from(*reference_id).expect("Invalid ID in game files"))
+							.or_default()
+							.push(resource_id);
+					}
+				}
+			});
 
-		let mut resource_reverse_references: HashMap<RuntimeID, Vec<RuntimeID>, BuildIdentityHasher<u64>> =
-			HashMap::with_capacity_and_hasher(file_types.len(), BuildIdentityHasher::default());
-
-		while let Some((key, val1)) = refs.next() {
-			let mut vals = vec![val1];
-			while let Some((_, v)) = refs.next_if(|(k, _)| *k == key) {
-				vals.push(v);
-			}
-
-			resource_reverse_references.entry(key).or_default().extend(vals);
-		}
+		let resource_reverse_references = resource_reverse_references.into_par_iter().collect();
 
 		finish_task(app, task)?;
 

@@ -16,7 +16,7 @@
 	import { ColumnDependency, Filter, SoftwareResource, TrashCan } from "carbon-icons-svelte"
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
 	import { VList } from "virtua/svelte"
-	import { platform } from "@tauri-apps/plugin-os"
+	import { convertFileSrc } from "@tauri-apps/api/core"
 
 	let { id }: { id: string } = $props()
 
@@ -132,19 +132,16 @@
 											on:load={() => {
 												previewImage = previewImage
 											}}
-											src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
+											src={convertFileSrc(`${id}/${data.data.asset_id}`, "editor-asset")}
 											alt="Resource preview"
 										/>
 									{:else if data.type === "Mesh"}
 										<div class="h-[30vh]">
-											<MeshPreview
-												src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}"
-												boundingBox={data.data.bounding_box}
-											/>
+											<MeshPreview src={convertFileSrc(`${id}/${data.data.asset_id}`, "editor-asset")} boundingBox={data.data.bounding_box} />
 										</div>
 									{:else if data.type === "Audio"}
 										{#if data.data.asset_id}
-											<WaveformPlayer src="{platform() === 'windows' ? 'https://editor-asset.localhost' : 'editor-asset:/'}/{id}/{data.data.asset_id}" />
+											<WaveformPlayer src={convertFileSrc(`${id}/${data.data.asset_id}`, "editor-asset")} />
 										{:else}
 											<div class="text-lg">This audio object is in an unsupported format (likely MIDI).</div>
 										{/if}
@@ -152,10 +149,7 @@
 										<div class="text-neutral-400 mb-2">{data.data.name}</div>
 										{#if data.data.audios.length}
 											<MultiWaveformPlayer
-												src={data.data.audios.map((a) => [
-													a[0],
-													a[1] ? `${platform() === "windows" ? "https://editor-asset.localhost" : "editor-asset:/"}/${id}/${a[1]}` : null
-												])}
+												src={data.data.audios.map((a) => [a[0], a[1] ? convertFileSrc(`${id}/${a[1]}`, "editor-asset") : null])}
 												on:download={async ({ detail }) => {
 													trackEvent("Extract specific audio from WWEV file")
 
