@@ -884,7 +884,7 @@
 		"[modules:/zcameraentity.class].pc_entitytype": "fa fa-camera",
 		"[modules:/zsequenceentity.class].pc_entitytype": "fa fa-film",
 		"[modules:/zhitmandamageovertime.class].pc_entitytype": "fa fa-skull-crossbones",
-		"0059FBD4AEBCDED0": "fa-regular fa-comment", // Hashes
+		"[assembly:/_pro/design/templates/ld design assets/ld_helpers_generic.template?/mockup_commentbubble.entitytemplate].pc_entitytype": "fa-regular fa-comment", // Hashes
 
 		"levelflow.template?/exit": "fa fa-sign-out-alt",
 		zitem: "fa fa-wrench", // Specific

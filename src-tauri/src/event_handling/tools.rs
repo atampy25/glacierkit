@@ -6,7 +6,8 @@ use ecow::eco_format;
 use fn_error_context::context;
 use hitman_commons::{
 	game::GameVersion,
-	metadata::{ResourceReference, RuntimeID}
+	metadata::{ResourceReference, RuntimeID},
+	rid
 };
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
@@ -32,7 +33,7 @@ use crate::{
 	convert_json_patch_to_merge_patch,
 	event_handling::{content_search::start_content_search, resource_overview::open_resource_overview},
 	finish_task,
-	general::{initialise_app, load_game_files, open_file, open_in_editor},
+	general::{EMPTY_ID, REPO_ID, UNLOCKABLES_ID, initialise_app, load_game_files, open_file, open_in_editor},
 	model::{
 		AppSettings, AppState, ContentSearchEvent, FileBrowserEvent, GameBrowserEntry, GameBrowserEvent,
 		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SettingsEvent, ToolEvent, ToolRequest
@@ -82,15 +83,18 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							fs::write(
 								path,
 								to_string(&Entity {
-									factory: "[assembly:/something.entity].pc_entitytemplate".parse()?,
-									blueprint: "[assembly:/something.entity].pc_entityblueprint".parse()?,
+									factory: EMPTY_ID,
+									blueprint: EMPTY_ID,
 									root_entity: 0xfffffffffffffffe.into(),
 									entities: velcro::map_iter! {
 										EntityID::from(0xfffffffffffffffe): SubEntity {
 											parent: None,
 											name: "Scene".into(),
-											factory: ResourceReference{resource:"[modules:/zspatialentity.class].pc_entitytype".parse().unwrap(),flags:Default::default()},
-											blueprint: "[modules:/zspatialentity.class].pc_entityblueprint".parse().unwrap(),
+											factory: ResourceReference {
+												resource: rid!("[modules:/zspatialentity.class].pc_entitytype"),
+												flags: Default::default()
+											},
+											blueprint: rid!("[modules:/zspatialentity.class].pc_entityblueprint"),
 											editor_only: Default::default(),
 											properties: Default::default(),
 											platform_specific_properties: Default::default(),
@@ -544,7 +548,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								);
 								x
 							},
-							file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
+							file_and_type: (REPO_ID.to_string(), "REPO".into())
 						})
 					)?;
 
@@ -578,14 +582,14 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.context("Patch had no file key")?
 					.as_str()
 					.context("File key was not string")?
-					== "0057C2C3941115CA"
+					.parse::<RuntimeID>()
+					.context("File key was invalid")?
+					== UNLOCKABLES_ID
 				{
 					if let Some(game) = app_state.game.load().as_ref() {
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-								&game
-									.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
-									.1
+								&game.extract_latest_resource(UNLOCKABLES_ID)?.1
 							)?)?
 							.into_iter()
 							.map(|x| {
@@ -677,9 +681,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				if let Some(game) = app_state.game.load().as_ref() {
 					let mut current = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&game
-								.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
-								.1
+							&game.extract_latest_resource(UNLOCKABLES_ID)?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -724,7 +726,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								);
 								x
 							},
-							file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
+							file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
 						})
 					)?;
 
@@ -807,7 +809,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 										})
 										.map(|id| GameBrowserEntry {
 											hash: Hash(id),
-											path: id.get_info().and_then(|i| i.path),
+											path: id.get_path(),
 											hint: id.get_info().and_then(|i| i.hint),
 											filetype: game.resource_type(id).unwrap(),
 											partition: {
@@ -855,7 +857,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 										})
 										.map(|id| GameBrowserEntry {
 											hash: Hash(id),
-											path: id.get_info().and_then(|i| i.path),
+											path: id.get_path(),
 											hint: id.get_info().and_then(|i| i.hint),
 											filetype: game.resource_type(id).unwrap(),
 											partition: {

@@ -1,14 +1,17 @@
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use itertools::Itertools;
-use quickentity_rs::{entity::Entity, variant::Variant};
-use serde::Serialize;
+use quickentity_rs::{
+	entity::{Entity, PinConnectionOverride, PinConnectionOverrideDelete, PropertyOverride},
+	variant::Variant
+};
 use serde_json::from_str;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	biome::to_string_clear,
 	entity::{get_ref_decoration, visit_variant},
 	finish_task,
 	model::{
@@ -131,42 +134,10 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 					editor: editor_id,
 					data: EditorRequestData::Entity(EntityEditorRequest::Overrides(
 						EntityOverridesRequest::Initialise {
-							property_overrides: {
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								entity.property_overrides.serialize(&mut ser)?;
-
-								String::from_utf8(buf)?
-							},
-							override_deletes: {
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								entity.override_deletes.serialize(&mut ser)?;
-
-								String::from_utf8(buf)?
-							},
-							pin_connection_overrides: {
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								entity.pin_connection_overrides.serialize(&mut ser)?;
-
-								String::from_utf8(buf)?
-							},
-							pin_connection_override_deletes: {
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								entity.pin_connection_override_deletes.serialize(&mut ser)?;
-
-								String::from_utf8(buf)?
-							}
+							property_overrides: to_string_clear(&entity.property_overrides)?,
+							override_deletes: to_string_clear(&entity.override_deletes)?,
+							pin_connection_overrides: to_string_clear(&entity.pin_connection_overrides)?,
+							pin_connection_override_deletes: to_string_clear(&entity.pin_connection_override_deletes)?
 						}
 					))
 				})
@@ -192,9 +163,16 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 				}
 			};
 
-			if let Ok(deserialised) = from_str(&content)
-				&& entity.property_overrides != deserialised
-			{
+			if let Ok(deserialised) = from_str::<Vec<PropertyOverride>>(&content)
+				&& (entity.property_overrides.len() != deserialised.len()
+					|| entity.property_overrides.iter().zip(deserialised.iter()).any(|(a, b)| {
+						a.entities != b.entities
+							|| a.properties.len() != b.properties.len()
+							|| a.properties
+								.iter()
+								.zip(b.properties.iter())
+								.any(|(a, b)| a.0 != b.0 || !a.1.rough_eq(b.1))
+					})) {
 				entity.property_overrides = deserialised;
 
 				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
@@ -260,9 +238,24 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 				}
 			};
 
-			if let Ok(deserialised) = from_str(&content)
-				&& entity.pin_connection_overrides != deserialised
-			{
+			if let Ok(deserialised) = from_str::<Vec<PinConnectionOverride>>(&content)
+				&& (entity.pin_connection_overrides.len() != deserialised.len()
+					|| entity
+						.pin_connection_overrides
+						.iter()
+						.zip(deserialised.iter())
+						.any(|(a, b)| {
+							a.from_entity != b.from_entity
+								|| a.to_entity != b.to_entity
+								|| a.from_pin != b.from_pin
+								|| a.to_pin != b.to_pin || (a.value.is_some() && b.value.is_none())
+								|| (a.value.is_none() && b.value.is_some())
+								|| (!a
+									.value
+									.as_ref()
+									.zip(b.value.as_ref())
+									.is_some_and(|(a, b)| a.rough_eq(b)))
+						})) {
 				entity.pin_connection_overrides = deserialised;
 
 				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
@@ -294,9 +287,24 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 				}
 			};
 
-			if let Ok(deserialised) = from_str(&content)
-				&& entity.pin_connection_override_deletes != deserialised
-			{
+			if let Ok(deserialised) = from_str::<Vec<PinConnectionOverrideDelete>>(&content)
+				&& (entity.pin_connection_override_deletes.len() != deserialised.len()
+					|| entity
+						.pin_connection_override_deletes
+						.iter()
+						.zip(deserialised.iter())
+						.any(|(a, b)| {
+							a.from_entity != b.from_entity
+								|| a.to_entity != b.to_entity
+								|| a.from_pin != b.from_pin
+								|| a.to_pin != b.to_pin || (a.value.is_some() && b.value.is_none())
+								|| (a.value.is_none() && b.value.is_some())
+								|| (!a
+									.value
+									.as_ref()
+									.zip(b.value.as_ref())
+									.is_some_and(|(a, b)| a.rough_eq(b)))
+						})) {
 				entity.pin_connection_override_deletes = deserialised;
 
 				send_overrides_decorations(app, editor_id.to_owned(), entity)?;

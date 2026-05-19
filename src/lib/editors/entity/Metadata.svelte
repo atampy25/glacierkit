@@ -4,7 +4,6 @@
 	import { TextInput, Dropdown } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
-	import md5 from "md5"
 	import { help } from "$lib/helpray"
 
 	export let editorID: string
@@ -15,7 +14,6 @@
 	let subType: SubType = "scene"
 	let externalScenes: string[] = []
 	let hashModificationAllowed = true
-	let customPaths: string[] = []
 
 	export async function handleRequest(request: EntityMetadataRequest) {
 		console.log(`Metadata editor for editor ${editorID} handling request`, request)
@@ -39,10 +37,6 @@
 
 			case "setHashModificationAllowed":
 				hashModificationAllowed = request.data.hashModificationAllowed
-				break
-
-			case "updateCustomPaths":
-				customPaths = request.data.customPaths
 				break
 
 			default:

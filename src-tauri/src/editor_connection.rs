@@ -12,7 +12,7 @@ use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use hitman_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
-use hitman_commons::metadata::ResourceMetadata;
+use hitman_commons::{metadata::ResourceMetadata, resource_type};
 use indexmap::IndexMap;
 use quickentity_rs::{
 	entity::{EntityID, Ref},
@@ -31,7 +31,9 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungsten
 use tryvial::{try_block, try_fn};
 
 use crate::{
-	Notification, NotificationKind, handle_event,
+	Notification, NotificationKind,
+	general::EMPTY_ID,
+	handle_event,
 	model::{
 		AppState, EditorConnectionEvent, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest,
 		EntityMonacoRequest, EntityTreeRequest, Event, GlobalRequest, Hash, Request
@@ -364,8 +366,8 @@ impl EditorConnection {
 										property_overrides: vec![]
 									},
 									&ResourceMetadata {
-										id: "[assembly:/dummy]".parse().unwrap(),
-										resource_type: "TEMP".try_into().unwrap(),
+										id: EMPTY_ID,
+										resource_type: resource_type!("TEMP"),
 										compressed: true,
 										scrambled: true,
 										references: vec![]
@@ -967,8 +969,8 @@ impl EditorConnection {
 								property_overrides: vec![]
 							},
 							&ResourceMetadata {
-								id: "[assembly:/dummy]".parse().unwrap(),
-								resource_type: "TEMP".try_into().unwrap(),
+								id: EMPTY_ID,
+								resource_type: resource_type!("TEMP"),
 								compressed: true,
 								scrambled: true,
 								references: vec![]

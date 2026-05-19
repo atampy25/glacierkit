@@ -467,11 +467,10 @@ pub async fn start_content_search(
 		let results = matching_ids
 			.into_iter()
 			.map(|id| {
-				let info = id.get_info();
-				let filetype = info.as_ref().map(|x| x.resource_type.into()).unwrap_or("".into());
-				let path = info.and_then(|x| x.path.or(x.hint)).map(|x| x.into());
+				let filetype = game.resource_type(id).map(|x| x.into()).unwrap_or("".into());
+				let path_or_hint = id.get_path_or_hint().map(|x| x.into());
 
-				(id.to_hash(), filetype, path)
+				(id.to_hash(), filetype, path_or_hint)
 			})
 			.collect();
 

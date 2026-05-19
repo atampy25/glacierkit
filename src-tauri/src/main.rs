@@ -53,7 +53,7 @@ use walkdir::WalkDir;
 use whirlwind::ShardMap;
 
 use crate::{
-	biome::format_json,
+	biome::{format_json, to_string_clear},
 	editor_connection::EditorConnection,
 	entity::get_diff_info,
 	event_handling::{
@@ -62,7 +62,7 @@ use crate::{
 		tools::handle_tool_event,
 		unlockables_patch::handle_unlockables_patch_event
 	},
-	general::open_file,
+	general::{REPO_ID, UNLOCKABLES_ID, open_file},
 	model::{
 		AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent,
 		EditorData, EditorEventData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityMetadataRequest,
@@ -613,25 +613,6 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					fs::write(path.join("project.json"), to_vec(&settings)?)?;
 				}
 
-				let mut editor_states = pin!(app_state.editor_states.stream_shards());
-				while let Some(shard) = editor_states.next().await {
-					for (id, editor) in shard.iter() {
-						if matches!(editor.data, EditorData::QNEntity { .. } | EditorData::QNPatch { .. }) {
-							send_request(
-								&app,
-								Request::Editor(EditorRequest {
-									editor: id.to_owned(),
-									data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
-										EntityMetadataRequest::UpdateCustomPaths {
-											custom_paths: settings.custom_paths.to_owned()
-										}
-									))
-								})
-							)?;
-						}
-					}
-				}
-
 				app_state.project.store(Some(
 					Project {
 						path: path.to_owned(),
@@ -1068,7 +1049,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											base,
 											current,
 											save_path: file.to_owned(),
-											file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
+											file_and_type: (REPO_ID.to_string(), "REPO".into())
 										})
 									)?;
 
@@ -1098,7 +1079,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												base,
 												current,
 												save_path: path.as_path().context("Invalid path")?.to_owned(),
-												file_and_type: ("00204D1AFD76AB13".into(), "REPO".into())
+												file_and_type: (REPO_ID.to_string(), "REPO".into())
 											})
 										)?;
 
@@ -1254,7 +1235,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											base,
 											current,
 											save_path: file.to_owned(),
-											file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
+											file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
 										})
 									)?;
 
@@ -1284,7 +1265,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												base,
 												current,
 												save_path: path.as_path().context("Invalid path")?.to_owned(),
-												file_and_type: ("0057C2C3941115CA".into(), "ORES".into())
+												file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
 											})
 										)?;
 
@@ -1586,16 +1567,6 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							})
 						)?;
 
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						entity
-							.entities
-							.get(&id)
-							.context("No such entity")?
-							.serialize(&mut ser)?;
-
 						send_request(
 							&app,
 							Request::Editor(EditorRequest {
@@ -1603,7 +1574,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 									EntityMonacoRequest::ReplaceContentIfSameEntityID {
 										entity_id: id.to_owned(),
-										content: String::from_utf8(buf)?
+										content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
 									}
 								))
 							})
@@ -1689,16 +1660,6 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							})
 						)?;
 
-						let mut buf = Vec::new();
-						let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-						let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-						entity
-							.entities
-							.get(&id)
-							.context("No such entity")?
-							.serialize(&mut ser)?;
-
 						send_request(
 							&app,
 							Request::Editor(EditorRequest {
@@ -1706,7 +1667,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 									EntityMonacoRequest::ReplaceContentIfSameEntityID {
 										entity_id: id.to_owned(),
-										content: String::from_utf8(buf)?
+										content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
 									}
 								))
 							})

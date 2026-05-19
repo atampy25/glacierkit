@@ -438,7 +438,10 @@ nesting::nest! {
 				ChangeColourblind { value: bool },
 				ChangeEditorConnection { value: bool },
 
-				ChangeCustomPaths { value: Vec<String> }
+				ChangeCustomPaths {
+					#[debug(skip)]
+					value: Vec<String>
+				}
 			}
 
 			ContentSearch(ContentSearchEvent)
@@ -464,6 +467,7 @@ nesting::nest! {
 					Initialise,
 
 					UpdateContent {
+						#[debug(skip)]
 						content: String
 					}
 				}
@@ -526,6 +530,8 @@ nesting::nest! {
 
 						UseTemplate {
 							parent_id: String,
+
+							#[debug(skip)]
 							template: CopiedEntityData
 						},
 
@@ -563,6 +569,8 @@ nesting::nest! {
 					pub enum EntityMonacoEvent {
 						UpdateContent {
 							entity_id: EntityID,
+
+							#[debug(skip)]
 							content: String
 						},
 
@@ -618,6 +626,7 @@ nesting::nest! {
 						},
 
 						SetExternalScenes {
+							#[debug(skip)]
 							external_scenes: Vec<RuntimeID>
 						}
 					}
@@ -627,18 +636,22 @@ nesting::nest! {
 						Initialise,
 
 						UpdatePropertyOverrides {
+							#[debug(skip)]
 							content: String
 						},
 
 						UpdateOverrideDeletes {
+							#[debug(skip)]
 							content: String
 						},
 
 						UpdatePinConnectionOverrides {
+							#[debug(skip)]
 							content: String
 						},
 
 						UpdatePinConnectionOverrideDeletes {
+							#[debug(skip)]
 							content: String
 						}
 					}
@@ -861,6 +874,7 @@ nesting::nest! {
 				Text(TextEditorRequest)
 				pub enum TextEditorRequest {
 					ReplaceContent {
+						#[debug(skip)]
 						content: String
 					},
 
@@ -930,8 +944,13 @@ nesting::nest! {
 						},
 
 						SetDiffInfo {
+							#[debug(skip)]
 							new: Vec<EntityID>,
+
+							#[debug(skip)]
 							modified: Vec<EntityID>,
+
+							#[debug(skip)]
 							#[specta(type = Vec<(EntityID, Option<Ref>, String, RuntimeID, bool)>)]
 							removed: Vec<(EntityID, Option<Ref>, EcoString, RuntimeID, bool)>
 						}
@@ -945,11 +964,15 @@ nesting::nest! {
 
 						ReplaceContent {
 							entity_id: EntityID,
+
+							#[debug(skip)]
 							content: String
 						},
 
 						ReplaceContentIfSameEntityID {
 							entity_id: EntityID,
+
+							#[debug(skip)]
 							content: String
 						},
 
@@ -965,7 +988,11 @@ nesting::nest! {
 
 						UpdateDecorationsAndMonacoInfo {
 							entity_id: EntityID,
+
+							#[debug(skip)]
 							decorations: Vec<(String, String)>,
+
+							#[debug(skip)]
 							local_ref_entity_ids: Vec<EntityID>
 						},
 
@@ -981,8 +1008,10 @@ nesting::nest! {
 					MetaPane(EntityMetaPaneRequest)
 					pub enum EntityMetaPaneRequest {
 						SetReverseRefs {
+							#[debug(skip)]
 							#[specta(type = std::collections::HashMap<EntityID, String>)]
 							entity_names: std::collections::HashMap<EntityID, EcoString>,
+
 							reverse_refs: Vec<ReverseReference>
 						},
 
@@ -1001,6 +1030,8 @@ nesting::nest! {
 							blueprint: RuntimeID,
 							root_entity: EntityID,
 							sub_type: SubType,
+
+							#[debug(skip)]
 							external_scenes: Vec<RuntimeID>
 						},
 
@@ -1014,23 +1045,27 @@ nesting::nest! {
 
 						SetBlueprint {
 							blueprint: RuntimeID
-						},
-
-						UpdateCustomPaths {
-							custom_paths: Vec<String>
 						}
 					}
 
 					Overrides(EntityOverridesRequest)
 					pub enum EntityOverridesRequest {
 						Initialise {
+							#[debug(skip)]
 							property_overrides: String,
+
+							#[debug(skip)]
 							override_deletes: String,
+
+							#[debug(skip)]
 							pin_connection_overrides: String,
+
+							#[debug(skip)]
 							pin_connection_override_deletes: String
 						},
 
 						UpdateDecorations {
+							#[debug(skip)]
 							decorations: Vec<(String, String)>,
 						}
 					}

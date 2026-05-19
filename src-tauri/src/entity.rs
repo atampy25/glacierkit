@@ -13,7 +13,6 @@ use quickentity_rs::{
 	entity::{Entity, EntityID, Ref, SubEntity},
 	variant::Variant
 };
-use rand::{rng, seq::IndexedRandom};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
@@ -321,17 +320,7 @@ pub struct CopiedEntityData {
 }
 
 pub fn random_entity_id() -> EntityID {
-	let digits = [
-		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
-	];
-
-	let mut id = String::from("cafe");
-
-	for _ in 0..12 {
-		id.push(*digits.choose(&mut rng()).expect("Slice is not empty"));
-	}
-
-	id.parse().unwrap()
+	EntityID::from(rand::random::<u64>() & !(0xffff << 48) | (0xcafe << 48))
 }
 
 /// Changes a Ref based on the given changelist (original entity ID -> new entity ID). Used for pasting.
@@ -725,13 +714,13 @@ pub fn get_decorations(
 			.core_info
 			.references
 			.into_iter()
-			.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "MATI"))
+			.find(|x| game.resource_type(x.resource).is_some_and(|ty| ty == "MATI"))
 		&& let Some(mate) = game
 			.extract_latest_metadata(mati.resource)?
 			.core_info
 			.references
 			.into_iter()
-			.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "MATE"))
+			.find(|x| game.resource_type(x.resource).is_some_and(|ty| ty == "MATE"))
 	{
 		let mate_data = game.extract_latest_resource(mate.resource)?.1;
 
@@ -822,7 +811,7 @@ pub fn get_diff_info(
 		.filter(|&(id, _)| !modified.entities.contains_key(id))
 		.map(|(id, orig)| {
 			(
-				id.to_owned(),
+				*id,
 				orig.parent.to_owned(),
 				orig.name.to_owned(),
 				orig.factory.resource.to_owned(),
@@ -836,9 +825,9 @@ pub fn get_diff_info(
 		.par_iter()
 		.filter_map(|(id, modif)| {
 			if let Some(orig) = original.entities.get(id) {
-				if modif != orig { Some(("changed", id)) } else { None }
+				if modif != orig { Some(("changed", *id)) } else { None }
 			} else {
-				Some(("new", id))
+				Some(("new", *id))
 			}
 		})
 		.collect::<Vec<_>>()
@@ -846,12 +835,8 @@ pub fn get_diff_info(
 		.into_group_map();
 
 	(
-		diff.remove("new")
-			.map(|x| x.into_iter().cloned().collect())
-			.unwrap_or_default(),
-		diff.remove("changed")
-			.map(|x| x.into_iter().cloned().collect())
-			.unwrap_or_default(),
+		diff.remove("new").unwrap_or_default(),
+		diff.remove("changed").unwrap_or_default(),
 		removed
 	)
 }

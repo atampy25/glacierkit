@@ -3,7 +3,7 @@ use fn_error_context::context;
 use hitman_commons::metadata::RuntimeID;
 use itertools::Itertools;
 use log::debug;
-use quickentity_rs::entity::EntityID;
+use quickentity_rs::entity::{EntityID, SubEntity};
 use serde_json::from_str;
 use std::collections::HashMap;
 use tauri::{AppHandle, Manager};
@@ -170,6 +170,92 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) 
 	}
 }
 
+pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
+	entity1.parent == entity2.parent
+		&& entity1.name == entity2.name
+		&& entity1.factory == entity2.factory
+		&& entity1.blueprint == entity2.blueprint
+		&& entity1.editor_only == entity2.editor_only
+		&& entity1.properties.len() == entity2.properties.len()
+		&& entity1
+			.properties
+			.iter()
+			.zip(entity2.properties.iter())
+			.all(|(a, b)| a.0 == b.0 && a.1.post_init == b.1.post_init && a.1.value.rough_eq(&b.1.value))
+		&& entity1.platform_specific_properties.len() == entity2.platform_specific_properties.len()
+		&& entity1
+			.platform_specific_properties
+			.iter()
+			.zip(entity2.platform_specific_properties.iter())
+			.all(|(a, b)| {
+				a.0 == b.0
+					&& a.1.len() == b.1.len()
+					&& a.1
+						.iter()
+						.zip(b.1.iter())
+						.all(|(a, b)| a.0 == b.0 && a.1.post_init == b.1.post_init && a.1.value.rough_eq(&b.1.value))
+			}) && entity1.events.len() == entity2.events.len()
+		&& entity1.events.iter().zip(entity2.events.iter()).all(|(a, b)| {
+			a.0 == b.0
+				&& a.1.len() == b.1.len()
+				&& a.1.iter().zip(b.1.iter()).all(|(a, b)| {
+					a.0 == b.0
+						&& a.1.len() == b.1.len()
+						&& a.1.iter().zip(b.1.iter()).all(|(a, b)| {
+							a.entity_ref == b.entity_ref
+								&& ((a.value.is_none() && b.value.is_none())
+									|| a.value
+										.as_ref()
+										.zip(b.value.as_ref())
+										.is_some_and(|(a, b)| a.rough_eq(b)))
+						})
+				})
+		}) && entity1.input_copying.len() == entity2.input_copying.len()
+		&& entity1
+			.input_copying
+			.iter()
+			.zip(entity2.input_copying.iter())
+			.all(|(a, b)| {
+				a.0 == b.0
+					&& a.1.len() == b.1.len()
+					&& a.1.iter().zip(b.1.iter()).all(|(a, b)| {
+						a.0 == b.0
+							&& a.1.len() == b.1.len()
+							&& a.1.iter().zip(b.1.iter()).all(|(a, b)| {
+								a.entity_id == b.entity_id
+									&& ((a.value.is_none() && b.value.is_none())
+										|| a.value
+											.as_ref()
+											.zip(b.value.as_ref())
+											.is_some_and(|(a, b)| a.rough_eq(b)))
+							})
+					})
+			}) && entity1.output_copying.len() == entity2.output_copying.len()
+		&& entity1
+			.output_copying
+			.iter()
+			.zip(entity2.output_copying.iter())
+			.all(|(a, b)| {
+				a.0 == b.0
+					&& a.1.len() == b.1.len()
+					&& a.1.iter().zip(b.1.iter()).all(|(a, b)| {
+						a.0 == b.0
+							&& a.1.len() == b.1.len()
+							&& a.1.iter().zip(b.1.iter()).all(|(a, b)| {
+								a.entity_id == b.entity_id
+									&& ((a.value.is_none() && b.value.is_none())
+										|| a.value
+											.as_ref()
+											.zip(b.value.as_ref())
+											.is_some_and(|(a, b)| a.rough_eq(b)))
+							})
+					})
+			}) && entity1.property_aliases == entity2.property_aliases
+		&& entity1.exposed_entities == entity2.exposed_entities
+		&& entity1.exposed_interfaces == entity2.exposed_interfaces
+		&& entity1.subsets == entity2.subsets
+}
+
 #[try_fn]
 #[context("Couldn't handle update content event")]
 pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityID, content: String) -> Result<()> {
@@ -201,8 +287,9 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 					.to_owned();
 
 				if sub_entity != previous {
-					if let Some(entry) = sub_entity.factory.resource.get_info()
-						&& !is_valid_entity_factory(entry.resource_type)
+					if let Some(game) = app_state.game.load().as_ref()
+						&& let Some(ty) = game.resource_type(sub_entity.factory.resource)
+						&& !is_valid_entity_factory(ty)
 					{
 						send_request(
 							app,
@@ -221,8 +308,9 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 						return Ok(());
 					}
 
-					if let Some(entry) = sub_entity.blueprint.get_info()
-						&& !is_valid_entity_blueprint(entry.resource_type)
+					if let Some(game) = app_state.game.load().as_ref()
+						&& let Some(ty) = game.resource_type(sub_entity.blueprint)
+						&& !is_valid_entity_blueprint(ty)
 					{
 						send_request(
 							app,
@@ -273,13 +361,15 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 						})
 					)?;
 
-					send_request(
-						app,
-						Request::Tab(TabRequest {
-							tab: editor_id,
-							data: TabRequestData::SetUnsaved { unsaved: true }
-						})
-					)?;
+					if !sub_entity_rough_eq(&sub_entity, &previous) {
+						send_request(
+							app,
+							Request::Tab(TabRequest {
+								tab: editor_id,
+								data: TabRequestData::SetUnsaved { unsaved: true }
+							})
+						)?;
+					}
 
 					if let Some(game) = app_state.game.load().as_ref()
 						&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
@@ -457,8 +547,8 @@ pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	if let Some(game) = app_state.game.load().as_deref() {
-		if let Ok((filetype, _, _)) = game.extract_latest_overview_info(factory) {
-			if filetype == "TEMP" {
+		if let Some(ty) = game.resource_type(factory) {
+			if ty == "TEMP" {
 				open_in_editor(app, game, factory).await?;
 			} else {
 				open_resource_overview(app, factory).await?;

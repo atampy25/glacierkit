@@ -4,13 +4,13 @@ use anyhow::{Context, Result, bail};
 use fn_error_context::context;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use serde::Serialize;
 use serde_json::{Value, from_str, from_value};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	biome::to_string_clear,
 	finish_task,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, RepositoryPatchEditorEvent,
@@ -449,24 +449,19 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 				}
 			};
 
-			let mut buf_orig = Vec::new();
-			let formatter_orig = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-			let mut ser_orig = serde_json::Serializer::with_formatter(&mut buf_orig, formatter_orig);
+			let orig_data = if let Some(item) = base.iter().find(|x| x.id == item) {
+				to_string_clear(&item.data)?
+			} else {
+				String::new()
+			};
 
-			if let Some(orig_item) = base.iter().find(|x| x.id == item) {
-				orig_item.data.serialize(&mut ser_orig)?;
-			}
-
-			let mut buf = Vec::new();
-			let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-			let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-			repository
-				.iter()
-				.find(|x| x.id == item)
-				.context("No such repository item")?
-				.data
-				.serialize(&mut ser)?;
+			let data = to_string_clear(
+				&repository
+					.iter()
+					.find(|x| x.id == item)
+					.context("No such repository item")?
+					.data
+			)?;
 
 			send_request(
 				app,
@@ -474,8 +469,8 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 					editor: id,
 					data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::SetMonacoContent {
 						item,
-						orig_data: String::from_utf8(buf_orig)?,
-						data: String::from_utf8(buf)?
+						orig_data,
+						data
 					})
 				})
 			)?;

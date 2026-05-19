@@ -4,13 +4,13 @@ use anyhow::{Context, Result, bail};
 use fn_error_context::context;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use serde::Serialize;
 use serde_json::{Value, from_str};
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
+	biome::to_string_clear,
 	finish_task,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, Request, TabRequest, TabRequestData,
@@ -365,24 +365,19 @@ pub async fn handle_unlockables_patch_event(
 				}
 			};
 
-			let mut buf_orig = Vec::new();
-			let formatter_orig = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-			let mut ser_orig = serde_json::Serializer::with_formatter(&mut buf_orig, formatter_orig);
+			let orig_data = if let Some(item) = base.iter().find(|x| x.id == unlockable) {
+				to_string_clear(&item.data)?
+			} else {
+				String::new()
+			};
 
-			if let Some(orig_unlockable) = base.iter().find(|x| x.id == unlockable) {
-				orig_unlockable.data.serialize(&mut ser_orig)?;
-			}
-
-			let mut buf = Vec::new();
-			let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-			let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-			unlockables
-				.iter()
-				.find(|x| x.id == unlockable)
-				.context("No such unlockable")?
-				.data
-				.serialize(&mut ser)?;
+			let data = to_string_clear(
+				&unlockables
+					.iter()
+					.find(|x| x.id == unlockable)
+					.context("No such unlockable")?
+					.data
+			)?;
 
 			send_request(
 				app,
@@ -390,8 +385,8 @@ pub async fn handle_unlockables_patch_event(
 					editor: id,
 					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::SetMonacoContent {
 						unlockable,
-						orig_data: String::from_utf8(buf_orig)?,
-						data: String::from_utf8(buf)?
+						orig_data,
+						data
 					})
 				})
 			)?;

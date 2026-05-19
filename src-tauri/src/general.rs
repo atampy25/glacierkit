@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use ecow::eco_format;
 use fn_error_context::context;
-use hitman_commons::{hash_list::HASH_LIST, metadata::RuntimeID};
+use hitman_commons::{hash_list::HASH_LIST, metadata::RuntimeID, rid};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -35,6 +35,13 @@ use crate::{
 	ores_repo::{RepositoryItem, UnlockableItem},
 	send_notification, send_request, start_task
 };
+
+pub const EMPTY_ID: RuntimeID = rid!("0000000000000000");
+
+pub const REPO_ID: RuntimeID = rid!("[assembly:/repository/pro.repo].pc_repo");
+
+pub const UNLOCKABLES_ID: RuntimeID =
+	rid!("[assembly:/_pro/online/default/offlineconfig/config.unlockables].pc_unlockables");
 
 #[try_fn]
 #[context("Couldn't open file")]
@@ -379,9 +386,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				if let Some(game) = app_state.game.load().as_ref() {
 					let mut unlockables = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&game
-								.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
-								.1
+							&game.extract_latest_resource(UNLOCKABLES_ID)?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -403,11 +408,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						.collect::<IndexMap<String, IndexMap<String, Value>>>()
 					)?;
 
-					let base = from_str::<Value>(&parse_json_ores(
-						&game
-							.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
-							.1
-					)?)?;
+					let base = from_str::<Value>(&parse_json_ores(&game.extract_latest_resource(UNLOCKABLES_ID)?.1)?)?;
 
 					let patch: Value =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
@@ -568,17 +569,17 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							.get("file")
 							.context("Patch had no file key")?
 							.as_str()
-							.context("Type key was not string")?
-							== "0057C2C3941115CA" =>
+							.context("File key was not string")?
+							.parse::<RuntimeID>()
+							.context("File key was invalid")?
+							== UNLOCKABLES_ID =>
 					{
 						let id = Uuid::new_v4();
 
 						if let Some(game) = app_state.game.load().as_ref() {
 							let mut unlockables = to_value(
 								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-									&game
-										.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
-										.1
+									&game.extract_latest_resource(UNLOCKABLES_ID)?.1
 								)?)?
 								.into_iter()
 								.map(|x| {
@@ -600,11 +601,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.collect::<IndexMap<String, IndexMap<String, Value>>>()
 							)?;
 
-							let base = from_str::<Value>(&parse_json_ores(
-								&game
-									.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
-									.1
-							)?)?;
+							let base =
+								from_str::<Value>(&parse_json_ores(&game.extract_latest_resource(UNLOCKABLES_ID)?.1)?)?;
 
 							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 								.context("Invalid JSON")?;
@@ -994,7 +992,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	match hash.get_info().context("Not in hash list")?.resource_type.as_ref() {
+	match game.resource_type(hash).context("Nonexistent resource")?.as_ref() {
 		"TEMP" => {
 			let task = start_task(app, format!("Loading entity {}", hash))?;
 
@@ -1010,19 +1008,17 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 				hash
 			);
 
-			let tab_name = if let Some(entry) = hash.get_info() {
-				if let Some(path) = entry.path.as_ref() {
-					path.replace("].pc_entitytype", "")
-						.replace("].pc_entitytemplate", "")
-						.split('/')
-						.next_back()
-						.map(|x| x.to_owned())
-						.unwrap_or(default_tab_name)
-				} else if let Some(hint) = entry.hint.as_ref() {
-					format!("{} ({})", hint, hash)
-				} else {
-					default_tab_name
-				}
+			let tab_name = if let Some(path) = hash.get_path() {
+				path.replace("].pc_entitytype", "")
+					.replace("].pc_entitytemplate", "")
+					.split('/')
+					.next_back()
+					.map(|x| x.to_owned())
+					.unwrap_or(default_tab_name)
+			} else if let Some(entry) = hash.get_info()
+				&& let Some(hint) = entry.hint
+			{
+				format!("{} ({})", hint, hash)
 			} else {
 				default_tab_name
 			};
@@ -1098,16 +1094,13 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 			finish_task(app, task)?;
 		}
 
-		"ORES" if hash == "0057C2C3941115CA".parse()? => {
+		"ORES" if hash == UNLOCKABLES_ID => {
 			let task = start_task(app, "Loading unlockables")?;
 
 			let id = Uuid::new_v4();
 
-			let unlockables: Vec<UnlockableItem> = from_str(&parse_json_ores(
-				&game
-					.extract_latest_resource("0057C2C3941115CA".parse::<RuntimeID>()?)?
-					.1
-			)?)?;
+			let unlockables: Vec<UnlockableItem> =
+				from_str(&parse_json_ores(&game.extract_latest_resource(UNLOCKABLES_ID)?.1)?)?;
 
 			app_state
 				.editor_states

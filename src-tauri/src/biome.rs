@@ -31,3 +31,16 @@ pub fn format_json(data: &str) -> Result<String> {
 	.context("Couldn't print formatted JSON")?
 	.into_code()
 }
+
+/// Format the given value to a pretty-printed JSON string with clear, consistent formatting (objects on newlines, etc.) - NOT Biome-based pretty formatting.
+#[try_fn]
+#[context("Couldn't serialize to clear JSON")]
+pub fn to_string_clear(value: impl serde::Serialize) -> Result<String> {
+	let mut buf = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+
+	value.serialize(&mut ser)?;
+
+	String::from_utf8(buf)?
+}

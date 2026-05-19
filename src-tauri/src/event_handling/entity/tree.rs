@@ -10,7 +10,8 @@ use fn_error_context::context;
 use hitman_bin1::game::h3::{ZSpatialEntity_ERoomBehaviour, ZVariant};
 use hitman_commons::{
 	game::GameVersion,
-	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID}
+	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
+	rid
 };
 use hitman_formats::wwev::WwiseEvent;
 use log::debug;
@@ -31,12 +32,14 @@ use uuid::Uuid;
 use super::monaco::SAFE_TO_SYNC;
 use crate::{
 	Notification, NotificationKind,
+	biome::to_string_clear,
 	entity::{
 		CopiedEntityData, ReverseReferenceData, alter_ref_according_to_changelist, calculate_reverse_references,
 		check_local_references_exist, get_decorations, get_diff_info, get_recursive_children, is_valid_entity_factory,
 		random_entity_id, reverse_parent_refs_set, visit_variant_mut
 	},
 	finish_task,
+	general::EMPTY_ID,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
 		EntityGeneralRequest, EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Request,
@@ -311,16 +314,6 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 		})
 	)?;
 
-	let mut buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-	entity
-		.entities
-		.get(&id)
-		.context("No such entity")?
-		.serialize(&mut ser)?;
-
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -328,7 +321,7 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id: id.to_owned(),
-					content: String::from_utf8(buf)?
+					content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
 				}
 			))
 		})
@@ -374,23 +367,13 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	let task = start_task(app, format!("Selecting {}", id))?;
 
-	let mut buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-	entity
-		.entities
-		.get(&id)
-		.context("No such entity")?
-		.serialize(&mut ser)?;
-
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
 			editor: editor_id.to_owned(),
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::ReplaceContent {
 				entity_id: id.to_owned(),
-				content: String::from_utf8(buf)?
+				content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
 			}))
 		})
 	)?;
@@ -555,16 +538,6 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 		})
 	)?;
 
-	let mut buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-	entity
-		.entities
-		.get(&id)
-		.context("No such entity")?
-		.serialize(&mut ser)?;
-
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -572,7 +545,7 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id: id.to_owned(),
-					content: String::from_utf8(buf)?
+					content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
 				}
 			))
 		})
@@ -625,8 +598,8 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 		.collect::<HashSet<_>>();
 
 	let mut patch = Patch {
-		factory: "[assembly:/dummy]".parse().unwrap(),
-		blueprint: "[assembly:/dummy]".parse().unwrap(),
+		factory: EMPTY_ID,
+		blueprint: EMPTY_ID,
 		patch: vec![],
 		patch_version: 7
 	};
@@ -1344,11 +1317,9 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 	let sub_entity = entity.entities.get(&entity_id).context("No such entity")?;
 
 	if let Some(game) = app_state.game.load().as_ref() {
-		let (properties, pins) = if sub_entity
-			.factory
-			.resource
-			.get_info()
-			.is_some_and(|entry| entry.resource_type == "TEMP")
+		let (properties, pins) = if game
+			.resource_type(sub_entity.factory.resource)
+			.is_some_and(|ty| ty == "TEMP")
 		{
 			let underlying_entity = game.extract_entity(sub_entity.factory.resource)?;
 
@@ -1437,10 +1408,11 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 	};
 
 	if let Some(game) = app_state.game.load().as_ref() {
-		if is_valid_entity_factory(file.get_info().context("File not in hash list")?.resource_type) {
+		let resource_type = game.resource_type(file).context("Nonexistent resource")?;
+		if is_valid_entity_factory(resource_type) {
 			let entity_id = random_entity_id();
 
-			let sub_entity = match file.get_info().context("File not in hash list")?.resource_type.as_ref() {
+			let sub_entity = match resource_type.as_ref() {
 				"TEMP" => {
 					let (temp_meta, temp_data) = game.extract_latest_resource(file)?;
 
@@ -1928,7 +1900,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					data: TabRequestData::SetUnsaved { unsaved: true }
 				})
 			)?;
-		} else if file.get_info().context("File not in hash list")?.resource_type == "WWEV" {
+		} else if resource_type == "WWEV" {
 			let (wwev_meta, wwev_data) = game.extract_latest_resource(file)?;
 
 			let wwev = WwiseEvent::parse(&wwev_data, &wwev_meta.core_info)?;
@@ -1943,10 +1915,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				},
 				name: wwev.name.into(),
 				factory: ResourceReference {
-					resource: "[modules:/zaudioevententity.class].pc_entitytype".parse()?,
+					resource: rid!("[modules:/zaudioevententity.class].pc_entitytype"),
 					flags: Default::default()
 				},
-				blueprint: "[modules:/zaudioevententity.class].pc_entityblueprint".parse()?,
+				blueprint: rid!("[modules:/zaudioevententity.class].pc_entityblueprint"),
 				editor_only: Default::default(),
 				properties: {
 					let mut properties = OrderMap::new();
@@ -2188,16 +2160,6 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 		})
 	)?;
 
-	let mut buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-	entity
-		.entities
-		.get(&entity_id)
-		.context("No such entity")?
-		.serialize(&mut ser)?;
-
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -2205,7 +2167,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: String::from_utf8(buf)?
+					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2347,16 +2309,6 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 		})
 	)?;
 
-	let mut buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-	entity
-		.entities
-		.get(&entity_id)
-		.context("No such entity")?
-		.serialize(&mut ser)?;
-
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -2364,7 +2316,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: String::from_utf8(buf)?
+					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2506,16 +2458,6 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 		})
 	)?;
 
-	let mut buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-	entity
-		.entities
-		.get(&entity_id)
-		.context("No such entity")?
-		.serialize(&mut ser)?;
-
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -2523,7 +2465,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: String::from_utf8(buf)?
+					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2646,16 +2588,6 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 		})
 	)?;
 
-	let mut buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-	entity
-		.entities
-		.get(&entity_id)
-		.context("No such entity")?
-		.serialize(&mut ser)?;
-
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -2663,7 +2595,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: String::from_utf8(buf)?
+					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2757,20 +2689,14 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 			})
 		)?;
 
-		let mut buf = Vec::new();
-		let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-		let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-		sub_entity.serialize(&mut ser)?;
-
 		send_request(
 			app,
 			Request::Editor(EditorRequest {
 				editor: editor_id.to_owned(),
 				data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 					EntityMonacoRequest::ReplaceContentIfSameEntityID {
-						entity_id: entity_id.to_owned(),
-						content: String::from_utf8(buf)?
+						entity_id,
+						content: to_string_clear(&sub_entity)?
 					}
 				))
 			})

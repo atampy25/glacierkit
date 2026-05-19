@@ -6,7 +6,8 @@ use fn_error_context::context;
 use hitman_bin1::game::h3::{IRenderMaterialEntity_EModifierOperation, SVector2, SVector3, SVector4, ZVariant};
 use hitman_commons::{
 	game::GameVersion,
-	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID}
+	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
+	rid
 };
 use hitman_formats::material::{MaterialEntity, MaterialOverride};
 use identity_hash::BuildIdentityHasher;
@@ -169,7 +170,7 @@ impl Intellisense {
 				.core_info
 				.references
 				.iter()
-				.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "MATB"))
+				.find(|x| game.resource_type(x.resource).is_some_and(|ty| ty == "MATB"))
 				.context("MATT has no MATB dependency")?
 				.resource
 		)?;
@@ -282,9 +283,10 @@ impl Intellisense {
 
 									"UICT" => {
 										// All UI controls have the properties of ZUIControlEntity
-										for (prop_name, default_val) in
-											self.get_cppt_properties(game, "002C4526CC9753E6".parse()?)?
-										{
+										for (prop_name, default_val) in self.get_cppt_properties(
+											game,
+											rid!("[modules:/zuicontrolentity.class].pc_entitytype")
+										)? {
 											found.push((prop_name, default_val, false));
 										}
 
@@ -297,9 +299,8 @@ impl Intellisense {
 															.references
 															.into_iter()
 															.find(|x| {
-																x.resource
-																	.get_info()
-																	.is_some_and(|entry| entry.resource_type == "UICB")
+																game.resource_type(x.resource)
+																	.is_some_and(|ty| ty == "UICB")
 															})
 															.context("No blueprint dependency on UICT")?
 															.resource
@@ -339,9 +340,10 @@ impl Intellisense {
 
 									"MATT" => {
 										// All materials have the properties of ZRenderMaterialEntity
-										for (prop_name, default_val) in
-											self.get_cppt_properties(game, "00B4B11DA327CAD0".parse()?)?
-										{
+										for (prop_name, default_val) in self.get_cppt_properties(
+											game,
+											rid!("[modules:/zrendermaterialentity.class].pc_entitytype")
+										)? {
 											found.push((prop_name, default_val, false));
 										}
 
@@ -447,18 +449,20 @@ impl Intellisense {
 
 									"WSWT" => {
 										// All switch groups have the properties of ZAudioSwitchEntity
-										for (prop_name, default_val) in
-											self.get_cppt_properties(game, "00797DC916520C4D".parse()?)?
-										{
+										for (prop_name, default_val) in self.get_cppt_properties(
+											game,
+											rid!("[modules:/zaudioswitchentity.class].pc_entitytype")
+										)? {
 											found.push((prop_name, default_val, false));
 										}
 									}
 
 									"ECPT" => {
 										// All extended CPP entities have the properties of ZMaterialOverwriteAspect
-										for (prop_name, default_val) in
-											self.get_cppt_properties(game, "00D3003AAA7B3817".parse()?)?
-										{
+										for (prop_name, default_val) in self.get_cppt_properties(
+											game,
+											rid!("[modules:/zmaterialoverwriteaspect.class].pc_entitytype")
+										)? {
 											found.push((prop_name, default_val, false));
 										}
 
@@ -469,9 +473,7 @@ impl Intellisense {
 													.references
 													.into_iter()
 													.find(|x| {
-														x.resource
-															.get_info()
-															.is_some_and(|entry| entry.resource_type == "ECPB")
+														game.resource_type(x.resource).is_some_and(|ty| ty == "ECPB")
 													})
 													.context("No blueprint dependency on ECPT")?
 													.resource
@@ -529,18 +531,20 @@ impl Intellisense {
 
 									"AIBX" => {
 										// All behaviour trees have the properties of ZBehaviorTreeEntity
-										for (prop_name, default_val) in
-											self.get_cppt_properties(game, "0028607138892D70".parse()?)?
-										{
+										for (prop_name, default_val) in self.get_cppt_properties(
+											game,
+											rid!("[modules:/zbehaviortreeentity.class].pc_entitytype")
+										)? {
 											found.push((prop_name, default_val, false));
 										}
 									}
 
 									"WSGT" => {
 										// All state groups have the properties of ZAudioStateEntity
-										for (prop_name, default_val) in
-											self.get_cppt_properties(game, "000D409686293996".parse()?)?
-										{
+										for (prop_name, default_val) in self.get_cppt_properties(
+											game,
+											rid!("[modules:/zaudiostateentity.class].pc_entitytype")
+										)? {
 											found.push((prop_name, default_val, false));
 										}
 									}
@@ -636,7 +640,9 @@ impl Intellisense {
 
 					"UICT" => {
 						// All UI controls have the properties of ZUIControlEntity
-						for (prop_name, default_val) in self.get_cppt_properties(game, "002C4526CC9753E6".parse()?)? {
+						for (prop_name, default_val) in
+							self.get_cppt_properties(game, rid!("[modules:/zuicontrolentity.class].pc_entitytype"))?
+						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
 							}
@@ -650,7 +656,7 @@ impl Intellisense {
 											.core_info
 											.references
 											.into_iter()
-											.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "UICB"))
+											.find(|x| game.resource_type(x.resource).is_some_and(|ty| ty == "UICB"))
 											.context("No blueprint dependency on UICT")?
 											.resource
 									)?
@@ -688,7 +694,9 @@ impl Intellisense {
 
 					"MATT" => {
 						// All materials have the properties of ZRenderMaterialEntity
-						for (prop_name, default_val) in self.get_cppt_properties(game, "00B4B11DA327CAD0".parse()?)? {
+						for (prop_name, default_val) in self
+							.get_cppt_properties(game, rid!("[modules:/zrendermaterialentity.class].pc_entitytype"))?
+						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
 							}
@@ -793,7 +801,9 @@ impl Intellisense {
 
 					"WSWT" => {
 						// All switch groups have the properties of ZAudioSwitchEntity
-						for (prop_name, default_val) in self.get_cppt_properties(game, "00797DC916520C4D".parse()?)? {
+						for (prop_name, default_val) in
+							self.get_cppt_properties(game, rid!("[modules:/zaudioswitchentity.class].pc_entitytype"))?
+						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
 							}
@@ -802,7 +812,10 @@ impl Intellisense {
 
 					"ECPT" => {
 						// All extended CPP entities have the properties of ZMaterialOverwriteAspect
-						for (prop_name, default_val) in self.get_cppt_properties(game, "00D3003AAA7B3817".parse()?)? {
+						for (prop_name, default_val) in self.get_cppt_properties(
+							game,
+							rid!("[modules:/zmaterialoverwriteaspect.class].pc_entitytype")
+						)? {
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
 							}
@@ -814,7 +827,7 @@ impl Intellisense {
 									.core_info
 									.references
 									.into_iter()
-									.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "ECPB"))
+									.find(|x| game.resource_type(x.resource).is_some_and(|ty| ty == "ECPB"))
 									.context("No blueprint dependency on ECPT")?
 									.resource
 							)?
@@ -864,7 +877,9 @@ impl Intellisense {
 
 					"AIBX" => {
 						// All behaviour trees have the properties of ZBehaviorTreeEntity
-						for (prop_name, default_val) in self.get_cppt_properties(game, "0028607138892D70".parse()?)? {
+						for (prop_name, default_val) in
+							self.get_cppt_properties(game, rid!("[modules:/zbehaviortreeentity.class].pc_entitytype"))?
+						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
 							}
@@ -873,7 +888,9 @@ impl Intellisense {
 
 					"WSGT" => {
 						// All state groups have the properties of ZAudioStateEntity
-						for (prop_name, default_val) in self.get_cppt_properties(game, "000D409686293996".parse()?)? {
+						for (prop_name, default_val) in
+							self.get_cppt_properties(game, rid!("[modules:/zaudiostateentity.class].pc_entitytype"))?
+						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
 							}
@@ -988,7 +1005,7 @@ impl Intellisense {
 							// All UI controls have the pins of ZUIControlEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"002C4526CC9753E6".parse::<RuntimeID>()?)
+								.get(&rid!("[modules:/zuicontrolentity.class].pc_entitytype"))
 								.context("No such CPPT in pins")?;
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
@@ -1003,9 +1020,8 @@ impl Intellisense {
 													.references
 													.into_iter()
 													.find(|x| {
-														x.resource
-															.get_info()
-															.is_some_and(|entry| entry.resource_type == "UICB")
+														game.resource_type(x.resource)
+															.is_some_and(|ty| ty == "UICB")
 													})
 													.context("No blueprint dependency on UICT")?
 													.resource
@@ -1034,7 +1050,7 @@ impl Intellisense {
 							// All materials have the pins of ZRenderMaterialEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"00B4B11DA327CAD0".parse::<RuntimeID>()?)
+								.get(&rid!("[modules:/zrendermaterialentity.class].pc_entitytype"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1051,7 +1067,7 @@ impl Intellisense {
 							// All switch groups have the pins of ZAudioSwitchEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"00797DC916520C4D".parse::<RuntimeID>()?)
+								.get(&rid!("[modules:/zaudioswitchentity.class].pc_entitytype"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1064,9 +1080,8 @@ impl Intellisense {
 								.references
 								.into_iter()
 								.find(|x| {
-									x.resource.get_info().is_some_and(|entry| {
-										entry.resource_type == "DSWB" || entry.resource_type == "WSWB"
-									})
+									game.resource_type(x.resource)
+										.is_some_and(|ty| ty == "DSWB" || ty == "WSWB")
 								})
 								.context("No blueprint dependency on WSWT")?
 								.resource;
@@ -1102,7 +1117,7 @@ impl Intellisense {
 							// All extended CPP entities have the pins of ZMaterialOverwriteAspect
 							let cppt_data = self
 								.cppt_pins
-								.get(&"00D3003AAA7B3817".parse::<RuntimeID>()?)
+								.get(&rid!("[modules:/zmaterialoverwriteaspect.class].pc_entitytype"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1113,7 +1128,7 @@ impl Intellisense {
 							// All behaviour trees have the pins of ZBehaviorTreeEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"0028607138892D70".parse::<RuntimeID>()?)
+								.get(&rid!("[modules:/zbehaviortreeentity.class].pc_entitytype"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1124,7 +1139,7 @@ impl Intellisense {
 							// All state groups have the pins of ZAudioStateEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&"000D409686293996".parse::<RuntimeID>()?)
+								.get(&rid!("[modules:/zaudiostateentity.class].pc_entitytype"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1136,7 +1151,7 @@ impl Intellisense {
 								.core_info
 								.references
 								.into_iter()
-								.find(|x| x.resource.get_info().is_some_and(|entry| entry.resource_type == "WSGB"))
+								.find(|x| game.resource_type(x.resource).is_some_and(|ty| ty == "WSGB"))
 								.context("No blueprint dependency on WSWT")?
 								.resource;
 

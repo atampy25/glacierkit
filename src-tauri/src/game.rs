@@ -24,6 +24,7 @@ use tryvial::try_fn;
 use crate::{
 	bin1::{deserialize_modern_blueprint, deserialize_modern_factory},
 	finish_task,
+	general::REPO_ID,
 	intellisense::Intellisense,
 	model::{
 		AppSettings, AppState, ContentSearchRequest, Request, ResourceChangelogEntry, ResourceChangelogOperation,
@@ -205,10 +206,9 @@ impl Game {
 
 		let task = start_task(app, "Caching repository")?;
 
-		let repository = serde_json::from_slice(&partition_manager.read_resource_from(
-			partition_manager.root_partition()?,
-			"00204D1AFD76AB13".parse::<RuntimeID>()?.into()
-		)?)?;
+		let repository = serde_json::from_slice(
+			&partition_manager.read_resource_from(partition_manager.root_partition()?, REPO_ID.into())?
+		)?;
 
 		finish_task(app, task)?;
 

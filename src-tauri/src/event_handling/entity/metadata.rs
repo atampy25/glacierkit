@@ -49,20 +49,6 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 				})
 			)?;
 
-			if let Some(project) = app_state.project.load().as_ref() {
-				send_request(
-					app,
-					Request::Editor(EditorRequest {
-						editor: editor_id.to_owned(),
-						data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
-							EntityMetadataRequest::UpdateCustomPaths {
-								custom_paths: project.settings.load().custom_paths.to_owned()
-							}
-						))
-					})
-				)?;
-			}
-
 			// allow user to modify hash if there is no defined file we're writing to; will automatically convert editor state into entity editor rather than patch editor
 			// also allow user to modify hash if it's already an entity
 			send_request(

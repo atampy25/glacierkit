@@ -380,12 +380,6 @@ export type EntityMetadataRequest =
 				blueprint: string
 			}
 	  }
-	| {
-			type: "updateCustomPaths"
-			data: {
-				customPaths: string[]
-			}
-	  }
 
 export type EntityMonacoEvent =
 	| {

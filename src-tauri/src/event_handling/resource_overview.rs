@@ -39,7 +39,7 @@ use crate::{
 	biome::format_json,
 	finish_task,
 	game::Game,
-	general::open_in_editor,
+	general::{UNLOCKABLES_ID, open_in_editor},
 	languages::get_language_map,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
@@ -97,16 +97,14 @@ pub async fn initialise_resource_overview(
 				hash: Hash(hash),
 				filetype: filetype.into(),
 				chunk_patch,
-				path_or_hint: hash
-					.get_info()
-					.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned()),
+				path_or_hint: hash.get_path_or_hint(),
 				dependencies: deps
 					.into_par_iter()
 					.map(|dep| {
 						(
 							Hash(dep.resource),
 							game.resource_type(dep.resource),
-							dep.resource.get_info().and_then(|x| x.path.or(x.hint)),
+							dep.resource.get_path_or_hint(),
 							dep.flags,
 							game.resource_exists(dep.resource)
 						)
@@ -117,13 +115,7 @@ pub async fn initialise_resource_overview(
 					.map(|hashes| {
 						hashes
 							.iter()
-							.map(|&hash| {
-								(
-									Hash(hash),
-									game.resource_type(hash).unwrap(),
-									hash.get_info().and_then(|x| x.path.or(x.hint))
-								)
-							})
+							.map(|&hash| (Hash(hash), game.resource_type(hash).unwrap(), hash.get_path_or_hint()))
 							.collect()
 					})
 					.unwrap_or_default(),
@@ -134,14 +126,11 @@ pub async fn initialise_resource_overview(
 
 						ResourceOverviewData::Entity {
 							blueprint_hash: Hash(entity.blueprint),
-							blueprint_path_or_hint: entity
-								.blueprint
-								.get_info()
-								.and_then(|x| x.path.as_ref().or(x.hint.as_ref()).cloned())
+							blueprint_path_or_hint: entity.blueprint.get_path_or_hint()
 						}
 					}
 
-					"ORES" if hash == "0057C2C3941115CA".parse()? => ResourceOverviewData::Unlockables,
+					"ORES" if hash == UNLOCKABLES_ID => ResourceOverviewData::Unlockables,
 
 					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF"
 					| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" => {
@@ -908,11 +897,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (metadata, data) = game.extract_latest_resource(hash)?;
 
-				let file_type = hash
-					.get_info()
-					.expect("Can only open files from the hash list")
-					.resource_type
-					.to_owned();
+				let resource_type = game.resource_type(hash).context("Nonexistent resource")?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -921,8 +906,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				}
 
 				if let Some(path) = dialog
-					.set_file_name(format!("{}.{}", hash.to_hash(), &file_type))
-					.add_filter(format!("{} file", &file_type), &[file_type.as_ref()])
+					.set_file_name(format!("{}.{}", hash.to_hash(), resource_type))
+					.add_filter(format!("{} file", resource_type), &[resource_type.as_ref()])
 					.blocking_save_file()
 				{
 					fs::write(path.as_path().context("Invalid path")?, data)?;
