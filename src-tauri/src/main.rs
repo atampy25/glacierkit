@@ -17,7 +17,6 @@ pub mod intellisense;
 pub mod languages;
 pub mod model;
 pub mod ores_repo;
-pub mod show_in_folder;
 
 use std::{
 	backtrace::{Backtrace, BacktraceStatus},
@@ -28,7 +27,7 @@ use std::{
 	path::{Path, PathBuf},
 	pin::pin,
 	sync::Arc,
-	time::{Duration, SystemTime, UNIX_EPOCH}
+	time::{Duration, Instant, SystemTime, UNIX_EPOCH}
 };
 
 use anyhow::{Context, Error, Result, anyhow, bail};
@@ -44,7 +43,6 @@ use notify_debouncer_full::FileIdMap;
 use quickentity_rs::{entity::Property, generate_patch, variant::Variant};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_slice, json, to_value, to_vec};
-use show_in_folder::show_in_folder;
 use tauri::{AppHandle, Emitter, Manager, async_runtime};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_dialog::DialogExt;
@@ -226,6 +224,7 @@ async fn main() {
 				.level_for("quickentity_rs", LevelFilter::Off)
 				.level_for("mio", LevelFilter::Off)
 				.level_for("optivorbis", LevelFilter::Off)
+				.level_for("reqwest", LevelFilter::Off)
 				.build()
 		)
 		.invoke_handler(specta.invoke_handler())
@@ -234,9 +233,12 @@ async fn main() {
 
 			async_runtime::spawn(async move {
 				let app_state = app.state::<AppState>();
-				if let Some(host) = req.uri().host()
-					&& let Ok(editor) = host.parse::<Uuid>()
-					&& let Ok(asset) = req.uri().path().trim_start_matches('/').parse::<Uuid>()
+
+				let path =
+					percent_encoding::percent_decode_str(req.uri().path().trim_start_matches('/')).decode_utf8_lossy();
+
+				if let Some(editor) = path.split('/').next().and_then(|s| s.parse::<Uuid>().ok())
+					&& let Some(asset) = path.split('/').nth(1).and_then(|s| s.parse::<Uuid>().ok())
 					&& let Some(editor) = app_state.editor_states.get(&editor).await
 					&& let Some(asset) = editor.assets.get(&asset).await
 				{
@@ -322,6 +324,7 @@ async fn main() {
 						_ => res.respond(
 							tauri::http::Response::builder()
 								.version(tauri::http::Version::HTTP_3)
+								.header("Access-Control-Allow-Origin", "*")
 								.status(405)
 								.body(&[])
 								.unwrap()
@@ -331,6 +334,7 @@ async fn main() {
 					res.respond(
 						tauri::http::Response::builder()
 							.version(tauri::http::Version::HTTP_3)
+							.header("Access-Control-Allow-Origin", "*")
 							.status(404)
 							.body(&[])
 							.unwrap()
@@ -1977,10 +1981,36 @@ pub fn start_task(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 	task_id
 }
 
+#[static_init::dynamic]
+static PROGRESSES: papaya::HashMap<Uuid, (Instant, f32)> = Default::default();
+
+#[try_fn]
+#[context("Couldn't send progress task start event for {:?} to frontend", name.as_ref())]
+pub fn start_progress(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
+	let task_id = Uuid::new_v4();
+	trace!("Starting progress task {}: {}", task_id, name.as_ref());
+	PROGRESSES.pin().insert(task_id, (Instant::now(), 0.0));
+	app.emit("start-progress-task", (&task_id, name.as_ref()))?;
+	task_id
+}
+
+#[try_fn]
+#[context("Couldn't send task progress event for {:?} to frontend", task)]
+pub fn task_progress(app: &AppHandle, task: Uuid, progress: f32) -> Result<()> {
+	if let Some((last_emit, last_progress)) = PROGRESSES.pin().get(&task)
+		&& (last_emit.elapsed().as_secs() > 1 || (progress * 100.0).round() != (last_progress * 100.0).round())
+	{
+		trace!("Updating progress for task {}: {}", task, progress);
+		PROGRESSES.pin().insert(task, (Instant::now(), progress));
+		app.emit("task-progress", (&task, progress))?;
+	}
+}
+
 #[try_fn]
 #[context("Couldn't send task finish event for {:?} to frontend", task)]
 pub fn finish_task(app: &AppHandle, task: Uuid) -> Result<()> {
 	trace!("Ending task {}", task);
+	PROGRESSES.pin().remove(&task);
 	app.emit("finish-task", &task)?;
 }
 
@@ -2012,4 +2042,12 @@ pub fn send_notification(app: &AppHandle, notification: Notification) -> Result<
 pub fn send_request(app: &AppHandle, request: Request) -> Result<()> {
 	trace!("Sending request: {:?}", request);
 	app.emit("request", &request)?;
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+fn show_in_folder(app: AppHandle, path: PathBuf) {
+	app.track_event("Show in folder", None).unwrap();
+
+	showfile::show_path_in_file_manager(path);
 }

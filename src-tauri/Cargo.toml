@@ -77,6 +77,8 @@ papaya = "0.2.4"
 identity-hash = "0.1.0"
 optivorbis = "0.3.0"
 showfile = "0.1.1"
+percent-encoding = "2.3.2"
+dashmap = { version = "6.2.1", features = ["rayon"] }
 
 [dependencies.tokio]
 version = "1.43.0"

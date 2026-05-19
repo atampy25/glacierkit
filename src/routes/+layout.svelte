@@ -51,6 +51,7 @@
 	let { children } = $props()
 
 	let tasks: [string, string][] = $state([])
+	let progresses: [string, string, number, number][] = $state([])
 	let notifications: [string, { kind: "error" | "info" | "info-square" | "success" | "warning" | "warning-alt"; title: string; subtitle: string }][] = $state([])
 
 	let destroyFunc = { run: () => {} }
@@ -68,20 +69,45 @@
 		}
 	})
 
-	let hasListened = false
+	function formatTime(ms: number) {
+		const seconds = Math.ceil(ms / 1000) % 60
+		const minutes = Math.floor(ms / (1000 * 60)) % 60
+		const hours = Math.floor(ms / (1000 * 60 * 60))
 
+		if (hours > 0) {
+			return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+		} else if (minutes > 0) {
+			return `${minutes}:${seconds.toString().padStart(2, "0")}`
+		} else {
+			return `${seconds}s`
+		}
+	}
+
+	let hasListened = false
 	$effect.pre(() => {
 		if (!hasListened) {
 			hasListened = true
-			;(async () => {
+			void (async () => {
 				const detachConsole = await attachConsole()
 
 				const unlistenStartTask = await listen("start-task", ({ payload: task }: { payload: [string, string] }) => {
 					tasks = [...tasks, task]
 				})
 
+				const unlistenStartProgressTask = await listen("start-progress-task", ({ payload: task }: { payload: [string, string] }) => {
+					progresses = [...progresses, [...task, 0, Date.now()]]
+				})
+
+				const unlistenTaskProgress = await listen("task-progress", ({ payload: [task, progress] }: { payload: [string, number] }) => {
+					const item = progresses.find((a) => a[0] === task)
+					if (item) {
+						item[2] = progress
+					}
+				})
+
 				const unlistenFinishTask = await listen("finish-task", ({ payload: task }: { payload: string }) => {
 					tasks = tasks.filter((a) => a[0] !== task)
+					progresses = progresses.filter((a) => a[0] !== task)
 				})
 
 				const unlistedNotification = await listen("send-notification", ({ payload: notification }: { payload: (typeof notifications)[number] }) => {
@@ -148,6 +174,8 @@
 
 				destroyFunc.run = () => {
 					unlistenStartTask()
+					unlistenStartProgressTask()
+					unlistenTaskProgress()
 					unlistenFinishTask()
 					unlistedNotification()
 					unlistenRequest()
@@ -669,9 +697,14 @@
 </div>
 
 <div class="h-6 flex items-center gap-4 px-3 bg-neutral-600" use:help={{ title: "Task bar", description: "You can see all currently running background tasks here." }}>
-	{#if tasks.length}
+	{#if tasks.length || progresses.length}
 		{#each tasks as [id, task] (id)}
 			<span transition:fade={{ duration: 100 }} animate:flip={{ duration: 250 }}>{task}</span>
+		{/each}
+		{#each progresses as [id, task, progress, startTime] (id)}
+			<span transition:fade={{ duration: 100 }}
+				>{task} ({Math.round(progress * 100)}%{#if progress > 0}, {formatTime(((Date.now() - startTime) / progress) * (1 - progress))} remaining{/if})</span
+			>
 		{/each}
 	{:else}
 		<span>No tasks running</span>
