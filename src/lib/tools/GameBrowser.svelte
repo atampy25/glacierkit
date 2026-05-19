@@ -3,11 +3,12 @@
 	import "jstree"
 	import { onMount } from "svelte"
 	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter } from "$lib/bindings"
-	import { Checkbox, Dropdown, Search } from "carbon-components-svelte"
+	import { Button, Checkbox, Dropdown, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"
 	import { help } from "$lib/helpray"
 	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
+	import { Reset } from "carbon-icons-svelte"
 
 	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 
@@ -466,6 +467,10 @@
 		tree.refresh()
 	}
 
+	function collapseTree() {
+		tree.close_all()
+	}
+
 	async function searchInput(evt: any) {
 		const _event = evt as { target: HTMLInputElement }
 
@@ -585,7 +590,12 @@
 				<Checkbox labelText="Separate tree by partition" bind:checked={separatePartitions} />
 			</div>
 			<div>{searchFeedback}</div>
-			<span class="text-neutral-400">{gameDescription}</span>
+			<div class="flex items-center">
+				<span class="text-neutral-400">{gameDescription}</span>
+				<Button iconDescription="Collapse" size="small" kind="ghost" icon={Reset} on:click={async () => {
+					collapseTree();
+				}}/>
+			</div>
 		</div>
 	{/if}
 

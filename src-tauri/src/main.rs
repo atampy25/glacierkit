@@ -854,6 +854,12 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				finish_task(&app, task)?;
 			}
 
+			GlobalEvent::CloseWorkspace => {
+				app_state.project.store(None);
+				send_request(&app, Request::Global(GlobalRequest::SetWindowTitle{title: "".to_string()}))?;
+				app_state.fs_watcher.store(None);
+			}
+
 			GlobalEvent::SelectTab(tab) => {
 				if let Some(tab) = tab {
 					if let Some(file) = app_state

@@ -3,10 +3,11 @@
 	import { help } from "$lib/helpray"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"
-	import { Button, Checkbox, Search } from "carbon-components-svelte"
+	import { Button, ButtonSet, Checkbox, Search, Tag } from "carbon-components-svelte"
 	import SearchIcon from "carbon-icons-svelte/lib/Search.svelte"
 	import CheckboxIcon from "carbon-icons-svelte/lib/Checkbox.svelte"
 	import CheckboxCheckedIcon from "carbon-icons-svelte/lib/CheckboxChecked.svelte"
+	import { tick } from "svelte"
 
 	export async function handleRequest(request: ContentSearchRequest) {
 		console.log("Content search tool handling request", request)
@@ -37,6 +38,10 @@
 	let searchQN = $state(false)
 	let searchLocalisation = $state(false)
 	let searchPartitions: Record<string, boolean> = $state({})
+
+	let searchEntitiesAndQN = $derived(searchQN && searchEntities)
+	let isAnySearchPartitionFalse = $derived(Object.values(searchPartitions).some(v => v === false))
+	let isAllSearchPartitionFalse = $derived(Object.values(searchPartitions).every(v => v === false))
 </script>
 
 <div
@@ -50,36 +55,41 @@
 	{:else}
 		<div class="pt-2 pb-1 px-2 text-base">
 			<div class="mb-3">Search through the contents of files - not just their names.</div>
-			<div class="mb-3"><Search placeholder="Search query (supports regex)" size="lg" bind:value={searchQuery} /></div>
+			<div class="mb-3">
+				<Search placeholder="Search query (supports regex)" size="lg" bind:value={searchQuery} />
+			</div>
 			<div class="mb-4">
 				<Checkbox labelText="Search entities" bind:checked={searchEntities} />
+				{#if searchEntities}
+					<div class="ml-6 mt-1">
 				<Checkbox labelText="Use QuickEntity format" bind:checked={searchQN} />
+					</div>
+				{/if}
 				<Checkbox labelText="Search BIN1 files" bind:checked={searchRL} />
 				<Checkbox labelText="Search textual files (JSON, REPO, ORES)" bind:checked={searchText} />
 				<Checkbox labelText="Search localisation" bind:checked={searchLocalisation} />
 			</div>
 			<div class="mb-4">
 				<div class="flex flex-wrap gap-2 items-center">
-					<div>Partitions to search</div>
-					<Button
-						icon={CheckboxIcon}
-						iconDescription="Deselect all partitions"
-						size="small"
-						on:click={async () => {
-							searchPartitions = Object.fromEntries(allPartitions.map((a) => [a[1], false]))
-						}}
-					/>
-					<Button
-						icon={CheckboxCheckedIcon}
-						iconDescription="Select all partitions"
-						size="small"
-						on:click={async () => {
-							searchPartitions = Object.fromEntries(allPartitions.map((a) => [a[1], true]))
-						}}
-					/>
+					<h4>Partitions to search</h4>
+				</div>
+				<div class="flex">
+					<Checkbox labelText={`Select all`}
+							  checked={!isAnySearchPartitionFalse}
+							  indeterminate={isAnySearchPartitionFalse && !isAllSearchPartitionFalse}
+							  on:change={() => {
+    								const newValue = isAnySearchPartitionFalse;
+    								searchPartitions = Object.fromEntries(allPartitions.map((a) => [a[1], newValue]));
+  							}}
+							  class="w-full overflow-hidden text-ellipsis whitespace-nowrap" />
 				</div>
 				{#each allPartitions as [partitionName, partitionId]}
-					<Checkbox labelText={`${partitionName} (${partitionId})`} bind:checked={searchPartitions[partitionId]} />
+					<div class="flex">
+						<Checkbox labelText={`${partitionName}`} bind:checked={searchPartitions[partitionId]}
+								  class="w-full overflow-hidden text-ellipsis whitespace-nowrap" />
+						<Tag class="whitespace-nowrap">{partitionId}</Tag>
+					</div>
+
 				{/each}
 			</div>
 			<Button
@@ -125,7 +135,8 @@
 							}
 						}
 					})
-				}}>Start search</Button
+				}}>Start search
+			</Button
 			>
 		</div>
 	{/if}

@@ -738,6 +738,7 @@ nesting::nest! {
 		pub enum GlobalEvent {
 			SetSeenAnnouncements(Vec<String>),
 			LoadWorkspace(PathBuf),
+			CloseWorkspace,
 			SelectAndOpenFile,
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),

@@ -62,6 +62,7 @@
 				reverseDependencies = request.data.reverseDependencies
 				changelog = request.data.changelog
 				data = request.data.data
+				referenceTab = !dependencies.length && reverseDependencies.length ? 1 : 0
 				break
 
 			// No exhaustivity check, only one request type
@@ -100,7 +101,7 @@
 			</div>
 		</div>
 
-		<div style="height: calc(100vh - 18rem)">
+		<div style="height: calc(100vh - 16rem)">
 			<Splitpanes theme="">
 				<Pane minSize={50} class="h-full">
 					<div class="h-full overflow-y-auto pr-2">
@@ -755,17 +756,17 @@
 					</div>
 				</Pane>
 				<Pane size={45} class="h-full flex flex-col">
-					<Tabs autoWidth class="mb-2" bind:selected={referenceTab}>
-						<Tab>
+					<Tabs autoWidth class="mb-2 overflow-hidden" bind:selected={referenceTab}>
+						<Tab disabled={dependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0" />
-								<div>References</div>
+								<div>References ({dependencies.length})</div>
 							</div>
 						</Tab>
-						<Tab>
+						<Tab disabled={reverseDependencies.length === 0}>
 							<div class="flex items-center gap-2">
 								<ColumnDependency class="flex-shrink-0 -scale-x-100" />
-								<div>Reverse references</div>
+								<div>Reverse references ({reverseDependencies.length})</div>
 							</div>
 						</Tab>
 					</Tabs>
