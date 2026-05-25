@@ -128,9 +128,8 @@
 										<img
 											class="h-[30vh] bg-[#7f7f7f]"
 											style="image-rendering: pixelated"
-											bind:this={previewImage}
-											on:load={() => {
-												previewImage = previewImage
+											onload={(evt) => {
+												previewImage = evt.target as HTMLImageElement
 											}}
 											src={convertFileSrc(`${id}/${data.data.asset_id}`, "editor-asset")}
 											alt="Resource preview"

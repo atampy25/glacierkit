@@ -38,7 +38,7 @@ pub enum ReverseReferenceData {
 		#[specta(type = String)]
 		property_name: EcoString
 	},
-	PlatformSpecificProperty {
+	PlatformProperty {
 		#[specta(type = String)]
 		property_name: EcoString,
 
@@ -52,14 +52,14 @@ pub enum ReverseReferenceData {
 		#[specta(type = String)]
 		trigger: EcoString
 	},
-	InputCopy {
+	InputForwarding {
 		#[specta(type = String)]
 		trigger: EcoString,
 
 		#[specta(type = String)]
 		propagate: EcoString
 	},
-	OutputCopy {
+	OutputForwarding {
 		#[specta(type = String)]
 		event: EcoString,
 
@@ -157,7 +157,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 			});
 		}
 
-		for (platform, properties) in &entity.platform_specific_properties {
+		for (platform, properties) in &entity.platform_properties {
 			for (property_name, property_data) in properties {
 				visit_variant(&property_data.value, &mut |val| {
 					if let Variant::Ref(val) = val
@@ -165,7 +165,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 					{
 						reverse_references.entry(ent).or_default().push(ReverseReference {
 							from: *entity_id,
-							data: ReverseReferenceData::PlatformSpecificProperty {
+							data: ReverseReferenceData::PlatformProperty {
 								property_name: property_name.to_owned(),
 								platform: platform.to_owned()
 							}
@@ -193,7 +193,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 			}
 		}
 
-		for (trigger, propagates) in &entity.input_copying {
+		for (trigger, propagates) in &entity.input_forwardings {
 			for (propagate, propagate_entities) in propagates {
 				for reference in propagate_entities {
 					reverse_references
@@ -201,7 +201,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 						.or_default()
 						.push(ReverseReference {
 							from: entity_id.to_owned(),
-							data: ReverseReferenceData::InputCopy {
+							data: ReverseReferenceData::InputForwarding {
 								trigger: trigger.to_owned(),
 								propagate: propagate.to_owned()
 							}
@@ -210,7 +210,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 			}
 		}
 
-		for (event, propagates) in &entity.output_copying {
+		for (event, propagates) in &entity.output_forwardings {
 			for (propagate, propagate_entities) in propagates {
 				for reference in propagate_entities {
 					reverse_references
@@ -218,7 +218,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 						.or_default()
 						.push(ReverseReference {
 							from: entity_id.to_owned(),
-							data: ReverseReferenceData::OutputCopy {
+							data: ReverseReferenceData::OutputForwarding {
 								event: event.to_owned(),
 								propagate: propagate.to_owned()
 							}
@@ -359,7 +359,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for properties in sub_entity.platform_specific_properties.values() {
+	for properties in sub_entity.platform_properties.values() {
 		for property_data in properties.values() {
 			let mut res = EditorValidity::Valid;
 			visit_variant(&property_data.value, &mut |val| {
@@ -392,9 +392,9 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	}
 
 	for propagates in sub_entity
-		.input_copying
+		.input_forwardings
 		.values()
-		.chain(sub_entity.output_copying.values())
+		.chain(sub_entity.output_forwardings.values())
 	{
 		for propagate_entities in propagates.values() {
 			for reference in propagate_entities {
@@ -612,7 +612,7 @@ pub fn get_decorations(
 		});
 	}
 
-	for properties in sub_entity.platform_specific_properties.values() {
+	for properties in sub_entity.platform_properties.values() {
 		for property_data in properties.values() {
 			visit_variant(&property_data.value, &mut |val| match val {
 				Variant::Ref(val) => {
@@ -661,9 +661,9 @@ pub fn get_decorations(
 	}
 
 	for propagates in sub_entity
-		.input_copying
+		.input_forwardings
 		.values()
-		.chain(sub_entity.output_copying.values())
+		.chain(sub_entity.output_forwardings.values())
 	{
 		for propagate_entities in propagates.values() {
 			for reference in propagate_entities {

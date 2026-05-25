@@ -12,7 +12,7 @@ use hitman_commons::{
 use identity_hash::BuildIdentityHasher;
 use itertools::Itertools;
 use papaya::HashMap as PapayaMap;
-use quickentity_rs::{convert_to_qn, entity::Entity};
+use quickentity_rs::entity::Entity;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::{
 	partition_manager::PartitionManager, pdefs::PackageDefinitionSource, resource_info::ResourceInfo,
@@ -381,7 +381,7 @@ impl Game {
 
 		let blueprint = deserialize_modern_blueprint(self.install.version, &tblu_data)?;
 
-		let entity = convert_to_qn(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
+		let entity = Entity::from_game(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
 			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 		let result: Arc<Entity> = entity.into();

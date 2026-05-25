@@ -315,11 +315,11 @@ impl Intellisense {
 														found.push((
 															entry.name,
 															match entry.r#type {
-																0 => Variant::Raw(ZVariant::new(())),
-																1 => Variant::Raw(ZVariant::new(0i32)),
-																2 => Variant::Raw(ZVariant::new(0.0f32)),
-																3 => Variant::Raw(ZVariant::new(EcoString::new())),
-																4 => Variant::Raw(ZVariant::new(false)),
+																0 => Variant::from_raw(&ZVariant::new(())),
+																1 => Variant::from_raw(&ZVariant::new(0i32)),
+																2 => Variant::from_raw(&ZVariant::new(0.0f32)),
+																3 => Variant::from_raw(&ZVariant::new(EcoString::new())),
+																4 => Variant::from_raw(&ZVariant::new(false)),
 																5 => Variant::Ref(None),
 																6 => Variant::Ref(None),
 																_ => bail!("Unknown UICB property type {}", entry.r#type)
@@ -364,7 +364,7 @@ impl Intellisense {
 
 													found.push((
 														eco_format!("{}_enab", property_name),
-														Variant::Raw(ZVariant::new(false)),
+														Variant::from_raw(&ZVariant::new(false)),
 														false
 													));
 
@@ -388,7 +388,7 @@ impl Intellisense {
 
 													found.push((
 														eco_format!("{}_op", property_name),
-														Variant::Raw(ZVariant::new(
+														Variant::from_raw(&ZVariant::new(
 															IRenderMaterialEntity_EModifierOperation::eLeave
 														)),
 														false
@@ -398,13 +398,13 @@ impl Intellisense {
 												MaterialOverride::Float(val) => {
 													found.push((
 														property_name.to_owned(),
-														Variant::Raw(ZVariant::new(val)),
+														Variant::from_raw(&ZVariant::new(val)),
 														false
 													));
 
 													found.push((
 														eco_format!("{}_op", property_name),
-														Variant::Raw(ZVariant::new(
+														Variant::from_raw(&ZVariant::new(
 															IRenderMaterialEntity_EModifierOperation::eLeave
 														)),
 														false
@@ -415,16 +415,16 @@ impl Intellisense {
 													found.push((
 														property_name.to_owned(),
 														match vec.len() {
-															2 => Variant::Raw(ZVariant::new(SVector2 {
+															2 => Variant::from_raw(&ZVariant::new(SVector2 {
 																x: vec[0],
 																y: vec[1]
 															})),
-															3 => Variant::Raw(ZVariant::new(SVector3 {
+															3 => Variant::from_raw(&ZVariant::new(SVector3 {
 																x: vec[0],
 																y: vec[1],
 																z: vec[2]
 															})),
-															4 => Variant::Raw(ZVariant::new(SVector4 {
+															4 => Variant::from_raw(&ZVariant::new(SVector4 {
 																x: vec[0],
 																y: vec[1],
 																z: vec[2],
@@ -437,7 +437,7 @@ impl Intellisense {
 
 													found.push((
 														eco_format!("{}_op", property_name),
-														Variant::Raw(ZVariant::new(
+														Variant::from_raw(&ZVariant::new(
 															IRenderMaterialEntity_EModifierOperation::eLeave
 														)),
 														false
@@ -495,19 +495,19 @@ impl Intellisense {
 																Variant::Resource(None)
 															}
 															EExtendedPropertyType::TYPE_INT32 => {
-																Variant::Raw(ZVariant::new(0i32))
+																Variant::from_raw(&ZVariant::new(0i32))
 															}
 															EExtendedPropertyType::TYPE_UINT32 => {
-																Variant::Raw(ZVariant::new(0u32))
+																Variant::from_raw(&ZVariant::new(0u32))
 															}
 															EExtendedPropertyType::TYPE_FLOAT => {
-																Variant::Raw(ZVariant::new(0.0f32))
+																Variant::from_raw(&ZVariant::new(0.0f32))
 															}
 															EExtendedPropertyType::TYPE_STRING => {
-																Variant::Raw(ZVariant::new(EcoString::from("")))
+																Variant::from_raw(&ZVariant::new(EcoString::from("")))
 															}
 															EExtendedPropertyType::TYPE_BOOL => {
-																Variant::Raw(ZVariant::new(false))
+																Variant::from_raw(&ZVariant::new(false))
 															}
 															EExtendedPropertyType::TYPE_ENTITYREF => Variant::Ref(None),
 															EExtendedPropertyType::TYPE_VARIANT => {
@@ -669,11 +669,11 @@ impl Intellisense {
 										// We can't get the actual default values, if there are any, so we just use sensible defaults
 										return Ok(Some((
 											match entry.r#type {
-												0 => Variant::Raw(ZVariant::new(())),
-												1 => Variant::Raw(ZVariant::new(0i32)),
-												2 => Variant::Raw(ZVariant::new(0.0f32)),
-												3 => Variant::Raw(ZVariant::new(EcoString::new())),
-												4 => Variant::Raw(ZVariant::new(false)),
+												0 => Variant::from_raw(&ZVariant::new(())),
+												1 => Variant::from_raw(&ZVariant::new(0i32)),
+												2 => Variant::from_raw(&ZVariant::new(0.0f32)),
+												3 => Variant::from_raw(&ZVariant::new(EcoString::new())),
+												4 => Variant::from_raw(&ZVariant::new(false)),
 												5 => Variant::Ref(None),
 												6 => Variant::Ref(None),
 												_ => bail!("Unknown UICB property type {}", entry.r#type)
@@ -719,7 +719,7 @@ impl Intellisense {
 									}
 
 									if format!("{}_enab", property_name) == property_to_find {
-										return Ok(Some((Variant::Raw(ZVariant::new(false)), false)));
+										return Ok(Some((Variant::from_raw(&ZVariant::new(false)), false)));
 									}
 
 									if format!("{}_dest", property_name) == property_to_find {
@@ -741,7 +741,7 @@ impl Intellisense {
 
 									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
-											Variant::Raw(ZVariant::new(
+											Variant::from_raw(&ZVariant::new(
 												IRenderMaterialEntity_EModifierOperation::eLeave
 											)),
 											false
@@ -751,12 +751,12 @@ impl Intellisense {
 
 								MaterialOverride::Float(val) => {
 									if property_name == property_to_find {
-										return Ok(Some((Variant::Raw(ZVariant::new(val)), false)));
+										return Ok(Some((Variant::from_raw(&ZVariant::new(val)), false)));
 									}
 
 									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
-											Variant::Raw(ZVariant::new(
+											Variant::from_raw(&ZVariant::new(
 												IRenderMaterialEntity_EModifierOperation::eLeave
 											)),
 											false
@@ -768,13 +768,15 @@ impl Intellisense {
 									if property_name == property_to_find {
 										return Ok(Some((
 											match vec.len() {
-												2 => Variant::Raw(ZVariant::new(SVector2 { x: vec[0], y: vec[1] })),
-												3 => Variant::Raw(ZVariant::new(SVector3 {
+												2 => {
+													Variant::from_raw(&ZVariant::new(SVector2 { x: vec[0], y: vec[1] }))
+												}
+												3 => Variant::from_raw(&ZVariant::new(SVector3 {
 													x: vec[0],
 													y: vec[1],
 													z: vec[2]
 												})),
-												4 => Variant::Raw(ZVariant::new(SVector4 {
+												4 => Variant::from_raw(&ZVariant::new(SVector4 {
 													x: vec[0],
 													y: vec[1],
 													z: vec[2],
@@ -788,7 +790,7 @@ impl Intellisense {
 
 									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
-											Variant::Raw(ZVariant::new(
+											Variant::from_raw(&ZVariant::new(
 												IRenderMaterialEntity_EModifierOperation::eLeave
 											)),
 											false
@@ -845,15 +847,21 @@ impl Intellisense {
 										return Ok(Some((
 											match entry.property_type {
 												EExtendedPropertyType::TYPE_RESOURCEPTR => Variant::Resource(None),
-												EExtendedPropertyType::TYPE_INT32 => Variant::Raw(ZVariant::new(0i32)),
-												EExtendedPropertyType::TYPE_UINT32 => Variant::Raw(ZVariant::new(0u32)),
+												EExtendedPropertyType::TYPE_INT32 => {
+													Variant::from_raw(&ZVariant::new(0i32))
+												}
+												EExtendedPropertyType::TYPE_UINT32 => {
+													Variant::from_raw(&ZVariant::new(0u32))
+												}
 												EExtendedPropertyType::TYPE_FLOAT => {
-													Variant::Raw(ZVariant::new(0.0f32))
+													Variant::from_raw(&ZVariant::new(0.0f32))
 												}
 												EExtendedPropertyType::TYPE_STRING => {
-													Variant::Raw(ZVariant::new(EcoString::from("")))
+													Variant::from_raw(&ZVariant::new(EcoString::from("")))
 												}
-												EExtendedPropertyType::TYPE_BOOL => Variant::Raw(ZVariant::new(false)),
+												EExtendedPropertyType::TYPE_BOOL => {
+													Variant::from_raw(&ZVariant::new(false))
+												}
 												EExtendedPropertyType::TYPE_ENTITYREF => Variant::Ref(None),
 												EExtendedPropertyType::TYPE_VARIANT => {
 													Variant::Variant(Variant::Ref(None).into())
@@ -931,11 +939,11 @@ impl Intellisense {
 		let mut output = vec![];
 
 		if !ignore_own {
-			input.extend(targeted.input_copying.keys().cloned());
+			input.extend(targeted.input_forwardings.keys().cloned());
 
 			output.extend(targeted.events.keys().cloned());
 
-			output.extend(targeted.output_copying.keys().cloned());
+			output.extend(targeted.output_forwardings.keys().cloned());
 		}
 
 		for sub_data in entity.entities.values() {
@@ -949,7 +957,7 @@ impl Intellisense {
 				}
 			}
 
-			for data in sub_data.input_copying.values() {
+			for data in sub_data.input_forwardings.values() {
 				for (trigger, refs) in data {
 					for reference in refs {
 						if reference.entity_id == sub_entity {
@@ -959,7 +967,7 @@ impl Intellisense {
 				}
 			}
 
-			for data in sub_data.output_copying.values() {
+			for data in sub_data.output_forwardings.values() {
 				for (propagate, refs) in data {
 					for reference in refs {
 						if reference.entity_id == sub_entity {

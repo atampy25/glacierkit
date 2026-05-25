@@ -12,7 +12,7 @@ use hitman_commons::{
 	rpkg_tool::RpkgResourceMeta
 };
 use itertools::Itertools;
-use quickentity_rs::convert_to_qn;
+use quickentity_rs::entity::Entity;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelExtend, ParallelIterator};
 use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use serde_json::{to_string, to_writer};
@@ -104,7 +104,7 @@ pub async fn start_content_search(
 											let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data).ok()?;
 
 											let entity =
-												convert_to_qn(&factory, &temp_meta, &blueprint, &tblu_meta, false)
+												Entity::from_game(&factory, &temp_meta, &blueprint, &tblu_meta, false)
 													.ok()?;
 
 											to_writer(&mut matcher, &entity).ok()?;

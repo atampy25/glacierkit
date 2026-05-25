@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
+use strum::EnumDiscriminants;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -13,7 +14,8 @@ pub struct RepositoryItem {
 	pub data: IndexMap<String, Value>
 }
 
-#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[derive(Type, Serialize, Deserialize, Clone, Debug, EnumDiscriminants)]
+#[strum_discriminants(name(RepositoryItemKind), derive(Type, Serialize, Deserialize))]
 #[serde(tag = "type", content = "data")]
 pub enum RepositoryItemInformation {
 	NPC { name: String },
@@ -44,7 +46,8 @@ pub struct UnlockableItem {
 	pub data: IndexMap<String, Value>
 }
 
-#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[derive(Type, Serialize, Deserialize, Clone, Debug, EnumDiscriminants)]
+#[strum_discriminants(name(UnlockableKind), derive(Type, Serialize, Deserialize))]
 #[serde(tag = "type", content = "data")]
 pub enum UnlockableInformation {
 	Access { id: Option<String> },

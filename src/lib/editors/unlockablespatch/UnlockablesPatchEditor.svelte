@@ -22,7 +22,7 @@
 
 	let modifiedUnlockables: Set<string> = new Set()
 
-	let searchQuery = ""
+	let searchResults: string[] | null = null
 	let searchFilter: UnlockableInformation["type"] | "All" = "All"
 
 	const debouncedUpdateFunction = { run: debounce(async (_: string) => {}, 500) }
@@ -70,6 +70,10 @@
 			case "modifyUnlockableInformation":
 				unlockables.find((a) => a[0] === request.data.unlockable)![1] = request.data.info
 				unlockables = unlockables
+				break
+
+			case "searchResults":
+				searchResults = request.data.items
 				break
 
 			default:
@@ -127,7 +131,22 @@
 	function searchInput(evt: any) {
 		const _event = evt as { target: HTMLInputElement }
 
-		searchQuery = _event.target.value.toLowerCase()
+		void event({
+			type: "editor",
+			data: {
+				editor: id,
+				data: {
+					type: "unlockablesPatch",
+					data: {
+						type: "search",
+						data: {
+							query: _event.target.value.toLowerCase(),
+							ty: searchFilter === "All" ? null : searchFilter
+						}
+					}
+				}
+			}
+		})
 	}
 </script>
 
@@ -310,7 +329,7 @@
 					size="lg"
 					on:input={searchInput}
 					on:clear={() => {
-						searchQuery = ""
+						searchResults = null
 					}}
 				/>
 				<Dropdown
@@ -338,7 +357,7 @@
 				<VList
 					data={unlockables
 						.filter((a) => searchFilter === "All" || a[1].type === searchFilter)
-						.filter((a) => (searchQuery ? searchQuery.split(" ").every((b) => JSON.stringify(a).toLowerCase().includes(b)) : true))
+						.filter((a) => (searchResults ? searchResults.includes(a[0]) : true))
 						.filter((a) => !modifiedUnlockables.has(a[0]))}
 					getKey={(a) => a[0]}
 				>

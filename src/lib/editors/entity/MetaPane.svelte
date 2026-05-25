@@ -108,9 +108,9 @@
 						<span style="font-size: 1rem;">{ref.data.data.property_name}</span>
 					</h4>
 					{entityNames[ref.from]} (<code>{ref.from}</code>)
-				{:else if ref.data.type === "platformSpecificProperty"}
+				{:else if ref.data.type === "platformProperty"}
 					<h4 class="-mt-1">
-						Platform-Specific Property
+						Platform Property
 						<span style="font-size: 1rem;">{ref.data.data.platform}: {ref.data.data.property_name}</span>
 					</h4>
 					{entityNames[ref.from]} (<code>{ref.from}</code>)
@@ -120,15 +120,15 @@
 						<span style="font-size: 1rem;">{ref.data.data.event}/{ref.data.data.trigger}</span>
 					</h4>
 					{entityNames[ref.from]} (<code>{ref.from}</code>)
-				{:else if ref.data.type === "inputCopy"}
+				{:else if ref.data.type === "inputForwarding"}
 					<h4 class="-mt-1">
-						Input Copy
+						Input Forwarding
 						<span style="font-size: 1rem;">{ref.data.data.trigger}/{ref.data.data.propagate}</span>
 					</h4>
 					{entityNames[ref.from]} (<code>{ref.from}</code>)
-				{:else if ref.data.type === "outputCopy"}
+				{:else if ref.data.type === "outputForwarding"}
 					<h4 class="-mt-1">
-						Output Copy
+						Output Forwarding
 						<span style="font-size: 1rem;">{ref.data.data.event}/{ref.data.data.propagate}</span>
 					</h4>
 					{entityNames[ref.from]} (<code>{ref.from}</code>)

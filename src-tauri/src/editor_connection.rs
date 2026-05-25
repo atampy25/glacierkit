@@ -12,7 +12,7 @@ use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use hitman_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
-use hitman_commons::{metadata::ResourceMetadata, resource_type};
+use hitman_commons::{game::GameVersion, metadata::ResourceMetadata, resource_type};
 use indexmap::IndexMap;
 use quickentity_rs::{
 	entity::{EntityID, Ref},
@@ -784,9 +784,9 @@ impl EditorConnection {
 		Transform {
 			position: transform.position,
 			rotation: Vec3 {
-				x: transform.rotation.yaw * 180.0 / std::f64::consts::PI,
-				y: transform.rotation.pitch * 180.0 / std::f64::consts::PI,
-				z: transform.rotation.roll * 180.0 / std::f64::consts::PI
+				x: (transform.rotation.yaw * 180.0 / std::f64::consts::PI) as f32,
+				y: (transform.rotation.pitch * 180.0 / std::f64::consts::PI) as f32,
+				z: (transform.rotation.roll * 180.0 / std::f64::consts::PI) as f32
 			},
 			scale: if (transform.scale.x * 100.0).trunc() == 100.0
 				&& (transform.scale.y * 100.0).trunc() == 100.0
@@ -823,9 +823,9 @@ impl EditorConnection {
 		Transform {
 			position: transform.position,
 			rotation: Vec3 {
-				x: transform.rotation.yaw * 180.0 / std::f64::consts::PI,
-				y: transform.rotation.pitch * 180.0 / std::f64::consts::PI,
-				z: transform.rotation.roll * 180.0 / std::f64::consts::PI
+				x: (transform.rotation.yaw * 180.0 / std::f64::consts::PI) as f32,
+				y: (transform.rotation.pitch * 180.0 / std::f64::consts::PI) as f32,
+				z: (transform.rotation.roll * 180.0 / std::f64::consts::PI) as f32
 			},
 			scale: if (transform.scale.x * 100.0).trunc() == 100.0
 				&& (transform.scale.y * 100.0).trunc() == 100.0
@@ -960,6 +960,7 @@ impl EditorConnection {
 						.unwrap_or(PropertyID::Known(property.to_owned())),
 					value: value
 						.to_game(
+							GameVersion::H3,
 							&STemplateEntityFactory {
 								blueprint_index_in_resource_header: 0,
 								root_entity_index: 0,

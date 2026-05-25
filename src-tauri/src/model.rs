@@ -22,7 +22,10 @@ use crate::{
 	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
 	game::Game,
-	ores_repo::{RepositoryItem, RepositoryItemInformation, UnlockableInformation, UnlockableItem}
+	ores_repo::{
+		RepositoryItem, RepositoryItemInformation, RepositoryItemKind, UnlockableInformation, UnlockableItem,
+		UnlockableKind
+	}
 };
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -91,11 +94,11 @@ pub enum EditorData {
 		file_type: TextFileType
 	},
 	QNEntity {
-		settings: EphemeralQNSettings,
+		settings: QNEditorSettings,
 		entity: Box<Entity>
 	},
 	QNPatch {
-		settings: EphemeralQNSettings,
+		settings: QNEditorSettings,
 		base: Arc<Entity>,
 		current: Box<Entity>
 	},
@@ -116,12 +119,12 @@ pub enum EditorData {
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct EphemeralQNSettings {
+pub struct QNEditorSettings {
 	pub show_reverse_parent_refs: bool,
 	pub show_changes_from_original: bool
 }
 
-impl Default for EphemeralQNSettings {
+impl Default for QNEditorSettings {
 	fn default() -> Self {
 		Self {
 			show_reverse_parent_refs: false,
@@ -713,6 +716,11 @@ nesting::nest! {
 
 					SelectItem {
 						item: Uuid
+					},
+
+					Search {
+						query: String,
+						ty: Option<RepositoryItemKind>
 					}
 				}
 
@@ -733,6 +741,11 @@ nesting::nest! {
 
 					SelectUnlockable {
 						unlockable: Uuid
+					},
+
+					Search {
+						query: String,
+						ty: Option<UnlockableKind>
 					}
 				}
 
@@ -1127,6 +1140,11 @@ nesting::nest! {
 					ModifyItemInformation {
 						item: Uuid,
 						info: RepositoryItemInformation
+					},
+
+					SearchResults {
+						#[debug(skip)]
+						items: Vec<Uuid>
 					}
 				}
 
@@ -1160,6 +1178,11 @@ nesting::nest! {
 					ModifyUnlockableInformation {
 						unlockable: Uuid,
 						info: UnlockableInformation
+					},
+
+					SearchResults {
+						#[debug(skip)]
+						items: Vec<Uuid>
 					}
 				}
 

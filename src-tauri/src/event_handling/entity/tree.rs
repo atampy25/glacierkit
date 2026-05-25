@@ -631,7 +631,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					}
 				}
 
-				ReverseReferenceData::PlatformSpecificProperty {
+				ReverseReferenceData::PlatformProperty {
 					property_name,
 					platform
 				} => {
@@ -639,7 +639,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 						.entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
-						.platform_specific_properties
+						.platform_properties
 						.get_mut(platform)
 						.unwrap();
 
@@ -659,7 +659,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 				}
 
 				ReverseReferenceData::Event { event, trigger } => {
-					patch.patch.push(PatchOperation::SubEntityOperation(
+					patch.patch.push(PatchOperation::PatchEntity(
 						reverse_ref.from.to_owned(),
 						SubEntityOperation::RemoveEventConnection(
 							event.to_owned(),
@@ -681,17 +681,17 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					));
 				}
 
-				ReverseReferenceData::InputCopy { trigger, propagate } => {
-					patch.patch.push(PatchOperation::SubEntityOperation(
+				ReverseReferenceData::InputForwarding { trigger, propagate } => {
+					patch.patch.push(PatchOperation::PatchEntity(
 						reverse_ref.from.to_owned(),
-						SubEntityOperation::RemoveInputCopyConnection(
+						SubEntityOperation::RemoveInputForwarding(
 							trigger.to_owned(),
 							propagate.to_owned(),
 							entity
 								.entities
 								.get(&reverse_ref.from)
 								.unwrap()
-								.input_copying
+								.input_forwardings
 								.get(trigger)
 								.unwrap()
 								.get(propagate)
@@ -704,17 +704,17 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					));
 				}
 
-				ReverseReferenceData::OutputCopy { event, propagate } => {
-					patch.patch.push(PatchOperation::SubEntityOperation(
+				ReverseReferenceData::OutputForwarding { event, propagate } => {
+					patch.patch.push(PatchOperation::PatchEntity(
 						reverse_ref.from.to_owned(),
-						SubEntityOperation::RemoveOutputCopyConnection(
+						SubEntityOperation::RemoveOutputForwarding(
 							event.to_owned(),
 							propagate.to_owned(),
 							entity
 								.entities
 								.get(&reverse_ref.from)
 								.unwrap()
-								.output_copying
+								.output_forwardings
 								.get(event)
 								.unwrap()
 								.get(propagate)
@@ -988,7 +988,7 @@ pub async fn paste(
 			});
 		}
 
-		for properties in sub_entity.platform_specific_properties.values_mut() {
+		for properties in sub_entity.platform_properties.values_mut() {
 			for property_data in properties.values_mut() {
 				visit_variant_mut(&mut property_data.value, &mut |val| {
 					if let Variant::Ref(val) = val {
@@ -1046,9 +1046,9 @@ pub async fn paste(
 		}
 
 		for values in sub_entity
-			.input_copying
+			.input_forwardings
 			.values_mut()
-			.chain(sub_entity.output_copying.values_mut())
+			.chain(sub_entity.output_forwardings.values_mut())
 		{
 			for refs in values.values_mut() {
 				for reference in refs.iter_mut() {
@@ -1277,12 +1277,11 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 				results: entity
 					.entities
 					.par_iter()
-					.filter(|(id, ent)| {
+					.filter_map(|(id, ent)| {
 						let mut s = format!("{}{}", id, to_string(ent).unwrap());
 						s.make_ascii_lowercase();
-						query.split(' ').all(|q| s.contains(q))
+						query.split(' ').all(|q| s.contains(q)).then_some(*id)
 					})
-					.map(|(id, _)| id.to_owned())
 					.collect()
 			}))
 		})
@@ -1467,10 +1466,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint: blueprint.to_owned(),
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1532,10 +1531,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint: blueprint.to_owned(),
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1577,10 +1576,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1622,10 +1621,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1669,10 +1668,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1720,10 +1719,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1767,10 +1766,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1814,10 +1813,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1861,10 +1860,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_specific_properties: Default::default(),
+						platform_properties: Default::default(),
 						events: Default::default(),
-						input_copying: Default::default(),
-						output_copying: Default::default(),
+						input_forwardings: Default::default(),
+						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
@@ -1937,10 +1936,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					);
 					properties
 				},
-				platform_specific_properties: Default::default(),
+				platform_properties: Default::default(),
 				events: Default::default(),
-				input_copying: Default::default(),
-				output_copying: Default::default(),
+				input_forwardings: Default::default(),
+				output_forwardings: Default::default(),
 				property_aliases: Default::default(),
 				exposed_entities: Default::default(),
 				exposed_interfaces: Default::default(),
@@ -2136,7 +2135,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
 					post_init: false
 				}
 			);
@@ -2147,7 +2146,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
 			)
 			.await?;
 	}
@@ -2285,7 +2284,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
 					post_init: false
 				}
 			);
@@ -2296,7 +2295,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
 			)
 			.await?;
 	}
@@ -2434,7 +2433,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
 					post_init: false
 				}
 			);
@@ -2445,7 +2444,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
 			)
 			.await?;
 	}
@@ -2564,7 +2563,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
 					post_init: false
 				}
 			);
@@ -2575,7 +2574,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::Raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
 			)
 			.await?;
 	}

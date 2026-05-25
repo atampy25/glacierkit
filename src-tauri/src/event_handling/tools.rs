@@ -13,7 +13,7 @@ use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
-	apply_patch, convert_to_game, convert_to_qn,
+	apply_patch,
 	entity::{CommentEntity, Entity, EntityID, SubEntity, SubType},
 	generate_patch,
 	patch::Patch
@@ -97,10 +97,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 											blueprint: rid!("[modules:/zspatialentity.class].pc_entityblueprint"),
 											editor_only: Default::default(),
 											properties: Default::default(),
-											platform_specific_properties: Default::default(),
+											platform_properties: Default::default(),
 											events: Default::default(),
-											input_copying: Default::default(),
-											output_copying: Default::default(),
+											input_forwardings: Default::default(),
+											output_forwardings: Default::default(),
 											property_aliases: Default::default(),
 											exposed_entities: Default::default(),
 											exposed_interfaces: Default::default(),
@@ -200,10 +200,11 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							}
 							entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
 
-							let (fac, fac_meta, blu, blu_meta) = convert_to_game(&entity, game.version())
+							let (fac, fac_meta, blu, blu_meta) = entity
+								.to_game(game.version())
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-							let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
+							let mut reconverted = Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 							reconverted.comments = comments;
@@ -246,10 +247,11 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							}
 							entity.comments = vec![];
 
-							let (fac, fac_meta, blu, blu_meta) = convert_to_game(&entity, game.version())
+							let (fac, fac_meta, blu, blu_meta) = entity
+								.to_game(game.version())
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
-							let mut reconverted = convert_to_qn(&fac, &fac_meta, &blu, &blu_meta, false)
+							let mut reconverted = Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
 								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 							reconverted.comments = comments;
@@ -328,8 +330,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 
 					let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data)?;
 
-					let base = convert_to_qn(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
-						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+					let base =
+						Entity::from_game(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 					fs::write(
 						{

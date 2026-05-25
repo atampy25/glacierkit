@@ -79,6 +79,7 @@ optivorbis = "0.3.0"
 showfile = "0.1.1"
 percent-encoding = "2.3.2"
 dashmap = { version = "6.2.1", features = ["rayon"] }
+strum = { version = "0.28.0", features = ["derive"] }
 
 [dependencies.tokio]
 version = "1.43.0"

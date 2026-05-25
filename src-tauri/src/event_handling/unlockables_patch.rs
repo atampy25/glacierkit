@@ -5,6 +5,7 @@ use fn_error_context::context;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::{Value, from_str};
+use strum::IntoDiscriminant;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -388,6 +389,46 @@ pub async fn handle_unlockables_patch_event(
 						orig_data,
 						data
 					})
+				})
+			)?;
+
+			finish_task(app, task)?;
+		}
+
+		UnlockablesPatchEditorEvent::Search { query, ty } => {
+			let editor_state = app_state.editor_states.get(&id).await.context("No such editor")?;
+
+			let task = start_task(app, format!("Searching for {query}"))?;
+
+			let unlockables = match editor_state.data {
+				EditorData::UnlockablesPatch { ref current, .. } => current,
+
+				_ => {
+					bail!("Editor {} is not a unlockables patch editor", id);
+				}
+			};
+
+			let items = unlockables
+				.par_iter()
+				.filter_map(|item| {
+					if let Some(ty) = ty
+						&& let Ok(info) = get_unlockable_information(item)
+						&& info.discriminant() != ty
+					{
+						return None;
+					}
+
+					let mut s = format!("{}{}", item.id, serde_json::to_string(&item.data).unwrap());
+					s.make_ascii_lowercase();
+					query.split(' ').all(|q| s.contains(q)).then_some(item.id)
+				})
+				.collect();
+
+			send_request(
+				app,
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::UnlockablesPatch(UnlockablesPatchEditorRequest::SearchResults { items })
 				})
 			)?;
 

@@ -118,7 +118,7 @@
 								$ref: null
 							}
 						},
-						platformSpecificProperties: {
+						platformProperties: {
 							additionalProperties: {
 								additionalProperties: {
 									anyOf: [
@@ -267,7 +267,7 @@
 			if (!word || !editorConnected) {
 				showSignalPinCondition.set(false)
 			} else {
-				showSignalPinCondition.set([...Object.keys(entData.inputCopying || {}), ...Object.keys(entData.outputCopying || {}), ...Object.keys(entData.events || {})].includes(word))
+				showSignalPinCondition.set([...Object.keys(entData.inputForwardings || {}), ...Object.keys(entData.outputForwardings || {}), ...Object.keys(entData.events || {})].includes(word))
 			}
 
 			showOpenResourceOverviewCondition.set(
@@ -306,7 +306,7 @@
 			run: async (ed) => {
 				try {
 					const pin = editor.getModel()!.getWordAtPosition(ed.getPosition()!)!.word
-					const output = !JSON.parse(editor.getValue()).inputCopying[pin]
+					const output = !JSON.parse(editor.getValue()).inputForwardings[pin]
 
 					trackEvent("Signal pin in-game")
 
@@ -518,7 +518,7 @@
 											])
 										)
 									},
-									inputCopying: {
+									inputForwardings: {
 										properties: Object.fromEntries(
 											data.inputPins.map((a) => [
 												a,
@@ -534,7 +534,7 @@
 											])
 										)
 									},
-									outputCopying: {
+									outputForwardings: {
 										properties: Object.fromEntries(
 											data.outputPins.map((a) => [
 												a,

@@ -81,7 +81,7 @@
 					"type": "boolean"
 				},
 				"properties": { "description": "Properties of the entity.", "type": "object", "additionalProperties": { "$ref": "#/$defs/Property" } },
-				"platformSpecificProperties": {
+				"platformProperties": {
 					"description": "Properties to apply conditionally to the entity based on platform.",
 					"type": "object",
 					"additionalProperties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/Property" } }
@@ -91,12 +91,12 @@
 					"type": "object",
 					"additionalProperties": { "type": "object", "additionalProperties": { "type": "array", "items": { "$ref": "#/$defs/PinConnection" } } }
 				},
-				"inputCopying": {
+				"inputForwardings": {
 					"description": "Inputs on entities to trigger when this entity is given inputs.",
 					"type": "object",
 					"additionalProperties": { "type": "object", "additionalProperties": { "type": "array", "items": { "$ref": "#/$defs/LocalPinConnection" } } }
 				},
-				"outputCopying": {
+				"outputForwardings": {
 					"description": "Events to propagate on other entities.",
 					"type": "object",
 					"additionalProperties": { "type": "object", "additionalProperties": { "type": "array", "items": { "$ref": "#/$defs/LocalPinConnection" } } }

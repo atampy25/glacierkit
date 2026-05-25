@@ -1344,6 +1344,26 @@ export type RepositoryItemInformation =
 	| { type: "WeaponConfig" }
 	| { type: "Unknown" }
 
+//Auto-generated discriminant enum variants
+export type RepositoryItemKind =
+	| "NPC"
+	| "Item"
+	| "Weapon"
+	| "Modifier"
+	| "MapArea"
+	| "Outfit"
+	| "Setpiece"
+	| "DifficultyParameter"
+	| "AmmoConfig"
+	| "MagazineConfig"
+	| "AmmoBehaviour"
+	| "MasteryItem"
+	| "ScoreMultiplier"
+	| "ItemBundle"
+	| "ItemList"
+	| "WeaponConfig"
+	| "Unknown"
+
 export type RepositoryPatchEditorEvent =
 	| { type: "initialise" }
 	| { type: "createRepositoryItem" }
@@ -1364,6 +1384,13 @@ export type RepositoryPatchEditorEvent =
 			type: "selectItem"
 			data: {
 				item: string
+			}
+	  }
+	| {
+			type: "search"
+			data: {
+				query: string
+				ty: RepositoryItemKind | null
 			}
 	  }
 
@@ -1406,6 +1433,12 @@ export type RepositoryPatchEditorRequest =
 			data: {
 				item: string
 				info: RepositoryItemInformation
+			}
+	  }
+	| {
+			type: "searchResults"
+			data: {
+				items: string[]
 			}
 	  }
 
@@ -1595,7 +1628,7 @@ export type ReverseReferenceData =
 			}
 	  }
 	| {
-			type: "platformSpecificProperty"
+			type: "platformProperty"
 			data: {
 				property_name: string
 				platform: string
@@ -1609,14 +1642,14 @@ export type ReverseReferenceData =
 			}
 	  }
 	| {
-			type: "inputCopy"
+			type: "inputForwarding"
 			data: {
 				trigger: string
 				propagate: string
 			}
 	  }
 	| {
-			type: "outputCopy"
+			type: "outputForwarding"
 			data: {
 				event: string
 				propagate: string
@@ -1722,13 +1755,13 @@ export type SubEntity_Deserialize = {
 	// Properties of the entity.
 	properties?: { [key in string]: Property_Deserialize }
 	// Properties to apply conditionally to the entity based on platform.
-	platformSpecificProperties?: { [key in string]: { [key in string]: Property_Deserialize } }
+	platformProperties?: { [key in string]: { [key in string]: Property_Deserialize } }
 	// Inputs on entities to trigger when events occur.
 	events?: { [key in string]: { [key in string]: PinConnectionProxy_Deserialize[] } }
 	// Inputs on entities to trigger when this entity is given inputs.
-	inputCopying?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
+	inputForwardings?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
 	// Events to propagate on other entities.
-	outputCopying?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
+	outputForwardings?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
 	// Properties on other entities that can be accessed from this entity.
 	propertyAliases?: { [key in string]: PropertyAlias[] }
 	// Entities that can be accessed from this entity.
@@ -1761,13 +1794,13 @@ export type SubEntity_Serialize = {
 	// Properties of the entity.
 	properties?: { [key in string]: Property_Serialize }
 	// Properties to apply conditionally to the entity based on platform.
-	platformSpecificProperties?: { [key in string]: { [key in string]: Property_Serialize } }
+	platformProperties?: { [key in string]: { [key in string]: Property_Serialize } }
 	// Inputs on entities to trigger when events occur.
 	events?: { [key in string]: { [key in string]: PinConnectionProxy_Serialize[] } }
 	// Inputs on entities to trigger when this entity is given inputs.
-	inputCopying?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
+	inputForwardings?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
 	// Events to propagate on other entities.
-	outputCopying?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
+	outputForwardings?: { [key in string]: { [key in string]: LocalPinConnectionProxy[] } }
 	// Properties on other entities that can be accessed from this entity.
 	propertyAliases?: { [key in string]: PropertyAlias[] }
 	// Entities that can be accessed from this entity.
@@ -1925,6 +1958,9 @@ export type UnlockableInformation =
 			}
 	  }
 
+//Auto-generated discriminant enum variants
+export type UnlockableKind = "Access" | "EvergreenMastery" | "Disguise" | "AgencyPickup" | "Weapon" | "Gear" | "Location" | "Package" | "LoadoutUnlock" | "Unknown"
+
 export type UnlockablesPatchEditorEvent =
 	| { type: "initialise" }
 	| { type: "createUnlockable" }
@@ -1945,6 +1981,13 @@ export type UnlockablesPatchEditorEvent =
 			type: "selectUnlockable"
 			data: {
 				unlockable: string
+			}
+	  }
+	| {
+			type: "search"
+			data: {
+				query: string
+				ty: UnlockableKind | null
 			}
 	  }
 
@@ -1987,6 +2030,12 @@ export type UnlockablesPatchEditorRequest =
 			data: {
 				unlockable: string
 				info: UnlockableInformation
+			}
+	  }
+	| {
+			type: "searchResults"
+			data: {
+				items: string[]
 			}
 	  }
 

@@ -376,8 +376,8 @@
 								}
 							}
 
-							if (data.platformSpecificProperties) {
-								for (const platformData of Object.values(data.platformSpecificProperties) as Record<string, Property>[]) {
+							if (data.platformProperties) {
+								for (const platformData of Object.values(data.platformProperties) as Record<string, Property>[]) {
 									for (const propertyData of Object.values(platformData)) {
 										if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
 											const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)

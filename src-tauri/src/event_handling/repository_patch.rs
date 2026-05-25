@@ -5,6 +5,7 @@ use fn_error_context::context;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::{Value, from_str, from_value};
+use strum::IntoDiscriminant;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -472,6 +473,46 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 						orig_data,
 						data
 					})
+				})
+			)?;
+
+			finish_task(app, task)?;
+		}
+
+		RepositoryPatchEditorEvent::Search { query, ty } => {
+			let editor_state = app_state.editor_states.get(&id).await.context("No such editor")?;
+
+			let task = start_task(app, format!("Searching for {query}"))?;
+
+			let repository = match editor_state.data {
+				EditorData::RepositoryPatch { ref current, .. } => current,
+
+				_ => {
+					bail!("Editor {} is not a repository patch editor", id);
+				}
+			};
+
+			let items = repository
+				.par_iter()
+				.filter_map(|item| {
+					if let Some(ty) = ty
+						&& let Ok(info) = get_repository_item_information(item)
+						&& info.discriminant() != ty
+					{
+						return None;
+					}
+
+					let mut s = format!("{}{}", item.id, serde_json::to_string(&item.data).unwrap());
+					s.make_ascii_lowercase();
+					query.split(' ').all(|q| s.contains(q)).then_some(item.id)
+				})
+				.collect();
+
+			send_request(
+				app,
+				Request::Editor(EditorRequest {
+					editor: id,
+					data: EditorRequestData::RepositoryPatch(RepositoryPatchEditorRequest::SearchResults { items })
 				})
 			)?;
 

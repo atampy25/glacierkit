@@ -182,11 +182,11 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 			.iter()
 			.zip(entity2.properties.iter())
 			.all(|(a, b)| a.0 == b.0 && a.1.post_init == b.1.post_init && a.1.value.rough_eq(&b.1.value))
-		&& entity1.platform_specific_properties.len() == entity2.platform_specific_properties.len()
+		&& entity1.platform_properties.len() == entity2.platform_properties.len()
 		&& entity1
-			.platform_specific_properties
+			.platform_properties
 			.iter()
-			.zip(entity2.platform_specific_properties.iter())
+			.zip(entity2.platform_properties.iter())
 			.all(|(a, b)| {
 				a.0 == b.0
 					&& a.1.len() == b.1.len()
@@ -210,11 +210,11 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 										.is_some_and(|(a, b)| a.rough_eq(b)))
 						})
 				})
-		}) && entity1.input_copying.len() == entity2.input_copying.len()
+		}) && entity1.input_forwardings.len() == entity2.input_forwardings.len()
 		&& entity1
-			.input_copying
+			.input_forwardings
 			.iter()
-			.zip(entity2.input_copying.iter())
+			.zip(entity2.input_forwardings.iter())
 			.all(|(a, b)| {
 				a.0 == b.0
 					&& a.1.len() == b.1.len()
@@ -230,11 +230,11 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 											.is_some_and(|(a, b)| a.rough_eq(b)))
 							})
 					})
-			}) && entity1.output_copying.len() == entity2.output_copying.len()
+			}) && entity1.output_forwardings.len() == entity2.output_forwardings.len()
 		&& entity1
-			.output_copying
+			.output_forwardings
 			.iter()
-			.zip(entity2.output_copying.iter())
+			.zip(entity2.output_forwardings.iter())
 			.all(|(a, b)| {
 				a.0 == b.0
 					&& a.1.len() == b.1.len()

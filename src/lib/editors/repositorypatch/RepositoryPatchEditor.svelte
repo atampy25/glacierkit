@@ -21,7 +21,7 @@
 
 	let modifiedRepositoryItems: Set<string> = new Set()
 
-	let searchQuery = ""
+	let searchResults: string[] | null = null
 	let searchFilter: RepositoryItemInformation["type"] | "All" = "All"
 
 	const debouncedUpdateFunction = { run: debounce(async (_: string) => {}, 500) }
@@ -63,6 +63,10 @@
 			case "modifyItemInformation":
 				repositoryItems.find((a) => a[0] === request.data.item)![1] = request.data.info
 				repositoryItems = repositoryItems
+				break
+
+			case "searchResults":
+				searchResults = request.data.items
 				break
 
 			default:
@@ -114,7 +118,22 @@
 	function searchInput(evt: any) {
 		const _event = evt as { target: HTMLInputElement }
 
-		searchQuery = _event.target.value.toLowerCase()
+		void event({
+			type: "editor",
+			data: {
+				editor: id,
+				data: {
+					type: "repositoryPatch",
+					data: {
+						type: "search",
+						data: {
+							query: _event.target.value.toLowerCase(),
+							ty: searchFilter === "All" ? null : searchFilter
+						}
+					}
+				}
+			}
+		})
 	}
 </script>
 
@@ -366,7 +385,7 @@
 					size="lg"
 					on:input={searchInput}
 					on:clear={() => {
-						searchQuery = ""
+						searchResults = null
 					}}
 				/>
 				<Dropdown
@@ -401,7 +420,7 @@
 				<VList
 					data={repositoryItems
 						.filter((a) => searchFilter === "All" || a[1].type === searchFilter)
-						.filter((a) => (searchQuery ? searchQuery.split(" ").every((b) => JSON.stringify(a).toLowerCase().includes(b)) : true))
+						.filter((a) => (searchResults ? searchResults.includes(a[0]) : true))
 						.filter((a) => !modifiedRepositoryItems.has(a[0]))}
 					getKey={(a) => a[0]}
 				>
