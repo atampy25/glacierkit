@@ -262,10 +262,16 @@ pub struct PastableTemplateCategory {
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
-#[serde(tag = "type", content = "data")]
+#[serde(
+	tag = "type",
+	content = "data",
+	rename_all = "camelCase",
+	rename_all_fields = "camelCase"
+)]
 pub enum ResourceOverviewData {
 	Generic,
 	Entity {
+		root_entity_name: String,
 		blueprint_hash: Hash,
 		#[specta(type = Option<String>)]
 		blueprint_path_or_hint: Option<EcoString>
@@ -278,7 +284,7 @@ pub enum ResourceOverviewData {
 	},
 	Image {
 		asset_id: Uuid,
-		dds_data: Option<(String, String)>
+		texture_data: Option<(String, String, Option<String>)>
 	},
 	Audio {
 		asset_id: Option<Uuid>
@@ -696,7 +702,17 @@ nesting::nest! {
 						index: u32
 					},
 
-					ExtractAsHMLanguages
+					ExtractAsHMLanguages,
+
+					ExtractAsMaterialInstance,
+
+					ExtractAsMaterialEntity,
+
+					ExtractAsSoundDefs,
+
+					ExtractAsObj,
+
+					ExtractAsTexture
 				}
 
 				RepositoryPatch(RepositoryPatchEditorEvent)

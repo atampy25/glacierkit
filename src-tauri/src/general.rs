@@ -8,11 +8,13 @@ use hitman_commons::{hash_list::HASH_LIST, metadata::RuntimeID, rid};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use lazy_regex::regex_captures;
 use quickentity_rs::{
 	apply_patch,
 	entity::{CommentEntity, Entity},
 	patch::Patch
 };
+use regex::Regex;
 use serde_json::{Value, from_slice, from_str, from_value, to_value};
 use tauri::{AppHandle, Manager, async_runtime};
 use tauri_plugin_aptabase::EventTracker;
@@ -42,6 +44,68 @@ pub const REPO_ID: RuntimeID = rid!("[assembly:/repository/pro.repo].pc_repo");
 
 pub const UNLOCKABLES_ID: RuntimeID =
 	rid!("[assembly:/_pro/online/default/offlineconfig/config.unlockables].pc_unlockables");
+
+/// Get a filename from a path as it would appear in the game file browser.
+pub fn get_name(path: &str) -> String {
+	if path.starts_with("[") {
+		if let Some((_, inner, params, filetype)) = regex_captures!(r"^\[(.*)\](?:\((.*)\))?(\..*)?$", path) {
+			let params = (!params.is_empty()).then_some(params);
+			let filetype = (!filetype.is_empty()).then_some(filetype);
+
+			let inner_name = get_name(inner);
+			let type_str = filetype.map(|ft| ft.replace(".pc_", ".")).unwrap_or_default();
+			let name = format!(
+				"[{}]{}{}",
+				inner_name,
+				params.map(|p| format!("({})", p)).unwrap_or_default(),
+				type_str
+			);
+
+			if name.ends_with(&format!("]{}{}", type_str, type_str)) {
+				if let Some((_, name)) = regex_captures!(r"^\[(.*)\]\..*$", &name) {
+					return name.into();
+				}
+			} else if Regex::new(&format!(
+				r"^\[.*{}\]\(.*\){}$",
+				regex::escape(&type_str),
+				regex::escape(&type_str)
+			))
+			.unwrap()
+			.is_match(&name)
+			{
+				if let Some((_, name)) = regex_captures!(r"^\[(.*)\]\(.*\)..*$", &name) {
+					return format!("[{}]({})", name, params.unwrap_or(""));
+				}
+			} else if [".wwisebank", ".gfx", ".wes"]
+				.iter()
+				.any(|a| name.ends_with(&format!("]{})", a)))
+			{
+				if let Some((_, name)) = regex_captures!(r"^\[(.*)\]\..*$", &name) {
+					return name.into();
+				}
+			} else if [".class", ".aspect", ".brick", ".entity", ".entitytemplate"]
+				.iter()
+				.any(|ty| name.ends_with(&format!("{}].entitytype", ty)))
+			{
+				if let Some((_, name)) = regex_captures!(r"^\[(.*)\]\..*$", &name) {
+					return name.into();
+				}
+			} else if [".class", ".aspect", ".brick", ".entity", ".entitytemplate"]
+				.iter()
+				.any(|ty| name.ends_with(&format!("{}].entityblueprint", ty)))
+				&& let Some((_, name)) = regex_captures!(r"^\[(.*)\]\..*$", &name)
+			{
+				return format!("{} (blueprint)", name);
+			}
+
+			name
+		} else {
+			path.into()
+		}
+	} else {
+		path.split('/').next_back().unwrap_or("").into()
+	}
+}
 
 #[try_fn]
 #[context("Couldn't open file")]
@@ -1005,20 +1069,15 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 					.get(&entity.root_entity)
 					.context("Root entity doesn't exist")?
 					.name,
-				hash
+				hash.to_hash()
 			);
 
 			let tab_name = if let Some(path) = hash.get_path() {
-				path.replace("].pc_entitytype", "")
-					.replace("].pc_entitytemplate", "")
-					.split('/')
-					.next_back()
-					.map(|x| x.to_owned())
-					.unwrap_or(default_tab_name)
+				get_name(&path)
 			} else if let Some(entry) = hash.get_info()
 				&& let Some(hint) = entry.hint
 			{
-				format!("{} ({})", hint, hash)
+				format!("{} ({})", hint, hash.to_hash())
 			} else {
 				default_tab_name
 			};

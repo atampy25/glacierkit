@@ -1638,9 +1638,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.core_info
 						.references
 						.into_iter()
-						.try_find(|dep| {
-							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "MATB")
-						})?
+						.find(|dep| game.resource_type(dep.resource).is_some_and(|ty| ty == "MATB"))
 						.context("No blueprint dependency found")?
 						.resource;
 
@@ -1685,13 +1683,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.core_info
 						.references
 						.into_iter()
-						.try_find(|dep| {
-							anyhow::Ok({
-								let x = game.extract_latest_metadata(dep.resource)?.core_info.resource_type;
-
-								x == "WSWB" || x == "DSWB"
-							})
-						})?
+						.find(|x| {
+							game.resource_type(x.resource)
+								.is_some_and(|ty| ty == "WSWB" || ty == "DSWB")
+						})
 						.context("No blueprint dependency found")?
 						.resource;
 
@@ -1736,9 +1731,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.core_info
 						.references
 						.into_iter()
-						.try_find(|dep| {
-							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "ECPB")
-						})?
+						.find(|dep| game.resource_type(dep.resource).is_some_and(|ty| ty == "ECPB"))
 						.context("No blueprint dependency found")?
 						.resource;
 
@@ -1783,9 +1776,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.core_info
 						.references
 						.into_iter()
-						.try_find(|dep| {
-							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "AIBB")
-						})?
+						.find(|dep| game.resource_type(dep.resource).is_some_and(|ty| ty == "AIBB"))
 						.context("No blueprint dependency found")?
 						.resource;
 
@@ -1830,9 +1821,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						.core_info
 						.references
 						.into_iter()
-						.try_find(|dep| {
-							anyhow::Ok(game.extract_latest_metadata(dep.resource)?.core_info.resource_type == "WSGB")
-						})?
+						.find(|dep| game.resource_type(dep.resource).is_some_and(|ty| ty == "WSGB"))
 						.context("No blueprint dependency found")?
 						.resource;
 

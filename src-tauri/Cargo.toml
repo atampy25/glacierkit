@@ -80,6 +80,8 @@ showfile = "0.1.1"
 percent-encoding = "2.3.2"
 dashmap = { version = "6.2.1", features = ["rayon"] }
 strum = { version = "0.28.0", features = ["derive"] }
+regex = "1.12.3"
+lazy-regex = "3.6.0"
 
 [dependencies.tokio]
 version = "1.43.0"

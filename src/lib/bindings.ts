@@ -1462,81 +1462,82 @@ export type ResourceChangelogEntry = {
 export type ResourceChangelogOperation = "Delete" | "Init" | "Edit"
 
 export type ResourceOverviewData =
-	| { type: "Generic" }
+	| { type: "generic" }
 	| {
-			type: "Entity"
+			type: "entity"
 			data: {
-				blueprint_hash: Hash
-				blueprint_path_or_hint: string | null
+				rootEntityName: string
+				blueprintHash: Hash
+				blueprintPathOrHint: string | null
 			}
 	  }
 	| {
-			type: "GenericRL"
-			data: {
-				json: string
-			}
-	  }
-	| {
-			type: "Json"
+			type: "genericRL"
 			data: {
 				json: string
 			}
 	  }
 	| {
-			type: "Image"
+			type: "json"
 			data: {
-				asset_id: string
-				dds_data: [string, string] | null
+				json: string
 			}
 	  }
 	| {
-			type: "Audio"
+			type: "image"
 			data: {
-				asset_id: string | null
+				assetId: string
+				textureData: [string, string, string | null] | null
 			}
 	  }
 	| {
-			type: "Mesh"
+			type: "audio"
 			data: {
-				asset_id: string
-				bounding_box: [number, number, number, number, number, number]
+				assetId: string | null
 			}
 	  }
 	| {
-			type: "MultiAudio"
+			type: "mesh"
+			data: {
+				assetId: string
+				boundingBox: [number, number, number, number, number, number]
+			}
+	  }
+	| {
+			type: "multiAudio"
 			data: {
 				name: string
 				audios: [string, string | null][]
 			}
 	  }
-	| { type: "Repository" }
-	| { type: "Unlockables" }
+	| { type: "repository" }
+	| { type: "unlockables" }
 	| {
-			type: "HMLanguages"
+			type: "hMLanguages"
 			data: {
 				json: string
 			}
 	  }
 	| {
-			type: "LocalisedLine"
+			type: "localisedLine"
 			data: {
 				languages: [string, string][]
 			}
 	  }
 	| {
-			type: "MaterialInstance"
+			type: "materialInstance"
 			data: {
 				json: string
 			}
 	  }
 	| {
-			type: "MaterialEntity"
+			type: "materialEntity"
 			data: {
 				json: string
 			}
 	  }
 	| {
-			type: "SoundDefinitions"
+			type: "soundDefinitions"
 			data: {
 				json: string
 			}
@@ -1573,6 +1574,11 @@ export type ResourceOverviewEvent =
 			}
 	  }
 	| { type: "extractAsHMLanguages" }
+	| { type: "extractAsMaterialInstance" }
+	| { type: "extractAsMaterialEntity" }
+	| { type: "extractAsSoundDefs" }
+	| { type: "extractAsObj" }
+	| { type: "extractAsTexture" }
 
 export type ResourceOverviewRequest = ResourceOverviewRequest_Serialize | ResourceOverviewRequest_Deserialize
 

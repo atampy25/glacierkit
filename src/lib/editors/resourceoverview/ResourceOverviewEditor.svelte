@@ -32,7 +32,7 @@
 	let previewImage: HTMLImageElement | null = $state(null)
 	let referenceTab = $state(0)
 
-	const typesWithPreview = ["Image", "Mesh", "Audio", "MultiAudio", "GenericRL", "Json", "HMLanguages", "LocalisedLine", "MaterialInstance", "MaterialEntity", "SoundDefinitions"]
+	const typesWithPreview = ["entity", "image", "mesh", "audio", "multiAudio", "genericRL", "json", "HMLanguages", "localisedLine", "materialInstance", "materialEntity", "soundDefinitions"]
 
 	onMount(async () => {
 		await event({
@@ -114,13 +114,56 @@
 							>
 								<Tile>
 									<h4 class="mb-1">Preview</h4>
-									{#if data.type === "Image"}
+									{#if data.type === "entity"}
+										<div class="text-lg">Root entity</div>
+										<div class="text-base font-semibold mb-2">{data.data.rootEntityName}</div>
+										<div class="text-lg mb-1">Blueprint</div>
+										<ClickableTile
+											style="min-height: unset"
+											light
+											on:click={async (e) => {
+												if (data?.type !== "entity") return
+
+												trackEvent(`Follow blueprint reference ${e.ctrlKey ? "in new tab " : "from resource overview"}`)
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: !e.ctrlKey
+																? {
+																		type: "followDependency",
+																		data: {
+																			newHash: data.data.blueprintHash
+																		}
+																	}
+																: {
+																		type: "followDependencyInNewTab",
+																		data: {
+																			hash: data.data.blueprintHash
+																		}
+																	}
+														}
+													}
+												})
+											}}
+										>
+											<div class="text-base -mt-1"
+												><span class="font-bold">{data.data.blueprintHash}.TBLU</span>
+												Install</div
+											>
+											<div class="break-all">{data.data.blueprintPathOrHint || "No path"}</div>
+										</ClickableTile>
+									{:else if data.type === "image"}
 										{#if previewImage}
 											<div class="text-neutral-400 mb-2 flex items-center gap-4">
 												<span>Resolution: {previewImage.naturalWidth}x{previewImage.naturalHeight}</span>
-												{#if data.data.dds_data}
-													<span>Type: {data.data.dds_data[0]}</span>
-													<span>Format: {data.data.dds_data[1]}</span>
+												{#if data.data.textureData}
+													<span>Type: {data.data.textureData[0]}</span>
+													<span>Format: {data.data.textureData[1]}</span>
+													{#if data.data.textureData[2]}<span>Interpret As: {data.data.textureData[2]}</span>{/if}
 												{/if}
 											</div>
 										{/if}
@@ -131,20 +174,20 @@
 											onload={(evt) => {
 												previewImage = evt.target as HTMLImageElement
 											}}
-											src={convertFileSrc(`${id}/${data.data.asset_id}`, "editor-asset")}
+											src={convertFileSrc(`${id}/${data.data.assetId}`, "editor-asset")}
 											alt="Resource preview"
 										/>
-									{:else if data.type === "Mesh"}
+									{:else if data.type === "mesh"}
 										<div class="h-[30vh]">
-											<MeshPreview src={convertFileSrc(`${id}/${data.data.asset_id}`, "editor-asset")} boundingBox={data.data.bounding_box} />
+											<MeshPreview src={convertFileSrc(`${id}/${data.data.assetId}`, "editor-asset")} boundingBox={data.data.boundingBox} />
 										</div>
-									{:else if data.type === "Audio"}
-										{#if data.data.asset_id}
-											<WaveformPlayer src={convertFileSrc(`${id}/${data.data.asset_id}`, "editor-asset")} />
+									{:else if data.type === "audio"}
+										{#if data.data.assetId}
+											<WaveformPlayer src={convertFileSrc(`${id}/${data.data.assetId}`, "editor-asset")} />
 										{:else}
 											<div class="text-lg">This audio object is in an unsupported format (likely MIDI).</div>
 										{/if}
-									{:else if data.type === "MultiAudio"}
+									{:else if data.type === "multiAudio"}
 										<div class="text-neutral-400 mb-2">{data.data.name}</div>
 										{#if data.data.audios.length}
 											<MultiWaveformPlayer
@@ -172,11 +215,11 @@
 										{:else}
 											<div class="-mt-1 text-lg">No linked audio</div>
 										{/if}
-									{:else if data.type === "GenericRL" || data.type === "Json" || data.type === "HMLanguages" || data.type === "MaterialInstance" || data.type === "MaterialEntity" || data.type === "SoundDefinitions"}
+									{:else if data.type === "genericRL" || data.type === "json" || data.type === "hMLanguages" || data.type === "materialInstance" || data.type === "materialEntity" || data.type === "soundDefinitions"}
 										<div class="h-[30vh]">
 											<Monaco id={v4()} content={data.data.json} />
 										</div>
-									{:else if data.type === "LocalisedLine"}
+									{:else if data.type === "localisedLine"}
 										<div class="max-h-[30vh] overflow-y-auto">
 											<DataTable
 												headers={[
@@ -200,7 +243,7 @@
 							<Tile>
 								<h4 class="mb-2">Actions</h4>
 								<div class="flex flex-wrap gap-2">
-									{#if data.type === "Entity"}
+									{#if data.type === "entity"}
 										<Button
 											icon={Edit}
 											on:click={async () => {
@@ -315,7 +358,28 @@
 												})
 											}}>Extract TBLU as JSON</Button
 										>
-									{:else if data.type === "Image"}
+									{:else if data.type === "image"}
+										{#if data.data.textureData}
+											<Button
+												icon={DocumentExport}
+												on:click={async () => {
+													// Analytics tracked on Rust end
+
+													await event({
+														type: "editor",
+														data: {
+															editor: id,
+															data: {
+																type: "resourceOverview",
+																data: {
+																	type: "extractAsTexture"
+																}
+															}
+														}
+													})
+												}}>Extract texture</Button
+											>
+										{/if}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -354,8 +418,8 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "Audio"}
-										{#if data.data.asset_id}
+									{:else if data.type === "audio"}
+										{#if data.data.assetId}
 											<Button
 												icon={DocumentExport}
 												on:click={async () => {
@@ -395,7 +459,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "MultiAudio"}
+									{:else if data.type === "multiAudio"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -434,7 +498,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "GenericRL"}
+									{:else if data.type === "genericRL"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -473,7 +537,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "Repository"}
+									{:else if data.type === "repository"}
 										<Button
 											icon={Edit}
 											on:click={async () => {
@@ -512,7 +576,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "Unlockables"}
+									{:else if data.type === "unlockables"}
 										<Button
 											icon={Edit}
 											on:click={async () => {
@@ -570,7 +634,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "HMLanguages"}
+									{:else if data.type === "hMLanguages"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -609,7 +673,26 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "Mesh"}
+									{:else if data.type === "mesh"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract mesh file as OBJ")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsObj"
+															}
+														}
+													}
+												})
+											}}>Extract as OBJ</Button
+										>
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -629,7 +712,26 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "MaterialInstance"}
+									{:else if data.type === "materialInstance"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract material instance file as JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsMaterialInstance"
+															}
+														}
+													}
+												})
+											}}>Extract as JSON</Button
+										>
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -649,7 +751,26 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "MaterialEntity"}
+									{:else if data.type === "materialEntity"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract material entity file as JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsMaterialEntity"
+															}
+														}
+													}
+												})
+											}}>Extract as JSON</Button
+										>
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -669,7 +790,26 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "SoundDefinitions"}
+									{:else if data.type === "soundDefinitions"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract sound definitions as JSON")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsSoundDefs"
+															}
+														}
+													}
+												})
+											}}>Extract as JSON</Button
+										>
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -689,7 +829,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "Json" || data.type === "LocalisedLine" || data.type === "Generic"}
+									{:else if data.type === "json" || data.type === "localisedLine" || data.type === "generic"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {

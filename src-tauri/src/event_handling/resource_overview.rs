@@ -8,7 +8,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use ecow::EcoVec;
 use fn_error_context::context;
 use glacier_texture::{
-	enums::{RenderFormat, TextureType},
+	enums::{InterpretAs, RenderFormat, TextureType},
 	mipblock::MipblockData,
 	texture_map::TextureMap
 };
@@ -39,7 +39,7 @@ use crate::{
 	biome::format_json,
 	finish_task,
 	game::Game,
-	general::{UNLOCKABLES_ID, open_in_editor},
+	general::{UNLOCKABLES_ID, get_name, open_in_editor},
 	languages::get_language_map,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
@@ -71,11 +71,84 @@ pub async fn open_resource_overview(app: &AppHandle, resource: RuntimeID) -> Res
 		Request::Tab(TabRequest {
 			tab: id,
 			data: TabRequestData::Create {
-				name: format!("Resource overview ({resource})"),
+				name: format!("Resource overview for {}", get_name(&resource.to_string())),
 				editor_type: EditorType::ResourceOverview
 			}
 		})
 	)?;
+}
+
+#[try_fn]
+#[context("Couldn't parse PRIM file")]
+pub fn parse_prim(game: &Game, res_data: &[u8]) -> Result<(EcoVec<u8>, [f32; 6])> {
+	let model = RenderPrimitive::process_data(game.version().into(), res_data).context("Couldn't process PRIM data")?;
+
+	// Higher is less detail
+	let preferred_lod = 1;
+
+	// Get only the meshes, we don't need weight metadata for the preview
+	let meshes = model
+		.data
+		.objects
+		.iter()
+		.map(|mesh_obj| match mesh_obj {
+			prim_rs::render_primitive::MeshObject::Normal(mesh) => mesh,
+			prim_rs::render_primitive::MeshObject::Weighted(mesh) => &mesh.prim_mesh,
+			prim_rs::render_primitive::MeshObject::Linked(mesh) => &mesh.prim_mesh
+		})
+		.collect::<Vec<_>>();
+
+	// Get only the meshes for the preferred LOD level
+	let meshes = meshes
+		.iter()
+		.filter(|mesh| mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod));
+
+	let mut previous_vertex_count: usize = 1;
+	let mut bounding_box: [f32; 6] = [
+		f32::INFINITY,
+		f32::INFINITY,
+		f32::INFINITY,
+		f32::NEG_INFINITY,
+		f32::NEG_INFINITY,
+		f32::NEG_INFINITY
+	];
+
+	let mut obj = EcoVec::new();
+
+	for (idx, mesh) in meshes.enumerate() {
+		writeln!(obj, "o object.00{}", idx)?;
+
+		for position in &mesh.sub_mesh.buffers.position {
+			writeln!(obj, "v {} {} {}", position.x, position.y, position.z)?;
+		}
+
+		for vm in &mesh.sub_mesh.buffers.main {
+			writeln!(obj, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
+		}
+
+		for idx in mesh.sub_mesh.indices.chunks(3) {
+			let [idx1, idx2, idx3] = [
+				idx[0] as usize + previous_vertex_count,
+				idx[1] as usize + previous_vertex_count,
+				idx[2] as usize + previous_vertex_count
+			];
+			writeln!(obj, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
+		}
+
+		previous_vertex_count += mesh.sub_mesh.buffers.position.len();
+
+		let bb = mesh.sub_mesh.calc_bb();
+
+		bounding_box[0] = bounding_box[0].min(bb.min.x);
+		bounding_box[1] = bounding_box[1].min(bb.min.y);
+		bounding_box[2] = bounding_box[2].min(bb.min.z);
+
+		bounding_box[3] = bounding_box[3].max(bb.max.x);
+		bounding_box[4] = bounding_box[4].max(bb.max.y);
+		bounding_box[5] = bounding_box[5].max(bb.max.z);
+	}
+
+	(obj, bounding_box)
 }
 
 #[try_fn]
@@ -125,6 +198,10 @@ pub async fn initialise_resource_overview(
 						let entity = game.extract_entity(hash)?;
 
 						ResourceOverviewData::Entity {
+							root_entity_name: entity
+								.entities
+								.get(&entity.root_entity)
+								.map_or_else(|| "Unknown".into(), |x| x.name.as_str().into()),
 							blueprint_hash: Hash(entity.blueprint),
 							blueprint_path_or_hint: entity.blueprint.get_path_or_hint()
 						}
@@ -133,7 +210,7 @@ pub async fn initialise_resource_overview(
 					"ORES" if hash == UNLOCKABLES_ID => ResourceOverviewData::Unlockables,
 
 					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF"
-					| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" => {
+					| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" | "TBLU" => {
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 						ResourceOverviewData::GenericRL {
@@ -185,73 +262,14 @@ pub async fn initialise_resource_overview(
 
 						ResourceOverviewData::Image {
 							asset_id,
-							dds_data: None
+							texture_data: None
 						}
 					}
 
 					"PRIM" => {
 						let (_, res_data) = game.extract_latest_resource(hash)?;
 
-						let model = RenderPrimitive::process_data(game.version().into(), res_data)
-							.context("Couldn't process texture data")?;
-
-						// Higher is less detail
-						let preferred_lod = 1;
-
-						// Get only the meshes, we don't need weight metadata for the preview
-						let meshes = model
-							.data
-							.objects
-							.iter()
-							.map(|mesh_obj| match mesh_obj {
-								prim_rs::render_primitive::MeshObject::Normal(mesh) => mesh,
-								prim_rs::render_primitive::MeshObject::Weighted(mesh) => &mesh.prim_mesh,
-								prim_rs::render_primitive::MeshObject::Linked(mesh) => &mesh.prim_mesh
-							})
-							.collect::<Vec<_>>();
-
-						// Get only the meshes for the preferred LOD level
-						let meshes = meshes
-							.iter()
-							.filter(|mesh| mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod));
-
-						let mut previous_vertex_count: usize = 1;
-						let mut bounding_box: [f32; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-
-						let mut obj = EcoVec::new();
-
-						for (idx, mesh) in meshes.enumerate() {
-							writeln!(obj, "o object.00{}", idx)?;
-
-							for position in &mesh.sub_mesh.buffers.position {
-								writeln!(obj, "v {} {} {}", position.x, position.y, position.z)?;
-							}
-
-							for vm in &mesh.sub_mesh.buffers.main {
-								writeln!(obj, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
-							}
-
-							for idx in mesh.sub_mesh.indices.chunks(3) {
-								let [idx1, idx2, idx3] = [
-									idx[0] as usize + previous_vertex_count,
-									idx[1] as usize + previous_vertex_count,
-									idx[2] as usize + previous_vertex_count
-								];
-								writeln!(obj, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
-							}
-
-							previous_vertex_count += mesh.sub_mesh.buffers.position.len();
-
-							let bb = mesh.sub_mesh.calc_bb();
-
-							bounding_box[0] = bounding_box[0].min(bb.min.x);
-							bounding_box[1] = bounding_box[1].min(bb.min.y);
-							bounding_box[2] = bounding_box[2].min(bb.min.z);
-
-							bounding_box[3] = bounding_box[3].max(bb.max.x);
-							bounding_box[4] = bounding_box[4].max(bb.max.y);
-							bounding_box[5] = bounding_box[5].max(bb.max.z);
-						}
+						let (obj, bounding_box) = parse_prim(game, &res_data)?;
 
 						let asset_id = Uuid::new_v4();
 
@@ -282,18 +300,12 @@ pub async fn initialise_resource_overview(
 							texture.set_mipblock1(mipblock);
 						}
 
-						let tga_data = glacier_texture::convert::create_tga(&texture)
-							.context("Couldn't convert texture to TGA")?;
-
-						let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
-
-						reader.set_format(image::ImageFormat::Tga);
+						let image = glacier_texture::convert::create_dynamic_image(&texture)
+							.context("Couldn't convert texture to dynamic image")?;
 
 						let mut image_data = vec![];
 
-						reader
-							.decode()?
-							.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
+						image.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
 
 						app_state
 							.editor_states
@@ -306,7 +318,7 @@ pub async fn initialise_resource_overview(
 
 						ResourceOverviewData::Image {
 							asset_id,
-							dds_data: Some((
+							texture_data: Some((
 								match texture.texture_type() {
 									TextureType::Colour => "Colour",
 									TextureType::Normal => "Normal",
@@ -331,7 +343,20 @@ pub async fn initialise_resource_overview(
 									RenderFormat::BC5 => "BC5",
 									RenderFormat::BC7 => "BC7"
 								}
-								.into()
+								.into(),
+								texture.interpret_as().map(|interpret_as| {
+									match interpret_as {
+										InterpretAs::Colour => "Colour",
+										InterpretAs::Normal => "Normal",
+										InterpretAs::Height => "Height",
+										InterpretAs::CompoundNormal => "CompoundNormal",
+										InterpretAs::Billboard => "Billboard",
+										InterpretAs::Cubemap => "Cubemap",
+										InterpretAs::Emission => "Emission",
+										InterpretAs::Volume => "Volume"
+									}
+									.into()
+								})
 							))
 						}
 					}
@@ -874,7 +899,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 					Request::Tab(TabRequest {
 						tab: id,
 						data: TabRequestData::Rename {
-							new_name: format!("Resource overview ({new_hash})")
+							new_name: format!("Resource overview for {}", get_name(&new_hash.to_string()))
 						}
 					})
 				)?;
@@ -1181,27 +1206,24 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 									.context("Couldn't convert texture to DDS")?;
 
 								fs::write(path.as_path().context("Invalid path")?, dds_data)?;
-							} else {
+							} else if path
+								.as_path()
+								.context("Invalid path")?
+								.file_name()
+								.context("No file name")?
+								.to_str()
+								.context("Filename was invalid string")?
+								.ends_with(".tga")
+							{
 								let tga_data = glacier_texture::convert::create_tga(&texture)
 									.context("Couldn't convert texture to TGA")?;
 
-								let mut reader = ImageReader::new(Cursor::new(tga_data.to_owned()));
+								fs::write(path.as_path().context("Invalid path")?, tga_data)?;
+							} else {
+								let image = glacier_texture::convert::create_dynamic_image(&texture)
+									.context("Couldn't convert texture to dynamic image")?;
 
-								reader.set_format(image::ImageFormat::Tga);
-
-								if path
-									.as_path()
-									.context("Invalid path")?
-									.file_name()
-									.context("No file name")?
-									.to_str()
-									.context("Filename was invalid string")?
-									.ends_with(".tga")
-								{
-									fs::write(path.as_path().context("Invalid path")?, tga_data)?;
-								} else {
-									reader.decode()?.save(path.as_path().context("Invalid path")?)?;
-								}
+								image.save(path.as_path().context("Invalid path")?)?;
 							}
 						}
 
@@ -1632,6 +1654,248 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 							_ => bail!("Not a valid HMLanguages resource type")
 						}
 					)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsObj => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (_, res_data) = game.extract_latest_resource(hash)?;
+				let (obj, _) = parse_prim(game, &res_data)?;
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog.add_filter("OBJ mesh file", &["obj"]).blocking_save_file() {
+					fs::write(path.as_path().context("Invalid path")?, obj)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsMaterialInstance => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
+
+				let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
+					.context("Couldn't parse material instance")?;
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog
+					.add_filter("Material JSON", &["material.json"])
+					.blocking_save_file()
+				{
+					fs::write(
+						path.as_path().context("Invalid path")?,
+						format_json(&to_string(&material)?)?
+					)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsMaterialEntity => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (matt_meta, matt_data) = game.extract_latest_resource(hash)?;
+				let (matb_meta, matb_data) = game.extract_latest_resource(
+					matt_meta
+						.core_info
+						.references
+						.get(1)
+						.context("No MATB dependency")?
+						.resource
+				)?;
+
+				let material =
+					MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)
+						.context("Couldn't parse material entity")?;
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog
+					.add_filter("Material entity JSON", &["material.entity.json"])
+					.blocking_save_file()
+				{
+					fs::write(
+						path.as_path().context("Invalid path")?,
+						format_json(&to_string(&material)?)?
+					)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsSoundDefs => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
+
+				let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game.version())
+					.context("Couldn't parse sound definitions")?;
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog
+					.add_filter("Sound definitions JSON", &["sounddefs.json"])
+					.blocking_save_file()
+				{
+					fs::write(
+						path.as_path().context("Invalid path")?,
+						format_json(&to_string(&sdef)?)?
+					)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsTexture => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
+
+				let mut texture = TextureMap::process_data(game.version().into(), res_data)
+					.context("Couldn't process texture data")?;
+
+				if let Some(texd_depend) = res_meta.core_info.references.first() {
+					let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
+					let mipblock = MipblockData::from_memory(&texd_data, game.version().into())
+						.context("Couldn't process TEXD data")?;
+					texture.set_mipblock1(mipblock);
+				}
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog
+					.set_file_name(format!("{}.texture.dds", hash.to_hash()))
+					.add_filter("DDS texture", &["texture.dds"])
+					.add_filter("TGA texture", &["texture.tga"])
+					.add_filter("PNG texture", &["texture.png"])
+					.blocking_save_file()
+				{
+					let path = path.as_path().context("Invalid path")?;
+
+					app.track_event(
+						"Extract texture as image format",
+						Some(json!({
+							"format": path
+								.extension()
+								.context("No file extension")?
+								.to_str()
+								.context("File extension was invalid string")?
+						}))
+					)
+					.unwrap();
+
+					if path
+						.file_name()
+						.context("No file name")?
+						.to_str()
+						.context("Filename was invalid string")?
+						.ends_with(".dds")
+					{
+						let dds_data = glacier_texture::convert::create_dds(&texture)
+							.context("Couldn't convert texture to DDS")?;
+
+						fs::write(path, dds_data)?;
+					} else if path
+						.file_name()
+						.context("No file name")?
+						.to_str()
+						.context("Filename was invalid string")?
+						.ends_with(".tga")
+					{
+						let tga_data = glacier_texture::convert::create_tga(&texture)
+							.context("Couldn't convert texture to TGA")?;
+
+						fs::write(path, tga_data)?;
+					} else {
+						let image = glacier_texture::convert::create_dynamic_image(&texture)
+							.context("Couldn't convert texture to dynamic image")?;
+
+						image.save(path)?;
+					}
+
+					let mut meta = json!({
+						"text": hash
+					});
+
+					if let Some(texd_depend) = res_meta.core_info.references.first() {
+						meta.as_object_mut()
+							.unwrap()
+							.insert("texd".to_owned(), serde_json::to_value(texd_depend.resource)?);
+					}
+
+					meta.as_object_mut().unwrap().insert(
+						"type".to_owned(),
+						match texture.texture_type() {
+							TextureType::Colour => "Colour",
+							TextureType::Normal => "Normal",
+							TextureType::Height => "Height",
+							TextureType::CompoundNormal => "CompoundNormal",
+							TextureType::Billboard => "Billboard",
+							TextureType::Projection => "Projection",
+							TextureType::Emission => "Emission",
+							TextureType::Cubemap => "Cubemap",
+							TextureType::UNKNOWN512 => "UNKNOWN512"
+						}
+						.into()
+					);
+
+					// BC7 is default
+					if texture.format() != RenderFormat::BC7 {
+						meta.as_object_mut().unwrap().insert(
+							"format".to_owned(),
+							match texture.format() {
+								RenderFormat::R16G16B16A16 => "R16G16B16A16",
+								RenderFormat::R8G8B8A8 => "R8G8B8A8",
+								RenderFormat::R8G8 => "R8G8",
+								RenderFormat::A8 => "A8",
+								RenderFormat::BC1 => "BC1",
+								RenderFormat::BC2 => "BC2",
+								RenderFormat::BC3 => "BC3",
+								RenderFormat::BC4 => "BC4",
+								RenderFormat::BC5 => "BC5",
+								RenderFormat::BC7 => "BC7"
+							}
+							.into()
+						);
+					}
+
+					// Normal is default
+					if let Some(interpret_as) = texture.interpret_as()
+						&& interpret_as != InterpretAs::Normal
+					{
+						meta.as_object_mut().unwrap().insert(
+							"interpretAs".to_owned(),
+							match interpret_as {
+								InterpretAs::Colour => "Colour",
+								InterpretAs::Normal => "Normal",
+								InterpretAs::Height => "Height",
+								InterpretAs::CompoundNormal => "CompoundNormal",
+								InterpretAs::Billboard => "Billboard",
+								InterpretAs::Cubemap => "Cubemap",
+								InterpretAs::Emission => "Emission",
+								InterpretAs::Volume => "Volume"
+							}
+							.into()
+						);
+					}
+
+					fs::write(path.with_extension("json"), format_json(&to_string(&meta)?)?)?;
 				}
 			}
 		}

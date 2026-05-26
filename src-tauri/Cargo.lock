@@ -132,6 +132,7 @@ dependencies = [
 	"indexmap 2.14.0",
 	"itertools 0.14.0",
 	"json-patch 4.2.0",
+	"lazy-regex",
 	"log",
 	"matchers",
 	"nesting",
@@ -146,6 +147,7 @@ dependencies = [
 	"quickentity-rs",
 	"rand 0.10.1",
 	"rayon",
+	"regex",
 	"reqwest 0.13.4",
 	"rpkg-rs",
 	"schemars 1.2.1",
@@ -1329,9 +1331,9 @@ checksum = "b13806bbd41ba81d25a772a999eaa60b19a1ee4d9a7e4baf99bf256d6932750c"
 
 [[package]]
 name = "ecow"
-version = "0.2.7"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95ae21feaa658771b8ee682352392269794e5e7670caf3b9586fa9d743715498"
+checksum = "78e4f79b296fbaab6ce2e22d52cb4c7f010fe0ebe7a32e34fa25885fd797bd02"
 dependencies = ["serde"]
 
 [[package]]
