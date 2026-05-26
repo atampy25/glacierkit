@@ -46,7 +46,7 @@ jobs:
                   default: true
 
             - name: Rust cache
-              uses: Swatinem/rust-cache@v2.7.3
+              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
               with:
                   prefix-key: v0-rust-${{ matrix.platform }}
                   workspaces: "src-tauri -> target"
