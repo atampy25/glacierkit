@@ -65,7 +65,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
 specta-typescript = "0.0.11"
 ordermap = "1.2.0"
-ecow = { version = "0.2.6", features = ["serde"] }
+ecow = { version = "0.3.0", features = ["serde"] }
 ww2ogg = "0.1.0"
 schemars = "1.2.1"
 matchers = "0.2.0"

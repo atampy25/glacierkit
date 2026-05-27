@@ -289,7 +289,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#a608386e5c71307d224332ed8b3240a45790b868"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#3717476deda37f34855665e52cc7de0ac704f262"
 
 [[package]]
 name = "autocfg"
@@ -603,6 +603,13 @@ name = "bitfield-struct"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3ca019570363e800b05ad4fd890734f28ac7b72f563ad8a35079efb793616f8"
+dependencies = ["proc-macro2", "quote", "syn 2.0.117"]
+
+[[package]]
+name = "bitfield-struct"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ca6739863c590881f038d033a146c51ddae239186a4327014839fd864f44ed5"
 dependencies = ["proc-macro2", "quote", "syn 2.0.117"]
 
 [[package]]
@@ -1226,9 +1233,9 @@ dependencies = ["bitflags 2.11.1", "block2", "libc", "objc2"]
 
 [[package]]
 name = "displaydoc"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
+checksum = "1ac70aa55017e108007fbaf5aa0f54b021c98f92ff8af59d42eda9da96e3dd4f"
 dependencies = ["proc-macro2", "quote", "syn 2.0.117"]
 
 [[package]]
@@ -1331,9 +1338,9 @@ checksum = "b13806bbd41ba81d25a772a999eaa60b19a1ee4d9a7e4baf99bf256d6932750c"
 
 [[package]]
 name = "ecow"
-version = "0.2.6"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78e4f79b296fbaab6ce2e22d52cb4c7f010fe0ebe7a32e34fa25885fd797bd02"
+checksum = "62bac48c16a993694c703f2991527d422d9efb8ec5625756004ba30e97683720"
 dependencies = ["serde"]
 
 [[package]]
@@ -1505,6 +1512,12 @@ version = "0.46.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f462bad2b5a574b2c94e9ad54162704ceacf3200741b4f0fb88020936b9003ec"
 dependencies = ["facet-macro-parse", "facet-macro-types", "proc-macro2", "quote", "strsim", "unsynn"]
+
+[[package]]
+name = "fast-md5"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d5eae88ed9322ba43db8f1ce3214050d9dea7730f44b2de0769604526b8d584"
 
 [[package]]
 name = "fastrand"
@@ -1998,7 +2011,7 @@ dependencies = ["macro_rules_attribute", "never-say-never", "paste"]
 [[package]]
 name = "hitman-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#1e237d3422f7c932f3fa55d1c4aea13969fbcb6b"
+source = "git+https://github.com/atampy25/hitman-bin1#6f8768aafe465d638dd74bcb55e808247e173725"
 dependencies = [
 	"Inflector",
 	"anyhow",
@@ -2011,6 +2024,7 @@ dependencies = [
 	"dynex_core",
 	"ecow",
 	"edit-distance",
+	"equivalent",
 	"facet",
 	"hitman-bin1-derive",
 	"lazy-regex",
@@ -2018,13 +2032,14 @@ dependencies = [
 	"mident",
 	"papaya",
 	"polonius-the-crab",
-	"rand 0.9.4",
+	"rand 0.10.1",
+	"rapidhash",
 	"rayon",
 	"serde",
 	"serde_json",
+	"serde_json_borrow",
 	"serde_with",
 	"static_init",
-	"string-interner",
 	"thiserror 2.0.18",
 	"tryvial"
 ]
@@ -2032,24 +2047,24 @@ dependencies = [
 [[package]]
 name = "hitman-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#1e237d3422f7c932f3fa55d1c4aea13969fbcb6b"
+source = "git+https://github.com/atampy25/hitman-bin1#6f8768aafe465d638dd74bcb55e808247e173725"
 dependencies = ["darling 0.21.3", "quote", "syn 2.0.117"]
 
 [[package]]
 name = "hitman-commons"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-commons#797afcbfb4aea536a25872cc735c83fdd3a77d14"
+source = "git+https://github.com/atampy25/hitman-commons#89a24e1b17131384c88b850a04cb4979907f31f6"
 dependencies = [
 	"arc-swap",
 	"brotli-decompressor",
 	"ecow",
+	"fast-md5",
 	"glacier-texture",
 	"home",
 	"identity-hash",
 	"itertools 0.14.0",
 	"keyvalues-serde",
 	"lhash",
-	"md5",
 	"papaya",
 	"registry",
 	"rpkg-rs",
@@ -2133,9 +2148,9 @@ checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
 name = "hyper"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6299f016b246a94207e63da54dbe807655bf9e00044f73ded42c3ac5305fbcca"
+checksum = "eb92f162bf56536459fc83c79b974bb12837acfed43d6bc370a7916d0ae15ecc"
 dependencies = ["atomic-waker", "bytes", "futures-channel", "futures-core", "h2", "http", "http-body", "httparse", "itoa", "pin-project-lite", "smallvec 1.15.1", "tokio", "want"]
 
 [[package]]
@@ -2633,9 +2648,9 @@ dependencies = ["cfg-if", "winapi"]
 
 [[package]]
 name = "libredox"
-version = "0.1.16"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e02f3bb43d335493c96bf3fd3a321600bf6bd07ed34bc64118e9293bdffea46c"
+checksum = "f02ab6bace2054fb888a3c16f990117b579d14a3088e472d63c6011fa185c9d3"
 dependencies = ["libc"]
 
 [[package]]
@@ -2780,9 +2795,9 @@ checksum = "ae960838283323069879657ca3de837e9f7bbb4c7bf6ea7f1b290d5e9476d2e0"
 
 [[package]]
 name = "memchr"
-version = "2.8.0"
+version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
+checksum = "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8"
 
 [[package]]
 name = "memmap2"
@@ -3541,7 +3556,7 @@ name = "proc-macro-crate"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f"
-dependencies = ["toml_edit 0.25.11+spec-1.1.0"]
+dependencies = ["toml_edit 0.25.12+spec-1.1.0"]
 
 [[package]]
 name = "proc-macro-error"
@@ -3641,7 +3656,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#a608386e5c71307d224332ed8b3240a45790b868"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#3717476deda37f34855665e52cc7de0ac704f262"
 dependencies = [
 	"anyhow",
 	"auto_context",
@@ -3790,6 +3805,13 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f97cdb2a36ed4183de61b2f824cc45c9f1037f28afe0a322e9fff4c108b5aaa"
 dependencies = ["rand_core 0.6.4"]
+
+[[package]]
+name = "rapidhash"
+version = "4.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5e48930979c155e2f33aa36ab3119b5ee81332beb6482199a8ecd6029b80b59"
+dependencies = ["rand 0.9.4", "rustversion"]
 
 [[package]]
 name = "rav1e"
@@ -4069,12 +4091,12 @@ dependencies = ["proc-macro2", "quote", "syn 1.0.109"]
 
 [[package]]
 name = "rpkg-rs"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a66a90ffc1ffb6881811394d9d90a4b5e92d16386f35569a7db6f8c620466bb8"
+checksum = "919a6aa01c7d37fe8aae2e810a9212a29a36ecacd9116577009754097474ef27"
 dependencies = [
 	"binrw 0.15.1",
-	"bitfield-struct 0.11.0",
+	"bitfield-struct 0.13.0",
 	"byteorder",
 	"crc32fast",
 	"extended-tea",
@@ -4379,6 +4401,13 @@ checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = ["indexmap 2.14.0", "itoa", "memchr", "serde", "serde_core", "zmij"]
 
 [[package]]
+name = "serde_json_borrow"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2780994ebdf8677793192229715c7f5d9dd4c37cefc7fb760b9418903ffb5c34"
+dependencies = ["serde", "serde_json"]
+
+[[package]]
 name = "serde_path_to_error"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4670,13 +4699,6 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1389c88ddd739ec6d3f8f83343764a0e944cd23cfbf126a9796a714b0b6edd6f"
 dependencies = ["cfg_aliases 0.1.1", "memchr", "proc-macro2", "quote", "syn 1.0.109"]
-
-[[package]]
-name = "string-interner"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23de088478b31c349c9ba67816fa55d9355232d63c3afea8bf513e31f0f1d2c0"
-dependencies = ["hashbrown 0.15.5", "serde"]
 
 [[package]]
 name = "string_cache"
@@ -5396,9 +5418,9 @@ dependencies = ["indexmap 2.14.0", "serde", "serde_spanned 0.6.9", "toml_datetim
 
 [[package]]
 name = "toml_edit"
-version = "0.25.11+spec-1.1.0"
+version = "0.25.12+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b59c4d22ed448339746c59b905d24568fcbb3ab65a500494f7b8c3e97739f2b"
+checksum = "d2153edc6955a6c354fad8f5efd38b6a8769bdccf9fe50f8e1329f81b0baa5d7"
 dependencies = ["indexmap 2.14.0", "toml_datetime 1.1.1+spec-1.1.0", "toml_parser", "winnow 1.0.3"]
 
 [[package]]
@@ -5416,8 +5438,8 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "tonytools"
-version = "0.7.1"
-source = "git+https://github.com/AnthonyFuller/tonytools-rs#f9b03d0236c8b2132dc79cce51c7d01f35620f17"
+version = "1.0.0"
+source = "git+https://github.com/AnthonyFuller/tonytools-rs#cbccaeb2306ae30414bbd3c8ec2e5f822e3b4299"
 dependencies = ["bimap", "bitchomp", "byteorder", "crc32fast", "extended-tea", "indexmap 2.14.0", "md5", "once_cell", "regex-lite", "serde", "serde_json", "strum_macros 0.27.2", "thiserror 2.0.18"]
 
 [[package]]
@@ -6694,16 +6716,16 @@ dependencies = ["proc-macro2", "quote", "syn 2.0.117", "synstructure"]
 
 [[package]]
 name = "zerocopy"
-version = "0.8.48"
+version = "0.8.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eed437bf9d6692032087e337407a86f04cd8d6a16a37199ed57949d415bd68e9"
+checksum = "bce33a6288fa3f072a8c2c7d0f2fdbb90e28298f0135c1f99b96c3db2efcc60b"
 dependencies = ["zerocopy-derive"]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.48"
+version = "0.8.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e3cd084b1788766f53af483dd21f93881ff30d7320490ec3ef7526d203bad4"
+checksum = "8fd425244944f4ab65ccff928e7323354c5a018c75838362fdce749dfad2ee1e"
 dependencies = ["proc-macro2", "quote", "syn 2.0.117"]
 
 [[package]]
