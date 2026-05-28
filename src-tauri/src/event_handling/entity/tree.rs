@@ -1906,7 +1906,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				blueprint: rid!("[modules:/zaudioevententity.class].pc_entityblueprint"),
 				editor_only: Default::default(),
 				properties: {
-					let mut properties = OrderMap::new();
+					let mut properties = OrderMap::default();
 					properties.insert(
 						"m_pMainEvent".into(),
 						Property {
