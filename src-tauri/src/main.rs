@@ -20,7 +20,6 @@ pub mod ores_repo;
 use std::{
 	backtrace::{Backtrace, BacktraceStatus},
 	cell::Cell,
-	collections::HashMap,
 	fmt::Write,
 	fs,
 	path::{Path, PathBuf},
@@ -49,7 +48,6 @@ use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 use walkdir::WalkDir;
-use whirlwind::ShardMap;
 
 use crate::{
 	biome::{format_json, to_string_clear},
@@ -70,6 +68,13 @@ use crate::{
 		TextEditorRequest, TextFileType, ToolRequest
 	}
 };
+
+pub type HashMap<K, V, S = rapidhash::fast::RandomState> = std::collections::HashMap<K, V, S>;
+pub type HashSet<K, S = rapidhash::fast::RandomState> = std::collections::HashSet<K, S>;
+pub type PapayaMap<K, V, S = rapidhash::fast::RandomState> = papaya::HashMap<K, V, S>;
+pub type PapayaSet<K, S = rapidhash::fast::RandomState> = papaya::HashSet<K, S>;
+pub type ShardMap<K, V, S = rapidhash::fast::RandomState> = whirlwind::ShardMap<K, V, S>;
+pub type ShardSet<K, S = rapidhash::fast::RandomState> = whirlwind::ShardSet<K, S>;
 
 pub const HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
@@ -392,8 +397,8 @@ async fn main() {
 					.and_then(|x| tonytools::hashlist::HashList::load(&x).ok().map(|x| x.into()))
 					.into(),
 				fs_watcher: None.into(),
-				editor_states: ShardMap::new().into(),
-				editor_removal: ShardMap::new().into(),
+				editor_states: Arc::new(ShardMap::with_hasher(Default::default())),
+				editor_removal: Arc::new(ShardMap::with_hasher(Default::default())),
 				game: None.into(),
 				editor_connection: EditorConnection::new(app.handle().clone())
 			});
@@ -527,13 +532,12 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							.await
 							.context("No such editor")?;
 
-						let results = match editor_state.data {
-							EditorData::ContentSearchResults { ref results, .. } => results,
-
-							_ => {
-								Err(anyhow!("Editor {} is not a content search results page", event.editor))?;
-								panic!();
-							}
+						let EditorData::ContentSearchResults {
+							ref query, ref results, ..
+						} = editor_state.data
+						else {
+							Err(anyhow!("Editor {} is not a content search results page", event.editor))?;
+							panic!();
 						};
 
 						send_request(
@@ -542,6 +546,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 								editor: event.editor,
 								data: EditorRequestData::ContentSearchResults(
 									ContentSearchResultsRequest::Initialise {
+										query: query.to_owned(),
 										results: results.to_owned()
 									}
 								)
@@ -1936,7 +1941,7 @@ pub fn start_task(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 }
 
 #[static_init::dynamic]
-static PROGRESSES: papaya::HashMap<Uuid, (Instant, f32)> = Default::default();
+static PROGRESSES: PapayaMap<Uuid, (Instant, f32)> = Default::default();
 
 #[try_fn]
 #[context("Couldn't send progress task start event for {:?} to frontend", name.as_ref())]
@@ -1952,6 +1957,7 @@ pub fn start_progress(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 #[context("Couldn't send task progress event for {:?} to frontend", task)]
 pub fn task_progress(app: &AppHandle, task: Uuid, progress: f32) -> Result<()> {
 	if let Some((last_emit, last_progress)) = PROGRESSES.pin().get(&task)
+		&& progress > *last_progress
 		&& (last_emit.elapsed().as_secs() > 1 || (progress * 100.0).round() != (last_progress * 100.0).round())
 	{
 		trace!("Updating progress for task {}: {}", task, progress);

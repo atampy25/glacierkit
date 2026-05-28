@@ -684,102 +684,104 @@ pub async fn initialise_resource_overview(
 						}
 					},
 
-					"LINE" => ResourceOverviewData::LocalisedLine {
-						languages: {
-							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
+					"LINE" => {
+						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-							let (locr_meta, locr_data) = game.extract_latest_resource(
-								res_meta
-									.core_info
-									.references
-									.first()
-									.context("No LOCR dependency on LINE")?
-									.resource
-							)?;
+						let (locr_meta, locr_data) = game.extract_latest_resource(
+							res_meta
+								.core_info
+								.references
+								.first()
+								.context("No LOCR dependency on LINE")?
+								.resource
+						)?;
 
-							let locr = {
-								let mut iteration = 0;
+						let locr = {
+							let mut iteration = 0;
 
-								loop {
-									if let Ok::<_, anyhow::Error>(x) = try_block! {
-										let langmap = get_language_map(game.version(), iteration)
-											.context("No more alternate language maps available")?;
+							loop {
+								if let Ok::<_, anyhow::Error>(x) = try_block! {
+									let langmap = get_language_map(game.version(), iteration)
+										.context("No more alternate language maps available")?;
 
-										let locr = hmlanguages::locr::LOCR::new(
-											app_state
-												.tonytools_hash_list
-												.load()
-												.as_ref()
-												.context("No TonyTools hash list available")?
-												.deref()
-												.to_owned(),
-											game.version().into(),
-											langmap.1.to_owned(),
-											langmap.0
-										)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+									let locr = hmlanguages::locr::LOCR::new(
+										app_state
+											.tonytools_hash_list
+											.load()
+											.as_ref()
+											.context("No TonyTools hash list available")?
+											.deref()
+											.to_owned(),
+										game.version().into(),
+										langmap.1.to_owned(),
+										langmap.0
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
-										locr.convert(
-											&locr_data,
-											to_string(&RpkgResourceMeta::from_resource_metadata(
-												locr_meta.to_owned(),
-												false
-											))?
-										)
-										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									} {
-										break x;
-									} else {
-										iteration += 1;
+									locr.convert(
+										&locr_data,
+										to_string(&RpkgResourceMeta::from_resource_metadata(
+											locr_meta.to_owned(),
+											false
+										))?
+									)
+									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+								} {
+									break x;
+								} else {
+									iteration += 1;
 
-										if get_language_map(game.version(), iteration).is_none() {
-											bail!("No more alternate language maps available");
-										}
+									if get_language_map(game.version(), iteration).is_none() {
+										bail!("No more alternate language maps available");
 									}
 								}
-							};
+							}
+						};
 
-							let res_data: [u8; 5] =
-								res_data.try_into().ok().context("Couldn't read LINE data as u32")?;
+						let res_data: [u8; 5] = res_data.try_into().ok().context("Couldn't read LINE data as u32")?;
 
-							let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
+						let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
 
-							let line_hash = format!("{:0>8X}", line_id);
+						let line_hash = format!("{:0>8X}", line_id);
 
-							let line_str = app_state
-								.tonytools_hash_list
-								.load()
-								.as_ref()
-								.context("No TonyTools hash list available")?
-								.lines
-								.get_by_left(&line_id)
-								.cloned();
+						let line_str = app_state
+							.tonytools_hash_list
+							.load()
+							.as_ref()
+							.context("No TonyTools hash list available")?
+							.lines
+							.get_by_left(&line_id)
+							.cloned();
 
-							if let Some(line_str) = line_str {
-								locr.languages
-									.into_iter()
-									.filter_map(|(lang, keys)| {
-										if let serde_json::Value::String(val) = keys.get(&line_str)? {
-											Some((lang.to_owned(), val.to_owned()))
-										} else {
-											None
-										}
-									})
-									.collect::<Vec<_>>()
-							} else {
-								locr.languages
-									.into_iter()
-									.filter_map(|(lang, keys)| {
-										if let serde_json::Value::String(val) = keys.get(&line_hash)? {
-											Some((lang.to_owned(), val.to_owned()))
-										} else {
-											None
-										}
-									})
-									.collect::<Vec<_>>()
+						ResourceOverviewData::LocalisedLine {
+							key: line_str.to_owned().unwrap_or_else(|| line_hash.to_owned()),
+							languages: {
+								if let Some(line_str) = line_str {
+									locr.languages
+										.into_iter()
+										.filter_map(|(lang, keys)| {
+											if let serde_json::Value::String(val) = keys.get(&line_str)? {
+												Some((lang.to_owned(), val.to_owned()))
+											} else {
+												None
+											}
+										})
+										.collect::<Vec<_>>()
+								} else {
+									locr.languages
+										.into_iter()
+										.filter_map(|(lang, keys)| {
+											if let serde_json::Value::String(val) = keys.get(&line_hash)? {
+												Some((lang.to_owned(), val.to_owned()))
+											} else {
+												None
+											}
+										})
+										.collect::<Vec<_>>()
+								}
 							}
 						}
-					},
+					}
 
 					"MATI" => ResourceOverviewData::MaterialInstance {
 						json: {
@@ -842,6 +844,74 @@ pub async fn initialise_resource_overview(
 							sdef.serialize(&mut ser)?;
 
 							String::from_utf8(buf)?
+						}
+					},
+
+					"AIBZ" => ResourceOverviewData::BehaviorTree {
+						pseudocode: {
+							let (_, res_data) = game.extract_latest_resource(hash)?;
+
+							match game.version() {
+								GameVersion::H1 => format!(
+									"{}\n---\n{:?}",
+									hash,
+									hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(
+										move || {
+											std::thread::Builder::new()
+												.stack_size(64 * 1024 * 1024)
+												.spawn(move || {
+													hitman_bin1::deserialize(&res_data)
+														.map_err(|e| format!("{e}"))
+														.unwrap()
+												})
+												.unwrap()
+												.join()
+												.unwrap()
+										}
+									))?
+									.root
+								),
+
+								GameVersion::H2 => format!(
+									"{}\n---\n{:?}",
+									hash,
+									hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(
+										move || {
+											std::thread::Builder::new()
+												.stack_size(64 * 1024 * 1024)
+												.spawn(move || {
+													hitman_bin1::deserialize(&res_data)
+														.map_err(|e| format!("{e}"))
+														.unwrap()
+												})
+												.unwrap()
+												.join()
+												.unwrap()
+										}
+									))?
+									.root
+								),
+
+								GameVersion::H3 => format!(
+									"{}\n---\n{:?}",
+									hash,
+									hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(
+										move || {
+											std::thread::Builder::new()
+												.stack_size(64 * 1024 * 1024)
+												.spawn(move || {
+													hitman_bin1::deserialize(&res_data)
+														.map_err(|e| format!("{e}"))
+														.unwrap()
+												})
+												.unwrap()
+												.join()
+												.unwrap()
+										}
+									))?
+									.root
+								)
+							}
 						}
 					},
 
@@ -1896,6 +1966,69 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 					}
 
 					fs::write(path.with_extension("json"), format_json(&to_string(&meta)?)?)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsPseudocode => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (_, res_data) = game.extract_latest_resource(hash)?;
+
+				let pseudocode = match game.version() {
+					GameVersion::H1 => format!(
+						"{}\n---\n{:?}",
+						hash,
+						hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
+							std::thread::Builder::new()
+								.stack_size(64 * 1024 * 1024)
+								.spawn(move || hitman_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.unwrap()
+								.join()
+								.unwrap()
+						}))?
+						.root
+					),
+
+					GameVersion::H2 => format!(
+						"{}\n---\n{:?}",
+						hash,
+						hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
+							std::thread::Builder::new()
+								.stack_size(64 * 1024 * 1024)
+								.spawn(move || hitman_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.unwrap()
+								.join()
+								.unwrap()
+						}))?
+						.root
+					),
+
+					GameVersion::H3 => format!(
+						"{}\n---\n{:?}",
+						hash,
+						hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
+							std::thread::Builder::new()
+								.stack_size(64 * 1024 * 1024)
+								.spawn(move || hitman_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.unwrap()
+								.join()
+								.unwrap()
+						}))?
+						.root
+					)
+				};
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog
+					.add_filter("Behavior tree", &["behavior.txt"])
+					.blocking_save_file()
+				{
+					fs::write(path.as_path().context("Invalid path")?, pseudocode)?;
 				}
 			}
 		}

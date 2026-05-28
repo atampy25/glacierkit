@@ -34,8 +34,8 @@
 	let searchEntities = $state(false)
 	let searchRL = $state(false)
 	let searchText = $state(false)
-	let searchQN = $state(false)
 	let searchLocalisation = $state(false)
+	let searchRest = $state(false)
 	let searchPartitions: Record<string, boolean> = $state({})
 </script>
 
@@ -49,14 +49,14 @@
 		</div>
 	{:else}
 		<div class="pt-2 pb-1 px-2 text-base">
-			<div class="mb-3">Search through the contents of files - not just their names.</div>
+			<div class="mb-3">Search through the contents of resources - not just their names.</div>
 			<div class="mb-3"><Search placeholder="Search query (supports regex)" size="lg" bind:value={searchQuery} /></div>
 			<div class="mb-4">
 				<Checkbox labelText="Search entities" bind:checked={searchEntities} />
-				<Checkbox labelText="Use QuickEntity format" bind:checked={searchQN} />
-				<Checkbox labelText="Search BIN1 files" bind:checked={searchRL} />
-				<Checkbox labelText="Search textual files (JSON, REPO, ORES)" bind:checked={searchText} />
+				<Checkbox labelText="Search BIN1 resources" bind:checked={searchRL} />
+				<Checkbox labelText="Search textual resources (JSON, REPO, ORES)" bind:checked={searchText} />
 				<Checkbox labelText="Search localisation" bind:checked={searchLocalisation} />
+				<Checkbox labelText="Search all other resources" bind:checked={searchRest} />
 			</div>
 			<div class="mb-4">
 				<div class="flex flex-wrap gap-2 items-center">
@@ -108,6 +108,8 @@
 
 					if (searchLocalisation) searchTypes.push("CLNG", "DITL", "DLGE", "LOCR", "RTLV", "LINE")
 
+					if (searchRest) searchTypes.push("REST")
+
 					await event({
 						type: "tool",
 						data: {
@@ -117,7 +119,6 @@
 								data: {
 									query: searchQuery,
 									resourceTypes: searchTypes,
-									useQnFormat: searchQN,
 									partitionsToSearch: Object.entries(searchPartitions)
 										.filter((a) => a[1])
 										.map((a) => a[0])

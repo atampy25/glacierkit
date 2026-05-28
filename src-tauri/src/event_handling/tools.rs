@@ -983,10 +983,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			ContentSearchEvent::Search {
 				query,
 				resource_types,
-				use_qn_format,
 				partitions_to_search
 			} => {
-				start_content_search(app, query, resource_types, use_qn_format, partitions_to_search).await?;
+				start_content_search(app, query, resource_types, partitions_to_search).await?;
 			}
 		}
 	}

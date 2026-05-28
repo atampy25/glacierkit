@@ -82,6 +82,8 @@ dashmap = { version = "6.2.1", features = ["rayon"] }
 strum = { version = "0.28.0", features = ["derive"] }
 regex = "1.12.3"
 lazy-regex = "3.6.0"
+rapidhash = { version = "4.4.1", features = ["rand", "unsafe"] }
+regex-automata = "0.4.14"
 
 [dependencies.tokio]
 version = "1.43.0"
@@ -98,6 +100,9 @@ features = ["debug"]
 [dependencies.hitman-bin1]
 git = "https://github.com/atampy25/hitman-bin1"
 features = ["all-games", "all-types"]
+
+[dependencies.hitman-behavior]
+git = "https://github.com/atampy25/hitman-behavior"
 
 [dependencies.hitman-commons]
 git = "https://github.com/atampy25/hitman-commons"

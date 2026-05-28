@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 use anyhow::{Context, Result, anyhow, bail};
 use ecow::EcoString;
 use fn_error_context::context;
@@ -21,7 +19,7 @@ use tonytools::hmlanguages;
 use tryvial::{try_block, try_fn};
 use velcro::vec;
 
-use crate::{game::Game, languages::get_language_map, model::EditorValidity};
+use crate::{HashMap, HashSet, game::Game, languages::get_language_map, model::EditorValidity};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -126,7 +124,7 @@ pub fn visit_variant_mut(variant: &mut Variant, handle: &mut impl FnMut(&mut Var
 #[try_fn]
 #[context("Couldn't calculate reverse references")]
 pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID, Vec<ReverseReference>>> {
-	let mut reverse_references: HashMap<EntityID, Vec<ReverseReference>> = HashMap::new();
+	let mut reverse_references: HashMap<EntityID, Vec<ReverseReference>> = HashMap::default();
 
 	reverse_references.reserve(entity.entities.len());
 
@@ -783,7 +781,7 @@ pub fn is_valid_entity_blueprint(resource_type: ResourceType) -> bool {
 
 /// Get the set of all entities which have reverse parent refs.
 pub fn reverse_parent_refs_set(entity: &Entity) -> HashSet<EntityID> {
-	let mut reverse_parent_refs = HashSet::new();
+	let mut reverse_parent_refs = HashSet::default();
 
 	for entity_data in entity.entities.values() {
 		if let Some(parent) = entity_data.parent.as_ref().and_then(Ref::as_local) {

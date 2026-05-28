@@ -1,7 +1,4 @@
-use std::{
-	collections::{HashMap, HashSet},
-	ops::Deref
-};
+use std::ops::Deref;
 
 use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
@@ -31,7 +28,7 @@ use uuid::Uuid;
 
 use super::monaco::SAFE_TO_SYNC;
 use crate::{
-	Notification, NotificationKind,
+	HashMap, HashSet, Notification, NotificationKind,
 	biome::to_string_clear,
 	entity::{
 		CopiedEntityData, ReverseReferenceData, alter_ref_according_to_changelist, calculate_reverse_references,
@@ -935,7 +932,7 @@ pub async fn paste(
 		}
 	};
 
-	let mut changed_entity_ids = HashMap::new();
+	let mut changed_entity_ids = HashMap::default();
 	let mut added_external_scenes = 0;
 
 	// Randomise new entity IDs for all subentities contained in the paste data

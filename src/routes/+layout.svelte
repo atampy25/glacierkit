@@ -62,7 +62,7 @@
 	})
 
 	function formatTime(ms: number) {
-		const seconds = Math.ceil(ms / 1000) % 60
+		const seconds = Math.round(ms / 1000) % 60
 		const minutes = Math.floor(ms / (1000 * 60)) % 60
 		const hours = Math.floor(ms / (1000 * 60 * 60))
 

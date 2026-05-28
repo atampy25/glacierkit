@@ -4,13 +4,12 @@ use hitman_commons::metadata::RuntimeID;
 use log::debug;
 use quickentity_rs::entity::{EntityID, SubEntity};
 use serde_json::from_str;
-use std::collections::HashMap;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
-	Notification, NotificationKind,
+	HashMap, Notification, NotificationKind,
 	entity::{
 		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
 		is_valid_entity_factory, reverse_parent_refs_set

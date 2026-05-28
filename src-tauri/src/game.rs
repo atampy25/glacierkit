@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path, sync::Arc};
+use std::{fs, path::Path, sync::Arc};
 
 use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
@@ -11,7 +11,6 @@ use hitman_commons::{
 };
 use identity_hash::BuildIdentityHasher;
 use itertools::Itertools;
-use papaya::HashMap as PapayaMap;
 use quickentity_rs::entity::Entity;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::{
@@ -22,6 +21,7 @@ use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 
 use crate::{
+	HashMap, PapayaMap,
 	bin1::{deserialize_modern_blueprint, deserialize_modern_factory},
 	finish_task,
 	general::REPO_ID,
@@ -268,10 +268,11 @@ impl Game {
 
 		let resource_id = RuntimeResourceID::from(runtime_id);
 		for partition in &self.game_files.partitions {
-			if let Some((info, _)) = partition
-				.latest_resources()
-				.into_iter()
-				.find(|(x, _)| *x.rrid() == resource_id)
+			if partition.contains(&resource_id)
+				&& let Some((info, _)) = partition
+					.latest_resources()
+					.into_iter()
+					.find(|(x, _)| *x.rrid() == resource_id)
 			{
 				return Ok((
 					info.try_into()
@@ -291,10 +292,11 @@ impl Game {
 		let resource_id = RuntimeResourceID::from(resource.into());
 
 		for partition in &self.game_files.partitions {
-			if let Some((info, _)) = partition
-				.latest_resources()
-				.into_iter()
-				.find(|(x, _)| *x.rrid() == resource_id)
+			if partition.contains(&resource_id)
+				&& let Some((info, _)) = partition
+					.latest_resources()
+					.into_iter()
+					.find(|(x, _)| *x.rrid() == resource_id)
 			{
 				return info
 					.try_into()
@@ -313,10 +315,11 @@ impl Game {
 		let resource_id = RuntimeResourceID::from(resource.into());
 
 		for partition in &self.game_files.partitions {
-			if let Some((info, patchlevel)) = partition
-				.latest_resources()
-				.into_iter()
-				.find(|(x, _)| *x.rrid() == resource_id)
+			if partition.contains(&resource_id)
+				&& let Some((info, patchlevel)) = partition
+					.latest_resources()
+					.into_iter()
+					.find(|(x, _)| *x.rrid() == resource_id)
 			{
 				let package_name = match patchlevel {
 					PatchId::Base => partition.partition_info().id.to_string(),

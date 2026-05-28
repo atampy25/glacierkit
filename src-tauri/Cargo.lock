@@ -123,6 +123,7 @@ dependencies = [
 	"futures-util",
 	"glacier-ini",
 	"glacier-texture",
+	"hitman-behavior",
 	"hitman-bin1",
 	"hitman-commons",
 	"hitman-formats",
@@ -146,8 +147,10 @@ dependencies = [
 	"prim-rs",
 	"quickentity-rs",
 	"rand 0.10.1",
+	"rapidhash",
 	"rayon",
 	"regex",
+	"regex-automata",
 	"reqwest 0.13.4",
 	"rpkg-rs",
 	"schemars 1.2.1",
@@ -289,7 +292,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#3717476deda37f34855665e52cc7de0ac704f262"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#674735a55adbdf0406c16a04fed00b8e54e91aea"
 
 [[package]]
 name = "autocfg"
@@ -683,16 +686,16 @@ dependencies = ["proc-macro2", "quote", "syn 2.0.117"]
 
 [[package]]
 name = "brotli"
-version = "8.0.2"
+version = "8.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bd8b9603c7aa97359dbd97ecf258968c95f3adddd6db2f7e7a5bef101c84560"
+checksum = "8119e4516436f5708bbc474a9d395bf12f1b5395e93a92a56e647ac3388c8610"
 dependencies = ["alloc-no-stdlib", "alloc-stdlib", "brotli-decompressor"]
 
 [[package]]
 name = "brotli-decompressor"
-version = "5.0.0"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "874bb8112abecc98cbd6d81ea4fa7e94fb9449648c93cc89aa40c81c24d7de03"
+checksum = "5962523e1b92ce1b5e793d9169b9943eece10d39f62550bc04bb605d75b94924"
 dependencies = ["alloc-no-stdlib", "alloc-stdlib"]
 
 [[package]]
@@ -889,6 +892,13 @@ version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
 dependencies = ["cc"]
+
+[[package]]
+name = "codegen"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff61280aed771c3070e7dcc9e050c66f1eb1e3b96431ba66f9f74641d02fc41d"
+dependencies = ["indexmap 1.9.3"]
 
 [[package]]
 name = "codegen"
@@ -2009,15 +2019,21 @@ checksum = "e690f8474c6c5d8ff99656fcbc195a215acc3949481a8b0b3351c838972dc776"
 dependencies = ["macro_rules_attribute", "never-say-never", "paste"]
 
 [[package]]
+name = "hitman-behavior"
+version = "0.1.0"
+source = "git+https://github.com/atampy25/hitman-behavior#9e717ef4b3318c7c4399a1d50faed366c6d52ab2"
+dependencies = ["Inflector", "anyhow", "codegen 0.2.0", "ecow", "hitman-bin1", "lazy-regex", "serde", "serde_json", "thiserror 2.0.18", "tryvial"]
+
+[[package]]
 name = "hitman-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#6f8768aafe465d638dd74bcb55e808247e173725"
+source = "git+https://github.com/atampy25/hitman-bin1#bb15e57c57fc477e4853d6077c397c1514ea9460"
 dependencies = [
 	"Inflector",
 	"anyhow",
 	"bimap",
 	"byteorder",
-	"codegen",
+	"codegen 0.3.0",
 	"const_format",
 	"crc32fast",
 	"dynex",
@@ -2047,7 +2063,7 @@ dependencies = [
 [[package]]
 name = "hitman-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#6f8768aafe465d638dd74bcb55e808247e173725"
+source = "git+https://github.com/atampy25/hitman-bin1#bb15e57c57fc477e4853d6077c397c1514ea9460"
 dependencies = ["darling 0.21.3", "quote", "syn 2.0.117"]
 
 [[package]]
@@ -3656,7 +3672,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#3717476deda37f34855665e52cc7de0ac704f262"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#674735a55adbdf0406c16a04fed00b8e54e91aea"
 dependencies = [
 	"anyhow",
 	"auto_context",
@@ -3671,6 +3687,7 @@ dependencies = [
 	"identity-hash",
 	"itertools 0.14.0",
 	"ordermap",
+	"rapidhash",
 	"rayon",
 	"schemars 1.2.1",
 	"serde",

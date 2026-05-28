@@ -16,9 +16,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
 use uuid::Uuid;
-use whirlwind::ShardMap;
 
 use crate::{
+	HashMap, ShardMap,
 	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
 	game::Game,
@@ -78,7 +78,7 @@ impl Default for EditorState {
 		Self {
 			file: None,
 			data: EditorData::Nil,
-			assets: ShardMap::new()
+			assets: ShardMap::with_hasher(Default::default())
 		}
 	}
 }
@@ -113,6 +113,7 @@ pub enum EditorData {
 		patch_type: JsonPatchType
 	},
 	ContentSearchResults {
+		query: String,
 		results: Vec<(String, String, Option<String>)>
 	}
 }
@@ -277,9 +278,11 @@ pub enum ResourceOverviewData {
 		blueprint_path_or_hint: Option<EcoString>
 	},
 	GenericRL {
+		#[debug(skip)]
 		json: String
 	},
 	Json {
+		#[debug(skip)]
 		json: String
 	},
 	Image {
@@ -295,24 +298,35 @@ pub enum ResourceOverviewData {
 	},
 	MultiAudio {
 		name: String,
+
+		#[debug(skip)]
 		audios: Vec<(String, Option<Uuid>)>
 	},
 	Repository,
 	Unlockables,
 	HMLanguages {
+		#[debug(skip)]
 		json: String
 	},
 	LocalisedLine {
+		key: String,
 		languages: Vec<(String, String)>
 	},
 	MaterialInstance {
+		#[debug(skip)]
 		json: String
 	},
 	MaterialEntity {
+		#[debug(skip)]
 		json: String
 	},
 	SoundDefinitions {
+		#[debug(skip)]
 		json: String
+	},
+	BehaviorTree {
+		#[debug(skip)]
+		pseudocode: String
 	}
 }
 
@@ -457,8 +471,7 @@ nesting::nest! {
 			pub enum ContentSearchEvent {
 				Search {
 					query: String,
-					resource_types: Vec<String>,
-					use_qn_format: bool,
+					resource_types: Vec<ResourceType>,
 					partitions_to_search: Vec<String>
 				}
 			}
@@ -712,7 +725,9 @@ nesting::nest! {
 
 					ExtractAsObj,
 
-					ExtractAsTexture
+					ExtractAsTexture,
+
+					ExtractAsPseudocode
 				}
 
 				RepositoryPatch(RepositoryPatchEditorEvent)
@@ -1039,7 +1054,7 @@ nesting::nest! {
 						SetReverseRefs {
 							#[debug(skip)]
 							#[specta(type = std::collections::HashMap<EntityID, String>)]
-							entity_names: std::collections::HashMap<EntityID, EcoString>,
+							entity_names: HashMap<EntityID, EcoString>,
 
 							reverse_refs: Vec<ReverseReference>
 						},
@@ -1205,6 +1220,8 @@ nesting::nest! {
 				ContentSearchResults(ContentSearchResultsRequest)
 				pub enum ContentSearchResultsRequest {
 					Initialise {
+						query: String,
+
 						/// Hash, type, path/hint
 						#[debug(skip)]
 						results: Vec<(String, String, Option<String>)>
@@ -1256,7 +1273,8 @@ nesting::nest! {
 			LogUploadRejected,
 			SetEnums {
 				#[debug(skip)]
-				enums: std::collections::HashMap<String, Vec<String>>
+				#[specta(type = std::collections::HashMap<String, Vec<String>>)]
+				enums: HashMap<String, Vec<String>>
 			}
 		}
 	}

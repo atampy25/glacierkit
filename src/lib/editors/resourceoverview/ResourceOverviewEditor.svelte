@@ -32,7 +32,21 @@
 	let previewImage: HTMLImageElement | null = $state(null)
 	let referenceTab = $state(0)
 
-	const typesWithPreview = ["entity", "image", "mesh", "audio", "multiAudio", "genericRL", "json", "HMLanguages", "localisedLine", "materialInstance", "materialEntity", "soundDefinitions"]
+	const typesWithPreview = [
+		"entity",
+		"image",
+		"mesh",
+		"audio",
+		"multiAudio",
+		"genericRL",
+		"json",
+		"hMLanguages",
+		"localisedLine",
+		"materialInstance",
+		"materialEntity",
+		"soundDefinitions",
+		"behaviorTree"
+	]
 
 	onMount(async () => {
 		await event({
@@ -219,12 +233,16 @@
 										<div class="h-[30vh]">
 											<Monaco id={v4()} content={data.data.json} />
 										</div>
+									{:else if data.type === "behaviorTree"}
+										<div class="h-[30vh]">
+											<Monaco id={v4()} content={data.data.pseudocode} />
+										</div>
 									{:else if data.type === "localisedLine"}
 										<div class="max-h-[30vh] overflow-y-auto">
 											<DataTable
 												headers={[
 													{ key: "lang", value: "Language", width: "8rem" },
-													{ key: "val", value: "String" }
+													{ key: "val", value: `String (${data.data.key})` }
 												]}
 												rows={data.data.languages.map(([lang, val], ind) => ({ id: ind, lang, val }))}
 											/>
@@ -814,6 +832,45 @@
 											icon={DocumentExport}
 											on:click={async () => {
 												trackEvent("Extract sound definitions file as original")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsFile"
+															}
+														}
+													}
+												})
+											}}>Extract file</Button
+										>
+									{:else if data.type === "behaviorTree"}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract behavior tree as pseudocode")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsPseudocode"
+															}
+														}
+													}
+												})
+											}}>Extract as TXT</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent("Extract behavior tree as binary")
 
 												await event({
 													type: "editor",

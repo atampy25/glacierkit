@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Error, Result, bail};
 use ecow::{EcoString, eco_format};
@@ -13,7 +13,6 @@ use hitman_formats::material::{MaterialEntity, MaterialOverride};
 use identity_hash::BuildIdentityHasher;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use papaya::HashMap as PapayaMap;
 use quickentity_rs::{
 	entity::{Entity, EntityID},
 	variant::Variant
@@ -22,7 +21,7 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
 
-use crate::game::Game;
+use crate::{HashMap, PapayaMap, game::Game};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CPPTPinsInfo {

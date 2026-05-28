@@ -34,7 +34,6 @@ export type ContentSearchEvent = {
 	data: {
 		query: string
 		resourceTypes: string[]
-		useQnFormat: boolean
 		partitionsToSearch: string[]
 	}
 }
@@ -66,6 +65,7 @@ export type ContentSearchResultsEvent =
 export type ContentSearchResultsRequest = {
 	type: "initialise"
 	data: {
+		query: string
 		// Hash, type, path/hint
 		results: [string, string, string | null][]
 	}
@@ -1521,6 +1521,7 @@ export type ResourceOverviewData =
 	| {
 			type: "localisedLine"
 			data: {
+				key: string
 				languages: [string, string][]
 			}
 	  }
@@ -1540,6 +1541,12 @@ export type ResourceOverviewData =
 			type: "soundDefinitions"
 			data: {
 				json: string
+			}
+	  }
+	| {
+			type: "behaviorTree"
+			data: {
+				pseudocode: string
 			}
 	  }
 
@@ -1579,6 +1586,7 @@ export type ResourceOverviewEvent =
 	| { type: "extractAsSoundDefs" }
 	| { type: "extractAsObj" }
 	| { type: "extractAsTexture" }
+	| { type: "extractAsPseudocode" }
 
 export type ResourceOverviewRequest = ResourceOverviewRequest_Serialize | ResourceOverviewRequest_Deserialize
 
