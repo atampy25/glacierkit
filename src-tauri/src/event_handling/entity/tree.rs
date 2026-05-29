@@ -2121,7 +2121,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2132,7 +2132,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}
@@ -2270,7 +2270,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2281,7 +2281,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}
@@ -2419,7 +2419,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2430,7 +2430,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}
@@ -2549,7 +2549,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC)),
+					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2560,7 +2560,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::ROOM_DYNAMIC))
+				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}

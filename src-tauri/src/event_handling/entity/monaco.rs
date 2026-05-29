@@ -78,9 +78,14 @@ pub static ENUMS: HashMap<&'static str, Vec<&'static str>> = hitman_bin1::game::
 	.chain(hitman_bin1::game::h3::VARIANT_TYPES.values())
 	.filter_map(|(ty, shape)| {
 		shape.and_then(|shape| match shape.ty {
-			facet::Type::User(facet::UserType::Enum(enum_ty)) => {
-				Some((*ty, enum_ty.variants.iter().map(|variant| variant.name).collect()))
-			}
+			facet::Type::User(facet::UserType::Enum(enum_ty)) => Some((
+				*ty,
+				enum_ty
+					.variants
+					.iter()
+					.map(|variant| variant.effective_name())
+					.collect()
+			)),
 
 			_ => None
 		})

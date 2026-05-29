@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use ecow::EcoString;
 use fn_error_context::context;
-use hitman_bin1::game::{h1, h2, h3};
+use hitman_bin1::game::{conversion::ConvertInto, h1, h2, h3};
 use hitman_commons::{game::GameVersion, metadata::ResourceType};
 use serde_json::{Value, to_value, to_writer};
 use tryvial::try_fn;
@@ -13,12 +13,12 @@ pub fn deserialize_modern_factory(game_version: GameVersion, data: &[u8]) -> Res
 	match game_version {
 		GameVersion::H1 => hitman_bin1::deserialize::<h1::STemplateEntity>(data)
 			.context("Couldn't deserialise factory")?
-			.try_into()
+			.convert_into()
 			.context("Couldn't convert factory to modern")?,
 
 		GameVersion::H2 => hitman_bin1::deserialize::<h2::STemplateEntityFactory>(data)
 			.context("Couldn't deserialise factory")?
-			.try_into()
+			.convert_into()
 			.context("Couldn't convert factory to modern")?,
 
 		GameVersion::H3 => {
@@ -34,12 +34,12 @@ pub fn deserialize_modern_blueprint(game_version: GameVersion, data: &[u8]) -> R
 	match game_version {
 		GameVersion::H1 => hitman_bin1::deserialize::<h1::STemplateEntityBlueprint>(data)
 			.context("Couldn't deserialise blueprint")?
-			.try_into()
+			.convert_into()
 			.context("Couldn't convert blueprint to modern")?,
 
 		GameVersion::H2 => hitman_bin1::deserialize::<h2::STemplateEntityBlueprint>(data)
 			.context("Couldn't deserialise blueprint")?
-			.try_into()
+			.convert_into()
 			.context("Couldn't convert blueprint to modern")?,
 
 		GameVersion::H3 => {

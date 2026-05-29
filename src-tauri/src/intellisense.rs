@@ -490,26 +490,26 @@ impl Intellisense {
 													found.push((
 														entry.property_name.into(),
 														match entry.property_type {
-															EExtendedPropertyType::TYPE_RESOURCEPTR => {
+															EExtendedPropertyType::Resourceptr => {
 																Variant::Resource(None)
 															}
-															EExtendedPropertyType::TYPE_INT32 => {
+															EExtendedPropertyType::Int32 => {
 																Variant::from_raw(&ZVariant::new(0i32))
 															}
-															EExtendedPropertyType::TYPE_UINT32 => {
+															EExtendedPropertyType::Uint32 => {
 																Variant::from_raw(&ZVariant::new(0u32))
 															}
-															EExtendedPropertyType::TYPE_FLOAT => {
+															EExtendedPropertyType::Float => {
 																Variant::from_raw(&ZVariant::new(0.0f32))
 															}
-															EExtendedPropertyType::TYPE_STRING => {
+															EExtendedPropertyType::String => {
 																Variant::from_raw(&ZVariant::new(EcoString::from("")))
 															}
-															EExtendedPropertyType::TYPE_BOOL => {
+															EExtendedPropertyType::Bool => {
 																Variant::from_raw(&ZVariant::new(false))
 															}
-															EExtendedPropertyType::TYPE_ENTITYREF => Variant::Ref(None),
-															EExtendedPropertyType::TYPE_VARIANT => {
+															EExtendedPropertyType::Entityref => Variant::Ref(None),
+															EExtendedPropertyType::Variant => {
 																Variant::Variant(Variant::Ref(None).into())
 															}
 														},
@@ -845,24 +845,20 @@ impl Intellisense {
 									if entry.property_name == property_to_find {
 										return Ok(Some((
 											match entry.property_type {
-												EExtendedPropertyType::TYPE_RESOURCEPTR => Variant::Resource(None),
-												EExtendedPropertyType::TYPE_INT32 => {
-													Variant::from_raw(&ZVariant::new(0i32))
-												}
-												EExtendedPropertyType::TYPE_UINT32 => {
+												EExtendedPropertyType::Resourceptr => Variant::Resource(None),
+												EExtendedPropertyType::Int32 => Variant::from_raw(&ZVariant::new(0i32)),
+												EExtendedPropertyType::Uint32 => {
 													Variant::from_raw(&ZVariant::new(0u32))
 												}
-												EExtendedPropertyType::TYPE_FLOAT => {
+												EExtendedPropertyType::Float => {
 													Variant::from_raw(&ZVariant::new(0.0f32))
 												}
-												EExtendedPropertyType::TYPE_STRING => {
+												EExtendedPropertyType::String => {
 													Variant::from_raw(&ZVariant::new(EcoString::from("")))
 												}
-												EExtendedPropertyType::TYPE_BOOL => {
-													Variant::from_raw(&ZVariant::new(false))
-												}
-												EExtendedPropertyType::TYPE_ENTITYREF => Variant::Ref(None),
-												EExtendedPropertyType::TYPE_VARIANT => {
+												EExtendedPropertyType::Bool => Variant::from_raw(&ZVariant::new(false)),
+												EExtendedPropertyType::Entityref => Variant::Ref(None),
+												EExtendedPropertyType::Variant => {
 													Variant::Variant(Variant::Ref(None).into())
 												}
 											},

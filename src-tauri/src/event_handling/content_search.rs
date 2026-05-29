@@ -96,331 +96,355 @@ pub async fn start_content_search(
 
 	let filetypes = filetypes.into_iter().collect::<HashSet<ResourceType>>();
 
-	if let Some(game) = app_state.game.load().as_ref() {
-		let mut task = start_progress(app, format!("Searching game files for \"{query}\""))?;
+	let matching_ids = tokio::task::spawn_blocking({
+		let app = app.clone();
+		let query = query.to_owned();
+		move || {
+			let app_state = app.state::<AppState>();
 
-		let resources = game
-			.partition_manager()
-			.partitions
-			.iter()
-			.filter(|x| partitions_to_search.contains(&x.partition_info().id.to_string()))
-			.collect_vec()
-			.into_par_iter()
-			.rev()
-			.flat_map(|partition| {
-				partition
-					.latest_resources()
+			if let Some(game) = app_state.game.load().as_ref() {
+				let task = start_progress(&app, format!("Searching game files for \"{query}\""))?;
+
+				let resources = game
+					.partition_manager()
+					.partitions
+					.iter()
+					.filter(|x| partitions_to_search.contains(&x.partition_info().id.to_string()))
+					.collect_vec()
 					.into_par_iter()
-					.map(move |(resource, _)| (resource.rrid(), (partition, resource)))
-			})
-			.collect::<HashMap<_, _>>();
+					.rev()
+					.flat_map(|partition| {
+						partition
+							.latest_resources()
+							.into_par_iter()
+							.map(move |(resource, _)| (resource.rrid(), (partition, resource)))
+					})
+					.collect::<HashMap<_, _>>();
 
-		let total_resources = resources.len();
+				let total_resources = resources.len();
 
-		let mut locr = vec![];
-		{
-			let mut iteration = 0;
-			while let Some((symmetric, lang_map)) = get_language_map(game.version(), iteration) {
-				locr.push(
-					hmlanguages::locr::LOCR::new(
-						app_state
-							.tonytools_hash_list
-							.load()
-							.as_ref()
-							.context("No hash list available")?
-							.deref()
-							.to_owned(),
-						game.version().into(),
-						lang_map,
-						symmetric
-					)
-					.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-				);
+				let mut locr = vec![];
+				{
+					let mut iteration = 0;
+					while let Some((symmetric, lang_map)) = get_language_map(game.version(), iteration) {
+						locr.push(
+							hmlanguages::locr::LOCR::new(
+								app_state
+									.tonytools_hash_list
+									.load()
+									.as_ref()
+									.context("No hash list available")?
+									.deref()
+									.to_owned(),
+								game.version().into(),
+								lang_map,
+								symmetric
+							)
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						);
 
-				iteration += 1;
-			}
-		}
-
-		let mut dlge = vec![];
-		{
-			let mut iteration = 0;
-			while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
-				dlge.push(
-					hmlanguages::dlge::DLGE::new(
-						app_state
-							.tonytools_hash_list
-							.load()
-							.as_ref()
-							.context("No hash list available")?
-							.deref()
-							.to_owned(),
-						game.version().into(),
-						lang_map,
-						None,
-						false
-					)
-					.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-				);
-
-				iteration += 1;
-			}
-		}
-
-		let ditl = hmlanguages::ditl::DITL::new(
-			app_state
-				.tonytools_hash_list
-				.load()
-				.as_ref()
-				.context("No hash list available")?
-				.deref()
-				.to_owned()
-		)
-		.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-		let mut clng = vec![];
-		{
-			let mut iteration = 0;
-			while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
-				clng.push(
-					hmlanguages::clng::CLNG::new(game.version().into(), lang_map)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-				);
-
-				iteration += 1;
-			}
-		}
-
-		let mut rtlv = vec![];
-		{
-			let mut iteration = 0;
-			while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
-				rtlv.push(
-					hmlanguages::rtlv::RTLV::new(game.version().into(), lang_map)
-						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-				);
-
-				iteration += 1;
-			}
-		}
-
-		let cached_locrs: DashMap<RuntimeID, LocrJson> = DashMap::default();
-
-		let search_rest = filetypes.contains(&resource_type!("REST"));
-
-		let matching_ids = resources
-			.into_iter()
-			.enumerate()
-			.par_bridge()
-			.filter_map(|(progress, (resource_id, (partition, resource_info)))| {
-				if progress.is_multiple_of(1000) {
-					let _ = task_progress(app, task, (progress as f32) / (total_resources as f32));
+						iteration += 1;
+					}
 				}
 
-				let filetype = resource_info.data_type().try_into().ok()?;
-
-				if filetypes.contains(&filetype) || search_rest {
-					let mut matcher = pattern.matcher().ok()?;
-
-					match filetype.as_ref() {
-						"TEMP" => {
-							let (temp_data, temp_meta) = (
-								partition.read_resource(resource_id).ok()?,
-								ResourceMetadata::try_from(resource_info).ok()?
-							);
-
-							let factory = deserialize_modern_factory(game.version(), &temp_data).ok()?;
-
-							let blueprint_hash = &temp_meta
-								.references
-								.get(factory.blueprint_index_in_resource_header as usize)?
-								.resource;
-
-							let tblu_rrid = RuntimeResourceID::from(blueprint_hash);
-
-							let (tblu_data, tblu_meta) = (
-								partition.read_resource(&tblu_rrid).ok()?,
-								ResourceMetadata::try_from(partition.get_resource_info(&tblu_rrid).ok()?).ok()?
-							);
-
-							let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data).ok()?;
-
-							let mut entity =
-								Entity::from_game(&factory, &temp_meta, &blueprint, &tblu_meta, false).ok()?;
-
-							entity.extra_factory_references.clear();
-							entity.extra_blueprint_references.clear();
-
-							let _ = to_writer(&mut matcher, &entity);
-						}
-
-						"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF"
-						| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "ORES" | "DSWB" => {
-							deserialize_generic_writer(
-								game.version(),
-								if filetype == "DSWB" {
-									"WSWB".try_into().ok()?
-								} else {
-									filetype
-								},
-								&mut matcher,
-								&partition.read_resource(resource_id).ok()?
+				let mut dlge = vec![];
+				{
+					let mut iteration = 0;
+					while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
+						dlge.push(
+							hmlanguages::dlge::DLGE::new(
+								app_state
+									.tonytools_hash_list
+									.load()
+									.as_ref()
+									.context("No hash list available")?
+									.deref()
+									.to_owned(),
+								game.version().into(),
+								lang_map,
+								None,
+								false
 							)
-							.ok()?;
+							.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						);
+
+						iteration += 1;
+					}
+				}
+
+				let ditl = hmlanguages::ditl::DITL::new(
+					app_state
+						.tonytools_hash_list
+						.load()
+						.as_ref()
+						.context("No hash list available")?
+						.deref()
+						.to_owned()
+				)
+				.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+				let mut clng = vec![];
+				{
+					let mut iteration = 0;
+					while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
+						clng.push(
+							hmlanguages::clng::CLNG::new(game.version().into(), lang_map)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						);
+
+						iteration += 1;
+					}
+				}
+
+				let mut rtlv = vec![];
+				{
+					let mut iteration = 0;
+					while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
+						rtlv.push(
+							hmlanguages::rtlv::RTLV::new(game.version().into(), lang_map)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						);
+
+						iteration += 1;
+					}
+				}
+
+				let cached_locrs: DashMap<RuntimeID, LocrJson> = DashMap::default();
+
+				let search_rest = filetypes.contains(&resource_type!("REST"));
+
+				let matching_ids = resources
+					.into_iter()
+					.enumerate()
+					.par_bridge()
+					.filter_map(|(progress, (resource_id, (partition, resource_info)))| {
+						if progress.is_multiple_of(1000) {
+							let _ = task_progress(&app, task, (progress as f32) / (total_resources as f32));
 						}
 
-						"JSON" | "REPO" => {
-							let _ = matcher.write_all(&partition.read_resource(resource_id).ok()?);
-						}
+						let filetype = resource_info.data_type().try_into().ok()?;
 
-						"CLNG" => {
-							let (res_meta, res_data) = (
-								RpkgResourceMeta::try_from(resource_info).ok()?,
-								partition.read_resource(resource_id).ok()?
-							);
+						if filetypes.contains(&filetype) || search_rest {
+							let mut matcher = pattern.matcher().ok()?;
 
-							let clng = clng
-								.iter()
-								.find_map(|clng| clng.convert(&res_data, to_string(&res_meta).ok()?).ok())?;
-
-							let _ = to_writer(&mut matcher, &clng);
-						}
-
-						"DITL" => {
-							let (res_meta, res_data) = (
-								RpkgResourceMeta::try_from(resource_info).ok()?,
-								partition.read_resource(resource_id).ok()?
-							);
-
-							let _ = to_writer(&mut matcher, &ditl.convert(&res_data, to_string(&res_meta).ok()?).ok()?);
-						}
-
-						"DLGE" => {
-							let (res_meta, res_data) = (
-								RpkgResourceMeta::try_from(resource_info).ok()?,
-								partition.read_resource(resource_id).ok()?
-							);
-
-							let dlge = dlge
-								.iter()
-								.find_map(|dlge| dlge.convert(&res_data, to_string(&res_meta).ok()?).ok())?;
-
-							let _ = to_writer(&mut matcher, &dlge);
-						}
-
-						"LOCR" => {
-							let locr = cached_locrs
-								.entry(resource_id.try_into().ok()?)
-								.or_try_insert_with(|| {
-									let (res_meta, res_data) = (
-										RpkgResourceMeta::try_from(resource_info)?,
-										partition.read_resource(resource_id)?
+							match filetype.as_ref() {
+								"TEMP" => {
+									let (temp_data, temp_meta) = (
+										partition.read_resource(resource_id).ok()?,
+										ResourceMetadata::try_from(resource_info).ok()?
 									);
 
-									let locr = locr
-										.iter()
-										.find_map(|locr| locr.convert(&res_data, to_string(&res_meta).ok()?).ok())
-										.context("Failed to convert LOCR resource")?;
+									let factory = deserialize_modern_factory(game.version(), &temp_data).ok()?;
 
-									anyhow::Ok(locr)
-								})
-								.ok()?
-								.downgrade();
+									let blueprint_hash = &temp_meta
+										.references
+										.get(factory.blueprint_index_in_resource_header as usize)?
+										.resource;
 
-							let _ = to_writer(&mut matcher, &*locr);
-						}
+									let tblu_rrid = RuntimeResourceID::from(blueprint_hash);
 
-						"RTLV" => {
-							let (res_meta, res_data) = (
-								RpkgResourceMeta::try_from(resource_info).ok()?,
-								partition.read_resource(resource_id).ok()?
-							);
+									let (tblu_data, tblu_meta) = (
+										partition.read_resource(&tblu_rrid).ok()?,
+										ResourceMetadata::try_from(partition.get_resource_info(&tblu_rrid).ok()?)
+											.ok()?
+									);
 
-							let rtlv = rtlv
-								.iter()
-								.find_map(|rtlv| rtlv.convert(&res_data, to_string(&res_meta).ok()?).ok())?;
+									let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data).ok()?;
 
-							let _ = to_writer(&mut matcher, &rtlv);
-						}
+									let mut entity =
+										Entity::from_game(&factory, &temp_meta, &blueprint, &tblu_meta, false).ok()?;
 
-						"LINE" => {
-							let (res_meta, res_data) = (
-								ResourceMetadata::try_from(resource_info).ok()?,
-								partition.read_resource(resource_id).ok()?
-							);
+									entity.extra_factory_references.clear();
+									entity.extra_blueprint_references.clear();
 
-							let locr_id = res_meta.references.first()?.resource;
-
-							let locr = cached_locrs
-								.entry(locr_id)
-								.or_try_insert_with(|| {
-									let (locr_meta, locr_data) = game.extract_latest_resource(locr_id)?;
-
-									let locr_meta = RpkgResourceMeta::from_resource_metadata(locr_meta, false);
-
-									let locr = locr
-										.iter()
-										.find_map(|locr| locr.convert(&locr_data, to_string(&locr_meta).ok()?).ok())
-										.context("Failed to convert LOCR resource")?;
-
-									anyhow::Ok(locr)
-								})
-								.ok()?
-								.downgrade();
-
-							let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
-
-							if let Some(line_str) = app_state
-								.tonytools_hash_list
-								.load()
-								.as_ref()?
-								.lines
-								.get_by_left(&line_id)
-							{
-								let _ = matcher.write_all(line_str.as_bytes());
-								let _ = matcher.write_all(b"\n");
-								for line in locr.languages.iter().filter_map(|(_, keys)| {
-									if let serde_json::Value::String(val) = keys.get(line_str)? {
-										Some(val)
-									} else {
-										None
-									}
-								}) {
-									let _ = matcher.write_all(line.as_bytes());
-									let _ = matcher.write_all(b"\n");
+									let _ = to_writer(&mut matcher, &entity);
 								}
-							} else {
-								let line_hash = format!("{:0>8X}", line_id);
-								let _ = matcher.write_all(line_hash.as_bytes());
-								let _ = matcher.write_all(b"\n");
-								for line in locr.languages.iter().filter_map(|(_, keys)| {
-									if let serde_json::Value::String(val) = keys.get(&line_hash)? {
-										Some(val)
-									} else {
-										None
-									}
-								}) {
-									let _ = matcher.write_all(line.as_bytes());
-									let _ = matcher.write_all(b"\n");
+
+								"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM"
+								| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "ORES" | "DSWB" => {
+									deserialize_generic_writer(
+										game.version(),
+										if filetype == "DSWB" {
+											"WSWB".try_into().ok()?
+										} else {
+											filetype
+										},
+										&mut matcher,
+										&partition.read_resource(resource_id).ok()?
+									)
+									.ok()?;
 								}
+
+								"JSON" | "REPO" => {
+									let _ = matcher.write_all(&partition.read_resource(resource_id).ok()?);
+								}
+
+								"CLNG" => {
+									let (res_meta, res_data) = (
+										RpkgResourceMeta::try_from(resource_info).ok()?,
+										partition.read_resource(resource_id).ok()?
+									);
+
+									let clng = clng
+										.iter()
+										.find_map(|clng| clng.convert(&res_data, to_string(&res_meta).ok()?).ok())?;
+
+									let _ = to_writer(&mut matcher, &clng);
+								}
+
+								"DITL" => {
+									let (res_meta, res_data) = (
+										RpkgResourceMeta::try_from(resource_info).ok()?,
+										partition.read_resource(resource_id).ok()?
+									);
+
+									let _ = to_writer(
+										&mut matcher,
+										&ditl.convert(&res_data, to_string(&res_meta).ok()?).ok()?
+									);
+								}
+
+								"DLGE" => {
+									let (res_meta, res_data) = (
+										RpkgResourceMeta::try_from(resource_info).ok()?,
+										partition.read_resource(resource_id).ok()?
+									);
+
+									let dlge = dlge
+										.iter()
+										.find_map(|dlge| dlge.convert(&res_data, to_string(&res_meta).ok()?).ok())?;
+
+									let _ = to_writer(&mut matcher, &dlge);
+								}
+
+								"LOCR" => {
+									let locr = cached_locrs
+										.entry(resource_id.try_into().ok()?)
+										.or_try_insert_with(|| {
+											let (res_meta, res_data) = (
+												RpkgResourceMeta::try_from(resource_info)?,
+												partition.read_resource(resource_id)?
+											);
+
+											let locr = locr
+												.iter()
+												.find_map(|locr| {
+													locr.convert(&res_data, to_string(&res_meta).ok()?).ok()
+												})
+												.context("Failed to convert LOCR resource")?;
+
+											anyhow::Ok(locr)
+										})
+										.ok()?
+										.downgrade();
+
+									let _ = to_writer(&mut matcher, &*locr);
+								}
+
+								"RTLV" => {
+									let (res_meta, res_data) = (
+										RpkgResourceMeta::try_from(resource_info).ok()?,
+										partition.read_resource(resource_id).ok()?
+									);
+
+									let rtlv = rtlv
+										.iter()
+										.find_map(|rtlv| rtlv.convert(&res_data, to_string(&res_meta).ok()?).ok())?;
+
+									let _ = to_writer(&mut matcher, &rtlv);
+								}
+
+								"LINE" => {
+									let (res_meta, res_data) = (
+										ResourceMetadata::try_from(resource_info).ok()?,
+										partition.read_resource(resource_id).ok()?
+									);
+
+									let locr_id = res_meta.references.first()?.resource;
+
+									let locr = cached_locrs
+										.entry(locr_id)
+										.or_try_insert_with(|| {
+											let (locr_meta, locr_data) = game.extract_latest_resource(locr_id)?;
+
+											let locr_meta = RpkgResourceMeta::from_resource_metadata(locr_meta, false);
+
+											let locr = locr
+												.iter()
+												.find_map(|locr| {
+													locr.convert(&locr_data, to_string(&locr_meta).ok()?).ok()
+												})
+												.context("Failed to convert LOCR resource")?;
+
+											anyhow::Ok(locr)
+										})
+										.ok()?
+										.downgrade();
+
+									let line_id = u32::from_le_bytes(res_data[0..4].try_into().unwrap());
+
+									if let Some(line_str) = app_state
+										.tonytools_hash_list
+										.load()
+										.as_ref()?
+										.lines
+										.get_by_left(&line_id)
+									{
+										let _ = matcher.write_all(line_str.as_bytes());
+										let _ = matcher.write_all(b"\n");
+										for line in locr.languages.iter().filter_map(|(_, keys)| {
+											if let serde_json::Value::String(val) = keys.get(line_str)? {
+												Some(val)
+											} else {
+												None
+											}
+										}) {
+											let _ = matcher.write_all(line.as_bytes());
+											let _ = matcher.write_all(b"\n");
+										}
+									} else {
+										let line_hash = format!("{:0>8X}", line_id);
+										let _ = matcher.write_all(line_hash.as_bytes());
+										let _ = matcher.write_all(b"\n");
+										for line in locr.languages.iter().filter_map(|(_, keys)| {
+											if let serde_json::Value::String(val) = keys.get(&line_hash)? {
+												Some(val)
+											} else {
+												None
+											}
+										}) {
+											let _ = matcher.write_all(line.as_bytes());
+											let _ = matcher.write_all(b"\n");
+										}
+									}
+								}
+
+								_ if search_rest => {
+									let _ = matcher.write_all(&partition.read_resource(resource_id).ok()?);
+								}
+
+								_ => {}
 							}
+
+							matcher.matched().then(|| RuntimeID::try_from(resource_id).unwrap())
+						} else {
+							None
 						}
+					})
+					.collect::<Vec<_>>();
 
-						_ if search_rest => {
-							let _ = matcher.write_all(&partition.read_resource(resource_id).ok()?);
-						}
+				finish_task(&app, task)?;
 
-						_ => {}
-					}
+				Ok(matching_ids)
+			} else {
+				anyhow::bail!("No game loaded");
+			}
+		}
+	})
+	.await??;
 
-					matcher.matched().then(|| RuntimeID::try_from(resource_id).unwrap())
-				} else {
-					None
-				}
-			})
-			.collect::<Vec<_>>();
-
-		finish_task(app, task)?;
-		task = start_task(app, format!("Preparing search results for \"{}\"", query))?;
+	if let Some(game) = app_state.game.load().as_ref() {
+		let task = start_task(app, format!("Preparing search results for \"{}\"", query))?;
 
 		let results = matching_ids
 			.into_iter()
