@@ -292,7 +292,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#a1357cc5f17b2f264473785567b1a53ae0a87413"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#3aee01b2d460f322878c18446cbff9ad22b0fbf0"
 
 [[package]]
 name = "autocfg"
@@ -1979,13 +1979,13 @@ dependencies = ["macro_rules_attribute", "never-say-never", "paste"]
 [[package]]
 name = "hitman-behavior"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-behavior#28cdb17164edf8c38885a3d3aa5f2fb43e42feb2"
+source = "git+https://github.com/atampy25/hitman-behavior#2af53c334c2f7474a0558590b4c6adce059c6b59"
 dependencies = ["Inflector", "anyhow", "codegen", "ecow", "hitman-bin1", "lazy-regex", "serde", "serde_json", "thiserror 2.0.18", "tryvial"]
 
 [[package]]
 name = "hitman-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#c50e11fc56becdd7dce77b955ee16425e795781b"
+source = "git+https://github.com/atampy25/hitman-bin1#5d67f1068f812d9a7ddabe4f6dae7b1ebc42f595"
 dependencies = [
 	"Inflector",
 	"anyhow",
@@ -2007,13 +2007,13 @@ dependencies = [
 [[package]]
 name = "hitman-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#c50e11fc56becdd7dce77b955ee16425e795781b"
-dependencies = ["Inflector", "codegen", "edit-distance", "lazy-regex", "rayon"]
+source = "git+https://github.com/atampy25/hitman-bin1#5d67f1068f812d9a7ddabe4f6dae7b1ebc42f595"
+dependencies = ["Inflector", "codegen", "edit-distance", "lazy-regex", "rayon", "serde", "serde_json"]
 
 [[package]]
 name = "hitman-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#c50e11fc56becdd7dce77b955ee16425e795781b"
+source = "git+https://github.com/atampy25/hitman-bin1#5d67f1068f812d9a7ddabe4f6dae7b1ebc42f595"
 dependencies = [
 	"anyhow",
 	"bimap",
@@ -2038,13 +2038,13 @@ dependencies = [
 [[package]]
 name = "hitman-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#c50e11fc56becdd7dce77b955ee16425e795781b"
+source = "git+https://github.com/atampy25/hitman-bin1#5d67f1068f812d9a7ddabe4f6dae7b1ebc42f595"
 dependencies = ["darling", "quote", "syn 2.0.117"]
 
 [[package]]
 name = "hitman-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#c50e11fc56becdd7dce77b955ee16425e795781b"
+source = "git+https://github.com/atampy25/hitman-bin1#5d67f1068f812d9a7ddabe4f6dae7b1ebc42f595"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -2072,7 +2072,7 @@ dependencies = [
 [[package]]
 name = "hitman-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#c50e11fc56becdd7dce77b955ee16425e795781b"
+source = "git+https://github.com/atampy25/hitman-bin1#5d67f1068f812d9a7ddabe4f6dae7b1ebc42f595"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -2100,7 +2100,7 @@ dependencies = [
 [[package]]
 name = "hitman-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-bin1#c50e11fc56becdd7dce77b955ee16425e795781b"
+source = "git+https://github.com/atampy25/hitman-bin1#5d67f1068f812d9a7ddabe4f6dae7b1ebc42f595"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -2610,9 +2610,9 @@ dependencies = ["keyvalues-parser", "serde_core"]
 
 [[package]]
 name = "kqueue"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eac30106d7dce88daf4a3fcb4879ea939476d5074a9b7ddd0fb97fa4bed5596a"
+checksum = "273c0752728918e0ac4976f2b275b6fefb9ecd400585dec929419f3844cd87b5"
 dependencies = ["kqueue-sys", "libc"]
 
 [[package]]
@@ -3718,7 +3718,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#a1357cc5f17b2f264473785567b1a53ae0a87413"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#3aee01b2d460f322878c18446cbff9ad22b0fbf0"
 dependencies = [
 	"anyhow",
 	"auto_context",
