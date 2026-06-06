@@ -79,6 +79,7 @@ jobs:
             - name: Build
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
+                  CARGO_BUILD_JOBS: 2
               run: |
                   yarn tauri build --verbose
 
