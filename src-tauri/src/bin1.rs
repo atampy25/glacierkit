@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use ecow::EcoString;
 use fn_error_context::context;
-use hitman_bin1::game::{conversion::ConvertInto, h1, h2, h3};
+use glacier_bin1::game::{conversion::ConvertInto, h1, h2, h3};
 use hitman_commons::{game::GameVersion, metadata::ResourceType};
 use serde_json::{Value, to_value, to_writer};
 use tryvial::try_fn;
@@ -11,18 +11,18 @@ use tryvial::try_fn;
 #[context("Couldn't deserialize factory for version {game_version:?}")]
 pub fn deserialize_modern_factory(game_version: GameVersion, data: &[u8]) -> Result<h3::STemplateEntityFactory> {
 	match game_version {
-		GameVersion::H1 => hitman_bin1::deserialize::<h1::STemplateEntity>(data)
+		GameVersion::H1 => glacier_bin1::deserialize::<h1::STemplateEntity>(data)
 			.context("Couldn't deserialise factory")?
 			.convert_into()
 			.context("Couldn't convert factory to modern")?,
 
-		GameVersion::H2 => hitman_bin1::deserialize::<h2::STemplateEntityFactory>(data)
+		GameVersion::H2 => glacier_bin1::deserialize::<h2::STemplateEntityFactory>(data)
 			.context("Couldn't deserialise factory")?
 			.convert_into()
 			.context("Couldn't convert factory to modern")?,
 
 		GameVersion::H3 => {
-			hitman_bin1::deserialize::<h3::STemplateEntityFactory>(data).context("Couldn't deserialise factory")?
+			glacier_bin1::deserialize::<h3::STemplateEntityFactory>(data).context("Couldn't deserialise factory")?
 		}
 	}
 }
@@ -32,18 +32,18 @@ pub fn deserialize_modern_factory(game_version: GameVersion, data: &[u8]) -> Res
 #[context("Couldn't deserialize blueprint for version {game_version:?}")]
 pub fn deserialize_modern_blueprint(game_version: GameVersion, data: &[u8]) -> Result<h3::STemplateEntityBlueprint> {
 	match game_version {
-		GameVersion::H1 => hitman_bin1::deserialize::<h1::STemplateEntityBlueprint>(data)
+		GameVersion::H1 => glacier_bin1::deserialize::<h1::STemplateEntityBlueprint>(data)
 			.context("Couldn't deserialise blueprint")?
 			.convert_into()
 			.context("Couldn't convert blueprint to modern")?,
 
-		GameVersion::H2 => hitman_bin1::deserialize::<h2::STemplateEntityBlueprint>(data)
+		GameVersion::H2 => glacier_bin1::deserialize::<h2::STemplateEntityBlueprint>(data)
 			.context("Couldn't deserialise blueprint")?
 			.convert_into()
 			.context("Couldn't convert blueprint to modern")?,
 
 		GameVersion::H3 => {
-			hitman_bin1::deserialize::<h3::STemplateEntityBlueprint>(data).context("Couldn't deserialise blueprint")?
+			glacier_bin1::deserialize::<h3::STemplateEntityBlueprint>(data).context("Couldn't deserialise blueprint")?
 		}
 	}
 }
@@ -54,7 +54,7 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 	macro_rules! impl_convert {
 		($resource_type:ident, $ty:literal, $res:ty) => {
 			if $resource_type == $ty {
-				return to_value(hitman_bin1::deserialize::<$res>(data).context("Couldn't deserialise resource")?)
+				return to_value(glacier_bin1::deserialize::<$res>(data).context("Couldn't deserialise resource")?)
 					.context("Couldn't convert resource to JSON value");
 			}
 		};
@@ -107,20 +107,20 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 			GameVersion::H1 => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_value(
-						hitman_bin1::deserialize::<Vec<h1::SBlobsConfigResourceEntry>>(data)
+						glacier_bin1::deserialize::<Vec<h1::SBlobsConfigResourceEntry>>(data)
 							.context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
-					to_value(hitman_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
+					to_value(glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
 						.context("Couldn't convert resource to JSON value")?
 				} else {
-					hitman_bin1::deserialize::<Vec<h1::SContractConfigResourceEntry>>(data)
+					glacier_bin1::deserialize::<Vec<h1::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
 						.map_or_else(
 							|_| {
 								to_value(
-									hitman_bin1::deserialize::<h1::SEnvironmentConfigResource>(data)
+									glacier_bin1::deserialize::<h1::SEnvironmentConfigResource>(data)
 										.context("Couldn't deserialise resource as SEnvironmentConfigResource")
 										.context("No ORES type matched")?
 								)
@@ -134,20 +134,20 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 			GameVersion::H2 => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_value(
-						hitman_bin1::deserialize::<Vec<h2::SBlobsConfigResourceEntry>>(data)
+						glacier_bin1::deserialize::<Vec<h2::SBlobsConfigResourceEntry>>(data)
 							.context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
-					to_value(hitman_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
+					to_value(glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
 						.context("Couldn't convert resource to JSON value")?
 				} else {
-					hitman_bin1::deserialize::<Vec<h2::SContractConfigResourceEntry>>(data)
+					glacier_bin1::deserialize::<Vec<h2::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
 						.map_or_else(
 							|_| {
 								to_value(
-									hitman_bin1::deserialize::<h2::SEnvironmentConfigResource>(data)
+									glacier_bin1::deserialize::<h2::SEnvironmentConfigResource>(data)
 										.context("Couldn't deserialise resource as SEnvironmentConfigResource")
 										.context("No ORES type matched")?
 								)
@@ -161,24 +161,24 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 			GameVersion::H3 => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_value(
-						hitman_bin1::deserialize::<Vec<h3::SBlobsConfigResourceEntry>>(data)
+						glacier_bin1::deserialize::<Vec<h3::SBlobsConfigResourceEntry>>(data)
 							.context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
-					to_value(hitman_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
+					to_value(glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
 						.context("Couldn't convert resource to JSON value")?
 				} else {
-					hitman_bin1::deserialize::<Vec<h3::SContractConfigResourceEntry>>(data)
+					glacier_bin1::deserialize::<Vec<h3::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
 						.map_or_else(
 							|_| {
-								hitman_bin1::deserialize::<h3::SEnvironmentConfigResource>(data)
+								glacier_bin1::deserialize::<h3::SEnvironmentConfigResource>(data)
 									.context("Couldn't deserialise resource as SEnvironmentConfigResource")
 									.map_or_else(
 										|_| {
 											to_value(
-												hitman_bin1::deserialize::<h3::SActivities>(data)
+												glacier_bin1::deserialize::<h3::SActivities>(data)
 													.context("Couldn't deserialise resource as SActivities")
 													.context("No ORES type matched")?
 											)
@@ -216,7 +216,7 @@ pub fn deserialize_generic_writer(
 			if $resource_type == $ty {
 				return to_writer(
 					writer,
-					&hitman_bin1::deserialize::<$res>(data).context("Couldn't deserialise resource")?
+					&glacier_bin1::deserialize::<$res>(data).context("Couldn't deserialise resource")?
 				)
 				.context("Couldn't convert resource to JSON value");
 			}
@@ -271,25 +271,25 @@ pub fn deserialize_generic_writer(
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_writer(
 						writer,
-						&hitman_bin1::deserialize::<Vec<h1::SBlobsConfigResourceEntry>>(data)
+						&glacier_bin1::deserialize::<Vec<h1::SBlobsConfigResourceEntry>>(data)
 							.context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
 					to_writer(
 						writer,
-						&hitman_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else {
-					if let Ok(x) = hitman_bin1::deserialize::<Vec<h1::SContractConfigResourceEntry>>(data)
+					if let Ok(x) = glacier_bin1::deserialize::<Vec<h1::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
 					{
 						to_writer(writer, &x).context("Couldn't convert resource to JSON value")?
 					} else {
 						to_writer(
 							writer,
-							&hitman_bin1::deserialize::<h1::SEnvironmentConfigResource>(data)
+							&glacier_bin1::deserialize::<h1::SEnvironmentConfigResource>(data)
 								.context("Couldn't deserialise resource as SEnvironmentConfigResource")
 								.context("No ORES type matched")?
 						)
@@ -302,25 +302,25 @@ pub fn deserialize_generic_writer(
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_writer(
 						writer,
-						&hitman_bin1::deserialize::<Vec<h2::SBlobsConfigResourceEntry>>(data)
+						&glacier_bin1::deserialize::<Vec<h2::SBlobsConfigResourceEntry>>(data)
 							.context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
 					to_writer(
 						writer,
-						&hitman_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else {
-					if let Ok(x) = hitman_bin1::deserialize::<Vec<h2::SContractConfigResourceEntry>>(data)
+					if let Ok(x) = glacier_bin1::deserialize::<Vec<h2::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
 					{
 						to_writer(writer, &x).context("Couldn't convert resource to JSON value")?
 					} else {
 						to_writer(
 							writer,
-							&hitman_bin1::deserialize::<h2::SEnvironmentConfigResource>(data)
+							&glacier_bin1::deserialize::<h2::SEnvironmentConfigResource>(data)
 								.context("Couldn't deserialise resource as SEnvironmentConfigResource")
 								.context("No ORES type matched")?
 						)
@@ -333,29 +333,29 @@ pub fn deserialize_generic_writer(
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_writer(
 						writer,
-						&hitman_bin1::deserialize::<Vec<h3::SBlobsConfigResourceEntry>>(data)
+						&glacier_bin1::deserialize::<Vec<h3::SBlobsConfigResourceEntry>>(data)
 							.context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
 					to_writer(
 						writer,
-						&hitman_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else {
-					if let Ok(x) = hitman_bin1::deserialize::<Vec<h3::SContractConfigResourceEntry>>(data)
+					if let Ok(x) = glacier_bin1::deserialize::<Vec<h3::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
 					{
 						to_writer(writer, &x).context("Couldn't convert resource to JSON value")?
-					} else if let Ok(x) = hitman_bin1::deserialize::<h3::SEnvironmentConfigResource>(data)
+					} else if let Ok(x) = glacier_bin1::deserialize::<h3::SEnvironmentConfigResource>(data)
 						.context("Couldn't deserialise resource as SEnvironmentConfigResource")
 					{
 						to_writer(writer, &x).context("Couldn't convert resource to JSON value")?
 					} else {
 						to_writer(
 							writer,
-							&hitman_bin1::deserialize::<h3::SActivities>(data)
+							&glacier_bin1::deserialize::<h3::SActivities>(data)
 								.context("Couldn't deserialise resource as SActivities")
 								.context("No ORES type matched")?
 						)

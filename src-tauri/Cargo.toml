@@ -15,7 +15,7 @@ codegen-units = 1
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.dev.package.hitman-bin1]
+[profile.dev.package.glacier-bin1]
 debug = false
 
 [profile.dev]
@@ -97,8 +97,8 @@ features = ["json"]
 version = "2.1.1"
 features = ["debug"]
 
-[dependencies.hitman-bin1]
-git = "https://github.com/atampy25/hitman-bin1"
+[dependencies.glacier-bin1]
+git = "https://github.com/atampy25/glacier-bin1"
 features = ["all-games", "all-types"]
 
 [dependencies.hitman-behavior]

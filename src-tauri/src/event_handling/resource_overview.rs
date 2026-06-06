@@ -860,7 +860,7 @@ pub async fn initialise_resource_overview(
 											std::thread::Builder::new()
 												.stack_size(64 * 1024 * 1024)
 												.spawn(move || {
-													hitman_bin1::deserialize(&res_data)
+													glacier_bin1::deserialize(&res_data)
 														.map_err(|e| format!("{e}"))
 														.unwrap()
 												})
@@ -880,7 +880,7 @@ pub async fn initialise_resource_overview(
 											std::thread::Builder::new()
 												.stack_size(64 * 1024 * 1024)
 												.spawn(move || {
-													hitman_bin1::deserialize(&res_data)
+													glacier_bin1::deserialize(&res_data)
 														.map_err(|e| format!("{e}"))
 														.unwrap()
 												})
@@ -900,7 +900,7 @@ pub async fn initialise_resource_overview(
 											std::thread::Builder::new()
 												.stack_size(64 * 1024 * 1024)
 												.spawn(move || {
-													hitman_bin1::deserialize(&res_data)
+													glacier_bin1::deserialize(&res_data)
 														.map_err(|e| format!("{e}"))
 														.unwrap()
 												})
@@ -1042,17 +1042,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 				let data = match game.version() {
 					GameVersion::H1 => to_vec(
-						&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&data)
+						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntity>(&data)
 							.context("Couldn't deserialise factory")?
 					)?,
 
 					GameVersion::H2 => to_vec(
-						&hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&data)
+						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityFactory>(&data)
 							.context("Couldn't deserialise factory")?
 					)?,
 
 					GameVersion::H3 => to_vec(
-						&hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&data)
+						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityFactory>(&data)
 							.context("Couldn't deserialise factory")?
 					)?
 				};
@@ -1111,17 +1111,17 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 				let data = match game.version() {
 					GameVersion::H1 => to_vec(
-						&hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntityBlueprint>(&data)
+						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?,
 
 					GameVersion::H2 => to_vec(
-						&hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityBlueprint>(&data)
+						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?,
 
 					GameVersion::H3 => to_vec(
-						&hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityBlueprint>(&data)
+						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?
 				};
@@ -1981,7 +1981,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
 							std::thread::Builder::new()
 								.stack_size(64 * 1024 * 1024)
-								.spawn(move || hitman_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.spawn(move || glacier_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
 								.unwrap()
 								.join()
 								.unwrap()
@@ -1995,7 +1995,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
 							std::thread::Builder::new()
 								.stack_size(64 * 1024 * 1024)
-								.spawn(move || hitman_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.spawn(move || glacier_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
 								.unwrap()
 								.join()
 								.unwrap()
@@ -2009,7 +2009,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
 							std::thread::Builder::new()
 								.stack_size(64 * 1024 * 1024)
-								.spawn(move || hitman_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.spawn(move || glacier_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
 								.unwrap()
 								.join()
 								.unwrap()

@@ -693,7 +693,7 @@
 	{/if}
 </div>
 
-<div class="absolute h-screen top-0 right-2" style="z-index: 9999">
+<div class="absolute h-screen top-0 right-2 pointer-events-none" style="z-index: 9999">
 	<div class="h-screen flex flex-col-reverse content-end pb-4">
 		{#each notifications as [id, { kind, title, subtitle }] (id)}
 			<div in:fly={{ x: 100 }} out:fade animate:flip>

@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
 use ecow::EcoString;
 use fn_error_context::context;
-use hitman_bin1::game::h3::{ZSpatialEntity_ERoomBehaviour, ZVariant};
+use glacier_bin1::game::h3::{ZSpatialEntity_ERoomBehaviour, ZVariant};
 use hitman_commons::{
 	game::GameVersion,
 	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
@@ -1414,19 +1414,19 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 
 					let blueprint_index_in_resource_header = match game.version() {
 						GameVersion::H1 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h1::STemplateEntity>(&temp_data)
+							glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntity>(&temp_data)
 								.context("Couldn't deserialise factory")?
 								.blueprint_index_in_resource_header
 						}
 
 						GameVersion::H2 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h2::STemplateEntityFactory>(&temp_data)
+							glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityFactory>(&temp_data)
 								.context("Couldn't deserialise factory")?
 								.blueprint_index_in_resource_header
 						}
 
 						GameVersion::H3 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h3::STemplateEntityFactory>(&temp_data)
+							glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityFactory>(&temp_data)
 								.context("Couldn't deserialise factory")?
 								.blueprint_index_in_resource_header
 						}
@@ -1479,19 +1479,19 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 
 					let blueprint_index_in_resource_header = match game.version() {
 						GameVersion::H1 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h1::SCppEntity>(&cppt_data)
+							glacier_bin1::deserialize::<glacier_bin1::game::h1::SCppEntity>(&cppt_data)
 								.context("Couldn't deserialise CPPT")?
 								.blueprint_index_in_resource_header
 						}
 
 						GameVersion::H2 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h2::SCppEntity>(&cppt_data)
+							glacier_bin1::deserialize::<glacier_bin1::game::h2::SCppEntity>(&cppt_data)
 								.context("Couldn't deserialise CPPT")?
 								.blueprint_index_in_resource_header
 						}
 
 						GameVersion::H3 => {
-							hitman_bin1::deserialize::<hitman_bin1::game::h3::SCppEntity>(&cppt_data)
+							glacier_bin1::deserialize::<glacier_bin1::game::h3::SCppEntity>(&cppt_data)
 								.context("Couldn't deserialise CPPT")?
 								.blueprint_index_in_resource_header
 						}

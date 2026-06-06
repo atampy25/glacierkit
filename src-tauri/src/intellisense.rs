@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Error, Result, bail};
 use ecow::{EcoString, eco_format};
 use fn_error_context::context;
-use hitman_bin1::game::h3::{IRenderMaterialEntity_EModifierOperation, SVector2, SVector3, SVector4, ZVariant};
+use glacier_bin1::game::h3::{IRenderMaterialEntity_EModifierOperation, SVector2, SVector3, SVector4, ZVariant};
 use hitman_commons::{
 	game::GameVersion,
 	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
@@ -77,7 +77,7 @@ impl Intellisense {
 
 		macro_rules! generate {
 			($game:ident) => {{
-				let cppt_data = hitman_bin1::deserialize::<hitman_bin1::game::$game::SCppEntity>(&cppt_data)
+				let cppt_data = glacier_bin1::deserialize::<glacier_bin1::game::$game::SCppEntity>(&cppt_data)
 					.context("Couldn't deserialise CPPT")?;
 
 				self.cppt_properties.pin().insert(
@@ -97,20 +97,20 @@ impl Intellisense {
 										.variant_type()
 										.as_ref()
 									{
-										"ZEntityReference" => hitman_bin1::game::$game::ZVariant::new(
-											hitman_bin1::game::$game::SEntityTemplateReference {
+										"ZEntityReference" => glacier_bin1::game::$game::ZVariant::new(
+											glacier_bin1::game::$game::SEntityTemplateReference {
 												entity_id: u64::MAX,
 												entity_index: -1,
 												exposed_entity: "".into(),
 												external_scene_index: -1
 											}
 										),
-										"TArray<ZEntityReference>" => hitman_bin1::game::$game::ZVariant::new(
-											vec![] as Vec<hitman_bin1::game::$game::SEntityTemplateReference>
+										"TArray<ZEntityReference>" => glacier_bin1::game::$game::ZVariant::new(
+											vec![] as Vec<glacier_bin1::game::$game::SEntityTemplateReference>
 										),
 										_ => property_value.value
 									})?)?,
-									&hitman_bin1::game::h3::STemplateEntityFactory {
+									&glacier_bin1::game::h3::STemplateEntityFactory {
 										blueprint_index_in_resource_header: 0,
 										root_entity_index: 0,
 										sub_type: 0,
@@ -119,7 +119,7 @@ impl Intellisense {
 										property_overrides: vec![]
 									},
 									&cppt_meta.core_info,
-									&hitman_bin1::game::h3::STemplateEntityBlueprint {
+									&glacier_bin1::game::h3::STemplateEntityBlueprint {
 										sub_type: 0,
 										root_entity_index: 0,
 										sub_entities: vec![],
@@ -291,7 +291,7 @@ impl Intellisense {
 
 										macro_rules! generate {
 											($game:ident) => {{
-												for entry in hitman_bin1::deserialize::<hitman_bin1::game::$game::SControlTypeInfo>(
+												for entry in glacier_bin1::deserialize::<glacier_bin1::game::$game::SControlTypeInfo>(
 													&game.extract_latest_resource(
 														game.extract_latest_metadata(factory)?
 															.core_info
@@ -481,12 +481,12 @@ impl Intellisense {
 
 										macro_rules! generate {
 											($game:ident) => {{
-												for entry in hitman_bin1::deserialize::<
-													hitman_bin1::game::$game::SExtendedCppEntityBlueprint
+												for entry in glacier_bin1::deserialize::<
+													glacier_bin1::game::$game::SExtendedCppEntityBlueprint
 												>(&ecpb_data)?
 												.properties
 												{
-													use hitman_bin1::game::$game::EExtendedPropertyType;
+													use glacier_bin1::game::$game::EExtendedPropertyType;
 													found.push((
 														entry.property_name.into(),
 														match entry.property_type {
@@ -649,7 +649,7 @@ impl Intellisense {
 
 						macro_rules! generate {
 							($game:ident) => {{
-								for entry in hitman_bin1::deserialize::<hitman_bin1::game::$game::SControlTypeInfo>(
+								for entry in glacier_bin1::deserialize::<glacier_bin1::game::$game::SControlTypeInfo>(
 									&game.extract_latest_resource(
 										game.extract_latest_metadata(factory)?
 											.core_info
@@ -836,12 +836,12 @@ impl Intellisense {
 
 						macro_rules! generate {
 							($game:ident) => {{
-								for entry in hitman_bin1::deserialize::<
-									hitman_bin1::game::$game::SExtendedCppEntityBlueprint
+								for entry in glacier_bin1::deserialize::<
+									glacier_bin1::game::$game::SExtendedCppEntityBlueprint
 								>(&ecpb_data)?
 								.properties
 								{
-									use hitman_bin1::game::$game::EExtendedPropertyType;
+									use glacier_bin1::game::$game::EExtendedPropertyType;
 									if entry.property_name == property_to_find {
 										return Ok(Some((
 											match entry.property_type {
@@ -1015,23 +1015,24 @@ impl Intellisense {
 
 							macro_rules! generate {
 								($game:ident) => {{
-									for entry in hitman_bin1::deserialize::<hitman_bin1::game::$game::SControlTypeInfo>(
-										&game
-											.extract_latest_resource(
-												game.extract_latest_metadata(factory)?
-													.core_info
-													.references
-													.into_iter()
-													.find(|x| {
-														game.resource_type(x.resource)
-															.is_some_and(|ty| ty == "UICB")
-													})
-													.context("No blueprint dependency on UICT")?
-													.resource
-											)?
-											.1
-									)?
-									.attributes
+									for entry in
+										glacier_bin1::deserialize::<glacier_bin1::game::$game::SControlTypeInfo>(
+											&game
+												.extract_latest_resource(
+													game.extract_latest_metadata(factory)?
+														.core_info
+														.references
+														.into_iter()
+														.find(|x| {
+															game.resource_type(x.resource)
+																.is_some_and(|ty| ty == "UICB")
+														})
+														.context("No blueprint dependency on UICT")?
+														.resource
+												)?
+												.1
+										)?
+										.attributes
 									{
 										if entry.kind == 1 {
 											input.push(entry.name);
@@ -1092,22 +1093,22 @@ impl Intellisense {
 							let dswb_data = game.extract_latest_resource(dswb_hash)?.1;
 
 							input.extend(match game.version() {
-								GameVersion::H1 => hitman_bin1::deserialize::<
-									hitman_bin1::game::h1::SAudioSwitchGroupData
+								GameVersion::H1 => glacier_bin1::deserialize::<
+									glacier_bin1::game::h1::SAudioSwitchGroupData
 								>(&dswb_data)?
 								.switches
 								.into_iter()
 								.map(|x| x.name)
 								.collect_vec(),
-								GameVersion::H2 => hitman_bin1::deserialize::<
-									hitman_bin1::game::h2::SAudioSwitchGroupData
+								GameVersion::H2 => glacier_bin1::deserialize::<
+									glacier_bin1::game::h2::SAudioSwitchGroupData
 								>(&dswb_data)?
 								.switches
 								.into_iter()
 								.map(|x| x.name)
 								.collect_vec(),
-								GameVersion::H3 => hitman_bin1::deserialize::<
-									hitman_bin1::game::h3::SAudioSwitchGroupData
+								GameVersion::H3 => glacier_bin1::deserialize::<
+									glacier_bin1::game::h3::SAudioSwitchGroupData
 								>(&dswb_data)?
 								.switches
 								.into_iter()
@@ -1161,27 +1162,27 @@ impl Intellisense {
 							let wsgb_data = game.extract_latest_resource(wsgb_hash)?.1;
 
 							input.extend(match game.version() {
-								GameVersion::H1 => {
-									hitman_bin1::deserialize::<hitman_bin1::game::h1::SAudioStateGroupData>(&wsgb_data)?
-										.states
-										.into_iter()
-										.map(|x| x.name)
-										.collect_vec()
-								}
-								GameVersion::H2 => {
-									hitman_bin1::deserialize::<hitman_bin1::game::h2::SAudioStateGroupData>(&wsgb_data)?
-										.states
-										.into_iter()
-										.map(|x| x.name)
-										.collect_vec()
-								}
-								GameVersion::H3 => {
-									hitman_bin1::deserialize::<hitman_bin1::game::h3::SAudioStateGroupData>(&wsgb_data)?
-										.states
-										.into_iter()
-										.map(|x| x.name)
-										.collect_vec()
-								}
+								GameVersion::H1 => glacier_bin1::deserialize::<
+									glacier_bin1::game::h1::SAudioStateGroupData
+								>(&wsgb_data)?
+								.states
+								.into_iter()
+								.map(|x| x.name)
+								.collect_vec(),
+								GameVersion::H2 => glacier_bin1::deserialize::<
+									glacier_bin1::game::h2::SAudioStateGroupData
+								>(&wsgb_data)?
+								.states
+								.into_iter()
+								.map(|x| x.name)
+								.collect_vec(),
+								GameVersion::H3 => glacier_bin1::deserialize::<
+									glacier_bin1::game::h3::SAudioStateGroupData
+								>(&wsgb_data)?
+								.states
+								.into_iter()
+								.map(|x| x.name)
+								.collect_vec()
 							});
 						}
 

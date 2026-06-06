@@ -72,10 +72,10 @@ pub static SAFE_TO_SYNC: [&str; 44] = [
 ];
 
 #[static_init::dynamic]
-pub static ENUMS: HashMap<&'static str, Vec<&'static str>> = hitman_bin1::game::h1::VARIANT_TYPES
+pub static ENUMS: HashMap<&'static str, Vec<&'static str>> = glacier_bin1::game::h1::VARIANT_TYPES
 	.values()
-	.chain(hitman_bin1::game::h2::VARIANT_TYPES.values())
-	.chain(hitman_bin1::game::h3::VARIANT_TYPES.values())
+	.chain(glacier_bin1::game::h2::VARIANT_TYPES.values())
+	.chain(glacier_bin1::game::h3::VARIANT_TYPES.values())
 	.filter_map(|(ty, shape)| {
 		shape.and_then(|shape| match shape.ty {
 			facet::Type::User(facet::UserType::Enum(enum_ty)) => Some((

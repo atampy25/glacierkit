@@ -11,7 +11,7 @@ use anyhow::{Context, Error, Result, anyhow, bail};
 use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
-use hitman_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
+use glacier_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
 use hitman_commons::{game::GameVersion, metadata::ResourceMetadata, resource_type};
 use indexmap::IndexMap;
 use quickentity_rs::{
