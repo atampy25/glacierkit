@@ -99,7 +99,7 @@ features = ["debug"]
 
 [dependencies.glacier-bin1]
 git = "https://github.com/atampy25/glacier-bin1"
-features = ["all-games", "all-types"]
+features = ["h1", "h2", "h3", "all-types"]
 
 [dependencies.hitman-behavior]
 git = "https://github.com/atampy25/hitman-behavior"

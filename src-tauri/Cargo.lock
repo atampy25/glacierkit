@@ -345,7 +345,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#c940fe458f79b18c51a20330e4c39048aa896601"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#c0c9b997e670cd1ca3d0275e591930e9cc8033d6"
 
 [[package]]
 name = "autocfg"
@@ -2542,7 +2542,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -2565,7 +2565,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "Inflector",
  "codegen",
@@ -2579,7 +2579,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "anyhow",
  "bimap",
@@ -2605,7 +2605,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "darling",
  "quote",
@@ -2615,7 +2615,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -2643,7 +2643,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -2671,7 +2671,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -2699,7 +2699,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#ea4d8ec2714cc3ac21e17500aecf779525b6e33c"
+source = "git+https://github.com/atampy25/glacier-bin1#6d215e5f6e6974d2d57f7daf699a8fde01d1719d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -3401,9 +3401,9 @@ dependencies = [
 
 [[package]]
 name = "imgref"
-version = "1.12.1"
+version = "1.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40fac9d56ed6437b198fddba683305e8e2d651aa42647f00f5ae542e7f5c94a2"
+checksum = "89194689a993ab15268672e99e7b0e19da2da3268ac682e8f02d29d4d1434cd7"
 
 [[package]]
 name = "impls"
@@ -5128,7 +5128,7 @@ dependencies = [
 [[package]]
 name = "prim-rs"
 version = "0.1.1"
-source = "git+https://github.com/dafitius/GlacierFormats-rs#717e0723f37bfc98773ec2ea08fa4473fed7a90c"
+source = "git+https://github.com/dafitius/GlacierFormats-rs#cbb8b7dcd999ef68adbe668a3c4a61942e9118fc"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -5303,7 +5303,7 @@ dependencies = [
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#c940fe458f79b18c51a20330e4c39048aa896601"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#c0c9b997e670cd1ca3d0275e591930e9cc8033d6"
 dependencies = [
  "anyhow",
  "auto_context",
