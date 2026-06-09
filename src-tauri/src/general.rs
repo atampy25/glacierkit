@@ -851,16 +851,6 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 	let app_settings = app.state::<ArcSwap<AppSettings>>();
 	let app_state = app.state::<AppState>();
 
-	send_request(
-		app,
-		Request::Global(GlobalRequest::SetEnums {
-			enums: ENUMS
-				.iter()
-				.map(|(&x, y)| (x.to_owned(), y.iter().map(|&z| z.to_owned()).collect()))
-				.collect()
-		})
-	)?;
-
 	let selected_install_info = app_settings
 		.load()
 		.game_install
@@ -894,17 +884,6 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 			settings: (*app_settings.load_full()).to_owned()
 		}))
 	)?;
-
-	if app
-		.path()
-		.app_log_dir()
-		.context("Couldn't get log dir")?
-		.join("..")
-		.join("last_panic.txt")
-		.exists()
-	{
-		send_request(app, Request::Global(GlobalRequest::RequestLastPanicUpload))?;
-	}
 
 	let res = tokio::spawn({
 		let app = app.clone();
@@ -976,6 +955,27 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 
 	load_game_files(app).await?;
 	res.await??;
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetEnums {
+			enums: ENUMS
+				.iter()
+				.map(|(&x, y)| (x.to_owned(), y.iter().map(|&z| z.to_owned()).collect()))
+				.collect()
+		})
+	)?;
+
+	if app
+		.path()
+		.app_log_dir()
+		.context("Couldn't get log dir")?
+		.join("..")
+		.join("last_panic.txt")
+		.exists()
+	{
+		send_request(app, Request::Global(GlobalRequest::RequestLastPanicUpload))?;
+	}
 
 	if let Ok(req) = reqwest::get("https://hitman-resources.netlify.app/glacierkit/dynamics.json").await {
 		send_request(
