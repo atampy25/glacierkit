@@ -25,10 +25,7 @@ use crate::{HashMap, PapayaMap, game::Game};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CPPTPinsInfo {
-	#[serde(rename = "in")]
 	pub inputs: Vec<CPPTPinInfo>,
-
-	#[serde(rename = "out")]
 	pub outputs: Vec<CPPTPinInfo>
 }
 
@@ -57,9 +54,32 @@ impl Default for Intellisense {
 
 impl Intellisense {
 	pub fn new() -> Self {
+		#[derive(Serialize, Deserialize)]
+		struct DeserialisedCPPTPinsInfo {
+			pub hash: RuntimeID,
+
+			#[serde(rename = "in")]
+			pub inputs: Vec<CPPTPinInfo>,
+
+			#[serde(rename = "out")]
+			pub outputs: Vec<CPPTPinInfo>
+		}
+
 		Self {
 			cppt_properties: Arc::new(Default::default()),
-			cppt_pins: serde_json::from_slice(include_bytes!("../assets/pins.json")).unwrap(),
+			cppt_pins: serde_json::from_slice::<Vec<DeserialisedCPPTPinsInfo>>(include_bytes!("../assets/pins.json"))
+				.unwrap()
+				.into_iter()
+				.map(|info| {
+					(
+						info.hash,
+						CPPTPinsInfo {
+							inputs: info.inputs,
+							outputs: info.outputs
+						}
+					)
+				})
+				.collect(),
 			matt_properties: Arc::new(Default::default())
 		}
 	}
@@ -999,9 +1019,10 @@ impl Intellisense {
 				if let Some(ty) = game.resource_type(factory) {
 					match ty.as_ref() {
 						"CPPT" => {
-							let cppt_data = self.cppt_pins.get(&factory).context("No such CPPT in pins")?;
-							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
-							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+							if let Some(cppt_data) = self.cppt_pins.get(&factory) {
+								input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
+								output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
+							}
 						}
 
 						"UICT" => {

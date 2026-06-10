@@ -1981,7 +1981,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
 							std::thread::Builder::new()
 								.stack_size(64 * 1024 * 1024)
-								.spawn(move || glacier_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.spawn(move || {
+									glacier_bin1::deserialize(&res_data)
+										.map_err(|e| format!("{e}"))
+										.unwrap()
+								})
 								.unwrap()
 								.join()
 								.unwrap()
@@ -1995,7 +1999,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
 							std::thread::Builder::new()
 								.stack_size(64 * 1024 * 1024)
-								.spawn(move || glacier_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.spawn(move || {
+									glacier_bin1::deserialize(&res_data)
+										.map_err(|e| format!("{e}"))
+										.unwrap()
+								})
 								.unwrap()
 								.join()
 								.unwrap()
@@ -2009,7 +2017,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
 							std::thread::Builder::new()
 								.stack_size(64 * 1024 * 1024)
-								.spawn(move || glacier_bin1::deserialize(&res_data).map_err(|e| format!("{e}")).unwrap())
+								.spawn(move || {
+									glacier_bin1::deserialize(&res_data)
+										.map_err(|e| format!("{e}"))
+										.unwrap()
+								})
 								.unwrap()
 								.join()
 								.unwrap()
