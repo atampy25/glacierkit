@@ -867,9 +867,15 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 			GlobalEvent::RemoveTab(tab) => {
 				let task = start_task(&app, "Closing tab")?;
 
-				trace!("Waiting to remove editor {}", tab);
-				if let Some(lock) = app_state.editor_removal.get(&tab).await {
-					let _guard = lock.write().await;
+				{
+					trace!("Waiting to remove editor {}", tab);
+					let lock = app_state.editor_removal.get(&tab).await;
+					let _guard = if let Some(lock) = lock.as_ref() {
+						Some(lock.write().await)
+					} else {
+						None
+					};
+
 					trace!("Removing editor {}", tab);
 					let old = app_state.editor_states.remove(&tab).await.context("No such editor")?;
 

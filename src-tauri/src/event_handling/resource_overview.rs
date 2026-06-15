@@ -16,6 +16,7 @@ use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgReso
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	sdef::SoundDefinitions,
+	texture::TextureMetadata,
 	wwev::WwiseEvent
 };
 use image::{ImageFormat, ImageReader};
@@ -320,30 +321,31 @@ pub async fn initialise_resource_overview(
 							asset_id,
 							texture_data: Some((
 								match texture.texture_type() {
-									TextureType::Colour => "Colour",
-									TextureType::Normal => "Normal",
-									TextureType::Height => "Height",
-									TextureType::CompoundNormal => "Compound Normal",
-									TextureType::Billboard => "Billboard",
-									TextureType::Projection => "Projection",
-									TextureType::Emission => "Emission",
-									TextureType::Cubemap => "Cubemap",
-									TextureType::UNKNOWN512 => "unknown"
-								}
-								.into(),
+									TextureType::Colour => "Colour".into(),
+									TextureType::Normal => "Normal".into(),
+									TextureType::Height => "Height".into(),
+									TextureType::CompoundNormal => "Compound Normal".into(),
+									TextureType::Billboard => "Billboard".into(),
+									TextureType::Projection => "Projection".into(),
+									TextureType::Emission => "Emission".into(),
+									TextureType::Cubemap => "Cubemap".into(),
+									TextureType::UNKNOWN5 => "Unknown (5)".into(),
+									TextureType::UNKNOWN517 => "Unknown (517)".into(),
+									x => format!("{x:?}")
+								},
 								match texture.format() {
-									RenderFormat::R16G16B16A16 => "R16G16B16A16",
-									RenderFormat::R8G8B8A8 => "R8G8B8A8",
-									RenderFormat::R8G8 => "R8G8",
-									RenderFormat::A8 => "A8",
-									RenderFormat::BC1 => "BC1",
-									RenderFormat::BC2 => "BC2",
-									RenderFormat::BC3 => "BC3",
-									RenderFormat::BC4 => "BC4",
-									RenderFormat::BC5 => "BC5",
-									RenderFormat::BC7 => "BC7"
-								}
-								.into(),
+									RenderFormat::R16G16B16A16 => "R16G16B16A16".into(),
+									RenderFormat::R8G8B8A8 => "R8G8B8A8".into(),
+									RenderFormat::R8G8 => "R8G8".into(),
+									RenderFormat::A8 => "A8".into(),
+									RenderFormat::BC1 => "BC1".into(),
+									RenderFormat::BC2 => "BC2".into(),
+									RenderFormat::BC3 => "BC3".into(),
+									RenderFormat::BC4 => "BC4".into(),
+									RenderFormat::BC5 => "BC5".into(),
+									RenderFormat::BC7 => "BC7".into(),
+									x => format!("{x:?}")
+								},
 								texture.interpret_as().map(|interpret_as| {
 									match interpret_as {
 										InterpretAs::Colour => "Colour",
@@ -1899,71 +1901,13 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						image.save(path)?;
 					}
 
-					let mut meta = json!({
-						"text": hash
-					});
-
-					if let Some(texd_depend) = res_meta.core_info.references.first() {
-						meta.as_object_mut()
-							.unwrap()
-							.insert("texd".to_owned(), serde_json::to_value(texd_depend.resource)?);
-					}
-
-					meta.as_object_mut().unwrap().insert(
-						"type".to_owned(),
-						match texture.texture_type() {
-							TextureType::Colour => "Colour",
-							TextureType::Normal => "Normal",
-							TextureType::Height => "Height",
-							TextureType::CompoundNormal => "CompoundNormal",
-							TextureType::Billboard => "Billboard",
-							TextureType::Projection => "Projection",
-							TextureType::Emission => "Emission",
-							TextureType::Cubemap => "Cubemap",
-							TextureType::UNKNOWN512 => "UNKNOWN512"
-						}
-						.into()
-					);
-
-					// BC7 is default
-					if texture.format() != RenderFormat::BC7 {
-						meta.as_object_mut().unwrap().insert(
-							"format".to_owned(),
-							match texture.format() {
-								RenderFormat::R16G16B16A16 => "R16G16B16A16",
-								RenderFormat::R8G8B8A8 => "R8G8B8A8",
-								RenderFormat::R8G8 => "R8G8",
-								RenderFormat::A8 => "A8",
-								RenderFormat::BC1 => "BC1",
-								RenderFormat::BC2 => "BC2",
-								RenderFormat::BC3 => "BC3",
-								RenderFormat::BC4 => "BC4",
-								RenderFormat::BC5 => "BC5",
-								RenderFormat::BC7 => "BC7"
-							}
-							.into()
-						);
-					}
-
-					// Normal is default
-					if let Some(interpret_as) = texture.interpret_as()
-						&& interpret_as != InterpretAs::Normal
-					{
-						meta.as_object_mut().unwrap().insert(
-							"interpretAs".to_owned(),
-							match interpret_as {
-								InterpretAs::Colour => "Colour",
-								InterpretAs::Normal => "Normal",
-								InterpretAs::Height => "Height",
-								InterpretAs::CompoundNormal => "CompoundNormal",
-								InterpretAs::Billboard => "Billboard",
-								InterpretAs::Cubemap => "Cubemap",
-								InterpretAs::Emission => "Emission",
-								InterpretAs::Volume => "Volume"
-							}
-							.into()
-						);
-					}
+					let meta = TextureMetadata {
+						text: hash,
+						texd: res_meta.core_info.references.first().map(|x| x.resource),
+						texture_type: texture.texture_type().into(),
+						format: texture.format().into(),
+						interpret_as: texture.interpret_as().unwrap_or(InterpretAs::Normal).into()
+					};
 
 					fs::write(path.with_extension("json"), format_json(&to_string(&meta)?)?)?;
 				}
