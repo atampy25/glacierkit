@@ -7,12 +7,12 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use ecow::EcoVec;
 use fn_error_context::context;
+use glacier_commons::{game::GlacierGame, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use glacier_texture::{
 	enums::{InterpretAs, RenderFormat, TextureType},
 	mipblock::MipblockData,
 	texture_map::TextureMap
 };
-use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use hitman_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	sdef::SoundDefinitions,
@@ -82,7 +82,11 @@ pub async fn open_resource_overview(app: &AppHandle, resource: RuntimeID) -> Res
 #[try_fn]
 #[context("Couldn't parse PRIM file")]
 pub fn parse_prim(game: &Game, res_data: &[u8]) -> Result<(EcoVec<u8>, [f32; 6])> {
-	let model = RenderPrimitive::process_data(game.version().into(), res_data).context("Couldn't process PRIM data")?;
+	let model = RenderPrimitive::process_data(
+		Option::from(game.version()).context("Game version net yet supported")?,
+		res_data
+	)
+	.context("Couldn't process PRIM data")?;
 
 	// Higher is less detail
 	let preferred_lod = 1;
@@ -210,8 +214,9 @@ pub async fn initialise_resource_overview(
 
 					"ORES" if hash == UNLOCKABLES_ID => ResourceOverviewData::Unlockables,
 
-					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF"
-					| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" | "TBLU" => {
+					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB" | "ENUM"
+					| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP" | "GFXA" | "KWOR"
+					| "TDAT" | "TDPK" | "WEMD" | "TBLU" => {
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 						ResourceOverviewData::GenericRL {
@@ -291,8 +296,11 @@ pub async fn initialise_resource_overview(
 
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-						let mut texture = TextureMap::process_data(game.version().into(), res_data)
-							.context("Couldn't process texture data")?;
+						let mut texture = TextureMap::process_data(
+							Option::from(game.version()).context("Game version net yet supported")?,
+							res_data
+						)
+						.context("Couldn't process texture data")?;
 
 						if let Some(texd_depend) = res_meta.core_info.references.first() {
 							let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
@@ -854,7 +862,7 @@ pub async fn initialise_resource_overview(
 							let (_, res_data) = game.extract_latest_resource(hash)?;
 
 							match game.version() {
-								GameVersion::H1 => format!(
+								GlacierGame::H1 => format!(
 									"{}\n---\n{:?}",
 									hash,
 									hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(
@@ -874,7 +882,7 @@ pub async fn initialise_resource_overview(
 									.root
 								),
 
-								GameVersion::H2 => format!(
+								GlacierGame::H2 => format!(
 									"{}\n---\n{:?}",
 									hash,
 									hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(
@@ -894,7 +902,7 @@ pub async fn initialise_resource_overview(
 									.root
 								),
 
-								GameVersion::H3 => format!(
+								GlacierGame::H3 => format!(
 									"{}\n---\n{:?}",
 									hash,
 									hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(
@@ -912,7 +920,9 @@ pub async fn initialise_resource_overview(
 										}
 									))?
 									.root
-								)
+								),
+
+								_ => "Unsupported game version for behavior tree".into()
 							}
 						}
 					},
@@ -1043,18 +1053,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				let (metadata, data) = game.extract_latest_resource(hash)?;
 
 				let data = match game.version() {
-					GameVersion::H1 => to_vec(
+					GlacierGame::H1 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntity>(&data)
 							.context("Couldn't deserialise factory")?
 					)?,
 
-					GameVersion::H2 => to_vec(
+					GlacierGame::H2 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityFactory>(&data)
 							.context("Couldn't deserialise factory")?
 					)?,
 
-					GameVersion::H3 => to_vec(
+					GlacierGame::H3 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityFactory>(&data)
+							.context("Couldn't deserialise factory")?
+					)?,
+
+					GlacierGame::FL => to_vec(
+						&glacier_bin1::deserialize::<glacier_bin1::game::fl::STemplateEntityFactory>(&data)
 							.context("Couldn't deserialise factory")?
 					)?
 				};
@@ -1112,18 +1127,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				let (metadata, data) = game.extract_latest_resource(game.extract_entity(hash)?.blueprint)?;
 
 				let data = match game.version() {
-					GameVersion::H1 => to_vec(
+					GlacierGame::H1 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?,
 
-					GameVersion::H2 => to_vec(
+					GlacierGame::H2 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?,
 
-					GameVersion::H3 => to_vec(
+					GlacierGame::H3 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityBlueprint>(&data)
+							.context("Couldn't deserialise blueprint")?
+					)?,
+
+					GlacierGame::FL => to_vec(
+						&glacier_bin1::deserialize::<glacier_bin1::game::fl::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?
 				};
@@ -1254,8 +1274,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						}
 
 						"TEXT" => {
-							let mut texture = TextureMap::process_data(game.version().into(), res_data)
-								.context("Couldn't process texture data")?;
+							let mut texture = TextureMap::process_data(
+								Option::from(game.version()).context("Game version net yet supported")?,
+								res_data
+							)
+							.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
 								let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
@@ -1835,8 +1858,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-				let mut texture = TextureMap::process_data(game.version().into(), res_data)
-					.context("Couldn't process texture data")?;
+				let mut texture = TextureMap::process_data(
+					Option::from(game.version()).context("Game version net yet supported")?,
+					res_data
+				)
+				.context("Couldn't process texture data")?;
 
 				if let Some(texd_depend) = res_meta.core_info.references.first() {
 					let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
@@ -1919,7 +1945,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				let (_, res_data) = game.extract_latest_resource(hash)?;
 
 				let pseudocode = match game.version() {
-					GameVersion::H1 => format!(
+					GlacierGame::H1 => format!(
 						"{}\n---\n{:?}",
 						hash,
 						hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
@@ -1937,7 +1963,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						.root
 					),
 
-					GameVersion::H2 => format!(
+					GlacierGame::H2 => format!(
 						"{}\n---\n{:?}",
 						hash,
 						hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
@@ -1955,7 +1981,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						.root
 					),
 
-					GameVersion::H3 => format!(
+					GlacierGame::H3 => format!(
 						"{}\n---\n{:?}",
 						hash,
 						hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
@@ -1971,7 +1997,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 								.unwrap()
 						}))?
 						.root
-					)
+					),
+
+					_ => bail!("Unsupported game for behavior tree")
 				};
 
 				let mut dialog = app.dialog().file().set_title("Extract file");

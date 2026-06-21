@@ -4,19 +4,22 @@
 	import { onMount } from "svelte"
 	import type { EntityTreeRequest, PastableTemplateCategory, RefProxy } from "$lib/bindings"
 	import { Modal, Search } from "carbon-components-svelte"
-	import { event } from "$lib/utils"
+	import { event, game } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { changeReferenceToLocalEntity, genRandHex, getReferencedLocalEntity } from "./utils"
 	import { trackEvent } from "$lib/utils"
 	import HighlightMonaco from "./HighlightMonaco.svelte"
 	import { v4 } from "uuid"
-	import { help } from "$lib/helpray"
 	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
 
-	export let editorID: string
+	interface Props {
+		editorID: string
+	}
+
+	let { editorID }: Props = $props()
 
 	const elemID = "tree-" + Math.random().toString(36).replace(".", "")
-	let tree: JSTree = null!
+	let tree: JSTree = $state(null!)
 
 	function compareNodes(a: any, b: any) {
 		if ((!(a.original ? a.original : a).folder && !(b.original ? b.original : b).folder) || ((a.original ? a.original : a).folder && (b.original ? b.original : b).folder)) {
@@ -42,11 +45,11 @@
 	// Gets around having to use JS for search
 	let entitiesToShowOnSearch: Set<string> = new Set()
 
-	let helpMenuOpen = false
-	let helpMenuFactory = ""
-	let helpMenuInputs: string[] = []
-	let helpMenuOutputs: string[] = []
-	let helpMenuDefaultPropertiesJSON = ""
+	let helpMenuOpen = $state(false)
+	let helpMenuFactory = $state("")
+	let helpMenuInputs: string[] = $state([])
+	let helpMenuOutputs: string[] = $state([])
+	let helpMenuDefaultPropertiesJSON = $state("")
 
 	let templates: PastableTemplateCategory[] = []
 
@@ -58,6 +61,9 @@
 
 	let showDiff = false
 	let diffTouchedEntities: string[] = []
+
+	const zentityFactory = $derived(game.version === "fl" ? "[modules:/zentity.class].entitytype" : "[modules:/zentity.class].pc_entitytype")
+	const zentityBlueprint = $derived(game.version === "fl" ? "[modules:/zentity.class].entityblueprint" : "[modules:/zentity.class].pc_entityblueprint")
 
 	onMount(async () => {
 		jQuery("#" + elemID).jstree({
@@ -143,7 +149,7 @@
 												icon: "fa fa-project-diagram",
 												text: "",
 												folder: false,
-												factory: "[modules:/zentity.class].pc_entitytype",
+												factory: zentityFactory,
 												hasReverseParentRefs: false,
 												parentRef: selected_node.id
 											},
@@ -157,12 +163,11 @@
 
 													// Ensure parent gets reclassified as a folder if necessary
 													selected_node.original.hasReverseParentRefs = true
-													selected_node.original.folder =
-														selected_node.original.factory === "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+													selected_node.original.folder = selected_node.original.factory === zentityFactory && selected_node.original.hasReverseParentRefs
 
 													tree.set_icon(
 														selected_node.id,
-														selected_node.original.factory === "[modules:/zentity.class].pc_entitytype" && selected_node.original.hasReverseParentRefs
+														selected_node.original.factory === zentityFactory && selected_node.original.hasReverseParentRefs
 															? "fa-regular fa-folder"
 															: icons.find((a) => selected_node.original.factory.includes(a[0]))
 																? icons.find((a) => selected_node.original.factory.includes(a[0]))![1]
@@ -187,8 +192,8 @@
 																			content: {
 																				parent: selected_node.id,
 																				name: node.text,
-																				factory: "[modules:/zentity.class].pc_entitytype",
-																				blueprint: "[modules:/zentity.class].pc_entityblueprint"
+																				factory: zentityFactory,
+																				blueprint: zentityBlueprint
 																			}
 																		}
 																	}
@@ -267,14 +272,12 @@
 												(a: any) => a.parent === tree.get_node(selected_node.parent).id
 											)
 											tree.get_node(selected_node.parent).original.folder =
-												tree.get_node(selected_node.parent).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-												tree.get_node(selected_node.parent).original.hasReverseParentRefs
+												tree.get_node(selected_node.parent).original.factory === zentityFactory && tree.get_node(selected_node.parent).original.hasReverseParentRefs
 
 											// Reclassify parent as not folder if necessary
 											tree.set_icon(
 												selected_node.parent,
-												tree.get_node(selected_node.parent).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-													tree.get_node(selected_node.parent).original.hasReverseParentRefs
+												tree.get_node(selected_node.parent).original.factory === zentityFactory && tree.get_node(selected_node.parent).original.hasReverseParentRefs
 													? "fa-regular fa-folder"
 													: icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))
 														? icons.find((a) => tree.get_node(selected_node.parent).original.factory.includes(a[0]))![1]
@@ -874,18 +877,17 @@
 	}
 
 	const icons = Object.entries({
-		"[assembly:/templates/gameplay/ai2/actors.template?/npcactor.entitytemplate].pc_entitytype": "fa-regular fa-user",
-		"[assembly:/_pro/characters/templates/hero/agent47/agent47.template?/agent47_default.entitytemplate].pc_entitytype": "fa-regular fa-user-circle",
-		"[assembly:/_pro/design/levelflow.template?/herospawn.entitytemplate].pc_entitytype": "fa-regular fa-user-circle",
-		"[modules:/zglobaloutfitkit.class].pc_entitytype": "fa fa-tshirt",
-		"[modules:/zroomentity.class].pc_entitytype": "fa fa-map-marker-alt",
-		"[modules:/zboxvolumeentity.class].pc_entitytype": "fa-regular fa-square",
-		"[modules:/zsoundbankentity.class].pc_entitytype": "fa fa-music",
-		"[modules:/zcameraentity.class].pc_entitytype": "fa fa-camera",
-		"[modules:/zsequenceentity.class].pc_entitytype": "fa fa-film",
-		"[modules:/zhitmandamageovertime.class].pc_entitytype": "fa fa-skull-crossbones",
-		"[assembly:/_pro/design/templates/ld design assets/ld_helpers_generic.template?/mockup_commentbubble.entitytemplate].pc_entitytype": "fa-regular fa-comment", // Hashes
-
+		"[assembly:/templates/gameplay/ai2/actors.template?/npcactor.entitytemplate]": "fa-regular fa-user",
+		"[assembly:/_pro/characters/templates/hero/agent47/agent47.template?/agent47_default.entitytemplate]": "fa-regular fa-user-circle",
+		"[assembly:/_pro/design/levelflow.template?/herospawn.entitytemplate]": "fa-regular fa-user-circle",
+		"[modules:/zglobaloutfitkit.class]": "fa fa-tshirt",
+		"[modules:/zroomentity.class]": "fa fa-map-marker-alt",
+		"[modules:/zboxvolumeentity.class]": "fa-regular fa-square",
+		"[modules:/zsoundbankentity.class]": "fa fa-music",
+		"[modules:/zcameraentity.class]": "fa fa-camera",
+		"[modules:/zsequenceentity.class]": "fa fa-film",
+		"[modules:/zhitmandamageovertime.class]": "fa fa-skull-crossbones",
+		"[assembly:/_pro/design/templates/ld design assets/ld_helpers_generic.template?/mockup_commentbubble.entitytemplate]": "fa-regular fa-comment",
 		"levelflow.template?/exit": "fa fa-sign-out-alt",
 		zitem: "fa fa-wrench", // Specific
 
@@ -917,13 +919,13 @@
 				id: entityID,
 				parent: getReferencedLocalEntity(parent) || "#",
 				icon:
-					factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+					factory === zentityFactory && hasReverseParentRefs
 						? "fa-regular fa-folder"
 						: icons.find((a) => factory.includes(a[0]))
 							? icons.find((a) => factory.includes(a[0]))![1]
 							: "fa-regular fa-file",
 				text: `${name} (${entityID})`,
-				folder: factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+				folder: factory === zentityFactory && hasReverseParentRefs,
 				factory,
 				hasReverseParentRefs,
 				parentRef: parent
@@ -947,21 +949,21 @@
 						tree.move_node(
 							existingNode,
 							getReferencedLocalEntity(parent) || "#",
-							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === zentityFactory && hasReverseParentRefs)
 						)
 
 						tree.rename_node(existingNode, `${name} (${entityID})`)
 
 						tree.set_icon(
 							existingNode,
-							factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+							factory === zentityFactory && hasReverseParentRefs
 								? "fa-regular fa-folder"
 								: icons.find((a) => factory.includes(a[0]))
 									? icons.find((a) => factory.includes(a[0]))![1]
 									: "fa-regular fa-file"
 						)
 
-						existingNode.original.folder = factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+						existingNode.original.folder = factory === zentityFactory && hasReverseParentRefs
 						existingNode.original.factory = factory
 						existingNode.original.hasReverseParentRefs = hasReverseParentRefs
 						existingNode.original.parentRef = parent
@@ -969,13 +971,11 @@
 						if (getReferencedLocalEntity(parent)) {
 							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
 							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === zentityFactory && tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 
 							tree.set_icon(
 								getReferencedLocalEntity(parent),
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === zentityFactory && tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 									? "fa-regular fa-folder"
 									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
 										? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
@@ -999,30 +999,28 @@
 								id: entityID,
 								parent: getReferencedLocalEntity(parent) || "#",
 								icon:
-									factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+									factory === zentityFactory && hasReverseParentRefs
 										? "fa-regular fa-folder"
 										: icons.find((a) => factory.includes(a[0]))
 											? icons.find((a) => factory.includes(a[0]))![1]
 											: "fa-regular fa-file",
 								text: `${name} (${entityID})`,
-								folder: factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+								folder: factory === zentityFactory && hasReverseParentRefs,
 								factory,
 								hasReverseParentRefs,
 								parentRef: parent
 							},
-							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+							getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === zentityFactory && hasReverseParentRefs)
 						)
 
 						if (getReferencedLocalEntity(parent)) {
 							tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
 							tree.get_node(getReferencedLocalEntity(parent)).original.folder =
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === zentityFactory && tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 
 							tree.set_icon(
 								getReferencedLocalEntity(parent),
-								tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+								tree.get_node(getReferencedLocalEntity(parent)).original.factory === zentityFactory && tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 									? "fa-regular fa-folder"
 									: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
 										? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
@@ -1092,13 +1090,13 @@
 									id: entityID,
 									parent: getReferencedLocalEntity(parent) || "#",
 									icon:
-										factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs
+										factory === zentityFactory && hasReverseParentRefs
 											? "fa-regular fa-folder"
 											: icons.find((a) => factory.includes(a[0]))
 												? icons.find((a) => factory.includes(a[0]))![1]
 												: "fa-regular fa-file",
 									text: `${name} (${entityID})`,
-									folder: factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs,
+									folder: factory === zentityFactory && hasReverseParentRefs,
 									factory,
 									hasReverseParentRefs,
 									parentRef: parent,
@@ -1106,19 +1104,17 @@
 										class: "item-removed"
 									}
 								},
-								getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === "[modules:/zentity.class].pc_entitytype" && hasReverseParentRefs)
+								getPositionOfNode(getReferencedLocalEntity(parent) || "#", name, factory === zentityFactory && hasReverseParentRefs)
 							)
 
 							if (getReferencedLocalEntity(parent)) {
 								tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs = true
 								tree.get_node(getReferencedLocalEntity(parent)).original.folder =
-									tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-									tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+									tree.get_node(getReferencedLocalEntity(parent)).original.factory === zentityFactory && tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 
 								tree.set_icon(
 									getReferencedLocalEntity(parent),
-									tree.get_node(getReferencedLocalEntity(parent)).original.factory === "[modules:/zentity.class].pc_entitytype" &&
-										tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
+									tree.get_node(getReferencedLocalEntity(parent)).original.factory === zentityFactory && tree.get_node(getReferencedLocalEntity(parent)).original.hasReverseParentRefs
 										? "fa-regular fa-folder"
 										: icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))
 											? icons.find((a) => tree.get_node(getReferencedLocalEntity(parent)).original.factory.includes(a[0]))![1]
@@ -1185,11 +1181,13 @@
 		}
 	}
 
-	let selectedNode: string | null = null
+	let selectedNode: string | null = $state(null)
 
-	$: if (selectedNode) {
-		fixSelection()
-	}
+	$effect(() => {
+		if (selectedNode) {
+			fixSelection()
+		}
+	})
 </script>
 
 <Search
@@ -1201,7 +1199,7 @@
 		tree.clear_search()
 	}}
 />
-<div id={elemID} class="flex-grow overflow-auto" />
+<div id={elemID} class="flex-grow overflow-auto"></div>
 
 <Modal bind:open={helpMenuOpen} modalHeading="Help for {helpMenuFactory}" passiveModal>
 	<div class="grid grid-cols-2 gap-4 h-[70vh]">

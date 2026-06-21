@@ -30,3 +30,5 @@ export function trackEvent(name: string, props?: Record<string, unknown>) {
 export const showInFolder = commands.showInFolder
 
 export const enums: Record<string, string[]> = {}
+
+export const game: { version: "h1" | "h2" | "h3" | "fl" } = { version: "h3" }

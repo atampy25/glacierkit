@@ -1,56 +1,14 @@
 use anyhow::{Context, Result, bail};
 use ecow::EcoString;
 use fn_error_context::context;
-use glacier_bin1::game::{conversion::ConvertInto, h1, h2, h3};
-use hitman_commons::{game::GameVersion, metadata::ResourceType};
+use glacier_bin1::game::{fl, h1, h2, h3};
+use glacier_commons::{game::GlacierGame, metadata::ResourceType};
 use serde_json::{Value, to_value, to_writer};
 use tryvial::try_fn;
 
-/// Deserialize a factory from the game and convert it to the H3 format if necessary.
-#[try_fn]
-#[context("Couldn't deserialize factory for version {game_version:?}")]
-pub fn deserialize_modern_factory(game_version: GameVersion, data: &[u8]) -> Result<h3::STemplateEntityFactory> {
-	match game_version {
-		GameVersion::H1 => glacier_bin1::deserialize::<h1::STemplateEntity>(data)
-			.context("Couldn't deserialise factory")?
-			.convert_into()
-			.context("Couldn't convert factory to modern")?,
-
-		GameVersion::H2 => glacier_bin1::deserialize::<h2::STemplateEntityFactory>(data)
-			.context("Couldn't deserialise factory")?
-			.convert_into()
-			.context("Couldn't convert factory to modern")?,
-
-		GameVersion::H3 => {
-			glacier_bin1::deserialize::<h3::STemplateEntityFactory>(data).context("Couldn't deserialise factory")?
-		}
-	}
-}
-
-/// Deserialize a blueprint from the game and convert it to the H3 format if necessary.
-#[try_fn]
-#[context("Couldn't deserialize blueprint for version {game_version:?}")]
-pub fn deserialize_modern_blueprint(game_version: GameVersion, data: &[u8]) -> Result<h3::STemplateEntityBlueprint> {
-	match game_version {
-		GameVersion::H1 => glacier_bin1::deserialize::<h1::STemplateEntityBlueprint>(data)
-			.context("Couldn't deserialise blueprint")?
-			.convert_into()
-			.context("Couldn't convert blueprint to modern")?,
-
-		GameVersion::H2 => glacier_bin1::deserialize::<h2::STemplateEntityBlueprint>(data)
-			.context("Couldn't deserialise blueprint")?
-			.convert_into()
-			.context("Couldn't convert blueprint to modern")?,
-
-		GameVersion::H3 => {
-			glacier_bin1::deserialize::<h3::STemplateEntityBlueprint>(data).context("Couldn't deserialise blueprint")?
-		}
-	}
-}
-
 #[try_fn]
 #[context("Couldn't deserialize {game_version:?} {resource_type} resource as generic")]
-pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceType, data: &[u8]) -> Result<Value> {
+pub fn deserialize_generic(game_version: GlacierGame, resource_type: ResourceType, data: &[u8]) -> Result<Value> {
 	macro_rules! impl_convert {
 		($resource_type:ident, $ty:literal, $res:ty) => {
 			if $resource_type == $ty {
@@ -81,6 +39,24 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 			impl_convert!($resource_type, "ECPB", h3::SExtendedCppEntityBlueprint);
 		}};
 
+		($resource_type:ident, fl) => {{
+			impl_convert!($resource_type, "CBLU", fl::SCppEntityBlueprint);
+			impl_convert!($resource_type, "CPPT", fl::SCppEntity);
+			impl_convert!($resource_type, "CRMD", fl::SCrowdMapData);
+			impl_convert!($resource_type, "ECPB", fl::SExtendedCppEntityBlueprint);
+			impl_convert!($resource_type, "ENUM", fl::SEnumType);
+			impl_convert!($resource_type, "GFXF", fl::SGFxMovieResource);
+			impl_convert!($resource_type, "GIDX", fl::SResourceIndex);
+			impl_convert!($resource_type, "KWOR", fl::SSerializedKeyword);
+			impl_convert!($resource_type, "TBLU", fl::STemplateEntityBlueprint);
+			impl_convert!($resource_type, "TDAT", fl::STerrainResource);
+			impl_convert!($resource_type, "TDPK", fl::STerrainDataPackage);
+			impl_convert!($resource_type, "TEMP", fl::STemplateEntityFactory);
+			impl_convert!($resource_type, "UICB", fl::SControlTypeInfo);
+			impl_convert!($resource_type, "WSGB", fl::SAudioStateGroupData);
+			impl_convert!($resource_type, "WSWB", fl::SAudioSwitchGroupData);
+		}};
+
 		(generic, $resource_type:ident, $game:ident) => {
 			impl_convert!($resource_type, "AIBB", $game::SBehaviorTreeInfo);
 			impl_convert!($resource_type, "AIRG", $game::SReasoningGrid);
@@ -104,7 +80,7 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 	if resource_type == "ORES" {
 		// Guess the right ORES type
 		match game_version {
-			GameVersion::H1 => {
+			GlacierGame::H1 => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_value(
 						glacier_bin1::deserialize::<Vec<h1::SBlobsConfigResourceEntry>>(data)
@@ -131,7 +107,7 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 				}
 			}
 
-			GameVersion::H2 => {
+			GlacierGame::H2 => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_value(
 						glacier_bin1::deserialize::<Vec<h2::SBlobsConfigResourceEntry>>(data)
@@ -158,7 +134,7 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 				}
 			}
 
-			GameVersion::H3 => {
+			GlacierGame::H3 | GlacierGame::FL => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_value(
 						glacier_bin1::deserialize::<Vec<h3::SBlobsConfigResourceEntry>>(data)
@@ -194,9 +170,10 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 		}
 	} else {
 		match game_version {
-			GameVersion::H1 => impl_all!(resource_type, h1),
-			GameVersion::H2 => impl_all!(resource_type, h2),
-			GameVersion::H3 => impl_all!(resource_type, h3)
+			GlacierGame::H1 => impl_all!(resource_type, h1),
+			GlacierGame::H2 => impl_all!(resource_type, h2),
+			GlacierGame::H3 => impl_all!(resource_type, h3),
+			GlacierGame::FL => impl_all!(resource_type, fl)
 		}
 
 		bail!("Resource type {resource_type} is not BIN1 or is unsupported for version {game_version:?}")
@@ -206,7 +183,7 @@ pub fn deserialize_generic(game_version: GameVersion, resource_type: ResourceTyp
 #[try_fn]
 #[context("Couldn't deserialize {game_version:?} {resource_type} resource as generic to writer")]
 pub fn deserialize_generic_writer(
-	game_version: GameVersion,
+	game_version: GlacierGame,
 	resource_type: ResourceType,
 	writer: &mut impl std::io::Write,
 	data: &[u8]
@@ -244,6 +221,24 @@ pub fn deserialize_generic_writer(
 			impl_convert!($resource_type, "ECPB", h3::SExtendedCppEntityBlueprint);
 		}};
 
+		($resource_type:ident, fl) => {{
+			impl_convert!($resource_type, "CBLU", fl::SCppEntityBlueprint);
+			impl_convert!($resource_type, "CPPT", fl::SCppEntity);
+			impl_convert!($resource_type, "CRMD", fl::SCrowdMapData);
+			impl_convert!($resource_type, "ECPB", fl::SExtendedCppEntityBlueprint);
+			impl_convert!($resource_type, "ENUM", fl::SEnumType);
+			impl_convert!($resource_type, "GFXF", fl::SGFxMovieResource);
+			impl_convert!($resource_type, "GIDX", fl::SResourceIndex);
+			impl_convert!($resource_type, "KWOR", fl::SSerializedKeyword);
+			impl_convert!($resource_type, "TBLU", fl::STemplateEntityBlueprint);
+			impl_convert!($resource_type, "TDAT", fl::STerrainResource);
+			impl_convert!($resource_type, "TDPK", fl::STerrainDataPackage);
+			impl_convert!($resource_type, "TEMP", fl::STemplateEntityFactory);
+			impl_convert!($resource_type, "UICB", fl::SControlTypeInfo);
+			impl_convert!($resource_type, "WSGB", fl::SAudioStateGroupData);
+			impl_convert!($resource_type, "WSWB", fl::SAudioSwitchGroupData);
+		}};
+
 		(generic, $resource_type:ident, $game:ident) => {
 			impl_convert!($resource_type, "AIBB", $game::SBehaviorTreeInfo);
 			impl_convert!($resource_type, "AIRG", $game::SReasoningGrid);
@@ -267,7 +262,7 @@ pub fn deserialize_generic_writer(
 	if resource_type == "ORES" {
 		// Guess the right ORES type
 		match game_version {
-			GameVersion::H1 => {
+			GlacierGame::H1 => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_writer(
 						writer,
@@ -298,7 +293,7 @@ pub fn deserialize_generic_writer(
 				}
 			}
 
-			GameVersion::H2 => {
+			GlacierGame::H2 => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_writer(
 						writer,
@@ -329,7 +324,7 @@ pub fn deserialize_generic_writer(
 				}
 			}
 
-			GameVersion::H3 => {
+			GlacierGame::H3 | GlacierGame::FL => {
 				if data.windows(11).any(|x| x == b"blobcachedb") {
 					to_writer(
 						writer,
@@ -366,9 +361,10 @@ pub fn deserialize_generic_writer(
 		}
 	} else {
 		match game_version {
-			GameVersion::H1 => impl_all!(resource_type, h1),
-			GameVersion::H2 => impl_all!(resource_type, h2),
-			GameVersion::H3 => impl_all!(resource_type, h3)
+			GlacierGame::H1 => impl_all!(resource_type, h1),
+			GlacierGame::H2 => impl_all!(resource_type, h2),
+			GlacierGame::H3 => impl_all!(resource_type, h3),
+			GlacierGame::FL => impl_all!(resource_type, fl)
 		}
 
 		bail!("Resource type {resource_type} is not BIN1 or is unsupported for version {game_version:?}")

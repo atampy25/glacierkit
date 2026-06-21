@@ -1081,14 +1081,12 @@ export type GameBrowserRequest =
 	  }
 
 export type GameInstall = {
-	version: GameVersion
-	platform: GamePlatform
+	version: GlacierGame
+	platform: StorePlatform
 	path: string
 }
 
-export type GamePlatform = "steam" | "epic" | "gOG" | "microsoft"
-
-export type GameVersion = "h1" | "h2" | "h3"
+export type GlacierGame = "h1" | "h2" | "h3" | "fL"
 
 export type GlobalEvent =
 	| { type: "setSeenAnnouncements"; data: string[] }
@@ -1155,8 +1153,9 @@ export type GlobalRequest =
 	| { type: "requestLastPanicUpload" }
 	| { type: "logUploadRejected" }
 	| {
-			type: "setEnums"
+			type: "setGameVersion"
 			data: {
+				version: GlacierGame | null
 				enums: { [key in string]: string[] }
 			}
 	  }
@@ -1252,7 +1251,7 @@ export type ReferenceFlags_Serialize = {
 	languageCode?: number
 }
 
-export type ReferenceType = "install" | "normal" | "weak" | "media" | "state" | "entityType"
+export type ReferenceType = "install" | "normal" | "weak" | "streamed" | "media" | "state" | "entityType"
 
 export type RepositoryItemInformation =
 	| {
@@ -1642,7 +1641,7 @@ export type ReverseReferenceData =
 			}
 	  }
 	| {
-			type: "platformProperty"
+			type: "platformSpecificProperty"
 			data: {
 				property_name: string
 				platform: string
@@ -1745,6 +1744,8 @@ export type SettingsRequest =
 			}
 	  }
 
+export type StorePlatform = "steam" | "epic" | "gOG" | "microsoft"
+
 export type SubEntity = SubEntity_Serialize | SubEntity_Deserialize
 
 export type SubEntity_Deserialize = {
@@ -1766,10 +1767,12 @@ export type SubEntity_Deserialize = {
 	 *  Setting this to true will remove the entity from the game as well as all of its organisational (but not coordinate) children.
 	 */
 	editorOnly?: boolean
+	// Platforms on which the entity will not be loaded.
+	excludedPlatforms?: string[]
 	// Properties of the entity.
 	properties?: { [key in string]: Property_Deserialize }
 	// Properties to apply conditionally to the entity based on platform.
-	platformProperties?: { [key in string]: { [key in string]: Property_Deserialize } }
+	platformSpecificProperties?: { [key in string]: { [key in string]: Property_Deserialize } }
 	// Inputs on entities to trigger when events occur.
 	events?: { [key in string]: { [key in string]: PinConnectionProxy_Deserialize[] } }
 	// Inputs on entities to trigger when this entity is given inputs.
@@ -1805,10 +1808,12 @@ export type SubEntity_Serialize = {
 	 *  Setting this to true will remove the entity from the game as well as all of its organisational (but not coordinate) children.
 	 */
 	editorOnly?: boolean
+	// Platforms on which the entity will not be loaded.
+	excludedPlatforms?: string[]
 	// Properties of the entity.
 	properties?: { [key in string]: Property_Serialize }
 	// Properties to apply conditionally to the entity based on platform.
-	platformProperties?: { [key in string]: { [key in string]: Property_Serialize } }
+	platformSpecificProperties?: { [key in string]: { [key in string]: Property_Serialize } }
 	// Inputs on entities to trigger when events occur.
 	events?: { [key in string]: { [key in string]: PinConnectionProxy_Serialize[] } }
 	// Inputs on entities to trigger when this entity is given inputs.

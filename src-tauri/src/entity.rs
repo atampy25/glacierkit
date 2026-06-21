@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow, bail};
 use ecow::EcoString;
 use fn_error_context::context;
-use hitman_commons::{
+use glacier_commons::{
 	metadata::{ResourceType, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
@@ -36,7 +36,7 @@ pub enum ReverseReferenceData {
 		#[specta(type = String)]
 		property_name: EcoString
 	},
-	PlatformProperty {
+	PlatformSpecificProperty {
 		#[specta(type = String)]
 		property_name: EcoString,
 
@@ -155,7 +155,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 			});
 		}
 
-		for (platform, properties) in &entity.platform_properties {
+		for (platform, properties) in &entity.platform_specific_properties {
 			for (property_name, property_data) in properties {
 				visit_variant(&property_data.value, &mut |val| {
 					if let Variant::Ref(val) = val
@@ -163,7 +163,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 					{
 						reverse_references.entry(ent).or_default().push(ReverseReference {
 							from: *entity_id,
-							data: ReverseReferenceData::PlatformProperty {
+							data: ReverseReferenceData::PlatformSpecificProperty {
 								property_name: property_name.to_owned(),
 								platform: platform.to_owned()
 							}
@@ -357,7 +357,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for properties in sub_entity.platform_properties.values() {
+	for properties in sub_entity.platform_specific_properties.values() {
 		for property_data in properties.values() {
 			let mut res = EditorValidity::Valid;
 			visit_variant(&property_data.value, &mut |val| {
@@ -599,7 +599,8 @@ pub fn get_decorations(
 			}
 
 			Variant::Uuid(uuid) => {
-				if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
+				if let Some(repo) = game.repository()
+					&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
 					&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 				{
 					decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
@@ -610,7 +611,7 @@ pub fn get_decorations(
 		});
 	}
 
-	for properties in sub_entity.platform_properties.values() {
+	for properties in sub_entity.platform_specific_properties.values() {
 		for property_data in properties.values() {
 			visit_variant(&property_data.value, &mut |val| match val {
 				Variant::Ref(val) => {
@@ -634,7 +635,8 @@ pub fn get_decorations(
 				}
 
 				Variant::Uuid(uuid) => {
-					if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
+					if let Some(repo) = game.repository()
+						&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
 						&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 					{
 						decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));

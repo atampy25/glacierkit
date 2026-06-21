@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
-use hitman_commons::metadata::RuntimeID;
+use glacier_commons::metadata::RuntimeID;
 use log::debug;
 use quickentity_rs::entity::{EntityID, SubEntity};
 use serde_json::from_str;
@@ -9,7 +9,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
-	HashMap, Notification, NotificationKind,
+	Notification, NotificationKind,
 	entity::{
 		check_local_references_exist, get_decorations, get_diff_info, is_valid_entity_blueprint,
 		is_valid_entity_factory, reverse_parent_refs_set
@@ -70,27 +70,6 @@ pub static SAFE_TO_SYNC: [&str; 44] = [
 	"SEntityTemplateReference",
 	"ZSpatialEntity.ERoomBehaviour"
 ];
-
-#[static_init::dynamic]
-pub static ENUMS: HashMap<&'static str, Vec<&'static str>> = glacier_bin1::game::h1::VARIANT_TYPES
-	.values()
-	.chain(glacier_bin1::game::h2::VARIANT_TYPES.values())
-	.chain(glacier_bin1::game::h3::VARIANT_TYPES.values())
-	.filter_map(|(ty, shape)| {
-		shape.and_then(|shape| match shape.ty {
-			facet::Type::User(facet::UserType::Enum(enum_ty)) => Some((
-				*ty,
-				enum_ty
-					.variants
-					.iter()
-					.map(|variant| variant.effective_name())
-					.collect()
-			)),
-
-			_ => None
-		})
-	})
-	.collect();
 
 #[try_fn]
 #[context("Couldn't handle monaco event")]
@@ -181,11 +160,11 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 			.iter()
 			.zip(entity2.properties.iter())
 			.all(|(a, b)| a.0 == b.0 && a.1.post_init == b.1.post_init && a.1.value.rough_eq(&b.1.value))
-		&& entity1.platform_properties.len() == entity2.platform_properties.len()
+		&& entity1.platform_specific_properties.len() == entity2.platform_specific_properties.len()
 		&& entity1
-			.platform_properties
+			.platform_specific_properties
 			.iter()
-			.zip(entity2.platform_properties.iter())
+			.zip(entity2.platform_specific_properties.iter())
 			.all(|(a, b)| {
 				a.0 == b.0
 					&& a.1.len() == b.1.len()

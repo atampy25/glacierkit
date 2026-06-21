@@ -1,10 +1,10 @@
-use std::{fs, path::Path, sync::atomic::Ordering, time::Duration};
+use std::{fs, path::Path, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use ecow::eco_format;
 use fn_error_context::context;
-use hitman_commons::{hash_list::HASH_LIST, metadata::RuntimeID, rid};
+use glacier_commons::{game::GlacierGame, hash_list::HASH_LIST, metadata::RuntimeID, rid};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -24,9 +24,8 @@ use uuid::Uuid;
 use velcro::vec;
 
 use crate::{
-	HASH_LIST_ENDPOINT, HASH_LIST_VERSION_ENDPOINT, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT,
-	TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
-	event_handling::{entity::monaco::ENUMS, resource_overview::initialise_resource_overview},
+	HashMap, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
+	event_handling::resource_overview::initialise_resource_overview,
 	finish_task,
 	game::Game,
 	model::{
@@ -378,10 +377,11 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 			"repository.json" => {
 				let id = Uuid::new_v4();
 
-				if let Some(game) = app_state.game.load().as_ref() {
+				if let Some(game) = app_state.game.load().as_ref()
+					&& let Some(repo) = game.repository()
+				{
 					let mut repository = to_value(
-						game.repository()
-							.iter()
+						repo.iter()
 							.cloned()
 							.map(|x| (x.id, x.data))
 							.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
@@ -438,7 +438,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						Notification {
 							kind: NotificationKind::Error,
 							title: "No game selected".into(),
-							subtitle: "You can't open patch files without a copy of the game selected.".into()
+							subtitle: "You can't open repository patch files without a copy of a supported game \
+							           selected."
+								.into()
 						}
 					)?;
 				}
@@ -556,16 +558,17 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					.context("Type key was not string")?
 				{
 					"REPO" => {
-						if let Some(game) = app_state.game.load().as_ref() {
+						if let Some(game) = app_state.game.load().as_ref()
+							&& let Some(repo) = game.repository()
+						{
 							let mut repository = to_value(
-								game.repository()
-									.iter()
+								repo.iter()
 									.cloned()
 									.map(|x| (x.id, x.data))
 									.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
 							)?;
 
-							let base = to_value(game.repository())?;
+							let base = to_value(repo)?;
 
 							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 								.context("Invalid JSON")?;
@@ -622,7 +625,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								Notification {
 									kind: NotificationKind::Error,
 									title: "No game selected".into(),
-									subtitle: "You can't open patch files without a copy of the game selected.".into()
+									subtitle: "You can't open repository patch files without a copy of a supported \
+									           game selected."
+										.into()
 								}
 							)?;
 						}
@@ -892,29 +897,7 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 
 			let app_data_dir = app.path().app_data_dir().context("Couldn't get data dir")?;
 
-			let _ = fs::read(app_data_dir.join("hash_list.sml"))
-				.ok()
-				.and_then(|x| HASH_LIST.load_compressed(&x).ok());
-
-			let current_version = HASH_LIST.version.load(Ordering::SeqCst);
-
-			if let Ok(data) = reqwest::get(HASH_LIST_VERSION_ENDPOINT).await
-				&& let Ok(data) = data.text().await
-			{
-				let new_version = data
-					.trim()
-					.parse::<u32>()
-					.context("Online hash list version wasn't a number")?;
-
-				if current_version < new_version
-					&& let Ok(data) = reqwest::get(HASH_LIST_ENDPOINT).await
-					&& let Ok(data) = data.bytes().await
-				{
-					HASH_LIST.load_compressed(&data)?;
-
-					fs::write(app_data_dir.join("hash_list.sml"), data)?;
-				}
-			}
+			HASH_LIST.load_latest().await?;
 
 			let app_state = app.state::<AppState>();
 			let current_version = app_state
@@ -955,16 +938,6 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 
 	load_game_files(app).await?;
 	res.await??;
-
-	send_request(
-		app,
-		Request::Global(GlobalRequest::SetEnums {
-			enums: ENUMS
-				.iter()
-				.map(|(&x, y)| (x.to_owned(), y.iter().map(|&z| z.to_owned()).collect()))
-				.collect()
-		})
-	)?;
 
 	if app
 		.path()
@@ -1029,6 +1002,38 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 		Request::Tool(ToolRequest::ContentSearch(ContentSearchRequest::SetEnabled {
 			enabled: app_state.game.load().is_some()
 		}))
+	)?;
+
+	send_request(
+		app,
+		Request::Global(GlobalRequest::SetGameVersion {
+			version: app_state.game.load().as_ref().map(|x| x.version()),
+			enums: {
+				let empty = HashMap::<_, _, rapidhash::fast::RandomState>::default();
+				match app_state.game.load().as_ref().map(|x| x.version()) {
+					Some(GlacierGame::H1) => glacier_bin1::game::h1::VARIANT_TYPES.values(),
+					Some(GlacierGame::H2) => glacier_bin1::game::h2::VARIANT_TYPES.values(),
+					Some(GlacierGame::H3) => glacier_bin1::game::h3::VARIANT_TYPES.values(),
+					Some(GlacierGame::FL) => glacier_bin1::game::fl::VARIANT_TYPES.values(),
+					None => empty.values()
+				}
+				.filter_map(|(ty, shape)| {
+					shape.and_then(|shape| match shape.ty {
+						facet::Type::User(facet::UserType::Enum(enum_ty)) => Some((
+							(*ty).to_owned(),
+							enum_ty
+								.variants
+								.iter()
+								.map(|variant| variant.effective_name().to_owned())
+								.collect::<Vec<_>>()
+						)),
+
+						_ => None
+					})
+				})
+				.collect()
+			}
+		})
 	)?;
 
 	if let Some(game) = app_state.game.load().as_ref() {
@@ -1119,7 +1124,8 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 
 			let id = Uuid::new_v4();
 
-			let repository: Vec<RepositoryItem> = game.repository().to_owned();
+			let repository: Vec<RepositoryItem> =
+				game.repository().to_owned().context("No repository present in game")?;
 
 			app_state
 				.editor_states

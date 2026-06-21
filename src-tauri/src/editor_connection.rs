@@ -12,10 +12,11 @@ use debounced::debounced;
 use fn_error_context::context;
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use glacier_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
-use hitman_commons::{game::GameVersion, metadata::ResourceMetadata, resource_type};
+use glacier_commons::{metadata::ResourceMetadata, resource_type};
 use indexmap::IndexMap;
 use quickentity_rs::{
 	entity::{EntityID, Ref},
+	game::{FromQuickEntity, ToQuickEntity},
 	variant::{Transform, Variant, Vec3}
 };
 use serde::{Deserialize, Serialize};
@@ -325,13 +326,48 @@ impl EditorConnection {
 								id: id.parse().expect("Couldn't parse entity ID"),
 								tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
 								transform: {
-									let matrix = from_value::<ZVariant>(json!({
-										"$type": transform.property_type,
-										"$val": transform.data
-									}))
-									.expect("Couldn't parse transform as ZVariant");
+									let matrix = from_value::<glacier_bin1::game::h3::SMatrix43>(transform.data)
+										.expect("Couldn't parse transform as ZVariant");
 
-									Transform::from_game(matrix.as_ref().expect("Transform was not SMatrix43"), false)
+									matrix
+										.to_qn(
+											&STemplateEntityFactory {
+												blueprint_index_in_resource_header: 0,
+												root_entity_index: 0,
+												sub_type: 0,
+												sub_entities: vec![],
+												external_scene_type_indices_in_resource_header: vec![],
+												property_overrides: vec![]
+											},
+											&ResourceMetadata {
+												id: EMPTY_ID,
+												resource_type: resource_type!("TEMP"),
+												compressed: true,
+												scrambled: true,
+												references: vec![]
+											},
+											&STemplateEntityBlueprint {
+												sub_type: 0,
+												root_entity_index: 0,
+												sub_entities: vec![],
+												external_scene_type_indices_in_resource_header: vec![],
+												pin_connections: vec![],
+												input_pin_forwardings: vec![],
+												output_pin_forwardings: vec![],
+												override_deletes: vec![],
+												pin_connection_overrides: vec![],
+												pin_connection_override_deletes: vec![]
+											},
+											&ResourceMetadata {
+												id: EMPTY_ID,
+												resource_type: resource_type!("TEMP"),
+												compressed: true,
+												scrambled: true,
+												references: vec![]
+											},
+											false
+										)
+										.into_ok()
 								}
 							})
 						);
@@ -351,12 +387,12 @@ impl EditorConnection {
 									PropertyID::Unknown(id) => id.to_string(),
 									PropertyID::Known(name) => name
 								},
-								property_value: match Variant::from_game(
-									&from_value::<ZVariant>(json!({
-										"$type": value.property_type,
-										"$val": value.data
-									}))
-									.expect("Couldn't parse value as ZVariant"),
+								property_value: match from_value::<ZVariant>(json!({
+									"$type": value.property_type,
+									"$val": value.data
+								}))
+								.expect("Couldn't parse value as ZVariant")
+								.to_qn(
 									&STemplateEntityFactory {
 										blueprint_index_in_resource_header: 0,
 										root_entity_index: 0,
@@ -383,6 +419,13 @@ impl EditorConnection {
 										override_deletes: vec![],
 										pin_connection_overrides: vec![],
 										pin_connection_override_deletes: vec![]
+									},
+									&ResourceMetadata {
+										id: EMPTY_ID,
+										resource_type: resource_type!("TEMP"),
+										compressed: true,
+										scrambled: true,
+										references: vec![]
 									},
 									false
 								)
@@ -958,29 +1001,14 @@ impl EditorConnection {
 						.parse()
 						.map(PropertyID::Unknown)
 						.unwrap_or(PropertyID::Known(property.to_owned())),
-					value: value
-						.to_game(
-							GameVersion::H3,
-							&STemplateEntityFactory {
-								blueprint_index_in_resource_header: 0,
-								root_entity_index: 0,
-								sub_type: 0,
-								sub_entities: vec![],
-								external_scene_type_indices_in_resource_header: vec![],
-								property_overrides: vec![]
-							},
-							&ResourceMetadata {
-								id: EMPTY_ID,
-								resource_type: resource_type!("TEMP"),
-								compressed: true,
-								scrambled: true,
-								references: vec![]
-							},
-							&Default::default(),
-							&Default::default()
-						)
-						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-						.to_serde()?
+					value: glacier_bin1::game::h3::ZVariant::from_qn(
+						&value,
+						&Default::default(),
+						&Default::default(),
+						&Default::default()
+					)
+					.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					.to_serde()?
 				})
 				.await?;
 			}

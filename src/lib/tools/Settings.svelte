@@ -172,7 +172,9 @@
 				}}
 			>
 				<div>
-					<div class="font-bold mb-2">{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})</div>
+					<div class="font-bold mb-2"
+						>{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : gameInstall.version === "h3" ? "HITMAN 3" : "007 First Light"} ({gameInstall.platform})</div
+					>
 					<span class="break-all">{gameInstall.path}</span>
 				</div>
 			</div>

@@ -47,7 +47,8 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 					}
 
 					Variant::Uuid(uuid) => {
-						if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
+						if let Some(repo) = game.repository()
+							&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
 							&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 						{
 							decorations

@@ -102,7 +102,32 @@
 
 					if (searchEntities) searchTypes.push("TEMP", "TBLU")
 
-					if (searchRL) searchTypes.push("AIBB", "AIRG", "ASVA", "ATMD", "BMSK", "CBLU", "CPPT", "CRMD", "ENUM", "GFXF", "GIDX", "UICB", "VIDB", "WSGB", "WSWB", "ECPB")
+					if (searchRL)
+						searchTypes.push(
+							"AIBB",
+							"AIRG",
+							"ASVA",
+							"ATMD",
+							"BMSK",
+							"CBLU",
+							"CPPT",
+							"CRMD",
+							"ECPB",
+							"ENUM",
+							"GFXF",
+							"GIDX",
+							"UICB",
+							"VIDB",
+							"WSGB",
+							"WSWB",
+							"DSWB",
+							"CLRP",
+							"GFXA",
+							"KWOR",
+							"TDAT",
+							"TDPK",
+							"WEMD"
+						)
 
 					if (searchText) searchTypes.push("JSON", "REPO", "ORES")
 

@@ -4,8 +4,8 @@ use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use ecow::eco_format;
 use fn_error_context::context;
-use hitman_commons::{
-	game::GameVersion,
+use glacier_commons::{
+	game::GlacierGame,
 	metadata::{ResourceReference, RuntimeID},
 	rid
 };
@@ -19,7 +19,6 @@ use quickentity_rs::{
 	patch::Patch
 };
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value, to_vec};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
@@ -28,9 +27,7 @@ use uuid::Uuid;
 use velcro::vec;
 
 use crate::{
-	Notification, NotificationKind,
-	bin1::{deserialize_modern_blueprint, deserialize_modern_factory},
-	convert_json_patch_to_merge_patch,
+	Notification, NotificationKind, convert_json_patch_to_merge_patch,
 	event_handling::{content_search::start_content_search, resource_overview::open_resource_overview},
 	finish_task,
 	general::{EMPTY_ID, REPO_ID, UNLOCKABLES_ID, initialise_app, load_game_files, open_file, open_in_editor},
@@ -91,20 +88,19 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 											parent: None,
 											name: "Scene".into(),
 											factory: ResourceReference {
-												resource: rid!("[modules:/zspatialentity.class].pc_entitytype"),
+												resource: if let Some(game) = app_state.game.load().as_ref() && game.version() == GlacierGame::FL {
+													rid!("[modules:/zspatialentity.class].entitytype")
+												} else {
+													rid!("[modules:/zspatialentity.class].pc_entitytype")
+												},
 												flags: Default::default()
 											},
-											blueprint: rid!("[modules:/zspatialentity.class].pc_entityblueprint"),
-											editor_only: Default::default(),
-											properties: Default::default(),
-											platform_properties: Default::default(),
-											events: Default::default(),
-											input_forwardings: Default::default(),
-											output_forwardings: Default::default(),
-											property_aliases: Default::default(),
-											exposed_entities: Default::default(),
-											exposed_interfaces: Default::default(),
-											subsets: Default::default()
+											blueprint: if let Some(game) = app_state.game.load().as_ref() && game.version() == GlacierGame::FL {
+												rid!("[modules:/zspatialentity.class].entityblueprint")
+											} else {
+												rid!("[modules:/zspatialentity.class].pc_entityblueprint")
+											},
+											..Default::default()
 										}
 									}
 									.map(|(x, y)| (x.to_owned(), y))
@@ -200,12 +196,51 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							}
 							entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
 
-							let (fac, fac_meta, blu, blu_meta) = entity
-								.to_game(game.version())
-								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+							let mut reconverted = match game.version() {
+								GlacierGame::H1 => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::h1::STemplateEntity,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
 
-							let mut reconverted = Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+								GlacierGame::H2 => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::h2::STemplateEntityFactory,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
+
+								GlacierGame::H3 => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::h3::STemplateEntityFactory,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
+
+								GlacierGame::FL => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::fl::STemplateEntityFactory,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
+							};
 
 							reconverted.comments = comments;
 
@@ -247,12 +282,51 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							}
 							entity.comments = vec![];
 
-							let (fac, fac_meta, blu, blu_meta) = entity
-								.to_game(game.version())
-								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+							let mut reconverted = match game.version() {
+								GlacierGame::H1 => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::h1::STemplateEntity,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
 
-							let mut reconverted = Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+								GlacierGame::H2 => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::h2::STemplateEntityFactory,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
+
+								GlacierGame::H3 => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::h3::STemplateEntityFactory,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
+
+								GlacierGame::FL => {
+									let (fac, fac_meta, blu, blu_meta): (
+										glacier_bin1::game::fl::STemplateEntityFactory,
+										_,
+										_,
+										_
+									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+								}
+							};
 
 							reconverted.comments = comments;
 
@@ -314,25 +388,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					}
 					entity.comments = comments;
 
-					// `extract_entity` is not used here because the entity needs to be extracted in non-lossless mode to avoid meaningless `scale`-removing patch operations being added.
-					let (temp_meta, temp_data) = game.extract_latest_resource(entity.factory)?;
-
-					let factory = deserialize_modern_factory(game.version(), &temp_data)?;
-
-					let blueprint_hash = temp_meta
-						.core_info
-						.references
-						.get(factory.blueprint_index_in_resource_header as usize)
-						.context("Blueprint referenced in factory does not exist in dependencies")?
-						.resource;
-
-					let (tblu_meta, tblu_data) = game.extract_latest_resource(blueprint_hash)?;
-
-					let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data)?;
-
-					let base =
-						Entity::from_game(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
-							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+					let base = game.extract_entity(entity.factory)?;
 
 					fs::write(
 						{
@@ -443,10 +499,11 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.context("Type key was not string")?
 					== "REPO"
 				{
-					if let Some(game) = app_state.game.load().as_ref() {
+					if let Some(game) = app_state.game.load().as_ref()
+						&& let Some(repo) = game.repository()
+					{
 						let mut current = to_value(
-							game.repository()
-								.iter()
+							repo.iter()
 								.cloned()
 								.map(|x| (x.id, x.data))
 								.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
@@ -519,10 +576,11 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::ConvertRepoPatchToJsonPatch { path } => {
-				if let Some(game) = app_state.game.load().as_ref() {
+				if let Some(game) = app_state.game.load().as_ref()
+					&& let Some(repo) = game.repository()
+				{
 					let mut current = to_value(
-						game.repository()
-							.iter()
+						repo.iter()
 							.cloned()
 							.map(|x| (x.id, x.data))
 							.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
@@ -782,15 +840,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					send_request(
 						app,
 						Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::NewTree {
-							game_description: format!(
-								"{} ({})",
-								match game.version() {
-									GameVersion::H1 => "HITMAN™",
-									GameVersion::H2 => "HITMAN 2",
-									GameVersion::H3 => "HITMAN 3"
-								},
-								game.platform()
-							),
+							game_description: format!("{} ({})", game.version(), game.platform()),
 							entries: {
 								if matches!(filter, SearchFilter::All) {
 									game.all_resources()
@@ -816,7 +866,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 											hint: id.get_info().and_then(|i| i.hint),
 											filetype: game.resource_type(id).unwrap(),
 											partition: {
-												let rrid = RuntimeResourceID::from(id);
+												let rrid = game.to_rrid(id);
 
 												let partition = game
 													.partition_manager()
@@ -864,7 +914,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 											hint: id.get_info().and_then(|i| i.hint),
 											filetype: game.resource_type(id).unwrap(),
 											partition: {
-												let rrid = RuntimeResourceID::from(id);
+												let rrid = game.to_rrid(id);
 
 												let partition = game
 													.partition_manager()

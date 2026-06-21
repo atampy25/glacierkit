@@ -3,6 +3,7 @@
 // Specta creates non snake case functions
 #![allow(non_snake_case)]
 #![feature(try_blocks)]
+#![feature(unwrap_infallible)]
 #![allow(clippy::type_complexity)]
 
 pub mod bin1;
@@ -32,7 +33,7 @@ use anyhow::{Context, Error, Result, anyhow, bail};
 use arc_swap::ArcSwap;
 use fn_error_context::context;
 use futures_util::StreamExt;
-use hitman_commons::game_detection::detect_installs;
+use glacier_commons::game_detection::detect_installs;
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{LevelFilter, info, trace};
@@ -75,12 +76,6 @@ pub type PapayaMap<K, V, S = rapidhash::fast::RandomState> = papaya::HashMap<K, 
 pub type PapayaSet<K, S = rapidhash::fast::RandomState> = papaya::HashSet<K, S>;
 pub type ShardMap<K, V, S = rapidhash::fast::RandomState> = whirlwind::ShardMap<K, V, S>;
 pub type ShardSet<K, S = rapidhash::fast::RandomState> = whirlwind::ShardSet<K, S>;
-
-pub const HASH_LIST_VERSION_ENDPOINT: &str =
-	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
-
-pub const HASH_LIST_ENDPOINT: &str =
-	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/hash_list.sml";
 
 pub const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/version.json";
@@ -156,20 +151,19 @@ async fn main() {
 					flush_interval: None
 				})
 				.with_panic_hook(Box::new(move |client, info, msg| {
+					eprintln!("Panic: {msg}: {info:?}");
 					if IS_MAIN_THREAD.get() {
 						let location = info
 							.location()
 							.map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
 							.unwrap_or_default();
 
-						client
-							.track_event(
-								"Panic",
-								Some(json!({
-								  "info": format!("{} - {}", location, msg),
-								}))
-							)
-							.unwrap();
+						let _ = client.track_event(
+							"Panic",
+							Some(json!({
+							  "info": format!("{} - {}", location, msg),
+							}))
+						);
 
 						let mut panic_report = String::new();
 

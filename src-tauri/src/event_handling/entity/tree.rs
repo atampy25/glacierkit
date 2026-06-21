@@ -5,8 +5,8 @@ use arboard::Clipboard;
 use ecow::EcoString;
 use fn_error_context::context;
 use glacier_bin1::game::h3::{ZSpatialEntity_ERoomBehaviour, ZVariant};
-use hitman_commons::{
-	game::GameVersion,
+use glacier_commons::{
+	game::GlacierGame,
 	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
 	rid
 };
@@ -628,7 +628,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					}
 				}
 
-				ReverseReferenceData::PlatformProperty {
+				ReverseReferenceData::PlatformSpecificProperty {
 					property_name,
 					platform
 				} => {
@@ -636,7 +636,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 						.entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
-						.platform_properties
+						.platform_specific_properties
 						.get_mut(platform)
 						.unwrap();
 
@@ -985,7 +985,7 @@ pub async fn paste(
 			});
 		}
 
-		for properties in sub_entity.platform_properties.values_mut() {
+		for properties in sub_entity.platform_specific_properties.values_mut() {
 			for property_data in properties.values_mut() {
 				visit_variant_mut(&mut property_data.value, &mut |val| {
 					if let Variant::Ref(val) = val {
@@ -1413,20 +1413,26 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let (temp_meta, temp_data) = game.extract_latest_resource(file)?;
 
 					let blueprint_index_in_resource_header = match game.version() {
-						GameVersion::H1 => {
+						GlacierGame::H1 => {
 							glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntity>(&temp_data)
 								.context("Couldn't deserialise factory")?
 								.blueprint_index_in_resource_header
 						}
 
-						GameVersion::H2 => {
+						GlacierGame::H2 => {
 							glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityFactory>(&temp_data)
 								.context("Couldn't deserialise factory")?
 								.blueprint_index_in_resource_header
 						}
 
-						GameVersion::H3 => {
+						GlacierGame::H3 => {
 							glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityFactory>(&temp_data)
+								.context("Couldn't deserialise factory")?
+								.blueprint_index_in_resource_header
+						}
+
+						GlacierGame::FL => {
+							glacier_bin1::deserialize::<glacier_bin1::game::fl::STemplateEntityFactory>(&temp_data)
 								.context("Couldn't deserialise factory")?
 								.blueprint_index_in_resource_header
 						}
@@ -1450,6 +1456,10 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].pc_entitytype", "")
+									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1463,14 +1473,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint: blueprint.to_owned(),
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1478,20 +1489,26 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					let (cppt_meta, cppt_data) = game.extract_latest_resource(file)?;
 
 					let blueprint_index_in_resource_header = match game.version() {
-						GameVersion::H1 => {
+						GlacierGame::H1 => {
 							glacier_bin1::deserialize::<glacier_bin1::game::h1::SCppEntity>(&cppt_data)
 								.context("Couldn't deserialise CPPT")?
 								.blueprint_index_in_resource_header
 						}
 
-						GameVersion::H2 => {
+						GlacierGame::H2 => {
 							glacier_bin1::deserialize::<glacier_bin1::game::h2::SCppEntity>(&cppt_data)
 								.context("Couldn't deserialise CPPT")?
 								.blueprint_index_in_resource_header
 						}
 
-						GameVersion::H3 => {
+						GlacierGame::H3 => {
 							glacier_bin1::deserialize::<glacier_bin1::game::h3::SCppEntity>(&cppt_data)
+								.context("Couldn't deserialise CPPT")?
+								.blueprint_index_in_resource_header
+						}
+
+						GlacierGame::FL => {
+							glacier_bin1::deserialize::<glacier_bin1::game::fl::SCppEntity>(&cppt_data)
 								.context("Couldn't deserialise CPPT")?
 								.blueprint_index_in_resource_header
 						}
@@ -1515,6 +1532,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1528,14 +1547,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint: blueprint.to_owned(),
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1560,6 +1580,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1573,14 +1595,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1605,6 +1628,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1618,14 +1643,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1650,6 +1676,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1663,14 +1691,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1698,6 +1727,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1711,14 +1742,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1743,6 +1775,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1756,14 +1790,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1788,6 +1823,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1801,14 +1838,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1833,6 +1871,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 							.and_then(|x| {
 								x.replace("].pc_entitytype", "")
 									.replace("].pc_entitytemplate", "")
+									.replace("].entitytype", "")
+									.replace("].entitytemplate", "")
 									.replace(".entitytemplate", "")
 									.split('/')
 									.next_back()
@@ -1846,14 +1886,15 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 						blueprint,
 						editor_only: Default::default(),
 						properties: Default::default(),
-						platform_properties: Default::default(),
+						platform_specific_properties: Default::default(),
 						events: Default::default(),
 						input_forwardings: Default::default(),
 						output_forwardings: Default::default(),
 						property_aliases: Default::default(),
 						exposed_entities: Default::default(),
 						exposed_interfaces: Default::default(),
-						subsets: Default::default()
+						subsets: Default::default(),
+						excluded_platforms: Default::default()
 					}
 				}
 
@@ -1900,11 +1941,18 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				},
 				name: wwev.name.into(),
 				factory: ResourceReference {
-					resource: rid!("[modules:/zaudioevententity.class].pc_entitytype"),
+					resource: if game.version() == GlacierGame::FL {
+						rid!("[modules:/zaudioevententity.class].entitytype")
+					} else {
+						rid!("[modules:/zaudioevententity.class].pc_entitytype")
+					},
 					flags: Default::default()
 				},
-				blueprint: rid!("[modules:/zaudioevententity.class].pc_entityblueprint"),
-				editor_only: Default::default(),
+				blueprint: if game.version() == GlacierGame::FL {
+					rid!("[modules:/zaudioevententity.class].entityblueprint")
+				} else {
+					rid!("[modules:/zaudioevententity.class].pc_entityblueprint")
+				},
 				properties: {
 					let mut properties = OrderMap::default();
 					properties.insert(
@@ -1922,14 +1970,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					);
 					properties
 				},
-				platform_properties: Default::default(),
-				events: Default::default(),
-				input_forwardings: Default::default(),
-				output_forwardings: Default::default(),
-				property_aliases: Default::default(),
-				exposed_entities: Default::default(),
-				exposed_interfaces: Default::default(),
-				subsets: Default::default()
+				..Default::default()
 			};
 
 			send_request(
@@ -2121,7 +2162,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
+					value: Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2132,7 +2173,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
+				Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}
@@ -2270,7 +2311,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
+					value: Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2281,7 +2322,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
+				Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}
@@ -2419,7 +2460,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
+					value: Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2430,7 +2471,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
+				Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}
@@ -2549,7 +2590,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 			.insert(
 				EcoString::from("m_eRoomBehaviour"),
 				Property {
-					value: Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
+					value: Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic)),
 					post_init: false
 				}
 			);
@@ -2560,7 +2601,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 				entity_id,
 				&entity.blueprint.to_hash(),
 				"m_eRoomBehaviour",
-				Variant::from_raw(&ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
+				Variant::from_raw(ZVariant::new(ZSpatialEntity_ERoomBehaviour::Dynamic))
 			)
 			.await?;
 	}

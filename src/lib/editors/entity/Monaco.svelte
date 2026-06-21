@@ -118,7 +118,7 @@
 								$ref: null
 							}
 						},
-						platformProperties: {
+						platformSpecificProperties: {
 							additionalProperties: {
 								additionalProperties: {
 									anyOf: [

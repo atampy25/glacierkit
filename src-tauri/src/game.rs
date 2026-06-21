@@ -3,27 +3,28 @@ use std::{fs, path::Path, sync::Arc};
 use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
 use dashmap::{DashMap, DashSet};
-use glacier_ini::IniFileSystem;
-use hitman_commons::{
-	game::{GamePlatform, GameVersion},
+use glacier_commons::{
+	game::{GamePlatform, GlacierGame, StorePlatform},
 	game_detection::GameInstall,
 	metadata::{ExtendedResourceMetadata, ReferenceFlags, ResourceReference, ResourceType, RuntimeID}
 };
+use glacier_ini::IniFileSystem;
 use identity_hash::BuildIdentityHasher;
 use itertools::Itertools;
 use quickentity_rs::entity::Entity;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::{
-	partition_manager::PartitionManager, pdefs::PackageDefinitionSource, resource_info::ResourceInfo,
-	resource_partition::PatchId, runtime_resource_id::RuntimeResourceID
+	partition_manager::PartitionManager,
+	pdefs::{PackageDefinitionParser, PackageDefinitionSource, bond_parser::BondParser},
+	resource_info::ResourceInfo,
+	resource_partition::PatchId,
+	runtime_resource_id::RuntimeResourceID
 };
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 
 use crate::{
-	HashMap, PapayaMap,
-	bin1::{deserialize_modern_blueprint, deserialize_modern_factory},
-	finish_task,
+	HashMap, PapayaMap, finish_task,
 	general::REPO_ID,
 	intellisense::Intellisense,
 	model::{
@@ -41,7 +42,7 @@ pub struct Game {
 
 	resource_reverse_references: HashMap<RuntimeID, Vec<RuntimeID>, BuildIdentityHasher<u64>>,
 	file_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>>,
-	repository: Vec<RepositoryItem>,
+	repository: Option<Vec<RepositoryItem>>,
 
 	cached_entities: Arc<PapayaMap<RuntimeID, Arc<Entity>, BuildIdentityHasher<u64>>>
 }
@@ -59,19 +60,25 @@ impl Game {
 			.context("No such game install")?
 			.to_owned();
 
-		let thumbs = IniFileSystem::from_path(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
+		let (proj_path, relative_runtime_path) = if install.version == GlacierGame::FL {
+			(r"..\".into(), "runtime".into())
+		} else {
+			let thumbs = IniFileSystem::from_path(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
 
-		let thumbs = thumbs
-			.root()
-			.sections()
-			.get("application")
-			.context("Couldn't get application section")?;
+			let thumbs = thumbs
+				.root()
+				.sections()
+				.get("application")
+				.context("Couldn't get application section")?;
 
-		let (Some(proj_path), Some(relative_runtime_path)) = (
-			thumbs.options().get("PROJECT_PATH"),
-			thumbs.options().get("RUNTIME_PATH")
-		) else {
-			bail!("thumbs.dat was missing required properties");
+			let (Some(proj_path), Some(relative_runtime_path)) = (
+				thumbs.options().get("PROJECT_PATH"),
+				thumbs.options().get("RUNTIME_PATH")
+			) else {
+				bail!("thumbs.dat was missing required properties");
+			};
+
+			(proj_path.to_owned(), relative_runtime_path.to_owned())
 		};
 
 		// Workaround for the Linux filesystem.
@@ -82,23 +89,26 @@ impl Game {
 			.map(|(idx, ch)| if idx == 0 { ch.to_ascii_uppercase() } else { ch })
 			.collect::<String>();
 
-		let runtime_path = [relative_runtime_path, &relative_runtime_path_uppercased]
+		let runtime_path = [relative_runtime_path, relative_runtime_path_uppercased]
 			.iter()
 			.flat_map(|folder| path.join(proj_path.replace('\\', "/")).join(folder).canonicalize())
 			.find(|joined_path| joined_path.exists())
 			.context("Couldn't find valid runtime folder")?;
 
 		let mut partitions = match install.version {
-			GameVersion::H1 => PackageDefinitionSource::HM2016(fs::read(runtime_path.join("packagedefinition.txt"))?)
+			GlacierGame::H1 => PackageDefinitionSource::HM2016(fs::read(runtime_path.join("packagedefinition.txt"))?)
 				.read()
 				.context("Couldn't read packagedefinition")?,
 
-			GameVersion::H2 => PackageDefinitionSource::HM2(fs::read(runtime_path.join("packagedefinition.txt"))?)
+			GlacierGame::H2 => PackageDefinitionSource::HM2(fs::read(runtime_path.join("packagedefinition.txt"))?)
 				.read()
 				.context("Couldn't read packagedefinition")?,
 
-			GameVersion::H3 => PackageDefinitionSource::HM3(fs::read(runtime_path.join("packagedefinition.txt"))?)
+			GlacierGame::H3 => PackageDefinitionSource::HM3(fs::read(runtime_path.join("packagedefinition.txt"))?)
 				.read()
+				.context("Couldn't read packagedefinition")?,
+
+			GlacierGame::FL => BondParser::parse(&fs::read(runtime_path.join("packagedefinition.txt"))?)
 				.context("Couldn't read packagedefinition")?
 		};
 
@@ -160,6 +170,7 @@ impl Game {
 			.rev()
 			.flat_map(|partition| {
 				partition.latest_resources().into_par_iter().map(|(resource, _)| {
+					dbg!(RuntimeID::try_from(*resource.rrid()));
 					(
 						RuntimeID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
 						resource
@@ -206,16 +217,27 @@ impl Game {
 
 		let task = start_task(app, "Caching repository")?;
 
-		let repository = serde_json::from_slice(
-			&partition_manager.read_resource_from(partition_manager.root_partition()?, REPO_ID.into())?
-		)?;
+		let repository = partition_manager
+			.read_resource_from(partition_manager.root_partition()?, REPO_ID.as_u64().into())
+			.ok()
+			.map(|x| serde_json::from_slice(&x))
+			.transpose()?;
 
 		finish_task(app, task)?;
 
 		Self {
 			install,
 			game_files: partition_manager,
-			intellisense: Intellisense::new(),
+			intellisense: Intellisense::new(
+				fs::read(
+					dirs::data_local_dir()
+						.context("No local data dir")?
+						.join("glacier-commons")
+						.join("pins.json")
+				)
+				.as_deref()
+				.unwrap_or(b"[]")
+			),
 			resource_reverse_references,
 			file_types,
 			repository,
@@ -223,11 +245,11 @@ impl Game {
 		}
 	}
 
-	pub fn version(&self) -> GameVersion {
+	pub fn version(&self) -> GlacierGame {
 		self.install.version
 	}
 
-	pub fn platform(&self) -> GamePlatform {
+	pub fn platform(&self) -> StorePlatform {
 		self.install.platform
 	}
 
@@ -251,7 +273,7 @@ impl Game {
 		self.file_types.keys().copied()
 	}
 
-	pub fn repository(&self) -> &Vec<RepositoryItem> {
+	pub fn repository(&self) -> &Option<Vec<RepositoryItem>> {
 		&self.repository
 	}
 
@@ -259,37 +281,42 @@ impl Game {
 		&self.intellisense
 	}
 
+	pub fn to_rrid(&self, resource: impl Into<RuntimeID>) -> RuntimeResourceID {
+		RuntimeResourceID::from(match self.version() {
+			GlacierGame::FL => resource.into().as_u64() | ((GamePlatform::PC.tag().unwrap() as u64) << 56),
+			_ => resource.into().as_u64()
+		})
+	}
+
 	/// Extract the latest copy of a resource.
 	pub fn extract_latest_resource(
 		&self,
 		resource: impl Into<RuntimeID>
 	) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
-		let runtime_id: RuntimeID = resource.into();
-
-		let resource_id = RuntimeResourceID::from(runtime_id);
+		let rrid = self.to_rrid(resource);
 		for partition in &self.game_files.partitions {
-			if partition.contains(&resource_id)
+			if partition.contains(&rrid)
 				&& let Some((info, _)) = partition
 					.latest_resources()
 					.into_iter()
-					.find(|(x, _)| *x.rrid() == resource_id)
+					.find(|(x, _)| *x.rrid() == rrid)
 			{
 				return Ok((
 					info.try_into()
-						.with_context(|| format!("Couldn't extract resource {runtime_id}"))?,
+						.with_context(|| format!("Couldn't extract resource {rrid}"))?,
 					partition
-						.read_resource(&resource_id)
-						.with_context(|| format!("Couldn't extract {runtime_id} using rpkg-rs"))?
+						.read_resource(&rrid)
+						.with_context(|| format!("Couldn't extract {rrid} using rpkg-rs"))?
 				));
 			}
 		}
 
-		bail!("Couldn't find {runtime_id} in any partition when extracting resource");
+		bail!("Couldn't find {rrid} in any partition when extracting resource");
 	}
 
 	/// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
 	pub fn extract_latest_metadata(&self, resource: impl Into<RuntimeID>) -> Result<ExtendedResourceMetadata> {
-		let resource_id = RuntimeResourceID::from(resource.into());
+		let resource_id = self.to_rrid(resource);
 
 		for partition in &self.game_files.partitions {
 			if partition.contains(&resource_id)
@@ -312,7 +339,7 @@ impl Game {
 		&self,
 		resource: impl Into<RuntimeID>
 	) -> Result<(ResourceType, String, Vec<ResourceReference>)> {
-		let resource_id = RuntimeResourceID::from(resource.into());
+		let resource_id = self.to_rrid(resource);
 
 		for partition in &self.game_files.partitions {
 			if partition.contains(&resource_id)
@@ -369,23 +396,40 @@ impl Game {
 			bail!("Given factory was not a TEMP");
 		}
 
-		let factory = deserialize_modern_factory(self.install.version, &temp_data)?;
+		macro_rules! impl_game {
+			($ty:ty) => {{
+				let factory = glacier_bin1::deserialize::<$ty>(&temp_data)?;
 
-		let blueprint_id = temp_meta
-			.core_info
-			.references
-			.get(factory.blueprint_index_in_resource_header as usize)
-			.context("Blueprint referenced in factory does not exist in dependencies")?
-			.resource;
+				let blueprint_hash = temp_meta
+					.core_info
+					.references
+					.get(factory.blueprint_index_in_resource_header as usize)
+					.context("Blueprint referenced in factory does not exist in dependencies")?
+					.resource;
 
-		let (tblu_meta, tblu_data) = self
-			.extract_latest_resource(blueprint_id)
-			.context("Couldn't extract TBLU")?;
+				let (tblu_meta, tblu_data) = self
+					.extract_latest_resource(blueprint_hash)
+					.context("Couldn't extract TBLU")?;
 
-		let blueprint = deserialize_modern_blueprint(self.install.version, &tblu_data)?;
+				let blueprint = glacier_bin1::deserialize(&tblu_data)?;
 
-		let entity = Entity::from_game(&factory, &temp_meta.core_info, &blueprint, &tblu_meta.core_info, false)
-			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+				Entity::from_game(
+					&factory,
+					&temp_meta.core_info,
+					&blueprint,
+					&tblu_meta.core_info,
+					false
+				)
+				.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+			}};
+		}
+
+		let entity = match self.install.version {
+			GlacierGame::H1 => impl_game!(glacier_bin1::game::h1::STemplateEntity),
+			GlacierGame::H2 => impl_game!(glacier_bin1::game::h2::STemplateEntityFactory),
+			GlacierGame::H3 => impl_game!(glacier_bin1::game::h3::STemplateEntityFactory),
+			GlacierGame::FL => impl_game!(glacier_bin1::game::fl::STemplateEntityFactory)
+		};
 
 		let result: Arc<Entity> = entity.into();
 		self.cached_entities.pin().insert(runtime_id, result.clone());
@@ -395,7 +439,7 @@ impl Game {
 
 	/// Get the history of the file, a changelog of events within the partitions. Will return an empty vector if the resource is not found in any partition.
 	pub fn extract_resource_changelog(&self, resource: impl Into<RuntimeID>) -> Vec<ResourceChangelogEntry> {
-		let resource_id = RuntimeResourceID::from(resource.into());
+		let resource_id = self.to_rrid(resource);
 
 		let mut events = vec![];
 

@@ -2,7 +2,8 @@ use std::{path::PathBuf, sync::Arc};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 use ecow::{EcoString, EcoVec};
-use hitman_commons::{
+use glacier_commons::{
+	game::GlacierGame,
 	game_detection::GameInstall,
 	metadata::{ReferenceFlags, ResourceType, RuntimeID}
 };
@@ -1271,7 +1272,9 @@ nesting::nest! {
 			},
 			RequestLastPanicUpload,
 			LogUploadRejected,
-			SetEnums {
+			SetGameVersion {
+				version: Option<GlacierGame>,
+
 				#[debug(skip)]
 				#[specta(type = std::collections::HashMap<String, Vec<String>>)]
 				enums: HashMap<String, Vec<String>>

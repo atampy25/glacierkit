@@ -1,9 +1,9 @@
-use hitman_commons::game::GameVersion;
+use glacier_commons::game::GlacierGame;
 
 /// Get the language map (and whether to use a symmetric cipher) for the given game version and iteration.
-pub fn get_language_map(version: GameVersion, iteration: u8) -> Option<(bool, Option<Vec<String>>)> {
+pub fn get_language_map(version: GlacierGame, iteration: u8) -> Option<(bool, Option<Vec<String>>)> {
 	match version {
-		GameVersion::H1 => (vec!["xx", "en", "fr", "it", "de", "es", "ru", "mx", "br", "pl", "cn", "jp"].len()
+		GlacierGame::H1 => (vec!["xx", "en", "fr", "it", "de", "es", "ru", "mx", "br", "pl", "cn", "jp"].len()
 			> iteration.into())
 		.then(|| {
 			(
@@ -19,7 +19,7 @@ pub fn get_language_map(version: GameVersion, iteration: u8) -> Option<(bool, Op
 				)
 			)
 		}),
-		GameVersion::H2 => (iteration == 0).then_some((
+		GlacierGame::H2 => (iteration == 0).then_some((
 			false,
 			Some(
 				vec![
@@ -30,7 +30,21 @@ pub fn get_language_map(version: GameVersion, iteration: u8) -> Option<(bool, Op
 				.collect()
 			)
 		)),
-		GameVersion::H3 => match iteration {
+		GlacierGame::H3 => match iteration {
+			0 => Some((false, None)),
+			1 => Some((
+				false,
+				Some(
+					vec!["xx", "en", "fr", "it", "de", "es"]
+						.into_iter()
+						.map(|x| x.into())
+						.collect()
+				)
+			)),
+			_ => None
+		},
+		GlacierGame::FL => match iteration {
+			// TODO
 			0 => Some((false, None)),
 			1 => Some((
 				false,
