@@ -1,4 +1,8 @@
-use std::{fs, path::Path, sync::Arc};
+use std::{
+	fs,
+	path::Path,
+	sync::{Arc, RwLock}
+};
 
 use anyhow::{Context, Result, anyhow, bail};
 use arc_swap::ArcSwap;
@@ -122,25 +126,30 @@ impl Game {
 
 		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
 
-		let mut last_index = 0;
-		let mut task = start_progress(app, format!("Loading {}", partition_names[last_index]))?;
+		let last_index = RwLock::new(0);
+		let task = RwLock::new(start_progress(app, format!("Loading {}", partition_names[0]))?);
 
-		let mut partition_manager =
-			PartitionManager::new(runtime_path.clone(), &PackageDefinitionSource::Custom(partitions))
-				.context("Couldn't create partition manager")?;
+		let mut partition_manager = PartitionManager::new(
+			runtime_path.clone(),
+			install.version.into(),
+			&PackageDefinitionSource::Custom(partitions)
+		)
+		.context("Couldn't create partition manager")?;
 
 		partition_manager
 			.mount_partitions(|cur_partition, state| {
 				if cur_partition < partition_names.len() {
-					if cur_partition != last_index {
-						last_index = cur_partition;
+					if cur_partition != *last_index.read().unwrap() {
+						*last_index.write().unwrap() = cur_partition;
 
-						finish_task(app, task).expect("Couldn't send data to frontend");
-						task = start_progress(app, format!("Loading {}", partition_names[last_index]))
-							.expect("Couldn't send data to frontend");
+						finish_task(app, *task.read().unwrap()).expect("Couldn't send data to frontend");
+						*task.write().unwrap() =
+							start_progress(app, format!("Loading {}", partition_names[cur_partition]))
+								.expect("Couldn't send data to frontend");
 					}
 
-					task_progress(app, task, state.install_progress).expect("Couldn't send data to frontend");
+					task_progress(app, *task.read().unwrap(), state.install_progress)
+						.expect("Couldn't send data to frontend");
 				}
 			})
 			.context("Couldn't mount partitions")?;
@@ -161,7 +170,7 @@ impl Game {
 			}))
 		)?;
 
-		finish_task(app, task)?;
+		finish_task(app, *task.read().unwrap())?;
 		let task = start_task(app, "Caching reverse references")?;
 
 		let file_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>> = partition_manager
@@ -170,7 +179,6 @@ impl Game {
 			.rev()
 			.flat_map(|partition| {
 				partition.latest_resources().into_par_iter().map(|(resource, _)| {
-					dbg!(RuntimeID::try_from(*resource.rrid()));
 					(
 						RuntimeID::try_from(*resource.rrid()).expect("Invalid ID in game files"),
 						resource

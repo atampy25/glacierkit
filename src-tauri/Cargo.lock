@@ -124,7 +124,7 @@ dependencies = [
 	"futures-util",
 	"glacier-bin1",
 	"glacier-commons",
-	"glacier-ini",
+	"glacier-ini 0.1.0",
 	"glacier-texture",
 	"hitman-behavior",
 	"hitman-formats",
@@ -153,7 +153,8 @@ dependencies = [
 	"regex",
 	"regex-automata",
 	"reqwest 0.13.4",
-	"rpkg-rs",
+	"rpkg-rs 1.4.0",
+	"rpkg-rs 2.0.0",
 	"schemars 1.2.1",
 	"serde",
 	"serde_json",
@@ -300,7 +301,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#794603d17ed33e76b574cb988298ff4c0bf29a05"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#df182d49bab7abb6c5157f8cbadf77df76b3370a"
 
 [[package]]
 name = "autocfg"
@@ -2013,7 +2014,8 @@ dependencies = [
 	"regex",
 	"registry",
 	"reqwest 0.13.4",
-	"rpkg-rs",
+	"rpkg-rs 1.4.0",
+	"rpkg-rs 2.0.0",
 	"schemars 1.2.1",
 	"serde",
 	"serde-smile",
@@ -2034,11 +2036,18 @@ checksum = "16ac22e00cb538a4e10a485378c256caac27e2c5656e14a268d2dba073720cde"
 dependencies = ["byteorder", "crc32fast", "extended-tea", "indexmap 2.14.0", "itertools 0.14.0", "pathdiff", "thiserror 2.0.18"]
 
 [[package]]
+name = "glacier-ini"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dd41e4b12fa901bb36a3a3e6fa01cbc45120077a9c53c4196123f25b0cc88a4"
+dependencies = ["glacier-base", "indexmap 2.14.0", "itertools 0.14.0", "pathdiff", "thiserror 2.0.18"]
+
+[[package]]
 name = "glacier-texture"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9bd0786b709adebbf9148f58c533954b1aee771e07fa8ffc02e932561c2b3fb"
-dependencies = ["binrw 0.15.1", "bitfield-struct 0.13.0", "directxtex", "glacier-base", "half", "image", "lz4", "memmap2", "png 0.18.1", "rpkg-rs", "serde", "thiserror 2.0.18"]
+dependencies = ["binrw 0.15.1", "bitfield-struct 0.13.0", "directxtex", "glacier-base", "half", "image", "lz4", "memmap2", "png 0.18.1", "rpkg-rs 1.4.0", "serde", "thiserror 2.0.18"]
 
 [[package]]
 name = "glam"
@@ -3671,7 +3680,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 name = "prim-rs"
 version = "0.1.1"
 source = "git+https://github.com/dafitius/GlacierFormats-rs#9e00c9914cf5ea8f8e8707cb4a9bf65c39c055e3"
-dependencies = ["base64 0.22.1", "bincode", "binrw 0.14.2", "bitfield-struct 0.9.5", "itertools 0.13.0", "num-traits", "obj", "rpkg-rs"]
+dependencies = ["base64 0.22.1", "bincode", "binrw 0.14.2", "bitfield-struct 0.9.5", "itertools 0.13.0", "num-traits", "obj", "rpkg-rs 1.4.0"]
 
 [[package]]
 name = "proc-macro-crate"
@@ -3792,7 +3801,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#794603d17ed33e76b574cb988298ff4c0bf29a05"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#df182d49bab7abb6c5157f8cbadf77df76b3370a"
 dependencies = [
 	"anyhow",
 	"auto_context",
@@ -4243,7 +4252,7 @@ dependencies = [
 	"byteorder",
 	"crc32fast",
 	"extended-tea",
-	"glacier-ini",
+	"glacier-ini 0.1.0",
 	"indexmap 2.14.0",
 	"itertools 0.14.0",
 	"lazy-regex",
@@ -4251,6 +4260,27 @@ dependencies = [
 	"md-5",
 	"memmap2",
 	"pathdiff",
+	"rayon",
+	"serde",
+	"serde-hex",
+	"thiserror 2.0.18"
+]
+
+[[package]]
+name = "rpkg-rs"
+version = "2.0.0"
+source = "git+https://github.com/dafitius/rpkg-rs?branch=v2#e2a697300760ef6fe77b2a331b102f4575962f66"
+dependencies = [
+	"binrw 0.15.1",
+	"bitfield-struct 0.13.0",
+	"glacier-base",
+	"glacier-ini 1.0.0",
+	"indexmap 2.14.0",
+	"itertools 0.14.0",
+	"lazy-regex",
+	"lzzzz",
+	"md-5",
+	"memmap2",
 	"rayon",
 	"serde",
 	"serde-hex",

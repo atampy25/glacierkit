@@ -23,7 +23,7 @@ use image::{ImageFormat, ImageReader};
 use optivorbis::{OggToOgg, Remuxer};
 use prim_rs::render_primitive::RenderPrimitive;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use rpkg_rs::GlacierResource;
+use rpkg_rs_1::GlacierResource as _;
 use serde::Serialize;
 use serde_json::{json, to_string, to_vec};
 use tauri::{AppHandle, Manager, State};

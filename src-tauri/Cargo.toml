@@ -36,7 +36,6 @@ velcro = "0.5.4"
 indexmap = "2.14.0"
 arboard = "3.3.0"
 rand = "0.10.1"
-rpkg-rs = "1.3.1"
 glacier-ini = "0.1.0"
 rayon = "1.10.0"
 tauri-plugin-aptabase = "1.0.0"
@@ -98,6 +97,14 @@ features = ["json"]
 version = "2.1.1"
 features = ["debug"]
 
+[dependencies.rpkg-rs]
+git = "https://github.com/dafitius/rpkg-rs"
+branch = "v2"
+
+[dependencies.rpkg-rs-1]
+package = "rpkg-rs"
+version = "1.4.0"
+
 [dependencies.glacier-bin1]
 git = "https://github.com/atampy25/glacier-bin1"
 features = ["all-games", "all-types"]
@@ -108,7 +115,7 @@ git = "https://github.com/atampy25/hitman-behavior"
 [dependencies.glacier-commons]
 git = "https://github.com/atampy25/hitman-commons"
 branch = "fl"
-features = ["serde", "specta", "rpkg-rs", "glacier-texture", "tonytools", "hash-list", "hash-list-download", "game-detection", "macros"]
+features = ["serde", "specta", "rpkg-rs-1", "rpkg-rs-2", "glacier-texture", "tonytools", "hash-list", "hash-list-download", "game-detection", "macros"]
 
 [dependencies.hitman-formats]
 git = "https://github.com/atampy25/hitman-formats"

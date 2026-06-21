@@ -1086,7 +1086,7 @@ export type GameInstall = {
 	path: string
 }
 
-export type GlacierGame = "h1" | "h2" | "h3" | "fL"
+export type GlacierGame = "h1" | "h2" | "h3" | "fl"
 
 export type GlobalEvent =
 	| { type: "setSeenAnnouncements"; data: string[] }
@@ -1744,7 +1744,7 @@ export type SettingsRequest =
 			}
 	  }
 
-export type StorePlatform = "steam" | "epic" | "gOG" | "microsoft"
+export type StorePlatform = "steam" | "epic" | "gog" | "microsoft"
 
 export type SubEntity = SubEntity_Serialize | SubEntity_Deserialize
 
