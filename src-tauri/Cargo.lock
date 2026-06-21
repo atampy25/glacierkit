@@ -301,7 +301,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#df182d49bab7abb6c5157f8cbadf77df76b3370a"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#306c41bd27b06431d40cc457cdf6a570d4cb8c3b"
 
 [[package]]
 name = "autocfg"
@@ -1825,7 +1825,7 @@ dependencies = ["binrw 0.15.1", "byteorder", "crc32fast", "extended-tea", "nalge
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = [
 	"Inflector",
 	"anyhow",
@@ -1848,13 +1848,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = ["Inflector", "codegen", "edit-distance", "lazy-regex", "rayon", "serde", "serde_json"]
 
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = [
 	"anyhow",
 	"bimap",
@@ -1880,13 +1880,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = ["darling", "quote", "syn 2.0.118"]
 
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1914,7 +1914,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1942,7 +1942,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1970,7 +1970,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#2e71378c3e9ebd48615dda29c2eba67b45161eec"
+source = "git+https://github.com/atampy25/glacier-bin1#09836dadd2295446a1812afc7de1968067c79df8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1998,6 +1998,7 @@ dependencies = [
 [[package]]
 name = "glacier-commons"
 version = "0.1.0"
+source = "git+https://github.com/atampy25/hitman-commons?branch=fl#f41041183f592f43fec5c7165ec56548640d131a"
 dependencies = [
 	"arc-swap",
 	"brotli-decompressor",
@@ -3801,7 +3802,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#df182d49bab7abb6c5157f8cbadf77df76b3370a"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#306c41bd27b06431d40cc457cdf6a570d4cb8c3b"
 dependencies = [
 	"anyhow",
 	"auto_context",
