@@ -584,7 +584,7 @@ pub fn get_decorations(
 				}
 			}
 
-			Variant::Resource(Some(reference)) => {
+			Variant::Resource(_, Some(reference)) => {
 				let res = reference.resource;
 				if game.resource_type(res).is_some_and(|x| x == "LINE") {
 					if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
@@ -620,7 +620,7 @@ pub fn get_decorations(
 					}
 				}
 
-				Variant::Resource(Some(reference)) => {
+				Variant::Resource(_, Some(reference)) => {
 					let res = reference.resource;
 					if game.resource_type(res).is_some_and(|x| x == "LINE") {
 						if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {

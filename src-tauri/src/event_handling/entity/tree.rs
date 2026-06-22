@@ -1958,13 +1958,16 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 					properties.insert(
 						"m_pMainEvent".into(),
 						Property {
-							value: Variant::Resource(Some(ResourceReference {
-								resource: file,
-								flags: ReferenceFlags {
-									reference_type: ReferenceType::Normal,
-									..Default::default()
-								}
-							})),
+							value: Variant::Resource(
+								false,
+								Some(ResourceReference {
+									resource: file,
+									flags: ReferenceFlags {
+										reference_type: ReferenceType::Normal,
+										..Default::default()
+									}
+								})
+							),
 							post_init: false
 						}
 					);

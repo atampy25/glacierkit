@@ -139,7 +139,7 @@ impl Intellisense {
 										external_scene_type_indices_in_resource_header: vec![],
 										property_overrides: vec![],
 										source_resource_id: Default::default(),
-										external_scene_runtime_resource_i_ds: vec![]
+										external_scene_runtime_resource_ids: vec![]
 									},
 									&cppt_meta.core_info,
 									&glacier_bin1::game::fl::STemplateEntityBlueprint {
@@ -154,7 +154,7 @@ impl Intellisense {
 										pin_connection_overrides: vec![],
 										pin_connection_override_deletes: vec![],
 										source_resource_id: Default::default(),
-										external_scene_runtime_resource_i_ds: vec![]
+										external_scene_runtime_resource_ids: vec![]
 									},
 									&cppt_meta.core_info,
 									false
@@ -495,13 +495,16 @@ impl Intellisense {
 												MaterialOverride::Texture(texture) => {
 													found.push((
 														property_name.to_owned(),
-														Variant::Resource(texture.map(|texture| ResourceReference {
-															resource: texture,
-															flags: ReferenceFlags {
-																reference_type: ReferenceType::Normal,
-																..Default::default()
-															}
-														})),
+														Variant::Resource(
+															false,
+															texture.map(|texture| ResourceReference {
+																resource: texture,
+																flags: ReferenceFlags {
+																	reference_type: ReferenceType::Normal,
+																	..Default::default()
+																}
+															})
+														),
 														false
 													));
 
@@ -634,7 +637,7 @@ impl Intellisense {
 														entry.property_name.into(),
 														match entry.property_type {
 															EExtendedPropertyType::Resourceptr => {
-																Variant::Resource(None)
+																Variant::Resource(false, None)
 															}
 															EExtendedPropertyType::Int32 => {
 																Variant::from_raw(ZVariant::new(0i32))
@@ -849,13 +852,16 @@ impl Intellisense {
 								MaterialOverride::Texture(texture) => {
 									if property_name == property_to_find {
 										return Ok(Some((
-											Variant::Resource(texture.map(|texture| ResourceReference {
-												resource: texture,
-												flags: ReferenceFlags {
-													reference_type: ReferenceType::Normal,
-													..Default::default()
-												}
-											})),
+											Variant::Resource(
+												false,
+												texture.map(|texture| ResourceReference {
+													resource: texture,
+													flags: ReferenceFlags {
+														reference_type: ReferenceType::Normal,
+														..Default::default()
+													}
+												})
+											),
 											false
 										)));
 									}
@@ -987,7 +993,7 @@ impl Intellisense {
 									if entry.property_name == property_to_find {
 										return Ok(Some((
 											match entry.property_type {
-												EExtendedPropertyType::Resourceptr => Variant::Resource(None),
+												EExtendedPropertyType::Resourceptr => Variant::Resource(false, None),
 												EExtendedPropertyType::Int32 => Variant::from_raw(ZVariant::new(0i32)),
 												EExtendedPropertyType::Uint32 => Variant::from_raw(ZVariant::new(0u32)),
 												EExtendedPropertyType::Float => {
