@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
 	entity::{Entity, EntityID, Ref, SubEntity},
-	variant::Variant
+	variant::{EnumValue, Variant}
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -598,6 +598,28 @@ pub fn get_decorations(
 				}
 			}
 
+			Variant::EnumValue(EnumValue { resource, value }) => {
+				let res = resource.resource;
+				if game.resource_type(res).is_some_and(|x| x == "LINE") {
+					if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
+						decorations.push((res.to_string(), decoration));
+					}
+				} else if res.get_path().is_none()
+					&& let Some(entry) = res.get_info()
+					&& let Some(hint) = entry.hint
+				{
+					decorations.push((res.to_string(), hint.into()));
+				}
+
+				if let Ok((_, data)) = game.extract_latest_resource(res)
+					&& let Ok(data) = glacier_bin1::deserialize::<glacier_bin1::game::fl::SEnumType>(&data)
+					&& let Some(idx) = data.item_values.iter().position(|x| x == value)
+					&& let Some(name) = data.item_names.get(idx)
+				{
+					decorations.push((format!(r#""value": {value}"#), name.into()));
+				}
+			}
+
 			Variant::Uuid(uuid) => {
 				if let Some(repo) = game.repository()
 					&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
@@ -631,6 +653,28 @@ pub fn get_decorations(
 						&& let Some(hint) = entry.hint
 					{
 						decorations.push((res.to_string(), hint.into()));
+					}
+				}
+
+				Variant::EnumValue(EnumValue { resource, value }) => {
+					let res = resource.resource;
+					if game.resource_type(res).is_some_and(|x| x == "LINE") {
+						if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
+							decorations.push((res.to_string(), decoration));
+						}
+					} else if res.get_path().is_none()
+						&& let Some(entry) = res.get_info()
+						&& let Some(hint) = entry.hint
+					{
+						decorations.push((res.to_string(), hint.into()));
+					}
+
+					if let Ok((_, data)) = game.extract_latest_resource(res)
+						&& let Ok(data) = glacier_bin1::deserialize::<glacier_bin1::game::fl::SEnumType>(&data)
+						&& let Some(idx) = data.item_values.iter().position(|x| x == value)
+						&& let Some(name) = data.item_names.get(idx)
+					{
+						decorations.push((format!(r#""value": {value}"#), name.into()));
 					}
 				}
 

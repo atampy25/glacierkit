@@ -274,7 +274,7 @@
 				!editor.getModel()!.getLineContent(e.position.lineNumber).includes(`"factory":`) &&
 					(editor.getModel()!.getLineContent(e.position.lineNumber).includes("assembly:/") ||
 						editor.getModel()!.getLineContent(e.position.lineNumber).includes("modules:/") ||
-						/"00[0-9A-F]{14}"/.test(editor.getModel()!.getLineContent(e.position.lineNumber)))
+						/"0(0|x)[0-9A-F]{14}"/.test(editor.getModel()!.getLineContent(e.position.lineNumber)))
 			)
 		})
 
