@@ -10,7 +10,8 @@ use dashmap::{DashMap, DashSet};
 use glacier_commons::{
 	game::{GamePlatform, GlacierGame, StorePlatform},
 	game_detection::GameInstall,
-	metadata::{ExtendedResourceMetadata, ReferenceFlags, ResourceReference, ResourceType, RuntimeID}
+	metadata::{ExtendedResourceMetadata, ReferenceFlags, ResourceReference, ResourceType, RuntimeID},
+	rid
 };
 use glacier_ini::IniFileSystem;
 use identity_hash::BuildIdentityHasher;

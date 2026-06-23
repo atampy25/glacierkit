@@ -1147,7 +1147,7 @@ export type GlobalRequest =
 					| ({ Array: Value[] } & { Bool?: never; Number?: never; Object?: never; String?: never })
 					| ({ Object: { [key in string]: Value } } & { Array?: never; Bool?: never; Number?: never; String?: never })
 				savePath: string
-				fileAndType: [string, string]
+				id: string
 			}
 	  }
 	| { type: "requestLastPanicUpload" }

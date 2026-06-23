@@ -31,4 +31,4 @@ export const showInFolder = commands.showInFolder
 
 export const enums: Record<string, string[]> = {}
 
-export const game: { version: "h1" | "h2" | "h3" | "fl" } = { version: "h3" }
+export const game: { version: "h1" | "h2" | "h3" | "fl" | null } = { version: "h3" }

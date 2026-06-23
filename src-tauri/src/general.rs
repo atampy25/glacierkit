@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use arc_swap::ArcSwap;
 use ecow::eco_format;
 use fn_error_context::context;
-use glacier_commons::{game::GlacierGame, hash_list::HASH_LIST, metadata::RuntimeID, rid};
+use glacier_commons::{game::GlacierGame, hash_list::HASH_LIST, metadata::RuntimeID, resource_type, rid};
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -550,101 +550,92 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				let file: Value =
 					from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid patch")?;
 
-				match file
-					.get("type")
-					.unwrap_or(&Value::String("JSON".into()))
-					.as_str()
-					.context("Type key was not string")?
-				{
-					"REPO" => {
-						if let Some(game) = app_state.game.load().as_ref()
-							&& let Some(repo) = game.repository()
-						{
-							let mut repository = to_value(
-								repo.iter()
-									.cloned()
-									.map(|x| (x.id, x.data))
-									.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
-							)?;
-
-							let base = to_value(repo)?;
-
-							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
-								.context("Invalid JSON")?;
-
-							let patch = patch.get("patch").context("Patch had no patch key")?;
-
-							json_patch::patch(
-								&mut repository,
-								&from_value::<Vec<json_patch::PatchOperation>>(patch.to_owned())
-									.context("Invalid JSON patch")?
-							)?;
-
-							let repository = from_value::<IndexMap<Uuid, IndexMap<String, Value>>>(repository)?
-								.into_iter()
-								.map(|(id, data)| RepositoryItem { id, data })
-								.collect();
-
-							app_state
-								.editor_states
-								.insert(
-									id.to_owned(),
-									EditorState {
-										file: Some(path.to_owned()),
-										data: EditorData::RepositoryPatch {
-											base: from_value(base)?,
-											current: repository,
-											patch_type: JsonPatchType::JsonPatch
-										},
-										..Default::default()
-									}
-								)
-								.await;
-
-							send_request(
-								app,
-								Request::Tab(TabRequest {
-									tab: id,
-									data: TabRequestData::Create {
-										name: path.file_name().context("No file name")?.to_string_lossy().into(),
-										editor_type: EditorType::RepositoryPatch {
-											patch_type: JsonPatchType::JsonPatch
-										}
-									}
-								})
-							)?;
-						} else {
-							send_request(
-								app,
-								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
-							)?;
-
-							send_notification(
-								app,
-								Notification {
-									kind: NotificationKind::Error,
-									title: "No game selected".into(),
-									subtitle: "You can't open repository patch files without a copy of a supported \
-									           game selected."
-										.into()
-								}
-							)?;
-						}
-					}
-
-					"ORES"
-						if file
-							.get("file")
-							.context("Patch had no file key")?
+				if let Some(game) = app_state.game.load().as_ref() {
+					match game.resource_type(
+						file.get("id")
+							.context("Patch had no id key")?
 							.as_str()
-							.context("File key was not string")?
+							.context("id key was not string")?
 							.parse::<RuntimeID>()
-							.context("File key was invalid")?
-							== game.unlockables_id() =>
-					{
-						let id = Uuid::new_v4();
+							.context("id key was invalid")?
+					) {
+						Some(ty) if ty == resource_type!("REPO") => {
+							if let Some(repo) = game.repository() {
+								let mut repository = to_value(
+									repo.iter()
+										.cloned()
+										.map(|x| (x.id, x.data))
+										.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+								)?;
 
-						if let Some(game) = app_state.game.load().as_ref() {
+								let base = to_value(repo)?;
+
+								let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
+									.context("Invalid JSON")?;
+
+								let patch = patch.get("patch").context("Patch had no patch key")?;
+
+								json_patch::patch(
+									&mut repository,
+									&from_value::<Vec<json_patch::PatchOperation>>(patch.to_owned())
+										.context("Invalid JSON patch")?
+								)?;
+
+								let repository = from_value::<IndexMap<Uuid, IndexMap<String, Value>>>(repository)?
+									.into_iter()
+									.map(|(id, data)| RepositoryItem { id, data })
+									.collect();
+
+								app_state
+									.editor_states
+									.insert(
+										id.to_owned(),
+										EditorState {
+											file: Some(path.to_owned()),
+											data: EditorData::RepositoryPatch {
+												base: from_value(base)?,
+												current: repository,
+												patch_type: JsonPatchType::JsonPatch
+											},
+											..Default::default()
+										}
+									)
+									.await;
+
+								send_request(
+									app,
+									Request::Tab(TabRequest {
+										tab: id,
+										data: TabRequestData::Create {
+											name: path.file_name().context("No file name")?.to_string_lossy().into(),
+											editor_type: EditorType::RepositoryPatch {
+												patch_type: JsonPatchType::JsonPatch
+											}
+										}
+									})
+								)?;
+							} else {
+								send_request(
+									app,
+									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+								)?;
+
+								send_notification(
+									app,
+									Notification {
+										kind: NotificationKind::Error,
+										title: "No game selected".into(),
+										subtitle: "You can't open repository patch files without a copy of a \
+										           supported game selected."
+											.into()
+									}
+								)?;
+							}
+						}
+
+						Some(ty) if ty == resource_type!("ORES") => {
+							let id = Uuid::new_v4();
+
 							let mut unlockables = to_value(
 								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
 									&game.extract_latest_resource(game.unlockables_id())?.1
@@ -731,54 +722,54 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 									}
 								})
 							)?;
-						} else {
+						}
+
+						_ => {
+							app_state
+								.editor_states
+								.insert(
+									id.to_owned(),
+									EditorState {
+										file: Some(path.to_owned()),
+										data: EditorData::Text {
+											content: fs::read_to_string(path)
+												.context("Couldn't read file")?
+												.replace("\r\n", "\n"),
+											file_type: TextFileType::Json
+										},
+										..Default::default()
+									}
+								)
+								.await;
+
 							send_request(
 								app,
-								Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
-							)?;
-
-							send_notification(
-								app,
-								Notification {
-									kind: NotificationKind::Error,
-									title: "No game selected".into(),
-									subtitle: "You can't open patch files without a copy of the game selected.".into()
-								}
+								Request::Tab(TabRequest {
+									tab: id,
+									data: TabRequestData::Create {
+										name: path.file_name().context("No file name")?.to_string_lossy().into(),
+										editor_type: EditorType::Text {
+											file_type: TextFileType::Json
+										}
+									}
+								})
 							)?;
 						}
 					}
+				} else {
+					send_request(
+						app,
+						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+					)?;
 
-					_ => {
-						app_state
-							.editor_states
-							.insert(
-								id.to_owned(),
-								EditorState {
-									file: Some(path.to_owned()),
-									data: EditorData::Text {
-										content: fs::read_to_string(path)
-											.context("Couldn't read file")?
-											.replace("\r\n", "\n"),
-										file_type: TextFileType::Json
-									},
-									..Default::default()
-								}
-							)
-							.await;
-
-						send_request(
-							app,
-							Request::Tab(TabRequest {
-								tab: id,
-								data: TabRequestData::Create {
-									name: path.file_name().context("No file name")?.to_string_lossy().into(),
-									editor_type: EditorType::Text {
-										file_type: TextFileType::Json
-									}
-								}
-							})
-						)?;
-					}
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Error,
+							title: "No game selected".into(),
+							subtitle: "You can't open patch files without a copy of the game selected.".into()
+						}
+					)?;
 				}
 			}
 

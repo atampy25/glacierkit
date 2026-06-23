@@ -7,7 +7,7 @@ use fn_error_context::context;
 use glacier_commons::{
 	game::GlacierGame,
 	metadata::{ResourceReference, RuntimeID},
-	rid
+	resource_type, rid
 };
 use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
@@ -491,16 +491,19 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::ConvertRepoPatchToMergePatch { path } => {
-				if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
-					.context("Invalid JSON")?
-					.get("type")
-					.unwrap_or(&Value::String("JSON".into()))
-					.as_str()
-					.context("Type key was not string")?
-					== "REPO"
+				if let Some(game) = app_state.game.load().as_ref()
+					&& let Some(repo) = game.repository()
 				{
-					if let Some(game) = app_state.game.load().as_ref()
-						&& let Some(repo) = game.repository()
+					if game.resource_type(
+						from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+							.context("Invalid JSON")?
+							.get("id")
+							.context("Patch had no id key")?
+							.as_str()
+							.context("id key was not string")?
+							.parse::<RuntimeID>()
+							.context("id key was invalid")?
+					) == Some(resource_type!("REPO"))
 					{
 						let mut current = to_value(
 							repo.iter()
@@ -554,9 +557,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							app,
 							Notification {
 								kind: NotificationKind::Error,
-								title: "No game selected".into(),
-								subtitle: "You can't convert between patch formats without a copy of the game \
-								           selected."
+								title: "Not a repository patch".into(),
+								subtitle: "This patch is for a different type of file, so it can't be converted to a \
+								           repository.json file."
 									.into()
 							}
 						)?;
@@ -566,9 +569,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						app,
 						Notification {
 							kind: NotificationKind::Error,
-							title: "Not a repository patch".into(),
-							subtitle: "This patch is for a different type of file, so it can't be converted to a \
-							           repository.json file."
+							title: "No game selected".into(),
+							subtitle: "You can't convert between patch formats without a copy of the game selected."
 								.into()
 						}
 					)?;
@@ -609,7 +611,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								);
 								x
 							},
-							file_and_type: (REPO_ID.to_string(), "REPO".into())
+							id: REPO_ID
 						})
 					)?;
 
@@ -637,17 +639,17 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::ConvertUnlockablesPatchToMergePatch { path } => {
-				if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
-					.context("Invalid JSON")?
-					.get("file")
-					.context("Patch had no file key")?
-					.as_str()
-					.context("File key was not string")?
-					.parse::<RuntimeID>()
-					.context("File key was invalid")?
-					== game.unlockables_id()
-				{
-					if let Some(game) = app_state.game.load().as_ref() {
+				if let Some(game) = app_state.game.load().as_ref() {
+					if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+						.context("Invalid JSON")?
+						.get("file")
+						.context("Patch had no file key")?
+						.as_str()
+						.context("File key was not string")?
+						.parse::<RuntimeID>()
+						.context("File key was invalid")?
+						== game.unlockables_id()
+					{
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
 								&game.extract_latest_resource(game.unlockables_id())?.1
@@ -717,9 +719,9 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							app,
 							Notification {
 								kind: NotificationKind::Error,
-								title: "No game selected".into(),
-								subtitle: "You can't convert between patch formats without a copy of the game \
-								           selected."
+								title: "Not an unlockables patch".into(),
+								subtitle: "This patch is for a different type of file, so it can't be converted to a \
+								           unlockables.json file."
 									.into()
 							}
 						)?;
@@ -729,9 +731,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						app,
 						Notification {
 							kind: NotificationKind::Error,
-							title: "Not an unlockables patch".into(),
-							subtitle: "This patch is for a different type of file, so it can't be converted to a \
-							           unlockables.json file."
+							title: "No game selected".into(),
+							subtitle: "You can't convert between patch formats without a copy of the game selected."
 								.into()
 						}
 					)?;
@@ -787,7 +788,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								);
 								x
 							},
-							file_and_type: (game.unlockables_id().to_string(), "ORES".into())
+							id: game.unlockables_id()
 						})
 					)?;
 

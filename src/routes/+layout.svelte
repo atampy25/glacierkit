@@ -137,8 +137,7 @@
 							void writeTextFile(
 								request.data.data.savePath,
 								JSON.stringify({
-									file: request.data.data.fileAndType[0],
-									type: request.data.data.fileAndType[1],
+									id: request.data.data.id,
 									patch
 								})
 							)

@@ -1268,7 +1268,7 @@ nesting::nest! {
 				base: Value,
 				current: Value,
 				save_path: PathBuf,
-				file_and_type: (String, String)
+				id: RuntimeID
 			},
 			RequestLastPanicUpload,
 			LogUploadRejected,

@@ -1053,7 +1053,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											base,
 											current,
 											save_path: file.to_owned(),
-											file_and_type: (REPO_ID.to_string(), "REPO".into())
+											id: REPO_ID
 										})
 									)?;
 
@@ -1083,7 +1083,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												base,
 												current,
 												save_path: path.as_path().context("Invalid path")?.to_owned(),
-												file_and_type: (REPO_ID.to_string(), "REPO".into())
+												id: REPO_ID
 											})
 										)?;
 
@@ -1240,7 +1240,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												base,
 												current,
 												save_path: file.to_owned(),
-												file_and_type: (game.unlockables_id().to_string(), "ORES".into())
+												id: game.unlockables_id()
 											})
 										)?;
 
@@ -1270,7 +1270,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 													base,
 													current,
 													save_path: path.as_path().context("Invalid path")?.to_owned(),
-													file_and_type: (game.unlockables_id().to_string(), "ORES".into())
+													id: game.unlockables_id()
 												})
 											)?;
 
