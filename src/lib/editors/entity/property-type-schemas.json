@@ -106,7 +106,14 @@
 		"description": "A specific value of an ENUM resource.",
 		"properties": {
 			"enum": {
-				"$ref": "#/$defs/ResourceReference"
+				"anyOf": [
+					{
+						"$ref": "#/$defs/ResourceReference"
+					},
+					{
+						"type": "null"
+					}
+				]
 			},
 			"value": {
 				"type": "integer"

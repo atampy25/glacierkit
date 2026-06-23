@@ -598,7 +598,10 @@ pub fn get_decorations(
 				}
 			}
 
-			Variant::EnumValue(EnumValue { resource, value }) => {
+			Variant::EnumValue(EnumValue {
+				resource: Some(resource),
+				value
+			}) => {
 				let res = resource.resource;
 				if game.resource_type(res).is_some_and(|x| x == "LINE") {
 					if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
@@ -656,7 +659,10 @@ pub fn get_decorations(
 					}
 				}
 
-				Variant::EnumValue(EnumValue { resource, value }) => {
+				Variant::EnumValue(EnumValue {
+					resource: Some(resource),
+					value
+				}) => {
 					let res = resource.resource;
 					if game.resource_type(res).is_some_and(|x| x == "LINE") {
 						if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
