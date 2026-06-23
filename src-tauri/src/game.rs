@@ -296,6 +296,16 @@ impl Game {
 		})
 	}
 
+	pub fn unlockables_id(&self) -> RuntimeID {
+		match self.version() {
+			GlacierGame::H1 | GlacierGame::H2 | GlacierGame::H3 => {
+				rid!("[assembly:/_pro/online/default/offlineconfig/config.unlockables].pc_unlockables")
+			}
+
+			GlacierGame::FL => rid!("[assembly:/_knt/online/default/offlineconfig/config.unlockables].unlockables")
+		}
+	}
+
 	/// Extract the latest copy of a resource.
 	pub fn extract_latest_resource(
 		&self,

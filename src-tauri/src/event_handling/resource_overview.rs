@@ -40,7 +40,7 @@ use crate::{
 	biome::format_json,
 	finish_task,
 	game::Game,
-	general::{UNLOCKABLES_ID, get_name, open_in_editor},
+	general::{get_name, open_in_editor},
 	languages::get_language_map,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
@@ -212,7 +212,7 @@ pub async fn initialise_resource_overview(
 						}
 					}
 
-					"ORES" if hash == UNLOCKABLES_ID => ResourceOverviewData::Unlockables,
+					"ORES" if hash == game.unlockables_id() => ResourceOverviewData::Unlockables,
 
 					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB" | "ENUM"
 					| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP" | "GFXA" | "KWOR"

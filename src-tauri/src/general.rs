@@ -41,9 +41,6 @@ pub const EMPTY_ID: RuntimeID = rid!("0000000000000000");
 
 pub const REPO_ID: RuntimeID = rid!("[assembly:/repository/pro.repo].pc_repo");
 
-pub const UNLOCKABLES_ID: RuntimeID =
-	rid!("[assembly:/_pro/online/default/offlineconfig/config.unlockables].pc_unlockables");
-
 /// Get a filename from a path as it would appear in the game file browser.
 pub fn get_name(path: &str) -> String {
 	if path.starts_with("[") {
@@ -452,7 +449,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				if let Some(game) = app_state.game.load().as_ref() {
 					let mut unlockables = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&game.extract_latest_resource(UNLOCKABLES_ID)?.1
+							&game.extract_latest_resource(game.unlockables_id())?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -474,7 +471,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						.collect::<IndexMap<String, IndexMap<String, Value>>>()
 					)?;
 
-					let base = from_str::<Value>(&parse_json_ores(&game.extract_latest_resource(UNLOCKABLES_ID)?.1)?)?;
+					let base = from_str::<Value>(&parse_json_ores(
+						&game.extract_latest_resource(game.unlockables_id())?.1
+					)?)?;
 
 					let patch: Value =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
@@ -641,14 +640,14 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							.context("File key was not string")?
 							.parse::<RuntimeID>()
 							.context("File key was invalid")?
-							== UNLOCKABLES_ID =>
+							== game.unlockables_id() =>
 					{
 						let id = Uuid::new_v4();
 
 						if let Some(game) = app_state.game.load().as_ref() {
 							let mut unlockables = to_value(
 								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-									&game.extract_latest_resource(UNLOCKABLES_ID)?.1
+									&game.extract_latest_resource(game.unlockables_id())?.1
 								)?)?
 								.into_iter()
 								.map(|x| {
@@ -670,8 +669,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.collect::<IndexMap<String, IndexMap<String, Value>>>()
 							)?;
 
-							let base =
-								from_str::<Value>(&parse_json_ores(&game.extract_latest_resource(UNLOCKABLES_ID)?.1)?)?;
+							let base = from_str::<Value>(&parse_json_ores(
+								&game.extract_latest_resource(game.unlockables_id())?.1
+							)?)?;
 
 							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 								.context("Invalid JSON")?;
@@ -1159,13 +1159,14 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 			finish_task(app, task)?;
 		}
 
-		"ORES" if hash == UNLOCKABLES_ID => {
+		"ORES" if hash == game.unlockables_id() => {
 			let task = start_task(app, "Loading unlockables")?;
 
 			let id = Uuid::new_v4();
 
-			let unlockables: Vec<UnlockableItem> =
-				from_str(&parse_json_ores(&game.extract_latest_resource(UNLOCKABLES_ID)?.1)?)?;
+			let unlockables: Vec<UnlockableItem> = from_str(&parse_json_ores(
+				&game.extract_latest_resource(game.unlockables_id())?.1
+			)?)?;
 
 			app_state
 				.editor_states

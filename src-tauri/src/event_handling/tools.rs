@@ -30,7 +30,7 @@ use crate::{
 	Notification, NotificationKind, convert_json_patch_to_merge_patch,
 	event_handling::{content_search::start_content_search, resource_overview::open_resource_overview},
 	finish_task,
-	general::{EMPTY_ID, REPO_ID, UNLOCKABLES_ID, initialise_app, load_game_files, open_file, open_in_editor},
+	general::{EMPTY_ID, REPO_ID, initialise_app, load_game_files, open_file, open_in_editor},
 	model::{
 		AppSettings, AppState, ContentSearchEvent, FileBrowserEvent, GameBrowserEntry, GameBrowserEvent,
 		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SettingsEvent, ToolEvent, ToolRequest
@@ -645,12 +645,12 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 					.context("File key was not string")?
 					.parse::<RuntimeID>()
 					.context("File key was invalid")?
-					== UNLOCKABLES_ID
+					== game.unlockables_id()
 				{
 					if let Some(game) = app_state.game.load().as_ref() {
 						let mut current = to_value(
 							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-								&game.extract_latest_resource(UNLOCKABLES_ID)?.1
+								&game.extract_latest_resource(game.unlockables_id())?.1
 							)?)?
 							.into_iter()
 							.map(|x| {
@@ -742,7 +742,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				if let Some(game) = app_state.game.load().as_ref() {
 					let mut current = to_value(
 						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
-							&game.extract_latest_resource(UNLOCKABLES_ID)?.1
+							&game.extract_latest_resource(game.unlockables_id())?.1
 						)?)?
 						.into_iter()
 						.map(|x| {
@@ -787,7 +787,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								);
 								x
 							},
-							file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
+							file_and_type: (game.unlockables_id().to_string(), "ORES".into())
 						})
 					)?;
 

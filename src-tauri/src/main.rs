@@ -60,7 +60,7 @@ use crate::{
 		tools::handle_tool_event,
 		unlockables_patch::handle_unlockables_patch_event
 	},
-	general::{REPO_ID, UNLOCKABLES_ID, open_file},
+	general::{REPO_ID, open_file},
 	model::{
 		AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent,
 		EditorData, EditorEventData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityMetadataRequest,
@@ -1179,97 +1179,68 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							}
 
 							JsonPatchType::JsonPatch => {
-								let base = to_value(
-									base.iter()
-										.map(|x| {
-											(
-												x.data
-													.get("Id")
-													.expect("Unlockable did not have Id")
-													.as_str()
-													.expect("Id was not string")
-													.to_owned(),
-												{
-													let mut y = IndexMap::new();
-													y.insert("Guid".into(), to_value(x.id).unwrap());
-													y.extend(
-														x.data
-															.iter()
-															.filter(|(key, _)| *key != "Id")
-															.map(|(x, y)| (x.to_owned(), y.to_owned()))
-													);
-													y
-												}
-											)
-										})
-										.collect::<IndexMap<String, IndexMap<String, Value>>>()
-								)?;
-
-								let current = to_value(
-									current
-										.iter()
-										.map(|x| {
-											(
-												x.data
-													.get("Id")
-													.expect("Unlockable did not have Id")
-													.as_str()
-													.expect("Id was not string")
-													.to_owned(),
-												{
-													let mut y = IndexMap::new();
-													y.insert("Guid".into(), to_value(x.id).unwrap());
-													y.extend(
-														x.data
-															.iter()
-															.filter(|(key, _)| *key != "Id")
-															.map(|(x, y)| (x.to_owned(), y.to_owned()))
-													);
-													y
-												}
-											)
-										})
-										.collect::<IndexMap<String, IndexMap<String, Value>>>()
-								)?;
-
-								if let Some(file) = editor.file.as_ref() {
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-											base,
-											current,
-											save_path: file.to_owned(),
-											file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
-										})
+								if let Some(game) = app_state.game.load().as_ref() {
+									let base = to_value(
+										base.iter()
+											.map(|x| {
+												(
+													x.data
+														.get("Id")
+														.expect("Unlockable did not have Id")
+														.as_str()
+														.expect("Id was not string")
+														.to_owned(),
+													{
+														let mut y = IndexMap::new();
+														y.insert("Guid".into(), to_value(x.id).unwrap());
+														y.extend(
+															x.data
+																.iter()
+																.filter(|(key, _)| *key != "Id")
+																.map(|(x, y)| (x.to_owned(), y.to_owned()))
+														);
+														y
+													}
+												)
+											})
+											.collect::<IndexMap<String, IndexMap<String, Value>>>()
 									)?;
 
-									send_request(
-										&app,
-										Request::Tab(TabRequest {
-											tab,
-											data: TabRequestData::SetUnsaved { unsaved: false }
-										})
+									let current = to_value(
+										current
+											.iter()
+											.map(|x| {
+												(
+													x.data
+														.get("Id")
+														.expect("Unlockable did not have Id")
+														.as_str()
+														.expect("Id was not string")
+														.to_owned(),
+													{
+														let mut y = IndexMap::new();
+														y.insert("Guid".into(), to_value(x.id).unwrap());
+														y.extend(
+															x.data
+																.iter()
+																.filter(|(key, _)| *key != "Id")
+																.map(|(x, y)| (x.to_owned(), y.to_owned()))
+														);
+														y
+													}
+												)
+											})
+											.collect::<IndexMap<String, IndexMap<String, Value>>>()
 									)?;
-								} else {
-									let mut dialog = app.dialog().file().set_title("Save file");
 
-									if let Some(project) = app_state.project.load().as_ref() {
-										dialog = dialog.set_directory(&project.path);
-									}
-
-									if let Some(path) = dialog
-										.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
-										.blocking_save_file()
-									{
-										editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
-
+									if let Some(file) = editor.file.as_ref() {
 										send_request(
 											&app,
 											Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 												base,
 												current,
-												save_path: path.as_path().context("Invalid path")?.to_owned(),
-												file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
+												save_path: file.to_owned(),
+												file_and_type: (game.unlockables_id().to_string(), "ORES".into())
 											})
 										)?;
 
@@ -1280,12 +1251,46 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												data: TabRequestData::SetUnsaved { unsaved: false }
 											})
 										)?;
+									} else {
+										let mut dialog = app.dialog().file().set_title("Save file");
+
+										if let Some(project) = app_state.project.load().as_ref() {
+											dialog = dialog.set_directory(&project.path);
+										}
+
+										if let Some(path) = dialog
+											.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
+											.blocking_save_file()
+										{
+											editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+													base,
+													current,
+													save_path: path.as_path().context("Invalid path")?.to_owned(),
+													file_and_type: (game.unlockables_id().to_string(), "ORES".into())
+												})
+											)?;
+
+											send_request(
+												&app,
+												Request::Tab(TabRequest {
+													tab,
+													data: TabRequestData::SetUnsaved { unsaved: false }
+												})
+											)?;
+										}
 									}
+
+									finish_task(&app, task)?;
+
+									return Ok(());
+								} else {
+									Err(anyhow!("No game loaded"))?;
+									panic!();
 								}
-
-								finish_task(&app, task)?;
-
-								return Ok(());
 							}
 						}
 					}
