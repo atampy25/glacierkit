@@ -484,6 +484,10 @@ pub async fn initialise_resource_overview(
 						json: format_json(&String::from_utf8(game.extract_latest_resource(hash)?.1)?)?
 					},
 
+					"XMLB" => ResourceOverviewData::Xml {
+						xml: String::from_utf8(game.extract_latest_resource(hash)?.1)?
+					},
+
 					"CLNG" => ResourceOverviewData::HMLanguages {
 						json: {
 							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
@@ -950,7 +954,56 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game) = app_state.game.load().as_ref() {
-				initialise_resource_overview(app, &app_state, id, hash, game).await?;
+				match initialise_resource_overview(app, &app_state, id, hash, game).await {
+					Ok(_) => {}
+					Err(e) => {
+						let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+
+						send_request(
+							app,
+							Request::Editor(EditorRequest {
+								editor: id,
+								data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+									hash: Hash(hash),
+									filetype: filetype.into(),
+									chunk_patch,
+									path_or_hint: hash.get_path_or_hint(),
+									dependencies: deps
+										.into_par_iter()
+										.map(|dep| {
+											(
+												Hash(dep.resource),
+												game.resource_type(dep.resource),
+												dep.resource.get_path_or_hint(),
+												dep.flags,
+												game.resource_exists(dep.resource)
+											)
+										})
+										.collect(),
+									reverse_dependencies: game
+										.resource_reverse_references(hash)
+										.map(|hashes| {
+											hashes
+												.iter()
+												.map(|&hash| {
+													(
+														Hash(hash),
+														game.resource_type(hash).unwrap(),
+														hash.get_path_or_hint()
+													)
+												})
+												.collect()
+										})
+										.unwrap_or_default(),
+									changelog: game.extract_resource_changelog(hash),
+									data: ResourceOverviewData::Error {
+										message: format!("{e:?}")
+									}
+								})
+							})
+						)?;
+					}
+				}
 			}
 
 			finish_task(app, task)?;
@@ -974,7 +1027,56 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game) = app_state.game.load().as_ref() {
-				initialise_resource_overview(app, &app_state, id, new_hash, game).await?;
+				match initialise_resource_overview(app, &app_state, id, new_hash, game).await {
+					Ok(_) => {}
+					Err(e) => {
+						let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(new_hash)?;
+
+						send_request(
+							app,
+							Request::Editor(EditorRequest {
+								editor: id,
+								data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+									hash: Hash(new_hash),
+									filetype: filetype.into(),
+									chunk_patch,
+									path_or_hint: new_hash.get_path_or_hint(),
+									dependencies: deps
+										.into_par_iter()
+										.map(|dep| {
+											(
+												Hash(dep.resource),
+												game.resource_type(dep.resource),
+												dep.resource.get_path_or_hint(),
+												dep.flags,
+												game.resource_exists(dep.resource)
+											)
+										})
+										.collect(),
+									reverse_dependencies: game
+										.resource_reverse_references(new_hash)
+										.map(|hashes| {
+											hashes
+												.iter()
+												.map(|&hash| {
+													(
+														Hash(hash),
+														game.resource_type(hash).unwrap(),
+														hash.get_path_or_hint()
+													)
+												})
+												.collect()
+										})
+										.unwrap_or_default(),
+									changelog: game.extract_resource_changelog(new_hash),
+									data: ResourceOverviewData::Error {
+										message: format!("{e:?}")
+									}
+								})
+							})
+						)?;
+					}
+				}
 
 				send_request(
 					app,

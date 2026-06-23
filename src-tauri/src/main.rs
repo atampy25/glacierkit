@@ -1346,6 +1346,11 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 									..
 								} => "JSON file",
 
+								EditorData::Text {
+									file_type: TextFileType::Xml,
+									..
+								} => "XML file",
+
 								EditorData::QNEntity { .. } => "QuickEntity entity",
 
 								EditorData::QNPatch { .. } => "QuickEntity patch",
@@ -1390,6 +1395,11 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 									file_type: TextFileType::Json | TextFileType::ManifestJson,
 									..
 								} => "json",
+
+								EditorData::Text {
+									file_type: TextFileType::Xml,
+									..
+								} => "xml",
 
 								EditorData::QNEntity { .. } => "entity.json",
 

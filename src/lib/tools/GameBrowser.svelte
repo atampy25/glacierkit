@@ -160,7 +160,7 @@
 											}
 										}
 									: {}),
-								...(rightClickedNode.id === "0057C2C3941115CA"
+								...(rightClickedNode.id === "0057C2C3941115CA" || rightClickedNode.id === "0xAD6EC6AE7DBE39"
 									? {
 											openInEditor: {
 												separator_before: false,

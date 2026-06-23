@@ -619,7 +619,7 @@
 <header data-tauri-drag-region class:bx--header={true}>
 	<SkipToContent />
 
-	<!-- svelte-ignore a11y-missing-attribute -->
+	<!-- svelte-ignore a11y_missing_attribute -->
 	<a data-tauri-drag-region class:bx--header__name={true} use:help={{ title: "GlacierKit title", description: "This is in fact the app you are using." }}
 		>GlacierKit<span class="font-normal ml-1">{#await getVersion() then x}{x}{/await}</span></a
 	>

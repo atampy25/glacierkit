@@ -14,6 +14,7 @@ use quickentity_rs::{
 	entity::{CommentEntity, Entity},
 	patch::Patch
 };
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::Regex;
 use serde_json::{Value, from_slice, from_str, from_value, to_value};
 use tauri::{AppHandle, Manager, async_runtime};
@@ -29,9 +30,10 @@ use crate::{
 	finish_task,
 	game::Game,
 	model::{
-		AppSettings, AppState, ContentSearchRequest, EditorData, EditorState, EditorType, FileBrowserRequest,
-		GameBrowserRequest, GlobalRequest, JsonPatchType, Request, SettingsRequest, TabRequest, TabRequestData,
-		TextFileType, ToolRequest
+		AppSettings, AppState, ContentSearchRequest, EditorData, EditorRequest, EditorRequestData, EditorState,
+		EditorType, FileBrowserRequest, GameBrowserRequest, GlobalRequest, Hash, JsonPatchType, Request,
+		ResourceOverviewData, ResourceOverviewRequest, SettingsRequest, TabRequest, TabRequestData, TextFileType,
+		ToolRequest
 	},
 	ores_repo::{RepositoryItem, UnlockableItem},
 	send_notification, send_request, start_task
@@ -298,6 +300,40 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						data: TabRequestData::Create {
 							name: path.file_name().context("No file name")?.to_string_lossy().into(),
 							editor_type: EditorType::Text { file_type }
+						}
+					})
+				)?;
+			}
+
+			"xml" => {
+				let id = Uuid::new_v4();
+
+				app_state
+					.editor_states
+					.insert(
+						id.to_owned(),
+						EditorState {
+							file: Some(path.to_owned()),
+							data: EditorData::Text {
+								content: fs::read_to_string(path)
+									.context("Couldn't read file")?
+									.replace("\r\n", "\n"),
+								file_type: TextFileType::Xml
+							},
+							..Default::default()
+						}
+					)
+					.await;
+
+				send_request(
+					app,
+					Request::Tab(TabRequest {
+						tab: id,
+						data: TabRequestData::Create {
+							name: path.file_name().context("No file name")?.to_string_lossy().into(),
+							editor_type: EditorType::Text {
+								file_type: TextFileType::Xml
+							}
 						}
 					})
 				)?;
@@ -1036,7 +1072,56 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 			{
 				let task = start_task(app, format!("Refreshing resource overview for {}", hash))?;
 
-				initialise_resource_overview(app, &app_state, editor.key().to_owned(), hash, game).await?;
+				match initialise_resource_overview(app, &app_state, editor.key().to_owned(), hash, game).await {
+					Ok(_) => {}
+					Err(e) => {
+						let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+
+						send_request(
+							app,
+							Request::Editor(EditorRequest {
+								editor: editor.key().to_owned(),
+								data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+									hash: Hash(hash),
+									filetype: filetype.into(),
+									chunk_patch,
+									path_or_hint: hash.get_path_or_hint(),
+									dependencies: deps
+										.into_par_iter()
+										.map(|dep| {
+											(
+												Hash(dep.resource),
+												game.resource_type(dep.resource),
+												dep.resource.get_path_or_hint(),
+												dep.flags,
+												game.resource_exists(dep.resource)
+											)
+										})
+										.collect(),
+									reverse_dependencies: game
+										.resource_reverse_references(hash)
+										.map(|hashes| {
+											hashes
+												.iter()
+												.map(|&hash| {
+													(
+														Hash(hash),
+														game.resource_type(hash).unwrap(),
+														hash.get_path_or_hint()
+													)
+												})
+												.collect()
+										})
+										.unwrap_or_default(),
+									changelog: game.extract_resource_changelog(hash),
+									data: ResourceOverviewData::Error {
+										message: format!("{e:?}")
+									}
+								})
+							})
+						)?;
+					}
+				}
 
 				finish_task(app, task)?;
 			}

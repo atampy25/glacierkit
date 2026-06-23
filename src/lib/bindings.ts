@@ -1483,6 +1483,12 @@ export type ResourceOverviewData =
 			}
 	  }
 	| {
+			type: "xml"
+			data: {
+				xml: string
+			}
+	  }
+	| {
 			type: "image"
 			data: {
 				assetId: string
@@ -1546,6 +1552,12 @@ export type ResourceOverviewData =
 			type: "behaviorTree"
 			data: {
 				pseudocode: string
+			}
+	  }
+	| {
+			type: "error"
+			data: {
+				message: string
 			}
 	  }
 
@@ -1883,7 +1895,7 @@ export type TextEditorRequest =
 			}
 	  }
 
-export type TextFileType = "Json" | "ManifestJson" | "PlainText" | "Markdown"
+export type TextFileType = "Json" | "ManifestJson" | "Xml" | "PlainText" | "Markdown"
 
 export type ToolEvent =
 	| { type: "fileBrowser"; data: FileBrowserEvent }

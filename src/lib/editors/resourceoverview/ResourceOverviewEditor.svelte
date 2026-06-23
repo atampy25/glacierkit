@@ -40,12 +40,14 @@
 		"multiAudio",
 		"genericRL",
 		"json",
+		"xml",
 		"hMLanguages",
 		"localisedLine",
 		"materialInstance",
 		"materialEntity",
 		"soundDefinitions",
-		"behaviorTree"
+		"behaviorTree",
+		"error"
 	]
 
 	onMount(async () => {
@@ -231,11 +233,15 @@
 										{/if}
 									{:else if data.type === "genericRL" || data.type === "json" || data.type === "hMLanguages" || data.type === "materialInstance" || data.type === "materialEntity" || data.type === "soundDefinitions"}
 										<div class="h-[30vh]">
-											<Monaco id={v4()} content={data.data.json} />
+											<Monaco id={v4()} filetype="json" content={data.data.json} />
+										</div>
+									{:else if data.type === "xml"}
+										<div class="h-[30vh]">
+											<Monaco id={v4()} filetype="xml" content={data.data.xml} />
 										</div>
 									{:else if data.type === "behaviorTree"}
 										<div class="h-[30vh]">
-											<Monaco id={v4()} content={data.data.pseudocode} />
+											<Monaco id={v4()} filetype="json" content={data.data.pseudocode} />
 										</div>
 									{:else if data.type === "localisedLine"}
 										<div class="max-h-[30vh] overflow-y-auto">
@@ -246,6 +252,10 @@
 												]}
 												rows={data.data.languages.map(([lang, val], ind) => ({ id: ind, lang, val }))}
 											/>
+										</div>
+									{:else if data.type === "error"}
+										<div class="max-h-[30vh] overflow-y-auto">
+											<pre><code>{data.data.message}</code></pre>
 										</div>
 									{/if}
 								</Tile>
@@ -886,7 +896,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "json" || data.type === "localisedLine" || data.type === "generic"}
+									{:else if data.type === "json" || data.type === "xml" || data.type === "localisedLine" || data.type === "error" || data.type === "generic"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {

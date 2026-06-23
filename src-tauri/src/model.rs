@@ -217,6 +217,7 @@ pub struct GameBrowserEntry {
 pub enum TextFileType {
 	Json,
 	ManifestJson,
+	Xml,
 	PlainText,
 	Markdown
 }
@@ -286,6 +287,10 @@ pub enum ResourceOverviewData {
 		#[debug(skip)]
 		json: String
 	},
+	Xml {
+		#[debug(skip)]
+		xml: String
+	},
 	Image {
 		asset_id: Uuid,
 		texture_data: Option<(String, String, Option<String>)>
@@ -328,6 +333,9 @@ pub enum ResourceOverviewData {
 	BehaviorTree {
 		#[debug(skip)]
 		pseudocode: String
+	},
+	Error {
+		message: String
 	}
 }
 

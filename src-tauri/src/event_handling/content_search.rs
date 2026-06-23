@@ -289,7 +289,7 @@ pub async fn start_content_search(
 									.ok()?;
 								}
 
-								"JSON" | "REPO" => {
+								"JSON" | "REPO" | "XMLB" => {
 									let _ = matcher.write_all(&partition.read_resource(resource_id).ok()?);
 								}
 

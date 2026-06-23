@@ -6,6 +6,7 @@
 	let editor: monaco.editor.IStandaloneCodeEditor = null!
 
 	export let id: string
+	export let filetype: string
 	export let content: string
 
 	const dispatch = createEventDispatcher()
@@ -18,7 +19,7 @@
 
 	onMount(async () => {
 		editor = monaco.editor.create(el, {
-			model: monaco.editor.createModel("{}", "json", monaco.Uri.parse(`monaco-model://${id}`)),
+			model: monaco.editor.createModel("{}", filetype, monaco.Uri.parse(`monaco-model://${id}`)),
 			roundedSelection: false,
 			theme: "theme",
 			minimap: {
