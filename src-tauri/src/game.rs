@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use arc_swap::ArcSwap;
 use dashmap::{DashMap, DashSet};
 use glacier_commons::{
 	game::{GamePlatform, GlacierGame, StorePlatform},
@@ -40,6 +39,47 @@ use crate::{
 	send_request, start_progress, start_task, task_progress
 };
 
+pub fn valid_game_path(path: impl AsRef<Path>) -> bool {
+	let path = path.as_ref();
+	path.join("HITMAN3.exe").is_file()
+		|| path.join("HITMAN2.exe").is_file()
+		|| path.join("HITMAN.exe").is_file()
+		|| path.join("007FirstLight.exe").is_file()
+}
+
+#[try_fn]
+pub fn custom_game_install(path: impl AsRef<Path>) -> Result<GameInstall> {
+	let path = path.as_ref();
+
+	let version = if path.join("HITMAN3.exe").is_file() {
+		GlacierGame::H3
+	} else if path.join("HITMAN2.exe").is_file() {
+		GlacierGame::H2
+	} else if path.join("HITMAN.exe").is_file() {
+		GlacierGame::H1
+	} else if path.join("007FirstLight.exe").is_file() {
+		GlacierGame::FL
+	} else {
+		bail!("Unknown game version");
+	};
+
+	let platform = if path.join("steam_api64.dll").is_file() {
+		StorePlatform::Steam
+	} else if path.join("EOSSDK-Win64-Shipping.dll").is_file() {
+		StorePlatform::Epic
+	} else if path.join("../../..").join("MicrosoftGame.Config").is_file() {
+		StorePlatform::Microsoft
+	} else {
+		StorePlatform::GOG
+	};
+
+	GameInstall {
+		version,
+		platform,
+		path: path.to_owned()
+	}
+}
+
 pub struct Game {
 	install: GameInstall,
 	game_files: PartitionManager,
@@ -62,8 +102,8 @@ impl Game {
 			.game_installs
 			.iter()
 			.find(|x| x.path == path)
-			.context("No such game install")?
-			.to_owned();
+			.cloned()
+			.map_or_else(|| custom_game_install(path), Ok)?;
 
 		let (proj_path, relative_runtime_path) = if install.version == GlacierGame::FL {
 			(r"..\".into(), "runtime".into())
@@ -117,7 +157,7 @@ impl Game {
 				.context("Couldn't read packagedefinition")?
 		};
 
-		if !app.state::<ArcSwap<AppSettings>>().load().extract_modded_files {
+		if !app.state::<AppSettings>().settings().extract_modded_files {
 			for partition in &mut partitions {
 				partition.set_max_patch_level(9);
 			}
@@ -252,6 +292,10 @@ impl Game {
 			repository,
 			cached_entities: Arc::new(Default::default())
 		}
+	}
+
+	pub fn install(&self) -> &GameInstall {
+		&self.install
 	}
 
 	pub fn version(&self) -> GlacierGame {

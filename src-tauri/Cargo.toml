@@ -84,6 +84,8 @@ lazy-regex = "3.6.0"
 rapidhash = { version = "4.4.1", features = ["rand", "unsafe"] }
 regex-automata = "0.4.14"
 dirs = "6.0.0"
+mesh-tools = "0.4.0"
+tempfile = "3.27.0"
 
 [dependencies.tokio]
 version = "1.43.0"
@@ -161,13 +163,18 @@ branch = "fl"
 features = ["schemars", "all-games"]
 
 [dependencies.glacier-texture]
-version = "2.1.0"
+version = "2.1.1"
 
-[dependencies.prim-rs]
+[dependencies.glacier-geometry]
 git = "https://github.com/dafitius/GlacierFormats-rs"
+branch = "primitive-refactor"
 
 [dependencies.tonytools]
 git = "https://github.com/AnthonyFuller/tonytools-rs"
+
+[dependencies.image_0_24]
+package = "image"
+version = "0.24.9"
 
 [dependencies.tauri-plugin-log]
 version = "2"

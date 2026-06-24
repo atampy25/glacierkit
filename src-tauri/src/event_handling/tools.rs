@@ -1,7 +1,6 @@
 use std::fs;
 
 use anyhow::{Context, Result, anyhow};
-use arc_swap::ArcSwap;
 use ecow::eco_format;
 use fn_error_context::context;
 use glacier_commons::{
@@ -30,10 +29,12 @@ use crate::{
 	Notification, NotificationKind, convert_json_patch_to_merge_patch,
 	event_handling::{content_search::start_content_search, resource_overview::open_resource_overview},
 	finish_task,
+	game::{custom_game_install, valid_game_path},
 	general::{EMPTY_ID, REPO_ID, initialise_app, load_game_files, open_file, open_in_editor},
 	model::{
 		AppSettings, AppState, ContentSearchEvent, FileBrowserEvent, GameBrowserEntry, GameBrowserEvent,
-		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SettingsEvent, ToolEvent, ToolRequest
+		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SettingsEvent, SettingsRequest, ToolEvent,
+		ToolRequest
 	},
 	ores_repo::UnlockableItem,
 	send_notification, send_request, start_task
@@ -42,7 +43,7 @@ use crate::{
 #[try_fn]
 #[context("Couldn't handle tool event")]
 pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_settings = app.state::<AppSettings>();
 	let app_state = app.state::<AppState>();
 
 	match event {
@@ -957,65 +958,98 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			SettingsEvent::ChangeGameInstall { path } => {
-				let mut settings = (*app_settings.load_full()).to_owned();
+				if path != app_settings.settings().game_path {
+					if let Some(path) = &path
+						&& !valid_game_path(path)
+					{
+						send_notification(
+							app,
+							Notification {
+								kind: NotificationKind::Error,
+								title: "Invalid game path".into(),
+								subtitle: "Make sure to select the Retail path containing the game executable.".into()
+							}
+						)?;
 
-				if path != settings.game_install {
-					settings.game_install = path;
-					fs::write(
-						app.path()
-							.app_data_dir()
-							.context("Couldn't get app data dir")?
-							.join("settings.json"),
-						to_vec(&settings)?
+						return Ok(());
+					}
+
+					if let Some(path) = &path
+						&& !app_state.game_installs.iter().any(|x| x.path == *path)
+					{
+						let mut custom_game_paths = app_settings.settings().custom_game_paths.to_owned();
+						if !custom_game_paths.contains(path) {
+							custom_game_paths.push(path.to_owned());
+							app_settings.set_custom_game_paths(custom_game_paths)?;
+						}
+					}
+
+					app_settings.set_game_path(path)?;
+
+					send_request(
+						app,
+						Request::Tool(ToolRequest::Settings(SettingsRequest::Initialise {
+							game_installs: app_state
+								.game_installs
+								.iter()
+								.cloned()
+								.map(Ok)
+								.chain(
+									app_settings
+										.settings()
+										.custom_game_paths
+										.iter()
+										.map(custom_game_install)
+								)
+								.collect::<Result<_>>()?,
+							settings: (**app_settings.settings()).to_owned()
+						}))
 					)?;
-					app_settings.store(settings.into());
 
 					load_game_files(app).await?;
 				}
 			}
 
-			SettingsEvent::ChangeExtractModdedFiles { value } => {
-				let mut settings = (*app_settings.load_full()).to_owned();
-				settings.extract_modded_files = value;
-				fs::write(
-					app.path()
-						.app_data_dir()
-						.context("Couldn't get app data dir")?
-						.join("settings.json"),
-					to_vec(&settings)?
+			SettingsEvent::RemoveCustomGamePath { path } => {
+				let mut custom_game_paths = app_settings.settings().custom_game_paths.to_owned();
+				custom_game_paths.retain(|x| *x != path);
+				app_settings.set_custom_game_paths(custom_game_paths)?;
+
+				send_request(
+					app,
+					Request::Tool(ToolRequest::Settings(SettingsRequest::Initialise {
+						game_installs: app_state
+							.game_installs
+							.iter()
+							.cloned()
+							.map(Ok)
+							.chain(
+								app_settings
+									.settings()
+									.custom_game_paths
+									.iter()
+									.map(custom_game_install)
+							)
+							.collect::<Result<_>>()?,
+						settings: (**app_settings.settings()).to_owned()
+					}))
 				)?;
-				app_settings.store(settings.into());
 			}
 
-			SettingsEvent::ChangeColourblind { value } => {
-				let mut settings = (*app_settings.load_full()).to_owned();
-				settings.colourblind_mode = value;
-				fs::write(
-					app.path()
-						.app_data_dir()
-						.context("Couldn't get app data dir")?
-						.join("settings.json"),
-					to_vec(&settings)?
-				)?;
-				app_settings.store(settings.into());
+			SettingsEvent::ChangeExtractModdedFiles { value } => {
+				app_settings.set_extract_modded_files(value)?;
+			}
+
+			SettingsEvent::ChangeColourblindMode { value } => {
+				app_settings.set_colourblind_mode(value)?;
 			}
 
 			SettingsEvent::ChangeEditorConnection { value } => {
-				let mut settings = (*app_settings.load_full()).to_owned();
-				settings.editor_connection = value;
+				app_settings.set_editor_connection(value)?;
 
 				if !value && app_state.editor_connection.is_connected().await {
 					app_state.editor_connection.disconnect().await?;
 				}
-
-				fs::write(
-					app.path()
-						.app_data_dir()
-						.context("Couldn't get app data dir")?
-						.join("settings.json"),
-					to_vec(&settings)?
-				)?;
-				app_settings.store(settings.into());
 			}
 
 			SettingsEvent::ChangeCustomPaths { value } => {

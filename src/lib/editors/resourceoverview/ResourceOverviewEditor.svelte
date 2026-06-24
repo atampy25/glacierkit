@@ -705,6 +705,25 @@
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
+												trackEvent("Extract mesh file as GLB")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsGlb"
+															}
+														}
+													}
+												})
+											}}>Extract as GLB</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
 												trackEvent("Extract mesh file as OBJ")
 
 												await event({

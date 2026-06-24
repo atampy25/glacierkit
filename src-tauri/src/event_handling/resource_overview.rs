@@ -1,6 +1,6 @@
 use std::{
 	fs::{self, File},
-	io::{BufWriter, Cursor, Write},
+	io::{BufWriter, Cursor},
 	ops::Deref
 };
 
@@ -20,10 +20,9 @@ use hitman_formats::{
 	wwev::WwiseEvent
 };
 use image::{ImageFormat, ImageReader};
+use itertools::Itertools;
 use optivorbis::{OggToOgg, Remuxer};
-use prim_rs::render_primitive::RenderPrimitive;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use rpkg_rs_1::GlacierResource as _;
 use serde::Serialize;
 use serde_json::{json, to_string, to_vec};
 use tauri::{AppHandle, Manager, State};
@@ -41,6 +40,7 @@ use crate::{
 	finish_task,
 	game::Game,
 	general::{get_name, open_in_editor},
+	geometry::{parse_prim_to_glb, parse_prim_to_obj},
 	languages::get_language_map,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
@@ -80,83 +80,6 @@ pub async fn open_resource_overview(app: &AppHandle, resource: RuntimeID) -> Res
 }
 
 #[try_fn]
-#[context("Couldn't parse PRIM file")]
-pub fn parse_prim(game: &Game, res_data: &[u8]) -> Result<(EcoVec<u8>, [f32; 6])> {
-	let model = RenderPrimitive::process_data(
-		Option::from(game.version()).context("Game version net yet supported")?,
-		res_data
-	)
-	.context("Couldn't process PRIM data")?;
-
-	// Higher is less detail
-	let preferred_lod = 1;
-
-	// Get only the meshes, we don't need weight metadata for the preview
-	let meshes = model
-		.data
-		.objects
-		.iter()
-		.map(|mesh_obj| match mesh_obj {
-			prim_rs::render_primitive::MeshObject::Normal(mesh) => mesh,
-			prim_rs::render_primitive::MeshObject::Weighted(mesh) => &mesh.prim_mesh,
-			prim_rs::render_primitive::MeshObject::Linked(mesh) => &mesh.prim_mesh
-		})
-		.collect::<Vec<_>>();
-
-	// Get only the meshes for the preferred LOD level
-	let meshes = meshes
-		.iter()
-		.filter(|mesh| mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod));
-
-	let mut previous_vertex_count: usize = 1;
-	let mut bounding_box: [f32; 6] = [
-		f32::INFINITY,
-		f32::INFINITY,
-		f32::INFINITY,
-		f32::NEG_INFINITY,
-		f32::NEG_INFINITY,
-		f32::NEG_INFINITY
-	];
-
-	let mut obj = EcoVec::new();
-
-	for (idx, mesh) in meshes.enumerate() {
-		writeln!(obj, "o object.00{}", idx)?;
-
-		for position in &mesh.sub_mesh.buffers.position {
-			writeln!(obj, "v {} {} {}", position.x, position.y, position.z)?;
-		}
-
-		for vm in &mesh.sub_mesh.buffers.main {
-			writeln!(obj, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
-		}
-
-		for idx in mesh.sub_mesh.indices.chunks(3) {
-			let [idx1, idx2, idx3] = [
-				idx[0] as usize + previous_vertex_count,
-				idx[1] as usize + previous_vertex_count,
-				idx[2] as usize + previous_vertex_count
-			];
-			writeln!(obj, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
-		}
-
-		previous_vertex_count += mesh.sub_mesh.buffers.position.len();
-
-		let bb = mesh.sub_mesh.calc_bb();
-
-		bounding_box[0] = bounding_box[0].min(bb.min.x);
-		bounding_box[1] = bounding_box[1].min(bb.min.y);
-		bounding_box[2] = bounding_box[2].min(bb.min.z);
-
-		bounding_box[3] = bounding_box[3].max(bb.max.x);
-		bounding_box[4] = bounding_box[4].max(bb.max.y);
-		bounding_box[5] = bounding_box[5].max(bb.max.z);
-	}
-
-	(obj, bounding_box)
-}
-
-#[try_fn]
 #[context("Couldn't initialise resource overview {id}")]
 pub async fn initialise_resource_overview(
 	app: &AppHandle,
@@ -167,6 +90,48 @@ pub async fn initialise_resource_overview(
 ) -> Result<()> {
 	let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
 
+	let dependencies = deps
+		.into_par_iter()
+		.map(|dep| {
+			(
+				Hash(dep.resource),
+				game.resource_type(dep.resource),
+				dep.resource.get_path_or_hint(),
+				dep.flags,
+				game.resource_exists(dep.resource)
+			)
+		})
+		.collect::<Vec<_>>();
+
+	let reverse_dependencies = game
+		.resource_reverse_references(hash)
+		.map(|hashes| {
+			hashes
+				.iter()
+				.map(|&hash| (Hash(hash), game.resource_type(hash).unwrap(), hash.get_path_or_hint()))
+				.collect_vec()
+		})
+		.unwrap_or_default();
+
+	let changelog = game.extract_resource_changelog(hash);
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest {
+			editor: id,
+			data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+				hash: Hash(hash),
+				filetype: filetype.into(),
+				chunk_patch: chunk_patch.to_owned(),
+				path_or_hint: hash.get_path_or_hint(),
+				dependencies: dependencies.to_owned(),
+				reverse_dependencies: reverse_dependencies.to_owned(),
+				changelog: changelog.to_owned(),
+				data: ResourceOverviewData::Generic
+			})
+		})
+	)?;
+
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -176,28 +141,9 @@ pub async fn initialise_resource_overview(
 				filetype: filetype.into(),
 				chunk_patch,
 				path_or_hint: hash.get_path_or_hint(),
-				dependencies: deps
-					.into_par_iter()
-					.map(|dep| {
-						(
-							Hash(dep.resource),
-							game.resource_type(dep.resource),
-							dep.resource.get_path_or_hint(),
-							dep.flags,
-							game.resource_exists(dep.resource)
-						)
-					})
-					.collect(),
-				reverse_dependencies: game
-					.resource_reverse_references(hash)
-					.map(|hashes| {
-						hashes
-							.iter()
-							.map(|&hash| (Hash(hash), game.resource_type(hash).unwrap(), hash.get_path_or_hint()))
-							.collect()
-					})
-					.unwrap_or_default(),
-				changelog: game.extract_resource_changelog(hash),
+				dependencies,
+				reverse_dependencies,
+				changelog,
 				data: match filetype.as_ref() {
 					"TEMP" => {
 						let entity = game.extract_entity(hash)?;
@@ -273,9 +219,9 @@ pub async fn initialise_resource_overview(
 					}
 
 					"PRIM" => {
-						let (_, res_data) = game.extract_latest_resource(hash)?;
+						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-						let (obj, bounding_box) = parse_prim(game, &res_data)?;
+						let (glb, bounding_box) = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?;
 
 						let asset_id = Uuid::new_v4();
 
@@ -285,7 +231,7 @@ pub async fn initialise_resource_overview(
 							.await
 							.context("No such editor")?
 							.assets
-							.insert(asset_id, ("model/obj".into(), obj))
+							.insert(asset_id, ("model/gltf-binary".into(), glb.into()))
 							.await;
 
 						ResourceOverviewData::Mesh { asset_id, bounding_box }
@@ -296,11 +242,8 @@ pub async fn initialise_resource_overview(
 
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-						let mut texture = TextureMap::process_data(
-							Option::from(game.version()).context("Game version net yet supported")?,
-							res_data
-						)
-						.context("Couldn't process texture data")?;
+						let mut texture = TextureMap::from_memory(&res_data, game.version().into())
+							.context("Couldn't process texture data")?;
 
 						if let Some(texd_depend) = res_meta.core_info.references.first() {
 							let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
@@ -1376,11 +1319,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						}
 
 						"TEXT" => {
-							let mut texture = TextureMap::process_data(
-								Option::from(game.version()).context("Game version net yet supported")?,
-								res_data
-							)
-							.context("Couldn't process texture data")?;
+							let mut texture = TextureMap::from_memory(&res_data, game.version().into())
+								.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
 								let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
@@ -1858,7 +1798,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		ResourceOverviewEvent::ExtractAsObj => {
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (_, res_data) = game.extract_latest_resource(hash)?;
-				let (obj, _) = parse_prim(game, &res_data)?;
+				let (obj, _) = parse_prim_to_obj(game, &res_data)?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1868,6 +1808,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 				if let Some(path) = dialog.add_filter("OBJ mesh file", &["obj"]).blocking_save_file() {
 					fs::write(path.as_path().context("Invalid path")?, obj)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsGlb => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
+				let glb = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?.0;
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog.add_filter("GLTF binary file", &["glb"]).blocking_save_file() {
+					fs::write(path.as_path().context("Invalid path")?, glb)?;
 				}
 			}
 		}
@@ -1960,11 +1917,8 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-				let mut texture = TextureMap::process_data(
-					Option::from(game.version()).context("Game version net yet supported")?,
-					res_data
-				)
-				.context("Couldn't process texture data")?;
+				let mut texture = TextureMap::from_memory(&res_data, game.version().into())
+					.context("Couldn't process texture data")?;
 
 				if let Some(texd_depend) = res_meta.core_info.references.first() {
 					let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;

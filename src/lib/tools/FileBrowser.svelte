@@ -814,6 +814,6 @@
 	{/if}
 
 	<div class="flex-grow overflow-y-auto">
-		<div class="w-full h-full" id={elemID} />
+		<div class="w-full h-full" id={elemID}></div>
 	</div>
 </div>

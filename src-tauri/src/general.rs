@@ -1,7 +1,6 @@
 use std::{fs, path::Path, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
-use arc_swap::ArcSwap;
 use ecow::eco_format;
 use fn_error_context::context;
 use glacier_commons::{game::GlacierGame, hash_list::HASH_LIST, metadata::RuntimeID, resource_type, rid};
@@ -28,7 +27,7 @@ use crate::{
 	HashMap, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
 	event_handling::resource_overview::initialise_resource_overview,
 	finish_task,
-	game::Game,
+	game::{Game, custom_game_install},
 	model::{
 		AppSettings, AppState, ContentSearchRequest, EditorData, EditorRequest, EditorRequestData, EditorState,
 		EditorType, FileBrowserRequest, GameBrowserRequest, GlobalRequest, Hash, JsonPatchType, Request,
@@ -880,40 +879,26 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 #[try_fn]
 #[context("Couldn't initialise app")]
 pub async fn initialise_app(app: &AppHandle) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_settings = app.state::<AppSettings>();
 	let app_state = app.state::<AppState>();
-
-	let selected_install_info = app_settings
-		.load()
-		.game_install
-		.as_ref()
-		.map(|x| {
-			let install = app_state
-				.game_installs
-				.iter()
-				.find(|y| y.path == *x)
-				.expect("No such game install");
-			format!("{:?} {}", install.version, install.platform)
-		})
-		.unwrap_or("None".into());
-
-	app.track_event(
-		"App initialised",
-		Some(serde_json::json!({
-			"game_installs": app_state.game_installs.len(),
-			"extract_modded_files": app_settings.load().extract_modded_files,
-			"colourblind_mode": app_settings.load().colourblind_mode,
-			"editor_connection": app_settings.load().editor_connection,
-			"selected_install": selected_install_info
-		}))
-	)
-	.unwrap();
 
 	send_request(
 		app,
 		Request::Tool(ToolRequest::Settings(SettingsRequest::Initialise {
-			game_installs: app_state.game_installs.to_owned(),
-			settings: (*app_settings.load_full()).to_owned()
+			game_installs: app_state
+				.game_installs
+				.iter()
+				.cloned()
+				.map(Ok)
+				.chain(
+					app_settings
+						.settings()
+						.custom_game_paths
+						.iter()
+						.map(custom_game_install)
+				)
+				.collect::<Result<_>>()?,
+			settings: (**app_settings.settings()).to_owned()
 		}))
 	)?;
 
@@ -966,6 +951,28 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 	load_game_files(app).await?;
 	res.await??;
 
+	let selected_install_info = app_state
+		.game
+		.load()
+		.as_ref()
+		.map(|x| {
+			let install = x.install();
+			format!("{:?}-{:?}", install.version, install.platform)
+		})
+		.unwrap_or("None".into());
+
+	app.track_event(
+		"App initialised",
+		Some(serde_json::json!({
+			"game_installs": app_state.game_installs.len(),
+			"extract_modded_files": app_settings.settings().extract_modded_files,
+			"colourblind_mode": app_settings.settings().colourblind_mode,
+			"editor_connection": app_settings.settings().editor_connection,
+			"selected_install": selected_install_info
+		}))
+	)
+	.unwrap();
+
 	if app
 		.path()
 		.app_log_dir()
@@ -982,7 +989,7 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 			app,
 			Request::Global(GlobalRequest::InitialiseDynamics {
 				dynamics: req.json().await.context("Couldn't deserialise dynamics response")?,
-				seen_announcements: app_settings.load().seen_announcements.to_owned()
+				seen_announcements: app_settings.settings().seen_announcements.to_owned()
 			})
 		)?;
 	}
@@ -995,7 +1002,7 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 			interval.tick().await;
 
 			// Attempt to connect every 10 seconds
-			if app.state::<ArcSwap<AppSettings>>().load().editor_connection
+			if app.state::<AppSettings>().settings().editor_connection
 				&& !app.state::<AppState>().editor_connection.is_connected().await
 				&& TcpStream::connect("localhost:46735").await.is_ok()
 			{
@@ -1009,9 +1016,9 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 #[context("Couldn't load game files")]
 pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	let app_state = app.state::<AppState>();
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_settings = app.state::<AppSettings>();
 
-	if let Some(path) = app_settings.load().game_install.as_ref() {
+	if let Some(path) = app_settings.settings().game_path.as_ref() {
 		app_state.game.store(Some(Game::load(app, path)?.into()));
 	} else {
 		app_state.game.store(None);

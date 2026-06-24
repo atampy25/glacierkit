@@ -13,6 +13,7 @@ pub mod entity;
 pub mod event_handling;
 pub mod game;
 pub mod general;
+pub mod geometry;
 pub mod intellisense;
 pub mod languages;
 pub mod model;
@@ -30,7 +31,6 @@ use std::{
 };
 
 use anyhow::{Context, Error, Result, anyhow, bail};
-use arc_swap::ArcSwap;
 use fn_error_context::context;
 use futures_util::StreamExt;
 use glacier_commons::game_detection::detect_installs;
@@ -351,29 +351,7 @@ async fn main() {
 
 			let game_installs = detect_installs().expect("Couldn't detect game installs");
 
-			if let Ok(read) = fs::read(app_data_path.join("settings.json"))
-				&& let Ok(mut settings) = from_slice::<AppSettings>(&read)
-			{
-				// Check if the game install is still valid
-				if settings
-					.game_install
-					.as_ref()
-					.is_some_and(|x| !game_installs.iter().any(|y| y.path == *x))
-				{
-					settings.game_install = None;
-				}
-
-				app.manage(ArcSwap::new(settings.into()));
-			} else {
-				let settings = AppSettings::default();
-				fs::create_dir_all(&app_data_path).expect("Couldn't create app data dir");
-				fs::write(
-					app_data_path.join("settings.json"),
-					to_vec(&settings).expect("Couldn't serialise default app settings")
-				)
-				.expect("Couldn't write default app settings");
-				app.manage(ArcSwap::new(settings.into()));
-			}
+			app.manage(AppSettings::load(&app_data_path).expect("Couldn't load app settings"));
 
 			info!("Loaded settings");
 
@@ -417,7 +395,7 @@ pub fn handle_event(app: &AppHandle, evt: Event) {
 
 #[try_fn]
 async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_settings = app.state::<AppSettings>();
 	let app_state = app.state::<AppState>();
 
 	match event {
@@ -557,16 +535,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 		Event::Global(event) => match event {
 			GlobalEvent::SetSeenAnnouncements(seen_announcements) => {
-				let mut settings = (*app_settings.load_full()).to_owned();
-				settings.seen_announcements = seen_announcements;
-				fs::write(
-					app.path()
-						.app_data_dir()
-						.context("Couldn't get app data dir")?
-						.join("settings.json"),
-					to_vec(&settings).unwrap()
-				)?;
-				app_settings.store(settings.into());
+				app_settings.set_seen_announcements(seen_announcements)?;
 			}
 
 			GlobalEvent::SelectAndOpenFile => {

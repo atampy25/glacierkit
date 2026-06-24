@@ -21,14 +21,6 @@ export type Announcement = {
 
 export type AnnouncementKind = "info" | "success" | "warning" | "error"
 
-export type AppSettings = {
-	extractModdedFiles: boolean
-	gameInstall: string | null
-	colourblindMode: boolean
-	editorConnection: boolean
-	seenAnnouncements: string[]
-}
-
 export type ContentSearchEvent = {
 	type: "search"
 	data: {
@@ -1596,6 +1588,7 @@ export type ResourceOverviewEvent =
 	| { type: "extractAsMaterialEntity" }
 	| { type: "extractAsSoundDefs" }
 	| { type: "extractAsObj" }
+	| { type: "extractAsGlb" }
 	| { type: "extractAsTexture" }
 	| { type: "extractAsPseudocode" }
 
@@ -1717,13 +1710,19 @@ export type SettingsEvent =
 			}
 	  }
 	| {
+			type: "removeCustomGamePath"
+			data: {
+				path: string
+			}
+	  }
+	| {
 			type: "changeExtractModdedFiles"
 			data: {
 				value: boolean
 			}
 	  }
 	| {
-			type: "changeColourblind"
+			type: "changeColourblindMode"
 			data: {
 				value: boolean
 			}
@@ -1741,12 +1740,21 @@ export type SettingsEvent =
 			}
 	  }
 
+export type SettingsInner = {
+	gamePath: string | null
+	customGamePaths: string[]
+	extractModdedFiles: boolean
+	colourblindMode: boolean
+	editorConnection: boolean
+	seenAnnouncements: string[]
+}
+
 export type SettingsRequest =
 	| {
 			type: "initialise"
 			data: {
 				gameInstalls: GameInstall[]
-				settings: AppSettings
+				settings: SettingsInner
 			}
 	  }
 	| {

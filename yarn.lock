@@ -978,6 +978,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/node@npm:^26.0.0":
+  version: 26.0.0
+  resolution: "@types/node@npm:26.0.0"
+  dependencies:
+    undici-types: "npm:~8.3.0"
+  checksum: f36e21634fd8e8ded162ca486508bd8bb229d398a8d5541f6d8c1255968d4464e53327a77f403b216ef98e3b6f6956882eef83e4857d4bc2be9569dd55d37aae
+  languageName: node
+  linkType: hard
+
 "@types/sizzle@npm:*":
   version: 2.3.8
   resolution: "@types/sizzle@npm:2.3.8"
@@ -2834,6 +2843,7 @@ __metadata:
     "@types/lodash": "npm:^4"
     "@types/md5": "npm:^2"
     "@types/mousetrap": "npm:^1"
+    "@types/node": "npm:^26.0.0"
     "@types/three": "npm:^0.167.1"
     "@types/uuid": "npm:^9"
     "@typescript-eslint/eslint-plugin": "npm:^8.59.2"
@@ -4011,6 +4021,13 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: eed465bd04b344517bd91eb232fd0187d93e34625c65ec93777449e29157c6c2accae409474a68a867b90465224d4908f9bce78ad763c159cacd7263ae24b5fc
+  languageName: node
+  linkType: hard
+
+"undici-types@npm:~8.3.0":
+  version: 8.3.0
+  resolution: "undici-types@npm:8.3.0"
+  checksum: c8aa7e2fbebfce519654dafadc0ece59be888d2ccaf180fb4495da875e7b536d2456345c384069c7e6f3e9c9ab7435f074957da306f142343eee86ff8048855a
   languageName: node
   linkType: hard
 
