@@ -252,21 +252,40 @@ pub async fn initialise_resource_overview(
 							texture.set_mipblock1(mipblock);
 						}
 
-						let image = glacier_texture::convert::create_dynamic_image(&texture)
-							.context("Couldn't convert texture to dynamic image")?;
+						if texture.format() == glacier_texture::enums::RenderFormat::BC5 {
+							let image = glacier_texture::convert::create_tga(&texture)
+								.context("Couldn't convert texture to TGA")?;
 
-						let mut image_data = vec![];
+							let mut image_data = vec![];
 
-						image.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
+							image::load_from_memory_with_format(&image, image::ImageFormat::Tga)?
+								.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
 
-						app_state
-							.editor_states
-							.get(&id)
-							.await
-							.context("No such editor")?
-							.assets
-							.insert(asset_id, ("image/webp".into(), image_data.into()))
-							.await;
+							app_state
+								.editor_states
+								.get(&id)
+								.await
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("image/x-targa".into(), image_data.into()))
+								.await;
+						} else {
+							let image = glacier_texture::convert::create_dynamic_image(&texture)
+								.context("Couldn't convert texture to dynamic image")?;
+
+							let mut image_data = vec![];
+
+							image.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
+
+							app_state
+								.editor_states
+								.get(&id)
+								.await
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("image/webp".into(), image_data.into()))
+								.await;
+						}
 
 						ResourceOverviewData::Image {
 							asset_id,

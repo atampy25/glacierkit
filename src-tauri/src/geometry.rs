@@ -163,13 +163,21 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 						texture.set_mipblock1(mipblock);
 					}
 
-					image_0_24::load_from_memory(&{
-						let mut bytes = vec![];
-						glacier_texture::convert::create_dynamic_image(&texture)
-							.context("Couldn't convert texture to PNG")?
-							.write_to(Cursor::new(&mut bytes), image::ImageFormat::Png)?;
-						bytes
-					})?
+					if texture.format() == glacier_texture::enums::RenderFormat::BC5 {
+						image_0_24::load_from_memory_with_format(
+							&glacier_texture::convert::create_tga(&texture)
+								.context("Couldn't convert texture to TGA")?,
+							image_0_24::ImageFormat::Tga
+						)?
+					} else {
+						image_0_24::load_from_memory(&{
+							let mut bytes = vec![];
+							glacier_texture::convert::create_dynamic_image(&texture)
+								.context("Couldn't convert texture to dynamic image")?
+								.write_to(Cursor::new(&mut bytes), image::ImageFormat::Png)?;
+							bytes
+						})?
+					}
 				}
 
 				let ((diffuse_texture, specular_texture), (normal_texture, emissive_texture)) = rayon::join(
