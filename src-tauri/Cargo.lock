@@ -718,10 +718,10 @@ dependencies = ["tinyvec"]
 
 [[package]]
 name = "bstr"
-version = "1.12.1"
+version = "1.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
-dependencies = ["memchr", "regex-automata", "serde"]
+checksum = "a4e308e67087593070530a666f7fe8815cbd2e61d8f5b7313b71b7d721d1dfde"
+dependencies = ["memchr", "regex-automata", "serde_core"]
 
 [[package]]
 name = "built"
@@ -884,9 +884,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chacha20"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f8d983286843e49675a4b7a2d174efe136dc93a18d69130dd18198a6c167601"
+checksum = "d524456ba66e72eb8b115ff89e01e497f8e6d11d78b70b1aa13c0fbd97540a81"
 dependencies = ["cfg-if", "cpufeatures 0.3.0", "rand_core 0.10.1"]
 
 [[package]]
@@ -1847,7 +1847,7 @@ dependencies = ["binrw 0.15.1", "byteorder", "crc32fast", "extended-tea", "nalge
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = [
 	"Inflector",
 	"anyhow",
@@ -1870,13 +1870,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = ["Inflector", "codegen", "edit-distance", "lazy-regex", "rayon", "serde", "serde_json"]
 
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = [
 	"anyhow",
 	"bimap",
@@ -1902,13 +1902,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = ["darling", "quote", "syn 2.0.118"]
 
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1936,7 +1936,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1964,7 +1964,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1992,7 +1992,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3d20e8d8267af25d3cf7220f1578b0f30f3d3842"
+source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -2254,7 +2254,7 @@ dependencies = ["Inflector", "anyhow", "codegen", "ecow", "glacier-bin1", "lazy-
 [[package]]
 name = "hitman-formats"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-formats?branch=fl#d6475ed6369749353ee9575472cb6b0b39242ee3"
+source = "git+https://github.com/atampy25/hitman-formats?branch=fl#6f9e46d62957f3dd035b9cbe2cf675e4a2b6b277"
 dependencies = ["discrim", "glacier-commons", "glacier-texture", "hex", "indexmap 2.14.0", "serde", "serde_with", "strum", "thiserror 2.0.18", "tryvial"]
 
 [[package]]
@@ -2675,9 +2675,9 @@ dependencies = ["rayon"]
 
 [[package]]
 name = "js-sys"
-version = "0.3.102"
+version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03d04c30968dffe80775bd4d7fb676131cd04a1fb46d2686dbffbaec2d9dfd31"
+checksum = "53b44bfcdb3f8d5837a46dae1ca9660a837176eee74a28b229bc626816589102"
 dependencies = ["cfg-if", "futures-util", "wasm-bindgen"]
 
 [[package]]
@@ -5987,9 +5987,9 @@ checksum = "133bf74f01486773317ddfcde8e2e20d2933cc3b68ab797e5d718bef996a81de"
 
 [[package]]
 name = "uuid"
-version = "1.23.3"
+version = "1.23.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "144d6b123cef80b301b8f72a9e2ca4370ddec21950d0a103dd22c437006d2db7"
+checksum = "bf80a72845275afea99e7f2b434723d3bc7e38470fcd1c7ed39a599c73319a53"
 dependencies = ["getrandom 0.4.3", "js-sys", "serde_core", "wasm-bindgen"]
 
 [[package]]
@@ -6112,37 +6112,37 @@ dependencies = ["wit-bindgen"]
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.125"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ddb3f79143bced6de84270411622a2699cee572fc0875aeaf1e7867cf9fca1a"
+checksum = "4b067c0c11094aef6b7a801c1e34a26affafdf3d051dba08456b868789aaf9a4"
 dependencies = ["cfg-if", "once_cell", "rustversion", "wasm-bindgen-macro", "wasm-bindgen-shared"]
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.75"
+version = "0.4.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "503b14d284f2c8dac03b819967e155ea753f573586193b2b2c95990cb5d69280"
+checksum = "c62df1340f32221cb9c54d6a27b030e3dba64361d4a95bed55f9aacb44da291d"
 dependencies = ["js-sys", "wasm-bindgen"]
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.125"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e21a184b13fb19e157296e2c46056aec9092264fab83e4ba59e68c61b323c3d"
+checksum = "167ce5e579f6bcf889c4f7175a8a5a585de84e8ff93976ce393efa5f2837aab1"
 dependencies = ["quote", "wasm-bindgen-macro-support"]
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.125"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fecefd9c35bd935a20fc3fc344b5f29138961e4f47fb03297d88f2587afb5ebd"
+checksum = "f3997c7839262f4ef12cf90b818d6340c18e80f263f1a94bf157d0ec4420380e"
 dependencies = ["bumpalo", "proc-macro2", "quote", "syn 2.0.118", "wasm-bindgen-shared"]
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.125"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23939e44bb9a5d7576fa2b563dc2e136628f1224e88a8deed09e04858b77871f"
+checksum = "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24"
 dependencies = ["unicode-ident"]
 
 [[package]]
@@ -6196,9 +6196,9 @@ dependencies = ["pkg-config"]
 
 [[package]]
 name = "web-sys"
-version = "0.3.102"
+version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6430a72df5eb332242960fe84b3002a241163998241eb596d4f739b9757061d"
+checksum = "8622dcb61c0bcc9fffa6938bed81210af2da9a7e4a1a834b2e37a59b6dfb6141"
 dependencies = ["js-sys", "wasm-bindgen"]
 
 [[package]]

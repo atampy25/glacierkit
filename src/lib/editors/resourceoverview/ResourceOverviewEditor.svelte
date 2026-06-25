@@ -23,6 +23,7 @@
 	let hash = $state("")
 	let filetype = $state("")
 	let partition = $state("")
+	let size = $state(0)
 	let pathOrHint: string | null = $state(null)
 	let dependencies: [string, string, string | null, ReferenceFlags, boolean][] = $state([])
 	let reverseDependencies: [string, string, string | null][] = $state([])
@@ -73,6 +74,7 @@
 				hash = request.data.hash
 				filetype = request.data.filetype
 				partition = request.data.chunkPatch.replace(/patch[0-9]+/, "")
+				size = request.data.size
 				pathOrHint = request.data.pathOrHint
 				dependencies = request.data.dependencies
 				reverseDependencies = request.data.reverseDependencies
@@ -113,6 +115,10 @@
 			<div>
 				<div>Partition</div>
 				<div class="text-xl">{partition}</div>
+			</div>
+			<div>
+				<div>Size</div>
+				<div class="text-xl">{size} byte{size !== 1 ? "s" : ""}</div>
 			</div>
 		</div>
 

@@ -88,7 +88,7 @@ pub async fn initialise_resource_overview(
 	hash: RuntimeID,
 	game: &Game
 ) -> Result<()> {
-	let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+	let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
 
 	let dependencies = deps
 		.into_par_iter()
@@ -123,6 +123,7 @@ pub async fn initialise_resource_overview(
 				hash: Hash(hash),
 				filetype: filetype.into(),
 				chunk_patch: chunk_patch.to_owned(),
+				size,
 				path_or_hint: hash.get_path_or_hint(),
 				dependencies: dependencies.to_owned(),
 				reverse_dependencies: reverse_dependencies.to_owned(),
@@ -140,6 +141,7 @@ pub async fn initialise_resource_overview(
 				hash: Hash(hash),
 				filetype: filetype.into(),
 				chunk_patch,
+				size,
 				path_or_hint: hash.get_path_or_hint(),
 				dependencies,
 				reverse_dependencies,
@@ -162,7 +164,7 @@ pub async fn initialise_resource_overview(
 
 					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB" | "ENUM"
 					| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP" | "GFXA" | "KWOR"
-					| "TDAT" | "TDPK" | "WEMD" | "TBLU" => {
+					| "TDAT" | "TDPK" | "WEMD" | "TBLU" | "ORES" => {
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 						ResourceOverviewData::GenericRL {
@@ -338,7 +340,7 @@ pub async fn initialise_resource_overview(
 
 						let mut audios = vec![];
 
-						let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+						let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
 
 						for (name, data) in wwev
 							.non_streamed
@@ -810,7 +812,7 @@ pub async fn initialise_resource_overview(
 						json: {
 							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-							let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game.version())
+							let sdef = SoundDefinitions::parse(game.version(), &res_data, &res_meta.core_info)
 								.context("Couldn't parse sound definitions")?;
 
 							let mut buf = Vec::new();
@@ -919,7 +921,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				match initialise_resource_overview(app, &app_state, id, hash, game).await {
 					Ok(_) => {}
 					Err(e) => {
-						let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+						let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
 
 						send_request(
 							app,
@@ -929,6 +931,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 									hash: Hash(hash),
 									filetype: filetype.into(),
 									chunk_patch,
+									size,
 									path_or_hint: hash.get_path_or_hint(),
 									dependencies: deps
 										.into_par_iter()
@@ -992,7 +995,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				match initialise_resource_overview(app, &app_state, id, new_hash, game).await {
 					Ok(_) => {}
 					Err(e) => {
-						let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(new_hash)?;
+						let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(new_hash)?;
 
 						send_request(
 							app,
@@ -1002,6 +1005,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 									hash: Hash(new_hash),
 									filetype: filetype.into(),
 									chunk_patch,
+									size,
 									path_or_hint: new_hash.get_path_or_hint(),
 									dependencies: deps
 										.into_par_iter()
@@ -1423,7 +1427,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 					let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+					let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
 
 					let non_streamed_count = wwev.non_streamed.len();
 
@@ -1512,7 +1516,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-				let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+				let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
 
 				if index < wwev.non_streamed.len() as u32 {
 					let object = wwev.non_streamed.get(index as usize).context("No such audio object")?;
@@ -1911,7 +1915,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-				let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game.version())
+				let sdef = SoundDefinitions::parse(game.version(), &res_data, &res_meta.core_info)
 					.context("Couldn't parse sound definitions")?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");

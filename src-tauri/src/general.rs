@@ -1,10 +1,9 @@
 use std::{fs, path::Path, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
-use ecow::eco_format;
+use ecow::{EcoString, eco_format};
 use fn_error_context::context;
 use glacier_commons::{game::GlacierGame, hash_list::HASH_LIST, metadata::RuntimeID, resource_type, rid};
-use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lazy_regex::regex_captures;
@@ -483,7 +482,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 
 				if let Some(game) = app_state.game.load().as_ref() {
 					let mut unlockables = to_value(
-						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+						from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
 							&game.extract_latest_resource(game.unlockables_id())?.1
 						)?)?
 						.into_iter()
@@ -506,7 +505,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 						.collect::<IndexMap<String, IndexMap<String, Value>>>()
 					)?;
 
-					let base = from_str::<Value>(&parse_json_ores(
+					let base = from_str::<Value>(&glacier_bin1::deserialize::<EcoString>(
 						&game.extract_latest_resource(game.unlockables_id())?.1
 					)?)?;
 
@@ -672,7 +671,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							let id = Uuid::new_v4();
 
 							let mut unlockables = to_value(
-								from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+								from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
 									&game.extract_latest_resource(game.unlockables_id())?.1
 								)?)?
 								.into_iter()
@@ -695,7 +694,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								.collect::<IndexMap<String, IndexMap<String, Value>>>()
 							)?;
 
-							let base = from_str::<Value>(&parse_json_ores(
+							let base = from_str::<Value>(&glacier_bin1::deserialize::<EcoString>(
 								&game.extract_latest_resource(game.unlockables_id())?.1
 							)?)?;
 
@@ -1082,7 +1081,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 				match initialise_resource_overview(app, &app_state, editor.key().to_owned(), hash, game).await {
 					Ok(_) => {}
 					Err(e) => {
-						let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+						let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
 
 						send_request(
 							app,
@@ -1092,6 +1091,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 									hash: Hash(hash),
 									filetype: filetype.into(),
 									chunk_patch,
+									size,
 									path_or_hint: hash.get_path_or_hint(),
 									dependencies: deps
 										.into_par_iter()
@@ -1247,7 +1247,7 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 
 			let id = Uuid::new_v4();
 
-			let unlockables: Vec<UnlockableItem> = from_str(&parse_json_ores(
+			let unlockables: Vec<UnlockableItem> = from_str(&glacier_bin1::deserialize::<EcoString>(
 				&game.extract_latest_resource(game.unlockables_id())?.1
 			)?)?;
 

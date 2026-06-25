@@ -1032,8 +1032,9 @@ export type GameBrowserEntry = {
 	hash: Hash
 	path: string | null
 	hint: string | null
-	filetype: string
+	resourceType: string
 	partition: [string, string]
+	order: number | null
 }
 
 export type GameBrowserEvent =
@@ -1048,6 +1049,7 @@ export type GameBrowserEvent =
 			data: {
 				query: string
 				filter: SearchFilter
+				sort: [SearchSort, boolean] | null
 			}
 	  }
 	| {
@@ -1601,6 +1603,7 @@ export type ResourceOverviewRequest_Deserialize = {
 		filetype: string
 		chunkPatch: string
 		pathOrHint: string | null
+		size: number
 		// Hash, type, path/hint, flags, is actually in current game version
 		dependencies: [string, string, string | null, ReferenceFlags_Deserialize, boolean][]
 		// Hash, type, path/hint
@@ -1617,6 +1620,7 @@ export type ResourceOverviewRequest_Serialize = {
 		filetype: string
 		chunkPatch: string
 		pathOrHint: string | null
+		size: number
 		// Hash, type, path/hint, flags, is actually in current game version
 		dependencies: [string, string, string | null, ReferenceFlags_Serialize, boolean][]
 		// Hash, type, path/hint
@@ -1700,6 +1704,8 @@ export type ReverseReferenceData =
 	  }
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
+
+export type SearchSort = "Size"
 
 export type SettingsEvent =
 	| { type: "initialise" }

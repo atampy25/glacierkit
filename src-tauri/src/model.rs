@@ -286,8 +286,9 @@ pub struct GameBrowserEntry {
 	pub path: Option<EcoString>,
 	#[specta(type = Option<String>)]
 	pub hint: Option<EcoString>,
-	pub filetype: ResourceType,
-	pub partition: (String, String)
+	pub resource_type: ResourceType,
+	pub partition: (String, String),
+	pub order: Option<usize>
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -442,6 +443,11 @@ pub enum SearchFilter {
 	Sound
 }
 
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+pub enum SearchSort {
+	Size
+}
+
 #[derive(Type, Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Dynamics {
@@ -531,7 +537,8 @@ nesting::nest! {
 				},
 				Search {
 					query: String,
-					filter: SearchFilter
+					filter: SearchFilter,
+					sort: Option<(SearchSort, bool)>
 				},
 				OpenInEditor {
 					resource: Hash
@@ -1213,6 +1220,8 @@ nesting::nest! {
 
 						#[specta(type = Option<String>)]
 						path_or_hint: Option<EcoString>,
+
+						size: u32,
 
 						/// Hash, type, path/hint, flags, is actually in current game version
 						#[debug(skip)]

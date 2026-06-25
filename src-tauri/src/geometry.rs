@@ -15,7 +15,7 @@ use glacier_texture::{mipblock::MipblockData, texture_map::TextureMap};
 use hitman_formats::material::{MaterialInstance, MaterialPropertyValue};
 use itertools::Itertools;
 use mesh_tools::{
-	GltfBuilder, Triangle,
+	GltfBuilder, PbrSpecularGlossiness, TextureInfo, Triangle,
 	compat::{Point3, Vector2, Vector3},
 	texture::TextureFormat
 };
@@ -363,10 +363,10 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 						.map(|image| gltf.create_texture_from_image(None, &image, TextureFormat::PNG))
 						.transpose()?;
 
-					gltf.add_textured_material(
+					let index = gltf.add_textured_material(
 						name,
 						diffuse_texture,
-						specular_texture,
+						None,
 						normal_texture,
 						None,
 						emissive_texture,
@@ -376,11 +376,39 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 						alpha_mode,
 						alpha_cutoff,
 						None
-					)
+					);
+
+					if let Some(specular_texture) = specular_texture {
+						gltf.gltf
+							.materials
+							.get_or_insert_default()
+							.get_mut(index)
+							.unwrap()
+							.extensions
+							.get_or_insert_default()
+							.pbr_specular_glossiness = Some(PbrSpecularGlossiness {
+							diffuse_texture: diffuse_texture.map(|diffuse_texture| TextureInfo {
+								index: diffuse_texture,
+								..Default::default()
+							}),
+							specular_glossiness_texture: Some(TextureInfo {
+								index: specular_texture,
+								..Default::default()
+							}),
+							..Default::default()
+						});
+					}
+
+					index
 				}))
 			}
 		)
 		.collect::<Result<HashMap<_, _>>>()?;
+
+	gltf.gltf
+		.extensions_used
+		.get_or_insert_default()
+		.push("KHR_materials_pbrSpecularGlossiness".into());
 
 	let mut bounding_box: [f32; 6] = [
 		f32::INFINITY,

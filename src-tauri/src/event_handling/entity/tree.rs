@@ -1929,7 +1929,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 		} else if resource_type == "WWEV" {
 			let (wwev_meta, wwev_data) = game.extract_latest_resource(file)?;
 
-			let wwev = WwiseEvent::parse(&wwev_data, &wwev_meta.core_info)?;
+			let wwev = WwiseEvent::parse(game.version(), &wwev_data, &wwev_meta.core_info)?;
 
 			let entity_id = random_entity_id();
 

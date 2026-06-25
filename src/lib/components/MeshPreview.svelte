@@ -1,6 +1,16 @@
 <script lang="ts">
 	import { T, Canvas } from "@threlte/core"
 	import { OrbitControls, GLTF } from "@threlte/extras"
+	import { WebIO } from "@gltf-transform/core"
+	import { metalRough } from "@gltf-transform/functions"
+	import { KHRONOS_EXTENSIONS } from "@gltf-transform/extensions"
+
+	async function transform(url: string) {
+		const io = new WebIO().registerExtensions(KHRONOS_EXTENSIONS)
+		const doc = await io.read(url)
+		await doc.transform(metalRough())
+		return URL.createObjectURL(new Blob([await io.writeBinary(doc)]))
+	}
 
 	let { src = "", boundingBox = [-1, -1, -1, 0, 0, 0] }: { src: string; boundingBox: [number, number, number, number, number, number] } = $props()
 
@@ -15,6 +25,23 @@
 		const centerZ = (minZ + maxZ) / 2
 		return [centerX, centerY, centerZ]
 	}
+
+	let objectUrl: string | null = $state(null)
+
+	$effect(() => {
+		if (src) {
+			void transform(src).then((url) => {
+				objectUrl = url
+			})
+		}
+
+		return () => {
+			if (objectUrl) {
+				URL.revokeObjectURL(objectUrl)
+				objectUrl = null
+			}
+		}
+	})
 </script>
 
 <Canvas>
@@ -31,5 +58,7 @@
 
 	<T.AmbientLight color={0xaaaaaa} />
 
-	<GLTF url={src} position={[-center[0] * scaleFactor, -center[2] * scaleFactor, center[1] * scaleFactor]} rotation={[0, 0, 0]} scale={[scaleFactor, scaleFactor, scaleFactor]} />
+	{#if objectUrl}
+		<GLTF url={objectUrl} position={[-center[0] * scaleFactor, -center[2] * scaleFactor, center[1] * scaleFactor]} rotation={[0, 0, 0]} scale={[scaleFactor, scaleFactor, scaleFactor]} />
+	{/if}
 </Canvas>

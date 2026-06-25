@@ -2,7 +2,7 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter } from "$lib/bindings"
+	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter, SearchSort } from "$lib/bindings"
 	import { Checkbox, Dropdown, Search } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"
@@ -15,7 +15,11 @@
 
 	function compareNodes(a: any, b: any) {
 		if ((!(a.original ? a.original : a).folder && !(b.original ? b.original : b).folder) || ((a.original ? a.original : a).folder && (b.original ? b.original : b).folder)) {
-			return (a?.original?.chunk || a.text).localeCompare(b?.original?.chunk || b.text, undefined, { numeric: true, sensitivity: "base" }) > 0 ? 1 : -1
+			if (a?.original?.order && b?.original?.order && a?.original?.order !== b?.original?.order) {
+				return a?.original?.order - b?.original?.order
+			} else {
+				return (a?.original?.chunk || a.text).localeCompare(b?.original?.chunk || b.text, undefined, { numeric: true, sensitivity: "base" }) > 0 ? 1 : -1
+			}
 		} else {
 			return (a.original ? a.original : a).folder ? -1 : 1
 		}
@@ -305,32 +309,38 @@
 
 		tree.settings!.core.data = []
 
-		const addedFolders = new Set()
-		const addedPartitions = new Set()
+		const addedFolders: Record<string, any> = {}
+		const addedPartitions: Record<string, any> = {}
 
 		for (const entry of entries) {
-			if (separatePartitions && !addedPartitions.has(entry.partition[0])) {
-				tree.settings!.core.data.push({
-					id: `partition-${entry.partition[0]}`,
-					parent: "#",
-					icon: "fa-solid fa-box",
-					text: `${entry.partition[1]} (${entry.partition[0]})`,
-					folder: true,
-					path: null,
-					filetype: null,
-					chunk: entry.partition[0]
-				})
+			if (separatePartitions) {
+				if (!addedPartitions[entry.partition[0]]) {
+					tree.settings!.core.data.push({
+						id: `partition-${entry.partition[0]}`,
+						parent: "#",
+						icon: "fa-solid fa-box",
+						text: `${entry.partition[1]} (${entry.partition[0]})`,
+						folder: true,
+						path: null,
+						filetype: null,
+						chunk: entry.partition[0],
+						order: entry.order
+					})
 
-				addedPartitions.add(entry.partition[0])
+					addedPartitions[entry.partition[0]] = tree.settings!.core.data.at(-1)!
+				} else {
+					addedPartitions[entry.partition[0]].order = Math.min(addedPartitions[entry.partition[0]].order || Infinity, entry.order || Infinity)
+				}
 			}
 
 			if (entry.path) {
 				const parsedPath = parsePath(entry.path)
 
 				for (const pathSection of parsedPath.parents.map((_, i, arr) => arr.slice(0, i + 1).join("/"))) {
-					if (!addedFolders.has(separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection)) {
+					const sectionID = separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection
+					if (!addedFolders[sectionID]) {
 						tree.settings!.core.data.push({
-							id: separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection,
+							id: sectionID,
 							parent: pathSection.split("/").slice(0, -1).join("/")
 								? separatePartitions
 									? `${entry.partition[0]}-${pathSection.split("/").slice(0, -1).join("/")}`
@@ -342,10 +352,13 @@
 							text: pathSection.split("/").at(-1),
 							folder: true,
 							path: pathSection,
-							filetype: null
+							filetype: null,
+							order: entry.order
 						})
 
-						addedFolders.add(separatePartitions ? `${entry.partition[0]}-${pathSection}` : pathSection)
+						addedFolders[sectionID] = tree.settings!.core.data.at(-1)!
+					} else {
+						addedFolders[sectionID].order = Math.min(addedFolders[sectionID].order || Infinity, entry.order || Infinity)
 					}
 				}
 
@@ -396,12 +409,13 @@
 							DSWB: "fa-regular fa-square",
 							ECPB: "fa-regular fa-square",
 							WSGB: "fa-regular fa-square"
-						}[entry.filetype] || "fa-regular fa-file"
+						}[entry.resourceType] || "fa-regular fa-file"
 					}`,
 					text: parsedPath.name,
 					folder: false,
 					path: entry.path,
-					filetype: entry.filetype
+					filetype: entry.resourceType,
+					order: entry.order
 				})
 			} else {
 				tree.settings!.core.data.push({
@@ -452,13 +466,14 @@
 							DSWB: "fa-regular fa-square",
 							ECPB: "fa-regular fa-square",
 							WSGB: "fa-regular fa-square"
-						}[entry.filetype] || "fa-regular fa-file"
+						}[entry.resourceType] || "fa-regular fa-file"
 					}`,
-					text: entry.hint ? `${entry.hint} (${entry.hash}.${entry.filetype})` : `${entry.hash}.${entry.filetype}`,
+					text: entry.hint ? `${entry.hint} (${entry.hash}.${entry.resourceType})` : `${entry.hash}.${entry.resourceType}`,
 					folder: false,
 					path: null,
 					hint: entry.hint || null,
-					filetype: entry.filetype
+					filetype: entry.resourceType,
+					order: entry.order
 				})
 			}
 		}
@@ -466,23 +481,29 @@
 		tree.refresh()
 	}
 
-	async function searchInput(evt: any) {
-		const _event = evt as { target: HTMLInputElement }
-
-		if (_event.target.value.length >= 3) {
+	async function search() {
+		if (searchQuery.length >= 3) {
 			searchFeedback = ""
-			await trackEvent("Search game files", { filter: searchFilter, separate_partitions: String(separatePartitions) })
+			await trackEvent("Search game files", { filter: searchFilter, sort: String(searchSort), separate_partitions: String(separatePartitions) })
 			await event({
 				type: "tool",
 				data: {
 					type: "gameBrowser",
 					data: {
 						type: "search",
-						data: { query: _event.target.value.toLowerCase(), filter: searchFilter }
+						data: {
+							query: searchQuery.toLowerCase(),
+							filter: searchFilter,
+							sort: {
+								none: null,
+								sizeAsc: ["Size", false],
+								sizeDesc: ["Size", true]
+							}[searchSort] as [SearchSort, boolean] | null
+						}
 					}
 				}
 			})
-		} else if (_event.target.value.length === 0) {
+		} else if (searchQuery.length === 0) {
 			searchFeedback = ""
 			gameDescription = "Search for a game file above to get started"
 			entries = []
@@ -495,10 +516,18 @@
 		}
 	}
 
+	async function searchInput(evt: any) {
+		const _event = evt as { target: HTMLInputElement }
+
+		searchQuery = _event.target.value
+		await search()
+	}
+
 	let enabled = false
 	let gameDescription = "Search for a game file above to get started"
 	let searchFeedback = ""
 	let searchFilter: SearchFilter = "All"
+	let searchSort: "none" | "sizeAsc" | "sizeDesc" = "none"
 	let searchQuery = ""
 	let separatePartitions = false
 	let entries: GameBrowserEntry[] = []
@@ -506,7 +535,7 @@
 	$: (separatePartitions,
 		(async () => {
 			await refreshTree()
-			await trackEvent("Search game files", { filter: searchFilter, separate_partitions: String(separatePartitions) })
+			await trackEvent("Search game files", { filter: searchFilter, sort: String(searchSort), separate_partitions: String(separatePartitions) })
 		})())
 </script>
 
@@ -526,7 +555,6 @@
 		<div class="pt-2 pb-1 px-2 leading-tight text-base">
 			<div class="mb-4">
 				<div
-					class="flex gap-2"
 					use:help={{
 						title: "Search query",
 						description: 'You can separate multiple queries with spaces. For example, "agent47 default" matches only files containing both "agent47" and "default" in their path.'
@@ -545,9 +573,13 @@
 						}}
 						bind:value={searchQuery}
 					/>
+				</div>
+				<div class="mt-2 flex gap-2">
 					<Dropdown
-						class="w-40 no-menu-spacing"
-						bind:selectedId={searchFilter}
+						class="w-1/2 no-menu-spacing"
+						size="sm"
+						helperText="Filter"
+						selectedId={searchFilter}
 						items={[
 							{ id: "All", text: "All" },
 							{ id: "Templates", text: "Templates" },
@@ -557,20 +589,23 @@
 							{ id: "Sound", text: "Sound" }
 						]}
 						on:select={async ({ detail: { selectedId } }) => {
-							if (searchQuery.length >= 3) {
-								searchFeedback = ""
-								await trackEvent("Search game files", { filter: selectedId, separate_partitions: String(separatePartitions) })
-								await event({
-									type: "tool",
-									data: {
-										type: "gameBrowser",
-										data: {
-											type: "search",
-											data: { query: searchQuery.toLowerCase(), filter: selectedId }
-										}
-									}
-								})
-							}
+							searchFilter = selectedId
+							await search()
+						}}
+					/>
+					<Dropdown
+						class="w-1/2 no-menu-spacing"
+						size="sm"
+						helperText="Sort"
+						selectedId={searchSort}
+						items={[
+							{ id: "none", text: "Name" },
+							{ id: "sizeAsc", text: "Size (Ascending)" },
+							{ id: "sizeDesc", text: "Size (Descending)" }
+						]}
+						on:select={async ({ detail: { selectedId } }) => {
+							searchSort = selectedId
+							await search()
 						}}
 					/>
 				</div>

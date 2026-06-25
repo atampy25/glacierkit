@@ -86,7 +86,7 @@ pub struct Game {
 	intellisense: Intellisense,
 
 	resource_reverse_references: HashMap<RuntimeID, Vec<RuntimeID>, BuildIdentityHasher<u64>>,
-	file_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>>,
+	resource_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>>,
 	repository: Option<Vec<RepositoryItem>>,
 
 	cached_entities: Arc<PapayaMap<RuntimeID, Arc<Entity>, BuildIdentityHasher<u64>>>
@@ -214,7 +214,7 @@ impl Game {
 		finish_task(app, *task.read().unwrap())?;
 		let task = start_task(app, "Caching reverse references")?;
 
-		let file_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>> = partition_manager
+		let resource_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>> = partition_manager
 			.partitions
 			.par_iter()
 			.rev()
@@ -232,11 +232,11 @@ impl Game {
 			.collect();
 
 		let resource_reverse_references: DashMap<RuntimeID, Vec<RuntimeID>, BuildIdentityHasher<u64>> =
-			DashMap::with_capacity_and_hasher(file_types.len(), BuildIdentityHasher::default());
+			DashMap::with_capacity_and_hasher(resource_types.len(), BuildIdentityHasher::default());
 
 		// Ensure we only get the references from the lowest chunk version of each resource (matches the rest of GK's behaviour)
 		let seen_resources: DashSet<RuntimeID, BuildIdentityHasher<u64>> =
-			DashSet::with_capacity_and_hasher(file_types.len(), BuildIdentityHasher::default());
+			DashSet::with_capacity_and_hasher(resource_types.len(), BuildIdentityHasher::default());
 
 		partition_manager
 			.partitions
@@ -288,7 +288,7 @@ impl Game {
 				.unwrap_or(b"[]")
 			),
 			resource_reverse_references,
-			file_types,
+			resource_types,
 			repository,
 			cached_entities: Arc::new(Default::default())
 		}
@@ -307,11 +307,11 @@ impl Game {
 	}
 
 	pub fn resource_exists(&self, resource: impl Into<RuntimeID>) -> bool {
-		self.file_types.contains_key(&resource.into())
+		self.resource_types.contains_key(&resource.into())
 	}
 
 	pub fn resource_type(&self, resource: impl Into<RuntimeID>) -> Option<ResourceType> {
-		self.file_types.get(&resource.into()).copied()
+		self.resource_types.get(&resource.into()).copied()
 	}
 
 	pub fn resource_reverse_references(&self, resource: impl Into<RuntimeID>) -> Option<&Vec<RuntimeID>> {
@@ -323,7 +323,7 @@ impl Game {
 	}
 
 	pub fn all_resources(&self) -> impl Iterator<Item = RuntimeID> {
-		self.file_types.keys().copied()
+		self.resource_types.keys().copied()
 	}
 
 	pub fn repository(&self) -> &Option<Vec<RepositoryItem>> {
@@ -358,18 +358,16 @@ impl Game {
 	) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
 		let rrid = self.to_rrid(resource);
 		for partition in &self.game_files.partitions {
-			if partition.contains(&rrid)
-				&& let Some((info, _)) = partition
-					.latest_resources()
-					.into_iter()
-					.find(|(x, _)| *x.rrid() == rrid)
-			{
+			if partition.contains(&rrid) {
 				return Ok((
-					info.try_into()
-						.with_context(|| format!("Couldn't extract resource {rrid}"))?,
+					partition
+						.get_resource_info(&rrid)
+						.with_context(|| format!("Couldn't extract metadata for {rrid}"))?
+						.try_into()
+						.with_context(|| format!("Metadata was invalid for {rrid}"))?,
 					partition
 						.read_resource(&rrid)
-						.with_context(|| format!("Couldn't extract {rrid} using rpkg-rs"))?
+						.with_context(|| format!("Couldn't extract data of {rrid}"))?
 				));
 			}
 		}
@@ -379,29 +377,25 @@ impl Game {
 
 	/// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
 	pub fn extract_latest_metadata(&self, resource: impl Into<RuntimeID>) -> Result<ExtendedResourceMetadata> {
-		let resource_id = self.to_rrid(resource);
-
+		let rrid = self.to_rrid(resource);
 		for partition in &self.game_files.partitions {
-			if partition.contains(&resource_id)
-				&& let Some((info, _)) = partition
-					.latest_resources()
-					.into_iter()
-					.find(|(x, _)| *x.rrid() == resource_id)
-			{
-				return info
+			if partition.contains(&rrid) {
+				return partition
+					.get_resource_info(&rrid)
+					.with_context(|| format!("Couldn't extract metadata for {rrid}"))?
 					.try_into()
-					.with_context(|| format!("Couldn't extract metadata for resource {resource_id}"));
+					.with_context(|| format!("Metadata was invalid for {rrid}"));
 			}
 		}
 
-		bail!("Couldn't find {resource_id} in any partition when extracting metadata");
+		bail!("Couldn't find {rrid} in any partition when extracting metadata");
 	}
 
-	/// Get miscellaneous information (filetype, chunk and patch, dependencies with hash and flag) for the latest copy of a resource.
+	/// Get miscellaneous information (resource type, file size, chunk and patch, dependencies with hash and flag) for the latest copy of a resource.
 	pub fn extract_latest_overview_info(
 		&self,
 		resource: impl Into<RuntimeID>
-	) -> Result<(ResourceType, String, Vec<ResourceReference>)> {
+	) -> Result<(ResourceType, u32, String, Vec<ResourceReference>)> {
 		let resource_id = self.to_rrid(resource);
 
 		for partition in &self.game_files.partitions {
@@ -420,6 +414,7 @@ impl Game {
 					info.data_type()
 						.try_into()
 						.with_context(|| format!("Couldn't extract overview info for resource {resource_id}"))?,
+					info.size(),
 					match &partition.partition_info().name {
 						Some(name) => format!("{} ({})", name, package_name),
 						None => package_name

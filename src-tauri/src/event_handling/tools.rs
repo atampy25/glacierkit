@@ -1,14 +1,13 @@
 use std::fs;
 
 use anyhow::{Context, Result, anyhow};
-use ecow::eco_format;
+use ecow::{EcoString, eco_format};
 use fn_error_context::context;
 use glacier_commons::{
 	game::GlacierGame,
-	metadata::{ResourceReference, RuntimeID},
+	metadata::{ResourceReference, ResourceType, RuntimeID},
 	resource_type, rid
 };
-use hitman_formats::ores::parse_json_ores;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
@@ -17,7 +16,7 @@ use quickentity_rs::{
 	generate_patch,
 	patch::Patch
 };
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelBridge, ParallelIterator};
 use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value, to_vec};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
@@ -33,8 +32,8 @@ use crate::{
 	general::{EMPTY_ID, REPO_ID, initialise_app, load_game_files, open_file, open_in_editor},
 	model::{
 		AppSettings, AppState, ContentSearchEvent, FileBrowserEvent, GameBrowserEntry, GameBrowserEvent,
-		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SettingsEvent, SettingsRequest, ToolEvent,
-		ToolRequest
+		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SearchSort, SettingsEvent, SettingsRequest,
+		ToolEvent, ToolRequest
 	},
 	ores_repo::UnlockableItem,
 	send_notification, send_request, start_task
@@ -652,7 +651,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						== game.unlockables_id()
 					{
 						let mut current = to_value(
-							from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+							from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
 								&game.extract_latest_resource(game.unlockables_id())?.1
 							)?)?
 							.into_iter()
@@ -743,7 +742,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			FileBrowserEvent::ConvertUnlockablesPatchToJsonPatch { path } => {
 				if let Some(game) = app_state.game.load().as_ref() {
 					let mut current = to_value(
-						from_str::<Vec<UnlockableItem>>(&parse_json_ores(
+						from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
 							&game.extract_latest_resource(game.unlockables_id())?.1
 						)?)?
 						.into_iter()
@@ -822,19 +821,35 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				open_resource_overview(app, resource.0).await?;
 			}
 
-			GameBrowserEvent::Search { query, filter } => {
+			GameBrowserEvent::Search { query, filter, sort } => {
 				let task = start_task(app, format!("Searching game files for {}", query))?;
 
 				if let Some(game) = app_state.game.load().as_ref() {
-					let filter_includes: &[&str] = match filter {
+					let filter_includes: &[ResourceType] = match filter {
 						SearchFilter::All => &[],
-						SearchFilter::Templates => {
-							&["TEMP", "CPPT", "ASET", "UICT", "MATT", "WSWT", "ECPT", "AIBX", "WSGT"]
+						SearchFilter::Templates => &[
+							resource_type!("TEMP"),
+							resource_type!("CPPT"),
+							resource_type!("ASET"),
+							resource_type!("UICT"),
+							resource_type!("MATT"),
+							resource_type!("WSWT"),
+							resource_type!("ECPT"),
+							resource_type!("AIBX"),
+							resource_type!("WSGT")
+						],
+						SearchFilter::Classes => &[resource_type!("CPPT")],
+						SearchFilter::Models => {
+							&[resource_type!("PRIM"), resource_type!("BORG"), resource_type!("ALOC")]
 						}
-						SearchFilter::Classes => &["CPPT"],
-						SearchFilter::Models => &["PRIM", "BORG", "ALOC"],
-						SearchFilter::Textures => &["TEXT", "TEXD"],
-						SearchFilter::Sound => &["WBNK", "WWFX", "WWEV", "WWES", "WWEM"]
+						SearchFilter::Textures => &[resource_type!("TEXT"), resource_type!("TEXD")],
+						SearchFilter::Sound => &[
+							resource_type!("WBNK"),
+							resource_type!("WWFX"),
+							resource_type!("WWEV"),
+							resource_type!("WWES"),
+							resource_type!("WWEM")
+						]
 					};
 
 					let query_terms = query.split(' ').collect_vec();
@@ -844,99 +859,146 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						Request::Tool(ToolRequest::GameBrowser(GameBrowserRequest::NewTree {
 							game_description: format!("{} ({})", game.version(), game.platform()),
 							entries: {
-								if matches!(filter, SearchFilter::All) {
+								let mut entries: Vec<_> = if matches!(filter, SearchFilter::All) {
 									game.all_resources()
 										.par_bridge()
-										.filter(|&id| {
-											let mut s = if let Some(info) = id.get_info() {
+										.map(|id| (id, id.get_info(), game.resource_type(id).unwrap()))
+										.filter(|(id, info, resource_type)| {
+											let mut s = if let Some(info) = &info {
 												format!(
 													"{}{}{}.{}",
 													info.path.as_deref().unwrap_or(""),
 													info.hint.as_deref().unwrap_or(""),
 													id.to_hash(),
-													info.resource_type
+													resource_type
 												)
 											} else {
-												format!("{}.{}", id.to_hash(), game.resource_type(id).unwrap())
+												format!("{}.{}", id.to_hash(), resource_type)
 											};
 											s.make_ascii_lowercase();
 											query_terms.iter().all(|&y| s.contains(y))
 										})
-										.map(|id| GameBrowserEntry {
-											hash: Hash(id),
-											path: id.get_path(),
-											hint: id.get_info().and_then(|i| i.hint),
-											filetype: game.resource_type(id).unwrap(),
-											partition: {
-												let rrid = game.to_rrid(id);
+										.map(|(id, info, resource_type)| {
+											let (path, hint) = if let Some(info) = info {
+												(info.path, info.hint)
+											} else {
+												(None, None)
+											};
 
-												let partition = game
-													.partition_manager()
-													.partitions
-													.iter()
-													.find(|x| x.contains(&rrid))
-													.unwrap();
+											let rrid = game.to_rrid(id);
 
-												(
-													partition.partition_info().id.to_string(),
-													partition
-														.partition_info()
-														.name
-														.to_owned()
-														.unwrap_or("<unnamed>".into())
-												)
-											}
+											let partition = game
+												.partition_manager()
+												.partitions
+												.iter()
+												.find(|x| x.contains(&rrid))
+												.unwrap();
+
+											(
+												partition,
+												GameBrowserEntry {
+													hash: Hash(id),
+													path,
+													hint,
+													resource_type,
+													partition: {
+														(
+															partition.partition_info().id.to_string(),
+															partition
+																.partition_info()
+																.name
+																.to_owned()
+																.unwrap_or("<unnamed>".into())
+														)
+													},
+													order: None
+												}
+											)
 										})
 										.collect()
 								} else {
 									game.all_resources()
 										.par_bridge()
-										.filter(|&id| {
-											let ty = game.resource_type(id).unwrap();
-											filter_includes.iter().any(|&x| ty == x)
+										.map(|id| (id, game.resource_type(id).unwrap()))
+										.filter_map(|(id, resource_type)| {
+											filter_includes.contains(&resource_type).then_some((
+												id,
+												id.get_info(),
+												resource_type
+											))
 										})
-										.filter(|&id| {
-											let mut s = if let Some(info) = id.get_info() {
+										.filter(|(id, info, resource_type)| {
+											let mut s = if let Some(info) = &info {
 												format!(
 													"{}{}{}.{}",
 													info.path.as_deref().unwrap_or(""),
 													info.hint.as_deref().unwrap_or(""),
 													id.to_hash(),
-													info.resource_type
+													resource_type
 												)
 											} else {
-												format!("{}.{}", id.to_hash(), game.resource_type(id).unwrap())
+												format!("{}.{}", id.to_hash(), resource_type)
 											};
 											s.make_ascii_lowercase();
 											query_terms.iter().all(|&y| s.contains(y))
 										})
-										.map(|id| GameBrowserEntry {
-											hash: Hash(id),
-											path: id.get_path(),
-											hint: id.get_info().and_then(|i| i.hint),
-											filetype: game.resource_type(id).unwrap(),
-											partition: {
-												let rrid = game.to_rrid(id);
+										.map(|(id, info, resource_type)| {
+											let (path, hint) = if let Some(info) = info {
+												(info.path, info.hint)
+											} else {
+												(None, None)
+											};
 
-												let partition = game
-													.partition_manager()
-													.partitions
-													.iter()
-													.find(|x| x.contains(&rrid))
-													.unwrap();
+											let rrid = game.to_rrid(id);
 
-												(
-													partition.partition_info().id.to_string(),
-													partition
-														.partition_info()
-														.name
-														.to_owned()
-														.unwrap_or("<unnamed>".into())
-												)
-											}
+											let partition = game
+												.partition_manager()
+												.partitions
+												.iter()
+												.find(|x| x.contains(&rrid))
+												.unwrap();
+
+											(
+												partition,
+												GameBrowserEntry {
+													hash: Hash(id),
+													path,
+													hint,
+													resource_type,
+													partition: {
+														(
+															partition.partition_info().id.to_string(),
+															partition
+																.partition_info()
+																.name
+																.to_owned()
+																.unwrap_or("<unnamed>".into())
+														)
+													},
+													order: None
+												}
+											)
 										})
 										.collect()
+								};
+
+								if let Some((sort, descending)) = sort {
+									match sort {
+										SearchSort::Size => {
+											entries.par_iter_mut().try_for_each(|(partition, entry)| {
+												let size =
+													partition.get_resource_info(&game.to_rrid(entry.hash.0))?.size();
+
+												entry.order =
+													Some(if descending { u32::MAX - size } else { size } as usize);
+
+												anyhow::Ok(())
+											})?;
+										}
+									}
 								}
+
+								entries.into_iter().map(|(_, entry)| entry).collect()
 							}
 						}))
 					)?;
