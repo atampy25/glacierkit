@@ -304,7 +304,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#3318b4eefcd91e774cc80d8dcb5c14836cc774b4"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#01883451e8a2c3a81e2643e40a597652aa542158"
 
 [[package]]
 name = "autocfg"
@@ -718,9 +718,9 @@ dependencies = ["tinyvec"]
 
 [[package]]
 name = "bstr"
-version = "1.12.2"
+version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4e308e67087593070530a666f7fe8815cbd2e61d8f5b7313b71b7d721d1dfde"
+checksum = "5cee35f73844aa3014bb606320a6c1f010249dbdf43342fe54b5a4f6a8ed4b79"
 dependencies = ["memchr", "regex-automata", "serde_core"]
 
 [[package]]
@@ -1847,7 +1847,7 @@ dependencies = ["binrw 0.15.1", "byteorder", "crc32fast", "extended-tea", "nalge
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = [
 	"Inflector",
 	"anyhow",
@@ -1870,13 +1870,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = ["Inflector", "codegen", "edit-distance", "lazy-regex", "rayon", "serde", "serde_json"]
 
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = [
 	"anyhow",
 	"bimap",
@@ -1902,13 +1902,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = ["darling", "quote", "syn 2.0.118"]
 
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1936,7 +1936,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1964,7 +1964,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1992,7 +1992,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#d0cb5b53d0d8b02d16649ccb8d9d2ab885fae2dd"
+source = "git+https://github.com/atampy25/glacier-bin1#d1421ba1db63d9adb7c64ea9013ab759615e4fe8"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -2254,7 +2254,7 @@ dependencies = ["Inflector", "anyhow", "codegen", "ecow", "glacier-bin1", "lazy-
 [[package]]
 name = "hitman-formats"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-formats?branch=fl#6f9e46d62957f3dd035b9cbe2cf675e4a2b6b277"
+source = "git+https://github.com/atampy25/hitman-formats?branch=fl#71cb18a657d1ce59bc0da78974d934eeaed409e0"
 dependencies = ["discrim", "glacier-commons", "glacier-texture", "hex", "indexmap 2.14.0", "serde", "serde_with", "strum", "thiserror 2.0.18", "tryvial"]
 
 [[package]]
@@ -3889,7 +3889,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#3318b4eefcd91e774cc80d8dcb5c14836cc774b4"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#01883451e8a2c3a81e2643e40a597652aa542158"
 dependencies = [
 	"anyhow",
 	"auto_context",
