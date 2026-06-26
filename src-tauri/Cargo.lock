@@ -97,9 +97,9 @@ dependencies = ["libc"]
 
 [[package]]
 name = "anyhow"
-version = "1.0.102"
+version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "app"
@@ -124,11 +124,11 @@ dependencies = [
 	"futures-util",
 	"glacier-bin1",
 	"glacier-commons",
+	"glacier-formats",
 	"glacier-geometry",
 	"glacier-ini 0.1.0",
 	"glacier-texture",
 	"hitman-behavior",
-	"hitman-formats",
 	"hrtime",
 	"identity-hash",
 	"image 0.24.9",
@@ -304,7 +304,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#01883451e8a2c3a81e2643e40a597652aa542158"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#00b82d504b5db908f5b520aecf5b9de637dc847f"
 
 [[package]]
 name = "autocfg"
@@ -2020,7 +2020,7 @@ dependencies = [
 [[package]]
 name = "glacier-commons"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-commons?branch=fl#8cfe1ffb3678a64df3415730302bb2b222c23fff"
+source = "git+https://github.com/atampy25/glacier-commons#8ceb5937eeed67ab31a8d46184517184dfe5f054"
 dependencies = [
 	"arc-swap",
 	"brotli-decompressor",
@@ -2050,6 +2050,12 @@ dependencies = [
 	"tonytools",
 	"tryvial"
 ]
+
+[[package]]
+name = "glacier-formats"
+version = "0.1.0"
+source = "git+https://github.com/atampy25/glacier-formats#f84d10f71fff27e0394592b12beee79b28fcfe55"
+dependencies = ["discrim", "glacier-commons", "glacier-texture", "hex", "indexmap 2.14.0", "serde", "serde_with", "strum", "thiserror 2.0.18", "tryvial"]
 
 [[package]]
 name = "glacier-geometry"
@@ -2252,12 +2258,6 @@ source = "git+https://github.com/atampy25/hitman-behavior#9bf1613ec531f031d2a057
 dependencies = ["Inflector", "anyhow", "codegen", "ecow", "glacier-bin1", "lazy-regex", "serde", "serde_json", "thiserror 2.0.18", "tryvial"]
 
 [[package]]
-name = "hitman-formats"
-version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-formats?branch=fl#71cb18a657d1ce59bc0da78974d934eeaed409e0"
-dependencies = ["discrim", "glacier-commons", "glacier-texture", "hex", "indexmap 2.14.0", "serde", "serde_with", "strum", "thiserror 2.0.18", "tryvial"]
-
-[[package]]
 name = "home"
 version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2266,16 +2266,16 @@ dependencies = ["windows-sys 0.61.2"]
 
 [[package]]
 name = "hotpath"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72ffc47505087fdc3825511dd51e7c9758ef729737d5764568f36fb671c0dee8"
+checksum = "dc2c28b1fa962e433f800ed1ea0bf53dc028d3745cf2acec6cfd28b65ac96afa"
 dependencies = ["hotpath-macros"]
 
 [[package]]
 name = "hotpath-macros"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a87c69fd35b5116b60e56c449afabc6cc6c05aac9d6d31aa3b565916d6b572db"
+checksum = "a585238d8daf746e27df0f24d1bbdcd2410e9febff63f9a0173f90d7e71c50f6"
 
 [[package]]
 name = "hrtime"
@@ -3889,7 +3889,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=fl#01883451e8a2c3a81e2643e40a597652aa542158"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#00b82d504b5db908f5b520aecf5b9de637dc847f"
 dependencies = [
 	"anyhow",
 	"auto_context",

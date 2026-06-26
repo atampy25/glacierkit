@@ -13,7 +13,7 @@ use glacier_texture::{
 	mipblock::MipblockData,
 	texture_map::TextureMap
 };
-use hitman_formats::{
+use glacier_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	sdef::SoundDefinitions,
 	texture::TextureMetadata,

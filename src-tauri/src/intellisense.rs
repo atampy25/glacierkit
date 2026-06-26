@@ -9,7 +9,7 @@ use glacier_commons::{
 	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
 	rid
 };
-use hitman_formats::material::{MaterialEntity, MaterialOverride};
+use glacier_formats::material::{MaterialEntity, MaterialOverride};
 use identity_hash::BuildIdentityHasher;
 use indexmap::IndexMap;
 use itertools::Itertools;

@@ -10,9 +10,9 @@ use glacier_commons::{
 	game::GlacierGame,
 	metadata::{ResourceMetadata, RuntimeID}
 };
+use glacier_formats::material::{MaterialInstance, MaterialPropertyValue};
 use glacier_geometry::render_primitive::{LodLevel, RenderPrimitive};
 use glacier_texture::{mipblock::MipblockData, texture_map::TextureMap};
-use hitman_formats::material::{MaterialInstance, MaterialPropertyValue};
 use itertools::Itertools;
 use mesh_tools::{
 	GltfBuilder, PbrSpecularGlossiness, TextureInfo, Triangle,

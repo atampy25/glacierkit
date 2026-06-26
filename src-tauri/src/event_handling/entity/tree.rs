@@ -10,7 +10,7 @@ use glacier_commons::{
 	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
 	rid
 };
-use hitman_formats::wwev::WwiseEvent;
+use glacier_formats::wwev::WwiseEvent;
 use log::debug;
 use ordermap::OrderMap;
 use quickentity_rs::{

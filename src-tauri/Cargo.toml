@@ -115,13 +115,11 @@ features = ["all-games", "all-types"]
 git = "https://github.com/atampy25/hitman-behavior"
 
 [dependencies.glacier-commons]
-git = "https://github.com/atampy25/hitman-commons"
-branch = "fl"
+git = "https://github.com/atampy25/glacier-commons"
 features = ["serde", "specta", "rpkg-rs-1", "rpkg-rs-2", "glacier-texture", "tonytools", "hash-list", "hash-list-download", "game-detection", "macros"]
 
-[dependencies.hitman-formats]
-git = "https://github.com/atampy25/hitman-formats"
-branch = "fl"
+[dependencies.glacier-formats]
+git = "https://github.com/atampy25/glacier-formats"
 features = ["material", "ores", "wwev", "serde", "sdef", "texture"]
 
 [dependencies.serde_json]
@@ -159,7 +157,7 @@ features = ["macos_fsevent"]
 
 [dependencies.quickentity-rs]
 git = "https://github.com/atampy25/quickentity-rs"
-branch = "fl"
+branch = "v3.2"
 features = ["schemars", "all-games"]
 
 [dependencies.glacier-texture]
