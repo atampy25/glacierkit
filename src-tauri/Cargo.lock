@@ -743,9 +743,9 @@ checksum = "7575182f7272186991736b70173b0ea045398f984bf5ebbb3804736ce1330c9d"
 
 [[package]]
 name = "byte-unit"
-version = "5.2.3"
+version = "5.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37bcaa4a0975bed4a760af3efe4368825098ce5f9d37a30c5a021d635dc63d8f"
+checksum = "4a813de7f2bbedb7dce265b64f1cf5908ebe4d56281ece8d847e98113788b9b0"
 dependencies = ["rust_decimal", "schemars 1.2.1", "serde", "utf8-width"]
 
 [[package]]
@@ -811,9 +811,9 @@ dependencies = ["glib-sys", "libc", "system-deps"]
 
 [[package]]
 name = "camino"
-version = "1.2.3"
+version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ce8d3bd5823c7504d3f579f13e7b2f3da252fcb938c594d5680ee508bf846f"
+checksum = "5f2d30e4173c4026932d51d31d6b0613b1fd3014bf3f9f8943d4ba139c437ba0"
 dependencies = ["serde_core"]
 
 [[package]]
@@ -1369,16 +1369,16 @@ dependencies = ["cfg-if"]
 
 [[package]]
 name = "enum-ordinalize"
-version = "4.3.2"
+version = "4.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a1091a7bb1f8f2c4b28f1fe2cef4980ca2d410a3d727d67ecc3178c9b0800f0"
+checksum = "07f808d588c10e464ea6f7d3eaed500049eff30aaac103460f61828c2d65b3eb"
 dependencies = ["enum-ordinalize-derive"]
 
 [[package]]
 name = "enum-ordinalize-derive"
-version = "4.3.2"
+version = "4.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ca9601fb2d62598ee17836250842873a413586e5d7ed88b356e38ddbb0ec631"
+checksum = "42e528e2d34ba8a67a1a650b86beae8ef69fc5fdb638016f386b973226590432"
 dependencies = ["proc-macro2", "quote", "syn 2.0.118"]
 
 [[package]]
@@ -2020,7 +2020,7 @@ dependencies = [
 [[package]]
 name = "glacier-commons"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-commons#8ceb5937eeed67ab31a8d46184517184dfe5f054"
+source = "git+https://github.com/atampy25/glacier-commons#558ae78c62b7d23c89cfeb3f474a5e302fbcd091"
 dependencies = [
 	"arc-swap",
 	"brotli-decompressor",
@@ -2104,9 +2104,9 @@ checksum = "f70749695b063ecbf6b62949ccccde2e733ec3ecbbd71d467dca4e5c6c97cca0"
 
 [[package]]
 name = "glam"
-version = "0.33.1"
+version = "0.33.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "898f5a568a84989b6c0f8caa50a93074b97dbdc58fc6d9543157bb4562758933"
+checksum = "7f22fb22f065b308be0d8724e3706c7fa3fc2a6c7d6899df4cad7860e7a75436"
 
 [[package]]
 name = "glib"
@@ -3115,7 +3115,7 @@ dependencies = [
 	"glam 0.30.10",
 	"glam 0.31.1",
 	"glam 0.32.1",
-	"glam 0.33.1",
+	"glam 0.33.2",
 	"matrixmultiply",
 	"nalgebra-macros 0.3.0",
 	"num-complex",
@@ -3899,7 +3899,7 @@ dependencies = [
 	"fn-error-context",
 	"glacier-bin1",
 	"glacier-commons",
-	"glam 0.33.1",
+	"glam 0.33.2",
 	"hotpath",
 	"identity-hash",
 	"itertools 0.14.0",
@@ -4042,9 +4042,9 @@ dependencies = ["rand_core 0.6.4"]
 
 [[package]]
 name = "rapidhash"
-version = "4.4.1"
+version = "4.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5e48930979c155e2f33aa36ab3119b5ee81332beb6482199a8ecd6029b80b59"
+checksum = "32b266a82f4aa99bb5c25e28d11cc44ace63d91adbcbcee4d323e2ae3d49ef37"
 dependencies = ["rand 0.9.4", "rustversion"]
 
 [[package]]
