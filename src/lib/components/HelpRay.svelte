@@ -66,7 +66,11 @@
 
 <div class="absolute top-0 left-0 h-screen w-screen bg-opacity-20 bg-black pointer-events-none transition-opacity {enabled ? 'opacity-100' : 'opacity-0'}" style="z-index: 9999"></div>
 
-<div bind:this={tooltipElem} class="absolute bg-[#505050] p-4 transition-opacity max-w-md" style="z-index: 99999; top: {tooltipTop}px; left: {tooltipLeft}px; opacity: {enabled ? '1' : '0'}">
+<div
+	bind:this={tooltipElem}
+	class="absolute bg-[#505050] p-4 transition-opacity max-w-md pointer-events-none"
+	style="z-index: 99999; top: {tooltipTop}px; left: {tooltipLeft}px; opacity: {enabled ? '1' : '0'}"
+>
 	{#if tooltipData}
 		<div class="font-bold mb-2">{tooltipData.title}</div>
 		<div class="leading-snug">{tooltipData.description}</div>
