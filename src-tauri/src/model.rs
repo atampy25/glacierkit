@@ -1067,7 +1067,9 @@ nesting::nest! {
 							input_pins: Vec<EcoString>,
 							#[specta(type = Vec<String>)]
 							output_pins: Vec<EcoString>,
-							default_properties_json: String
+							default_properties_json: String,
+							#[specta(type = Vec<String>)]
+							subsets: Vec<EcoString>
 						},
 
 						SetTemplates {
@@ -1124,6 +1126,8 @@ nesting::nest! {
 							input_pins: Vec<EcoString>,
 							#[specta(type = Vec<String>)]
 							output_pins: Vec<EcoString>,
+							#[specta(type = Vec<String>)]
+							subsets: Vec<EcoString>
 						},
 
 						UpdateDecorationsAndMonacoInfo {

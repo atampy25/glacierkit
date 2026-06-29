@@ -50,6 +50,7 @@
 	let helpMenuInputs: string[] = $state([])
 	let helpMenuOutputs: string[] = $state([])
 	let helpMenuDefaultPropertiesJSON = $state("")
+	let helpMenuSubsets: string[] = $state([])
 
 	let templates: PastableTemplateCategory[] = []
 
@@ -841,6 +842,7 @@
 				helpMenuInputs = request.data.inputPins
 				helpMenuOutputs = request.data.outputPins
 				helpMenuDefaultPropertiesJSON = request.data.defaultPropertiesJson
+				helpMenuSubsets = request.data.subsets
 				helpMenuOpen = true
 				break
 
@@ -1226,6 +1228,15 @@
 				<div class="mt-1 flex flex-row gap-2 flex-wrap">
 					{#each helpMenuOutputs as pin}
 						<div class="inline-flex items-center p-2 rounded-sm bg-neutral-800">{pin}</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if helpMenuSubsets.length}
+				<h2 class="mt-8">Subsets</h2>
+				<div class="mt-1 flex flex-row gap-2 flex-wrap">
+					{#each helpMenuSubsets as subset}
+						<div class="inline-flex items-center p-2 rounded-sm bg-neutral-800">{subset}</div>
 					{/each}
 				</div>
 			{/if}

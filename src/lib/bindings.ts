@@ -436,6 +436,7 @@ export type EntityMonacoRequest =
 				properties: [string, VariantProxy, boolean][]
 				inputPins: string[]
 				outputPins: string[]
+				subsets: string[]
 			}
 	  }
 	| {
@@ -767,6 +768,7 @@ export type EntityTreeRequest_Deserialize =
 				inputPins: string[]
 				outputPins: string[]
 				defaultPropertiesJson: string
+				subsets: string[]
 			}
 	  }
 	| {
@@ -836,6 +838,7 @@ export type EntityTreeRequest_Serialize =
 				inputPins: string[]
 				outputPins: string[]
 				defaultPropertiesJson: string
+				subsets: string[]
 			}
 	  }
 	| {

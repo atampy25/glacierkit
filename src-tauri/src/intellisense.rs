@@ -1377,4 +1377,93 @@ impl Intellisense {
 			output.into_iter().unique().collect()
 		)
 	}
+
+	/// Get the names of all entity subsets of a given sub-entity.
+	#[try_fn]
+	#[context("Couldn't get subsets for sub-entity {} in {}", sub_entity, entity.factory)]
+	pub fn get_subsets(
+		&self,
+		game: &Game,
+		entity: &Entity,
+		sub_entity: EntityID,
+		ignore_own: bool
+	) -> Result<Vec<EcoString>> {
+		let mut found = vec![];
+
+		if !ignore_own {
+			for ent in entity.entities.values() {
+				found.extend(
+					ent.subsets
+						.iter()
+						.filter_map(|(subset, entities)| entities.contains(&sub_entity).then_some(subset.to_owned()))
+				);
+			}
+		}
+
+		let targeted = entity.entities.get(&sub_entity).context("No such sub-entity")?;
+
+		for factory in if let Some(ty) = game.resource_type(targeted.factory.resource)
+			&& ty == "ASET"
+		{
+			game.extract_latest_metadata(targeted.factory.resource)?
+				.core_info
+				.references
+				.into_iter()
+				.rev()
+				.skip(1)
+				.rev()
+				.map(|x| x.resource)
+				.collect_vec()
+		} else {
+			vec![targeted.factory.resource.to_owned()]
+		} {
+			if let Some(ty) = game.resource_type(factory)
+				&& ty.as_ref() == "TEMP"
+			{
+				let extracted = game.extract_entity(factory)?;
+
+				found.extend(self.get_subsets(game, &extracted, extracted.root_entity, false)?);
+			}
+		}
+
+		for blueprint in if let Some(ty) = game.resource_type(targeted.blueprint)
+			&& ty == "ASEB"
+		{
+			game.extract_latest_metadata(targeted.blueprint)?
+				.core_info
+				.references
+				.into_iter()
+				.map(|x| x.resource)
+				.collect_vec()
+		} else {
+			vec![targeted.blueprint]
+		} {
+			if let Some(ty) = game.resource_type(blueprint)
+				&& ty.as_ref() == "CBLU"
+			{
+				let res_data = game.extract_latest_resource(blueprint)?.1;
+
+				macro_rules! impl_game {
+					($game:ident) => {{
+						glacier_bin1::deserialize::<glacier_bin1::game::$game::SCppEntityBlueprint>(&res_data)?
+							.subsets
+							.into_iter()
+							.map(|x| x.name)
+							.collect_vec()
+					}};
+				}
+
+				let subsets = match game.version() {
+					GlacierGame::H1 => impl_game!(h1),
+					GlacierGame::H2 => impl_game!(h2),
+					GlacierGame::H3 => impl_game!(h3),
+					_ => vec![]
+				};
+
+				found.extend(subsets);
+			}
+		}
+
+		found.into_iter().unique().collect()
+	}
 }

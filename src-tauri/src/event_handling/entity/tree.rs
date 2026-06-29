@@ -441,9 +441,20 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 	{
 		let task = start_task(app, format!("Gathering intellisense data for {}", id))?;
 
-		let (properties, pins) = rayon::join(
+		let (properties, (pins, subsets)) = rayon::join(
 			|| game.intellisense().get_properties(game, entity, id, true),
-			|| game.intellisense().get_pins(game, entity, id, false)
+			|| {
+				rayon::join(
+					|| game.intellisense().get_pins(game, entity, id, false),
+					|| {
+						if id == entity.root_entity {
+							Ok(vec![])
+						} else {
+							game.intellisense().get_subsets(game, entity, id, true)
+						}
+					}
+				)
+			}
 		);
 
 		let (input_pins, output_pins) = pins?;
@@ -456,7 +467,8 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					entity_id: id.to_owned(),
 					properties: properties?,
 					input_pins,
-					output_pins
+					output_pins,
+					subsets: subsets?
 				}))
 			})
 		)?;
@@ -1313,7 +1325,7 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 	let sub_entity = entity.entities.get(&entity_id).context("No such entity")?;
 
 	if let Some(game) = app_state.game.load().as_ref() {
-		let (properties, pins) = if game
+		let (properties, pins, subsets) = if game
 			.resource_type(sub_entity.factory.resource)
 			.is_some_and(|ty| ty == "TEMP")
 		{
@@ -1323,12 +1335,15 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 				game.intellisense()
 					.get_properties(game, &underlying_entity, underlying_entity.root_entity, false)?,
 				game.intellisense()
-					.get_pins(game, &underlying_entity, underlying_entity.root_entity, false)?
+					.get_pins(game, &underlying_entity, underlying_entity.root_entity, false)?,
+				game.intellisense()
+					.get_subsets(game, &underlying_entity, underlying_entity.root_entity, false)?
 			)
 		} else {
 			(
 				game.intellisense().get_properties(game, entity, entity_id, true)?,
-				game.intellisense().get_pins(game, entity, entity_id, true)?
+				game.intellisense().get_pins(game, entity, entity_id, true)?,
+				game.intellisense().get_subsets(game, entity, entity_id, true)?
 			)
 		};
 
@@ -1362,7 +1377,8 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 					factory: sub_entity.factory.resource.to_owned(),
 					input_pins: pins.0,
 					output_pins: pins.1,
-					default_properties_json: properties_data_str
+					default_properties_json: properties_data_str,
+					subsets
 				}))
 			})
 		)?;
