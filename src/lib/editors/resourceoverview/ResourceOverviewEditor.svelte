@@ -23,6 +23,7 @@
 	let hash = $state("")
 	let filetype = $state("")
 	let partition = $state("")
+	let size = $state(0)
 	let pathOrHint: string | null = $state(null)
 	let dependencies: [string, string, string | null, ReferenceFlags, boolean][] = $state([])
 	let reverseDependencies: [string, string, string | null][] = $state([])
@@ -40,12 +41,14 @@
 		"multiAudio",
 		"genericRL",
 		"json",
+		"xml",
 		"hMLanguages",
 		"localisedLine",
 		"materialInstance",
 		"materialEntity",
 		"soundDefinitions",
-		"behaviorTree"
+		"behaviorTree",
+		"error"
 	]
 
 	onMount(async () => {
@@ -71,6 +74,7 @@
 				hash = request.data.hash
 				filetype = request.data.filetype
 				partition = request.data.chunkPatch.replace(/patch[0-9]+/, "")
+				size = request.data.size
 				pathOrHint = request.data.pathOrHint
 				dependencies = request.data.dependencies
 				reverseDependencies = request.data.reverseDependencies
@@ -111,6 +115,10 @@
 			<div>
 				<div>Partition</div>
 				<div class="text-xl">{partition}</div>
+			</div>
+			<div>
+				<div>Size</div>
+				<div class="text-xl">{size} byte{size !== 1 ? "s" : ""}</div>
 			</div>
 		</div>
 
@@ -231,11 +239,15 @@
 										{/if}
 									{:else if data.type === "genericRL" || data.type === "json" || data.type === "hMLanguages" || data.type === "materialInstance" || data.type === "materialEntity" || data.type === "soundDefinitions"}
 										<div class="h-[30vh]">
-											<Monaco id={v4()} content={data.data.json} />
+											<Monaco id={v4()} filetype="json" content={data.data.json} />
+										</div>
+									{:else if data.type === "xml"}
+										<div class="h-[30vh]">
+											<Monaco id={v4()} filetype="xml" content={data.data.xml} />
 										</div>
 									{:else if data.type === "behaviorTree"}
 										<div class="h-[30vh]">
-											<Monaco id={v4()} content={data.data.pseudocode} />
+											<Monaco id={v4()} filetype="json" content={data.data.pseudocode} />
 										</div>
 									{:else if data.type === "localisedLine"}
 										<div class="max-h-[30vh] overflow-y-auto">
@@ -246,6 +258,10 @@
 												]}
 												rows={data.data.languages.map(([lang, val], ind) => ({ id: ind, lang, val }))}
 											/>
+										</div>
+									{:else if data.type === "error"}
+										<div class="max-h-[30vh] overflow-y-auto">
+											<pre><code>{data.data.message}</code></pre>
 										</div>
 									{/if}
 								</Tile>
@@ -695,6 +711,25 @@
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
+												trackEvent("Extract mesh file as GLB")
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extractAsGlb"
+															}
+														}
+													}
+												})
+											}}>Extract as GLB</Button
+										>
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
 												trackEvent("Extract mesh file as OBJ")
 
 												await event({
@@ -886,7 +921,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "json" || data.type === "localisedLine" || data.type === "generic"}
+									{:else if data.type === "json" || data.type === "xml" || data.type === "localisedLine" || data.type === "error" || data.type === "generic"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {

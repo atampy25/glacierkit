@@ -3,7 +3,8 @@ use std::{io::Write, ops::Deref};
 use anyhow::{Context, Result, anyhow};
 use dashmap::DashMap;
 use fn_error_context::context;
-use hitman_commons::{
+use glacier_commons::{
+	game::GlacierGame,
 	metadata::{ResourceMetadata, ResourceType, RuntimeID},
 	resource_type,
 	rpkg_tool::RpkgResourceMeta
@@ -12,7 +13,6 @@ use itertools::Itertools;
 use quickentity_rs::entity::Entity;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelBridge, ParallelIterator};
 use regex_automata::dfa::Automaton;
-use rpkg_rs::resource::runtime_resource_id::RuntimeResourceID;
 use serde_json::{to_string, to_writer};
 use tauri::{AppHandle, Manager};
 use tonytools::{hmlanguages, locr::LocrJson};
@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 use crate::{
 	HashMap, HashSet,
-	bin1::{deserialize_generic_writer, deserialize_modern_blueprint, deserialize_modern_factory},
+	bin1::deserialize_generic_writer,
 	finish_task,
 	languages::get_language_map,
 	model::{AppState, EditorData, EditorState, EditorType, Request, TabRequest, TabRequestData},
@@ -124,7 +124,7 @@ pub async fn start_content_search(
 				let total_resources = resources.len();
 
 				let mut locr = vec![];
-				{
+				if filetypes.contains(&resource_type!("LOCR")) || filetypes.contains(&resource_type!("LINE")) {
 					let mut iteration = 0;
 					while let Some((symmetric, lang_map)) = get_language_map(game.version(), iteration) {
 						locr.push(
@@ -148,7 +148,7 @@ pub async fn start_content_search(
 				}
 
 				let mut dlge = vec![];
-				{
+				if filetypes.contains(&resource_type!("DLGE")) {
 					let mut iteration = 0;
 					while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
 						dlge.push(
@@ -184,7 +184,7 @@ pub async fn start_content_search(
 				.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
 
 				let mut clng = vec![];
-				{
+				if filetypes.contains(&resource_type!("CLNG")) {
 					let mut iteration = 0;
 					while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
 						clng.push(
@@ -197,7 +197,7 @@ pub async fn start_content_search(
 				}
 
 				let mut rtlv = vec![];
-				{
+				if filetypes.contains(&resource_type!("RTLV")) {
 					let mut iteration = 0;
 					while let Some((_, lang_map)) = get_language_map(game.version(), iteration) {
 						rtlv.push(
@@ -234,25 +234,38 @@ pub async fn start_content_search(
 										ResourceMetadata::try_from(resource_info).ok()?
 									);
 
-									let factory = deserialize_modern_factory(game.version(), &temp_data).ok()?;
+									macro_rules! impl_game {
+										($ty:ty) => {{
+											let factory = glacier_bin1::deserialize::<$ty>(&temp_data).ok()?;
 
-									let blueprint_hash = &temp_meta
-										.references
-										.get(factory.blueprint_index_in_resource_header as usize)?
-										.resource;
+											let blueprint_hash = temp_meta
+												.references
+												.get(factory.blueprint_index_in_resource_header as usize)?
+												.resource;
 
-									let tblu_rrid = RuntimeResourceID::from(blueprint_hash);
+											let tblu_rrid = game.to_rrid(blueprint_hash);
 
-									let (tblu_data, tblu_meta) = (
-										partition.read_resource(&tblu_rrid).ok()?,
-										ResourceMetadata::try_from(partition.get_resource_info(&tblu_rrid).ok()?)
-											.ok()?
-									);
+											let (tblu_data, tblu_meta) = (
+												partition.read_resource(&tblu_rrid).ok()?,
+												ResourceMetadata::try_from(
+													partition.get_resource_info(&tblu_rrid).ok()?
+												)
+												.ok()?
+											);
 
-									let blueprint = deserialize_modern_blueprint(game.version(), &tblu_data).ok()?;
+											let blueprint = glacier_bin1::deserialize(&tblu_data).ok()?;
 
-									let mut entity =
-										Entity::from_game(&factory, &temp_meta, &blueprint, &tblu_meta, false).ok()?;
+											Entity::from_game(&factory, &temp_meta, &blueprint, &tblu_meta, false)
+												.ok()?
+										}};
+									}
+
+									let mut entity = match game.version() {
+										GlacierGame::H1 => impl_game!(glacier_bin1::game::h1::STemplateEntity),
+										GlacierGame::H2 => impl_game!(glacier_bin1::game::h2::STemplateEntityFactory),
+										GlacierGame::H3 => impl_game!(glacier_bin1::game::h3::STemplateEntityFactory),
+										GlacierGame::FL => impl_game!(glacier_bin1::game::fl::STemplateEntityFactory)
+									};
 
 									entity.extra_factory_references.clear();
 									entity.extra_blueprint_references.clear();
@@ -260,8 +273,9 @@ pub async fn start_content_search(
 									let _ = to_writer(&mut matcher, &entity);
 								}
 
-								"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM"
-								| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "ORES" | "DSWB" => {
+								"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB"
+								| "ENUM" | "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP"
+								| "GFXA" | "KWOR" | "TDAT" | "TDPK" | "WEMD" => {
 									deserialize_generic_writer(
 										game.version(),
 										if filetype == "DSWB" {
@@ -275,7 +289,7 @@ pub async fn start_content_search(
 									.ok()?;
 								}
 
-								"JSON" | "REPO" => {
+								"JSON" | "REPO" | "XMLB" => {
 									let _ = matcher.write_all(&partition.read_resource(resource_id).ok()?);
 								}
 

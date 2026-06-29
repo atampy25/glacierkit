@@ -34,7 +34,7 @@
 	import { attachConsole, info } from "tauri-plugin-log"
 	import { help } from "$lib/helpray"
 	import HelpRay from "$lib/components/HelpRay.svelte"
-	import { enums, trackEvent } from "$lib/utils"
+	import { enums, game, trackEvent } from "$lib/utils"
 	import { check, Update } from "@tauri-apps/plugin-updater"
 	import { getVersion } from "@tauri-apps/api/app"
 	import { relaunch } from "@tauri-apps/plugin-process"
@@ -137,8 +137,7 @@
 							void writeTextFile(
 								request.data.data.savePath,
 								JSON.stringify({
-									file: request.data.data.fileAndType[0],
-									type: request.data.data.fileAndType[1],
+									id: request.data.data.id,
 									patch
 								})
 							)
@@ -156,10 +155,11 @@
 							logUploadRejectedModalOpen = true
 						}
 
-						if (request.data.type === "setEnums") {
+						if (request.data.type === "setGameVersion") {
 							console.log("Layout handling request", request)
 
 							Object.assign(enums, request.data.data.enums)
+							game.version = request.data.data.version
 						}
 					}
 				})
@@ -376,8 +376,8 @@
 								}
 							}
 
-							if (data.platformProperties) {
-								for (const platformData of Object.values(data.platformProperties) as Record<string, Property>[]) {
+							if (data.platformSpecificProperties) {
+								for (const platformData of Object.values(data.platformSpecificProperties) as Record<string, Property>[]) {
 									for (const propertyData of Object.values(platformData)) {
 										if (propertyData.type === "SColorRGB" && typeof propertyData.value === "string" && propertyData.value.length === 7) {
 											const r = parseInt(propertyData.value.slice(1).slice(0, 2), 16)
@@ -619,7 +619,7 @@
 <header data-tauri-drag-region class:bx--header={true}>
 	<SkipToContent />
 
-	<!-- svelte-ignore a11y-missing-attribute -->
+	<!-- svelte-ignore a11y_missing_attribute -->
 	<a data-tauri-drag-region class:bx--header__name={true} use:help={{ title: "GlacierKit title", description: "This is in fact the app you are using." }}
 		>GlacierKit<span class="font-normal ml-1">{#await getVersion() then x}{x}{/await}</span></a
 	>

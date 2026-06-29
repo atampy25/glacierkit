@@ -108,9 +108,9 @@
 						<span style="font-size: 1rem;">{ref.data.data.property_name}</span>
 					</h4>
 					{entityNames[ref.from]} (<code>{ref.from}</code>)
-				{:else if ref.data.type === "platformProperty"}
+				{:else if ref.data.type === "platformSpecificProperty"}
 					<h4 class="-mt-1">
-						Platform Property
+						Platform-Specific Property
 						<span style="font-size: 1rem;">{ref.data.data.platform}: {ref.data.data.property_name}</span>
 					</h4>
 					{entityNames[ref.from]} (<code>{ref.from}</code>)

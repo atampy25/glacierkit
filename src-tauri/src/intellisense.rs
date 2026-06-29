@@ -4,17 +4,18 @@ use anyhow::{Context, Error, Result, bail};
 use ecow::{EcoString, eco_format};
 use fn_error_context::context;
 use glacier_bin1::game::h3::{IRenderMaterialEntity_EModifierOperation, SVector2, SVector3, SVector4, ZVariant};
-use hitman_commons::{
-	game::GameVersion,
+use glacier_commons::{
+	game::GlacierGame,
 	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
 	rid
 };
-use hitman_formats::material::{MaterialEntity, MaterialOverride};
+use glacier_formats::material::{MaterialEntity, MaterialOverride};
 use identity_hash::BuildIdentityHasher;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
 	entity::{Entity, EntityID},
+	game::ToQuickEntity,
 	variant::Variant
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -46,14 +47,18 @@ pub struct Intellisense {
 	pub matt_properties: Arc<PapayaMap<RuntimeID, IndexMap<EcoString, MaterialOverride>, BuildIdentityHasher<u64>>>
 }
 
-impl Default for Intellisense {
-	fn default() -> Self {
-		Self::new()
-	}
+macro_rules! class_for_game {
+	($game:ident, $class:literal) => {
+		if $game.version() == GlacierGame::FL {
+			rid!(concat!("[modules:/", $class, ".class].entitytype"))
+		} else {
+			rid!(concat!("[modules:/", $class, ".class].pc_entitytype"))
+		}
+	};
 }
 
 impl Intellisense {
-	pub fn new() -> Self {
+	pub fn new(pins_data: &[u8]) -> Self {
 		#[derive(Serialize, Deserialize)]
 		struct DeserialisedCPPTPinsInfo {
 			pub hash: RuntimeID,
@@ -67,7 +72,7 @@ impl Intellisense {
 
 		Self {
 			cppt_properties: Arc::new(Default::default()),
-			cppt_pins: serde_json::from_slice::<Vec<DeserialisedCPPTPinsInfo>>(include_bytes!("../assets/pins.json"))
+			cppt_pins: serde_json::from_slice::<Vec<DeserialisedCPPTPinsInfo>>(pins_data)
 				.unwrap()
 				.into_iter()
 				.map(|info| {
@@ -96,6 +101,128 @@ impl Intellisense {
 		let (cppt_meta, cppt_data) = game.extract_latest_resource(cppt)?;
 
 		macro_rules! generate {
+			(fl) => {{
+				let cppt_data = glacier_bin1::deserialize::<glacier_bin1::game::fl::SCppEntity>(&cppt_data)
+					.context("Couldn't deserialise CPPT")?;
+
+				self.cppt_properties.pin().insert(
+					cppt,
+					cppt_data
+						.property_values
+						.into_iter()
+						.map(|property_value| {
+							Ok((
+								property_value
+									.property_id
+									.as_name()
+									.unwrap_or_else(|| property_value.property_id.0.to_string().into()),
+								match property_value.value.variant_type().as_ref() {
+									"ZEntityReference" => glacier_bin1::game::fl::ZVariant::new(
+										glacier_bin1::game::fl::SEntityTemplateReference {
+											entity_id: u64::MAX,
+											entity_index: -1,
+											exposed_entity: "".into(),
+											external_scene_index: -1
+										}
+									),
+									"TArray<ZEntityReference>" => glacier_bin1::game::fl::ZVariant::new(
+										vec![] as Vec<glacier_bin1::game::fl::SEntityTemplateReference>
+									),
+									_ => property_value.value
+								}
+								.to_qn(
+									&glacier_bin1::game::fl::STemplateEntityFactory {
+										blueprint_index_in_resource_header: 0,
+										root_entity_index: 0,
+										sub_type: 0,
+										sub_entities: vec![],
+										external_scene_type_indices_in_resource_header: vec![],
+										property_overrides: vec![],
+										source_resource_id: Default::default(),
+										external_scene_runtime_resource_ids: vec![]
+									},
+									&cppt_meta.core_info,
+									&glacier_bin1::game::fl::STemplateEntityBlueprint {
+										sub_type: 0,
+										root_entity_index: 0,
+										sub_entities: vec![],
+										external_scene_type_indices_in_resource_header: vec![],
+										pin_connections: vec![],
+										input_pin_forwardings: vec![],
+										output_pin_forwardings: vec![],
+										override_deletes: vec![],
+										pin_connection_overrides: vec![],
+										pin_connection_override_deletes: vec![],
+										source_resource_id: Default::default(),
+										external_scene_runtime_resource_ids: vec![]
+									},
+									&cppt_meta.core_info,
+									false
+								)?
+							))
+						})
+						.collect::<Result<_>>()?
+				);
+			}};
+
+			(h1) => {{
+				let cppt_data = glacier_bin1::deserialize::<glacier_bin1::game::h1::SCppEntity>(&cppt_data)
+					.context("Couldn't deserialise CPPT")?;
+
+				self.cppt_properties.pin().insert(
+					cppt,
+					cppt_data
+						.property_values
+						.into_iter()
+						.map(|property_value| {
+							Ok((
+								property_value
+									.property_id
+									.as_name()
+									.unwrap_or_else(|| property_value.property_id.0.to_string().into()),
+								match property_value.value.variant_type().as_ref() {
+									"ZEntityReference" => glacier_bin1::game::h1::ZVariant::new(
+										glacier_bin1::game::h1::SEntityTemplateReference {
+											entity_id: u64::MAX,
+											entity_index: -1,
+											exposed_entity: "".into(),
+											external_scene_index: -1
+										}
+									),
+									"TArray<ZEntityReference>" => glacier_bin1::game::h1::ZVariant::new(
+										vec![] as Vec<glacier_bin1::game::h1::SEntityTemplateReference>
+									),
+									_ => property_value.value
+								}
+								.to_qn(
+									&glacier_bin1::game::h1::STemplateEntity {
+										blueprint_index_in_resource_header: 0,
+										root_entity_index: 0,
+										sub_type: 0,
+										entity_templates: vec![],
+										external_scene_type_indices_in_resource_header: vec![],
+										property_overrides: vec![]
+									},
+									&cppt_meta.core_info,
+									&glacier_bin1::game::h1::STemplateEntityBlueprint {
+										sub_type: 0,
+										root_entity_index: 0,
+										entity_templates: vec![],
+										external_scene_type_indices_in_resource_header: vec![],
+										pin_connections: vec![],
+										input_pin_forwardings: vec![],
+										output_pin_forwardings: vec![],
+										override_deletes: vec![]
+									},
+									&cppt_meta.core_info,
+									false
+								)?
+							))
+						})
+						.collect::<Result<_>>()?
+				);
+			}};
+
 			($game:ident) => {{
 				let cppt_data = glacier_bin1::deserialize::<glacier_bin1::game::$game::SCppEntity>(&cppt_data)
 					.context("Couldn't deserialise CPPT")?;
@@ -111,26 +238,22 @@ impl Intellisense {
 									.property_id
 									.as_name()
 									.unwrap_or_else(|| property_value.property_id.0.to_string().into()),
-								Variant::from_game(
-									&serde_json::from_value(serde_json::to_value(&match property_value
-										.value
-										.variant_type()
-										.as_ref()
-									{
-										"ZEntityReference" => glacier_bin1::game::$game::ZVariant::new(
-											glacier_bin1::game::$game::SEntityTemplateReference {
-												entity_id: u64::MAX,
-												entity_index: -1,
-												exposed_entity: "".into(),
-												external_scene_index: -1
-											}
-										),
-										"TArray<ZEntityReference>" => glacier_bin1::game::$game::ZVariant::new(
-											vec![] as Vec<glacier_bin1::game::$game::SEntityTemplateReference>
-										),
-										_ => property_value.value
-									})?)?,
-									&glacier_bin1::game::h3::STemplateEntityFactory {
+								match property_value.value.variant_type().as_ref() {
+									"ZEntityReference" => glacier_bin1::game::$game::ZVariant::new(
+										glacier_bin1::game::$game::SEntityTemplateReference {
+											entity_id: u64::MAX,
+											entity_index: -1,
+											exposed_entity: "".into(),
+											external_scene_index: -1
+										}
+									),
+									"TArray<ZEntityReference>" => glacier_bin1::game::$game::ZVariant::new(
+										vec![] as Vec<glacier_bin1::game::$game::SEntityTemplateReference>
+									),
+									_ => property_value.value
+								}
+								.to_qn(
+									&glacier_bin1::game::$game::STemplateEntityFactory {
 										blueprint_index_in_resource_header: 0,
 										root_entity_index: 0,
 										sub_type: 0,
@@ -139,7 +262,7 @@ impl Intellisense {
 										property_overrides: vec![]
 									},
 									&cppt_meta.core_info,
-									&glacier_bin1::game::h3::STemplateEntityBlueprint {
+									&glacier_bin1::game::$game::STemplateEntityBlueprint {
 										sub_type: 0,
 										root_entity_index: 0,
 										sub_entities: vec![],
@@ -151,6 +274,7 @@ impl Intellisense {
 										pin_connection_overrides: vec![],
 										pin_connection_override_deletes: vec![]
 									},
+									&cppt_meta.core_info,
 									false
 								)?
 							))
@@ -161,9 +285,10 @@ impl Intellisense {
 		}
 
 		match game.version() {
-			GameVersion::H1 => generate!(h1),
-			GameVersion::H2 => generate!(h2),
-			GameVersion::H3 => generate!(h3)
+			GlacierGame::H1 => generate!(h1),
+			GlacierGame::H2 => generate!(h2),
+			GlacierGame::H3 => generate!(h3),
+			GlacierGame::FL => generate!(fl)
 		}
 
 		self.cppt_properties
@@ -302,10 +427,9 @@ impl Intellisense {
 
 									"UICT" => {
 										// All UI controls have the properties of ZUIControlEntity
-										for (prop_name, default_val) in self.get_cppt_properties(
-											game,
-											rid!("[modules:/zuicontrolentity.class].pc_entitytype")
-										)? {
+										for (prop_name, default_val) in
+											self.get_cppt_properties(game, class_for_game!(game, "zuicontrolentity"))?
+										{
 											found.push((prop_name, default_val, false));
 										}
 
@@ -334,11 +458,11 @@ impl Intellisense {
 														found.push((
 															entry.name,
 															match entry.r#type {
-																0 => Variant::from_raw(&ZVariant::new(())),
-																1 => Variant::from_raw(&ZVariant::new(0i32)),
-																2 => Variant::from_raw(&ZVariant::new(0.0f32)),
-																3 => Variant::from_raw(&ZVariant::new(EcoString::new())),
-																4 => Variant::from_raw(&ZVariant::new(false)),
+																0 => Variant::from_raw(ZVariant::new(())),
+																1 => Variant::from_raw(ZVariant::new(0i32)),
+																2 => Variant::from_raw(ZVariant::new(0.0f32)),
+																3 => Variant::from_raw(ZVariant::new(EcoString::new())),
+																4 => Variant::from_raw(ZVariant::new(false)),
 																5 => Variant::Ref(None),
 																6 => Variant::Ref(None),
 																_ => bail!("Unknown UICB property type {}", entry.r#type)
@@ -351,18 +475,18 @@ impl Intellisense {
 										}
 
 										match game.version() {
-											GameVersion::H1 => generate!(h1),
-											GameVersion::H2 => generate!(h2),
-											GameVersion::H3 => generate!(h3)
+											GlacierGame::H1 => generate!(h1),
+											GlacierGame::H2 => generate!(h2),
+											GlacierGame::H3 => generate!(h3),
+											GlacierGame::FL => generate!(fl)
 										}
 									}
 
 									"MATT" => {
 										// All materials have the properties of ZRenderMaterialEntity
-										for (prop_name, default_val) in self.get_cppt_properties(
-											game,
-											rid!("[modules:/zrendermaterialentity.class].pc_entitytype")
-										)? {
+										for (prop_name, default_val) in self
+											.get_cppt_properties(game, class_for_game!(game, "zrendermaterialentity"))?
+										{
 											found.push((prop_name, default_val, false));
 										}
 
@@ -371,19 +495,22 @@ impl Intellisense {
 												MaterialOverride::Texture(texture) => {
 													found.push((
 														property_name.to_owned(),
-														Variant::Resource(texture.map(|texture| ResourceReference {
-															resource: texture,
-															flags: ReferenceFlags {
-																reference_type: ReferenceType::Normal,
-																..Default::default()
-															}
-														})),
+														Variant::Resource(
+															false,
+															texture.map(|texture| ResourceReference {
+																resource: texture,
+																flags: ReferenceFlags {
+																	reference_type: ReferenceType::Normal,
+																	..Default::default()
+																}
+															})
+														),
 														false
 													));
 
 													found.push((
 														eco_format!("{}_enab", property_name),
-														Variant::from_raw(&ZVariant::new(false)),
+														Variant::from_raw(ZVariant::new(false)),
 														false
 													));
 
@@ -407,7 +534,7 @@ impl Intellisense {
 
 													found.push((
 														eco_format!("{}_op", property_name),
-														Variant::from_raw(&ZVariant::new(
+														Variant::from_raw(ZVariant::new(
 															IRenderMaterialEntity_EModifierOperation::eLeave
 														)),
 														false
@@ -417,13 +544,13 @@ impl Intellisense {
 												MaterialOverride::Float(val) => {
 													found.push((
 														property_name.to_owned(),
-														Variant::from_raw(&ZVariant::new(val)),
+														Variant::from_raw(ZVariant::new(val)),
 														false
 													));
 
 													found.push((
 														eco_format!("{}_op", property_name),
-														Variant::from_raw(&ZVariant::new(
+														Variant::from_raw(ZVariant::new(
 															IRenderMaterialEntity_EModifierOperation::eLeave
 														)),
 														false
@@ -434,16 +561,16 @@ impl Intellisense {
 													found.push((
 														property_name.to_owned(),
 														match vec.len() {
-															2 => Variant::from_raw(&ZVariant::new(SVector2 {
+															2 => Variant::from_raw(ZVariant::new(SVector2 {
 																x: vec[0],
 																y: vec[1]
 															})),
-															3 => Variant::from_raw(&ZVariant::new(SVector3 {
+															3 => Variant::from_raw(ZVariant::new(SVector3 {
 																x: vec[0],
 																y: vec[1],
 																z: vec[2]
 															})),
-															4 => Variant::from_raw(&ZVariant::new(SVector4 {
+															4 => Variant::from_raw(ZVariant::new(SVector4 {
 																x: vec[0],
 																y: vec[1],
 																z: vec[2],
@@ -456,7 +583,7 @@ impl Intellisense {
 
 													found.push((
 														eco_format!("{}_op", property_name),
-														Variant::from_raw(&ZVariant::new(
+														Variant::from_raw(ZVariant::new(
 															IRenderMaterialEntity_EModifierOperation::eLeave
 														)),
 														false
@@ -468,10 +595,9 @@ impl Intellisense {
 
 									"WSWT" => {
 										// All switch groups have the properties of ZAudioSwitchEntity
-										for (prop_name, default_val) in self.get_cppt_properties(
-											game,
-											rid!("[modules:/zaudioswitchentity.class].pc_entitytype")
-										)? {
+										for (prop_name, default_val) in
+											self.get_cppt_properties(game, class_for_game!(game, "zaudioswitchentity"))?
+										{
 											found.push((prop_name, default_val, false));
 										}
 									}
@@ -480,7 +606,7 @@ impl Intellisense {
 										// All extended CPP entities have the properties of ZMaterialOverwriteAspect
 										for (prop_name, default_val) in self.get_cppt_properties(
 											game,
-											rid!("[modules:/zmaterialoverwriteaspect.class].pc_entitytype")
+											class_for_game!(game, "zmaterialoverwriteaspect")
 										)? {
 											found.push((prop_name, default_val, false));
 										}
@@ -511,22 +637,22 @@ impl Intellisense {
 														entry.property_name.into(),
 														match entry.property_type {
 															EExtendedPropertyType::Resourceptr => {
-																Variant::Resource(None)
+																Variant::Resource(false, None)
 															}
 															EExtendedPropertyType::Int32 => {
-																Variant::from_raw(&ZVariant::new(0i32))
+																Variant::from_raw(ZVariant::new(0i32))
 															}
 															EExtendedPropertyType::Uint32 => {
-																Variant::from_raw(&ZVariant::new(0u32))
+																Variant::from_raw(ZVariant::new(0u32))
 															}
 															EExtendedPropertyType::Float => {
-																Variant::from_raw(&ZVariant::new(0.0f32))
+																Variant::from_raw(ZVariant::new(0.0f32))
 															}
 															EExtendedPropertyType::String => {
-																Variant::from_raw(&ZVariant::new(EcoString::from("")))
+																Variant::from_raw(ZVariant::new(EcoString::from("")))
 															}
 															EExtendedPropertyType::Bool => {
-																Variant::from_raw(&ZVariant::new(false))
+																Variant::from_raw(ZVariant::new(false))
 															}
 															EExtendedPropertyType::Entityref => Variant::Ref(None),
 															EExtendedPropertyType::Variant => {
@@ -540,30 +666,29 @@ impl Intellisense {
 										}
 
 										match game.version() {
-											GameVersion::H1 => {
+											GlacierGame::H1 => {
 												// ECPB files don't exist in H1
 											}
-											GameVersion::H2 => generate!(h2),
-											GameVersion::H3 => generate!(h3)
+											GlacierGame::H2 => generate!(h2),
+											GlacierGame::H3 => generate!(h3),
+											GlacierGame::FL => generate!(fl)
 										}
 									}
 
 									"AIBX" => {
 										// All behaviour trees have the properties of ZBehaviorTreeEntity
-										for (prop_name, default_val) in self.get_cppt_properties(
-											game,
-											rid!("[modules:/zbehaviortreeentity.class].pc_entitytype")
-										)? {
+										for (prop_name, default_val) in self
+											.get_cppt_properties(game, class_for_game!(game, "zbehaviortreeentity"))?
+										{
 											found.push((prop_name, default_val, false));
 										}
 									}
 
 									"WSGT" => {
 										// All state groups have the properties of ZAudioStateEntity
-										for (prop_name, default_val) in self.get_cppt_properties(
-											game,
-											rid!("[modules:/zaudiostateentity.class].pc_entitytype")
-										)? {
+										for (prop_name, default_val) in
+											self.get_cppt_properties(game, class_for_game!(game, "zaudiostateentity"))?
+										{
 											found.push((prop_name, default_val, false));
 										}
 									}
@@ -660,7 +785,7 @@ impl Intellisense {
 					"UICT" => {
 						// All UI controls have the properties of ZUIControlEntity
 						for (prop_name, default_val) in
-							self.get_cppt_properties(game, rid!("[modules:/zuicontrolentity.class].pc_entitytype"))?
+							self.get_cppt_properties(game, class_for_game!(game, "zuicontrolentity"))?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
@@ -688,11 +813,11 @@ impl Intellisense {
 										// We can't get the actual default values, if there are any, so we just use sensible defaults
 										return Ok(Some((
 											match entry.r#type {
-												0 => Variant::from_raw(&ZVariant::new(())),
-												1 => Variant::from_raw(&ZVariant::new(0i32)),
-												2 => Variant::from_raw(&ZVariant::new(0.0f32)),
-												3 => Variant::from_raw(&ZVariant::new(EcoString::new())),
-												4 => Variant::from_raw(&ZVariant::new(false)),
+												0 => Variant::from_raw(ZVariant::new(())),
+												1 => Variant::from_raw(ZVariant::new(0i32)),
+												2 => Variant::from_raw(ZVariant::new(0.0f32)),
+												3 => Variant::from_raw(ZVariant::new(EcoString::new())),
+												4 => Variant::from_raw(ZVariant::new(false)),
 												5 => Variant::Ref(None),
 												6 => Variant::Ref(None),
 												_ => bail!("Unknown UICB property type {}", entry.r#type)
@@ -705,16 +830,17 @@ impl Intellisense {
 						}
 
 						match game.version() {
-							GameVersion::H1 => generate!(h1),
-							GameVersion::H2 => generate!(h2),
-							GameVersion::H3 => generate!(h3)
+							GlacierGame::H1 => generate!(h1),
+							GlacierGame::H2 => generate!(h2),
+							GlacierGame::H3 => generate!(h3),
+							GlacierGame::FL => generate!(fl)
 						}
 					}
 
 					"MATT" => {
 						// All materials have the properties of ZRenderMaterialEntity
-						for (prop_name, default_val) in self
-							.get_cppt_properties(game, rid!("[modules:/zrendermaterialentity.class].pc_entitytype"))?
+						for (prop_name, default_val) in
+							self.get_cppt_properties(game, class_for_game!(game, "zrendermaterialentity"))?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
@@ -726,19 +852,22 @@ impl Intellisense {
 								MaterialOverride::Texture(texture) => {
 									if property_name == property_to_find {
 										return Ok(Some((
-											Variant::Resource(texture.map(|texture| ResourceReference {
-												resource: texture,
-												flags: ReferenceFlags {
-													reference_type: ReferenceType::Normal,
-													..Default::default()
-												}
-											})),
+											Variant::Resource(
+												false,
+												texture.map(|texture| ResourceReference {
+													resource: texture,
+													flags: ReferenceFlags {
+														reference_type: ReferenceType::Normal,
+														..Default::default()
+													}
+												})
+											),
 											false
 										)));
 									}
 
 									if format!("{}_enab", property_name) == property_to_find {
-										return Ok(Some((Variant::from_raw(&ZVariant::new(false)), false)));
+										return Ok(Some((Variant::from_raw(ZVariant::new(false)), false)));
 									}
 
 									if format!("{}_dest", property_name) == property_to_find {
@@ -760,7 +889,7 @@ impl Intellisense {
 
 									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
-											Variant::from_raw(&ZVariant::new(
+											Variant::from_raw(ZVariant::new(
 												IRenderMaterialEntity_EModifierOperation::eLeave
 											)),
 											false
@@ -770,12 +899,12 @@ impl Intellisense {
 
 								MaterialOverride::Float(val) => {
 									if property_name == property_to_find {
-										return Ok(Some((Variant::from_raw(&ZVariant::new(val)), false)));
+										return Ok(Some((Variant::from_raw(ZVariant::new(val)), false)));
 									}
 
 									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
-											Variant::from_raw(&ZVariant::new(
+											Variant::from_raw(ZVariant::new(
 												IRenderMaterialEntity_EModifierOperation::eLeave
 											)),
 											false
@@ -788,14 +917,14 @@ impl Intellisense {
 										return Ok(Some((
 											match vec.len() {
 												2 => {
-													Variant::from_raw(&ZVariant::new(SVector2 { x: vec[0], y: vec[1] }))
+													Variant::from_raw(ZVariant::new(SVector2 { x: vec[0], y: vec[1] }))
 												}
-												3 => Variant::from_raw(&ZVariant::new(SVector3 {
+												3 => Variant::from_raw(ZVariant::new(SVector3 {
 													x: vec[0],
 													y: vec[1],
 													z: vec[2]
 												})),
-												4 => Variant::from_raw(&ZVariant::new(SVector4 {
+												4 => Variant::from_raw(ZVariant::new(SVector4 {
 													x: vec[0],
 													y: vec[1],
 													z: vec[2],
@@ -809,7 +938,7 @@ impl Intellisense {
 
 									if format!("{}_op", property_name) == property_to_find {
 										return Ok(Some((
-											Variant::from_raw(&ZVariant::new(
+											Variant::from_raw(ZVariant::new(
 												IRenderMaterialEntity_EModifierOperation::eLeave
 											)),
 											false
@@ -823,7 +952,7 @@ impl Intellisense {
 					"WSWT" => {
 						// All switch groups have the properties of ZAudioSwitchEntity
 						for (prop_name, default_val) in
-							self.get_cppt_properties(game, rid!("[modules:/zaudioswitchentity.class].pc_entitytype"))?
+							self.get_cppt_properties(game, class_for_game!(game, "zaudioswitchentity"))?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
@@ -833,10 +962,9 @@ impl Intellisense {
 
 					"ECPT" => {
 						// All extended CPP entities have the properties of ZMaterialOverwriteAspect
-						for (prop_name, default_val) in self.get_cppt_properties(
-							game,
-							rid!("[modules:/zmaterialoverwriteaspect.class].pc_entitytype")
-						)? {
+						for (prop_name, default_val) in
+							self.get_cppt_properties(game, class_for_game!(game, "zmaterialoverwriteaspect"))?
+						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
 							}
@@ -865,18 +993,16 @@ impl Intellisense {
 									if entry.property_name == property_to_find {
 										return Ok(Some((
 											match entry.property_type {
-												EExtendedPropertyType::Resourceptr => Variant::Resource(None),
-												EExtendedPropertyType::Int32 => Variant::from_raw(&ZVariant::new(0i32)),
-												EExtendedPropertyType::Uint32 => {
-													Variant::from_raw(&ZVariant::new(0u32))
-												}
+												EExtendedPropertyType::Resourceptr => Variant::Resource(false, None),
+												EExtendedPropertyType::Int32 => Variant::from_raw(ZVariant::new(0i32)),
+												EExtendedPropertyType::Uint32 => Variant::from_raw(ZVariant::new(0u32)),
 												EExtendedPropertyType::Float => {
-													Variant::from_raw(&ZVariant::new(0.0f32))
+													Variant::from_raw(ZVariant::new(0.0f32))
 												}
 												EExtendedPropertyType::String => {
-													Variant::from_raw(&ZVariant::new(EcoString::from("")))
+													Variant::from_raw(ZVariant::new(EcoString::from("")))
 												}
-												EExtendedPropertyType::Bool => Variant::from_raw(&ZVariant::new(false)),
+												EExtendedPropertyType::Bool => Variant::from_raw(ZVariant::new(false)),
 												EExtendedPropertyType::Entityref => Variant::Ref(None),
 												EExtendedPropertyType::Variant => {
 													Variant::Variant(Variant::Ref(None).into())
@@ -890,18 +1016,19 @@ impl Intellisense {
 						}
 
 						match game.version() {
-							GameVersion::H1 => {
+							GlacierGame::H1 => {
 								// ECPB files don't exist in H1
 							}
-							GameVersion::H2 => generate!(h2),
-							GameVersion::H3 => generate!(h3)
+							GlacierGame::H2 => generate!(h2),
+							GlacierGame::H3 => generate!(h3),
+							GlacierGame::FL => generate!(fl)
 						}
 					}
 
 					"AIBX" => {
 						// All behaviour trees have the properties of ZBehaviorTreeEntity
 						for (prop_name, default_val) in
-							self.get_cppt_properties(game, rid!("[modules:/zbehaviortreeentity.class].pc_entitytype"))?
+							self.get_cppt_properties(game, class_for_game!(game, "zbehaviortreeentity"))?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
@@ -912,7 +1039,7 @@ impl Intellisense {
 					"WSGT" => {
 						// All state groups have the properties of ZAudioStateEntity
 						for (prop_name, default_val) in
-							self.get_cppt_properties(game, rid!("[modules:/zaudiostateentity.class].pc_entitytype"))?
+							self.get_cppt_properties(game, class_for_game!(game, "zaudiostateentity"))?
 						{
 							if prop_name == property_to_find {
 								return Ok(Some((default_val, false)));
@@ -1029,7 +1156,7 @@ impl Intellisense {
 							// All UI controls have the pins of ZUIControlEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&rid!("[modules:/zuicontrolentity.class].pc_entitytype"))
+								.get(&class_for_game!(game, "zuicontrolentity"))
 								.context("No such CPPT in pins")?;
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
 							output.extend(cppt_data.outputs.iter().map(|x| &x.name).cloned());
@@ -1065,9 +1192,10 @@ impl Intellisense {
 							}
 
 							match game.version() {
-								GameVersion::H1 => generate!(h1),
-								GameVersion::H2 => generate!(h2),
-								GameVersion::H3 => generate!(h3)
+								GlacierGame::H1 => generate!(h1),
+								GlacierGame::H2 => generate!(h2),
+								GlacierGame::H3 => generate!(h3),
+								GlacierGame::FL => generate!(fl)
 							}
 						}
 
@@ -1075,7 +1203,7 @@ impl Intellisense {
 							// All materials have the pins of ZRenderMaterialEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&rid!("[modules:/zrendermaterialentity.class].pc_entitytype"))
+								.get(&class_for_game!(game, "zrendermaterialentity"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1092,7 +1220,7 @@ impl Intellisense {
 							// All switch groups have the pins of ZAudioSwitchEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&rid!("[modules:/zaudioswitchentity.class].pc_entitytype"))
+								.get(&class_for_game!(game, "zaudioswitchentity"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1114,22 +1242,29 @@ impl Intellisense {
 							let dswb_data = game.extract_latest_resource(dswb_hash)?.1;
 
 							input.extend(match game.version() {
-								GameVersion::H1 => glacier_bin1::deserialize::<
+								GlacierGame::H1 => glacier_bin1::deserialize::<
 									glacier_bin1::game::h1::SAudioSwitchGroupData
 								>(&dswb_data)?
 								.switches
 								.into_iter()
 								.map(|x| x.name)
 								.collect_vec(),
-								GameVersion::H2 => glacier_bin1::deserialize::<
+								GlacierGame::H2 => glacier_bin1::deserialize::<
 									glacier_bin1::game::h2::SAudioSwitchGroupData
 								>(&dswb_data)?
 								.switches
 								.into_iter()
 								.map(|x| x.name)
 								.collect_vec(),
-								GameVersion::H3 => glacier_bin1::deserialize::<
+								GlacierGame::H3 => glacier_bin1::deserialize::<
 									glacier_bin1::game::h3::SAudioSwitchGroupData
+								>(&dswb_data)?
+								.switches
+								.into_iter()
+								.map(|x| x.name)
+								.collect_vec(),
+								GlacierGame::FL => glacier_bin1::deserialize::<
+									glacier_bin1::game::fl::SAudioSwitchGroupData
 								>(&dswb_data)?
 								.switches
 								.into_iter()
@@ -1142,7 +1277,7 @@ impl Intellisense {
 							// All extended CPP entities have the pins of ZMaterialOverwriteAspect
 							let cppt_data = self
 								.cppt_pins
-								.get(&rid!("[modules:/zmaterialoverwriteaspect.class].pc_entitytype"))
+								.get(&class_for_game!(game, "zmaterialoverwriteaspect"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1153,7 +1288,7 @@ impl Intellisense {
 							// All behaviour trees have the pins of ZBehaviorTreeEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&rid!("[modules:/zbehaviortreeentity.class].pc_entitytype"))
+								.get(&class_for_game!(game, "zbehaviortreeentity"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1164,7 +1299,7 @@ impl Intellisense {
 							// All state groups have the pins of ZAudioStateEntity
 							let cppt_data = self
 								.cppt_pins
-								.get(&rid!("[modules:/zaudiostateentity.class].pc_entitytype"))
+								.get(&class_for_game!(game, "zaudiostateentity"))
 								.context("No such CPPT in pins")?;
 
 							input.extend(cppt_data.inputs.iter().map(|x| &x.name).cloned());
@@ -1183,22 +1318,29 @@ impl Intellisense {
 							let wsgb_data = game.extract_latest_resource(wsgb_hash)?.1;
 
 							input.extend(match game.version() {
-								GameVersion::H1 => glacier_bin1::deserialize::<
+								GlacierGame::H1 => glacier_bin1::deserialize::<
 									glacier_bin1::game::h1::SAudioStateGroupData
 								>(&wsgb_data)?
 								.states
 								.into_iter()
 								.map(|x| x.name)
 								.collect_vec(),
-								GameVersion::H2 => glacier_bin1::deserialize::<
+								GlacierGame::H2 => glacier_bin1::deserialize::<
 									glacier_bin1::game::h2::SAudioStateGroupData
 								>(&wsgb_data)?
 								.states
 								.into_iter()
 								.map(|x| x.name)
 								.collect_vec(),
-								GameVersion::H3 => glacier_bin1::deserialize::<
+								GlacierGame::H3 => glacier_bin1::deserialize::<
 									glacier_bin1::game::h3::SAudioStateGroupData
+								>(&wsgb_data)?
+								.states
+								.into_iter()
+								.map(|x| x.name)
+								.collect_vec(),
+								GlacierGame::FL => glacier_bin1::deserialize::<
+									glacier_bin1::game::fl::SAudioStateGroupData
 								>(&wsgb_data)?
 								.states
 								.into_iter()
@@ -1234,5 +1376,94 @@ impl Intellisense {
 			input.into_iter().unique().collect(),
 			output.into_iter().unique().collect()
 		)
+	}
+
+	/// Get the names of all entity subsets of a given sub-entity.
+	#[try_fn]
+	#[context("Couldn't get subsets for sub-entity {} in {}", sub_entity, entity.factory)]
+	pub fn get_subsets(
+		&self,
+		game: &Game,
+		entity: &Entity,
+		sub_entity: EntityID,
+		ignore_own: bool
+	) -> Result<Vec<EcoString>> {
+		let mut found = vec![];
+
+		if !ignore_own {
+			for ent in entity.entities.values() {
+				found.extend(
+					ent.subsets
+						.iter()
+						.filter_map(|(subset, entities)| entities.contains(&sub_entity).then_some(subset.to_owned()))
+				);
+			}
+		}
+
+		let targeted = entity.entities.get(&sub_entity).context("No such sub-entity")?;
+
+		for factory in if let Some(ty) = game.resource_type(targeted.factory.resource)
+			&& ty == "ASET"
+		{
+			game.extract_latest_metadata(targeted.factory.resource)?
+				.core_info
+				.references
+				.into_iter()
+				.rev()
+				.skip(1)
+				.rev()
+				.map(|x| x.resource)
+				.collect_vec()
+		} else {
+			vec![targeted.factory.resource.to_owned()]
+		} {
+			if let Some(ty) = game.resource_type(factory)
+				&& ty.as_ref() == "TEMP"
+			{
+				let extracted = game.extract_entity(factory)?;
+
+				found.extend(self.get_subsets(game, &extracted, extracted.root_entity, false)?);
+			}
+		}
+
+		for blueprint in if let Some(ty) = game.resource_type(targeted.blueprint)
+			&& ty == "ASEB"
+		{
+			game.extract_latest_metadata(targeted.blueprint)?
+				.core_info
+				.references
+				.into_iter()
+				.map(|x| x.resource)
+				.collect_vec()
+		} else {
+			vec![targeted.blueprint]
+		} {
+			if let Some(ty) = game.resource_type(blueprint)
+				&& ty.as_ref() == "CBLU"
+			{
+				let res_data = game.extract_latest_resource(blueprint)?.1;
+
+				macro_rules! impl_game {
+					($game:ident) => {{
+						glacier_bin1::deserialize::<glacier_bin1::game::$game::SCppEntityBlueprint>(&res_data)?
+							.subsets
+							.into_iter()
+							.map(|x| x.name)
+							.collect_vec()
+					}};
+				}
+
+				let subsets = match game.version() {
+					GlacierGame::H1 => impl_game!(h1),
+					GlacierGame::H2 => impl_game!(h2),
+					GlacierGame::H3 => impl_game!(h3),
+					_ => vec![]
+				};
+
+				found.extend(subsets);
+			}
+		}
+
+		found.into_iter().unique().collect()
 	}
 }

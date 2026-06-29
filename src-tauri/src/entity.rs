@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow, bail};
 use ecow::EcoString;
 use fn_error_context::context;
-use hitman_commons::{
+use glacier_commons::{
 	metadata::{ResourceType, RuntimeID},
 	rpkg_tool::RpkgResourceMeta
 };
@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
 	entity::{Entity, EntityID, Ref, SubEntity},
-	variant::Variant
+	variant::{EnumValue, Variant}
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ pub enum ReverseReferenceData {
 		#[specta(type = String)]
 		property_name: EcoString
 	},
-	PlatformProperty {
+	PlatformSpecificProperty {
 		#[specta(type = String)]
 		property_name: EcoString,
 
@@ -155,7 +155,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 			});
 		}
 
-		for (platform, properties) in &entity.platform_properties {
+		for (platform, properties) in &entity.platform_specific_properties {
 			for (property_name, property_data) in properties {
 				visit_variant(&property_data.value, &mut |val| {
 					if let Variant::Ref(val) = val
@@ -163,7 +163,7 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 					{
 						reverse_references.entry(ent).or_default().push(ReverseReference {
 							from: *entity_id,
-							data: ReverseReferenceData::PlatformProperty {
+							data: ReverseReferenceData::PlatformSpecificProperty {
 								property_name: property_name.to_owned(),
 								platform: platform.to_owned()
 							}
@@ -357,7 +357,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		}
 	}
 
-	for properties in sub_entity.platform_properties.values() {
+	for properties in sub_entity.platform_specific_properties.values() {
 		for property_data in properties.values() {
 			let mut res = EditorValidity::Valid;
 			visit_variant(&property_data.value, &mut |val| {
@@ -584,7 +584,7 @@ pub fn get_decorations(
 				}
 			}
 
-			Variant::Resource(Some(reference)) => {
+			Variant::Resource(_, Some(reference)) => {
 				let res = reference.resource;
 				if game.resource_type(res).is_some_and(|x| x == "LINE") {
 					if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
@@ -598,8 +598,34 @@ pub fn get_decorations(
 				}
 			}
 
+			Variant::EnumValue(EnumValue {
+				resource: Some(resource),
+				value
+			}) => {
+				let res = resource.resource;
+				if game.resource_type(res).is_some_and(|x| x == "LINE") {
+					if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
+						decorations.push((res.to_string(), decoration));
+					}
+				} else if res.get_path().is_none()
+					&& let Some(entry) = res.get_info()
+					&& let Some(hint) = entry.hint
+				{
+					decorations.push((res.to_string(), hint.into()));
+				}
+
+				if let Ok((_, data)) = game.extract_latest_resource(res)
+					&& let Ok(data) = glacier_bin1::deserialize::<glacier_bin1::game::fl::SEnumType>(&data)
+					&& let Some(idx) = data.item_values.iter().position(|x| x == value)
+					&& let Some(name) = data.item_names.get(idx)
+				{
+					decorations.push((format!(r#""value": {value}"#), name.into()));
+				}
+			}
+
 			Variant::Uuid(uuid) => {
-				if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
+				if let Some(repo) = game.repository()
+					&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
 					&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 				{
 					decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
@@ -610,7 +636,7 @@ pub fn get_decorations(
 		});
 	}
 
-	for properties in sub_entity.platform_properties.values() {
+	for properties in sub_entity.platform_specific_properties.values() {
 		for property_data in properties.values() {
 			visit_variant(&property_data.value, &mut |val| match val {
 				Variant::Ref(val) => {
@@ -619,7 +645,7 @@ pub fn get_decorations(
 					}
 				}
 
-				Variant::Resource(Some(reference)) => {
+				Variant::Resource(_, Some(reference)) => {
 					let res = reference.resource;
 					if game.resource_type(res).is_some_and(|x| x == "LINE") {
 						if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
@@ -633,8 +659,34 @@ pub fn get_decorations(
 					}
 				}
 
+				Variant::EnumValue(EnumValue {
+					resource: Some(resource),
+					value
+				}) => {
+					let res = resource.resource;
+					if game.resource_type(res).is_some_and(|x| x == "LINE") {
+						if let Ok(Some(decoration)) = get_line_decoration(game, tonytools_hash_list, res) {
+							decorations.push((res.to_string(), decoration));
+						}
+					} else if res.get_path().is_none()
+						&& let Some(entry) = res.get_info()
+						&& let Some(hint) = entry.hint
+					{
+						decorations.push((res.to_string(), hint.into()));
+					}
+
+					if let Ok((_, data)) = game.extract_latest_resource(res)
+						&& let Ok(data) = glacier_bin1::deserialize::<glacier_bin1::game::fl::SEnumType>(&data)
+						&& let Some(idx) = data.item_values.iter().position(|x| x == value)
+						&& let Some(name) = data.item_names.get(idx)
+					{
+						decorations.push((format!(r#""value": {value}"#), name.into()));
+					}
+				}
+
 				Variant::Uuid(uuid) => {
-					if let Some(repo_item) = game.repository().iter().find(|x| x.id == *uuid)
+					if let Some(repo) = game.repository()
+						&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
 						&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
 					{
 						decorations.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));

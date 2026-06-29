@@ -54,7 +54,7 @@
 			<div class="mb-4">
 				<Checkbox labelText="Search entities" bind:checked={searchEntities} />
 				<Checkbox labelText="Search BIN1 resources" bind:checked={searchRL} />
-				<Checkbox labelText="Search textual resources (JSON, REPO, ORES)" bind:checked={searchText} />
+				<Checkbox labelText="Search textual resources (JSON, XMLB, REPO, ORES)" bind:checked={searchText} />
 				<Checkbox labelText="Search localisation" bind:checked={searchLocalisation} />
 				<Checkbox labelText="Search all other resources" bind:checked={searchRest} />
 			</div>
@@ -102,9 +102,34 @@
 
 					if (searchEntities) searchTypes.push("TEMP", "TBLU")
 
-					if (searchRL) searchTypes.push("AIBB", "AIRG", "ASVA", "ATMD", "BMSK", "CBLU", "CPPT", "CRMD", "ENUM", "GFXF", "GIDX", "UICB", "VIDB", "WSGB", "WSWB", "ECPB")
+					if (searchRL)
+						searchTypes.push(
+							"AIBB",
+							"AIRG",
+							"ASVA",
+							"ATMD",
+							"BMSK",
+							"CBLU",
+							"CPPT",
+							"CRMD",
+							"ECPB",
+							"ENUM",
+							"GFXF",
+							"GIDX",
+							"UICB",
+							"VIDB",
+							"WSGB",
+							"WSWB",
+							"DSWB",
+							"CLRP",
+							"GFXA",
+							"KWOR",
+							"TDAT",
+							"TDPK",
+							"WEMD"
+						)
 
-					if (searchText) searchTypes.push("JSON", "REPO", "ORES")
+					if (searchText) searchTypes.push("JSON", "XMLB", "REPO", "ORES")
 
 					if (searchLocalisation) searchTypes.push("CLNG", "DITL", "DLGE", "LOCR", "RTLV", "LINE")
 

@@ -1,8 +1,15 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+	fs,
+	ops::Deref,
+	path::{Path, PathBuf},
+	sync::Arc
+};
 
+use anyhow::{Context, Result};
 use arc_swap::{ArcSwap, ArcSwapOption};
 use ecow::{EcoString, EcoVec};
-use hitman_commons::{
+use glacier_commons::{
+	game::GlacierGame,
 	game_detection::GameInstall,
 	metadata::{ReferenceFlags, ResourceType, RuntimeID}
 };
@@ -15,39 +22,125 @@ use quickentity_rs::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
+use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
 	HashMap, ShardMap,
 	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
-	game::Game,
+	game::{Game, valid_game_path},
 	ores_repo::{
 		RepositoryItem, RepositoryItemInformation, RepositoryItemKind, UnlockableInformation, UnlockableItem,
 		UnlockableKind
 	}
 };
 
+pub struct AppSettings {
+	data_dir: PathBuf,
+	settings: ArcSwap<SettingsInner>
+}
+
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AppSettings {
+pub struct SettingsInner {
+	pub game_path: Option<PathBuf>,
+	pub custom_game_paths: Vec<PathBuf>,
 	pub extract_modded_files: bool,
-	pub game_install: Option<PathBuf>,
 	pub colourblind_mode: bool,
 	pub editor_connection: bool,
 	pub seen_announcements: Vec<String>
 }
 
-impl Default for AppSettings {
+impl Default for SettingsInner {
 	fn default() -> Self {
 		Self {
+			game_path: None,
+			custom_game_paths: vec![],
 			extract_modded_files: false,
-			game_install: None,
 			colourblind_mode: false,
 			editor_connection: true,
 			seen_announcements: vec![]
 		}
 	}
+}
+
+macro_rules! impl_set {
+	($fn_name:ident, $field:ident, $ty:ty) => {
+		#[try_fn]
+		pub fn $fn_name(&self, value: $ty) -> Result<()> {
+			let mut handle = self.settings.load_full();
+			let settings = Arc::make_mut(&mut handle);
+			if settings.$field != value {
+				settings.$field = value;
+				self.settings.store(handle);
+				self.persist()?;
+			}
+		}
+	};
+}
+
+impl AppSettings {
+	#[try_fn]
+	pub fn load(data_dir: impl AsRef<Path>) -> Result<Self> {
+		let data_dir = data_dir.as_ref();
+		if let Ok(read) = fs::read(data_dir.join("settings.json"))
+			&& let Ok(mut settings) = serde_json::from_slice::<SettingsInner>(&read)
+		{
+			settings.game_path = settings.game_path.filter(|path| valid_game_path(path));
+			settings.custom_game_paths.retain(|path| valid_game_path(path));
+
+			Self {
+				data_dir: data_dir.to_owned(),
+				settings: Arc::new(settings).into()
+			}
+		} else {
+			let settings = Self {
+				data_dir: data_dir.to_owned(),
+				settings: Default::default()
+			};
+
+			fs::create_dir_all(data_dir).context("Couldn't create app data dir")?;
+			fs::write(
+				data_dir.join("settings.json"),
+				serde_json::to_vec(settings.settings.load().deref())
+					.context("Couldn't serialise default app settings")?
+			)
+			.context("Couldn't write default app settings")?;
+			settings
+		}
+	}
+
+	pub fn settings(&self) -> arc_swap::Guard<Arc<SettingsInner>> {
+		self.settings.load()
+	}
+
+	#[try_fn]
+	fn persist(&self) -> Result<()> {
+		fs::write(
+			self.data_dir.join("settings.json"),
+			serde_json::to_vec(self.settings.load().deref()).context("Couldn't serialise app settings")?
+		)
+		.context("Couldn't write app settings")?;
+	}
+
+	/// Set the game path. Does not check if the path is valid.
+	#[try_fn]
+	pub fn set_game_path(&self, path: Option<PathBuf>) -> Result<()> {
+		let mut handle = self.settings.load_full();
+		let settings = Arc::make_mut(&mut handle);
+		if settings.game_path != path {
+			settings.game_path = path;
+			self.settings.store(handle);
+			self.persist()?;
+		}
+	}
+
+	impl_set!(set_custom_game_paths, custom_game_paths, Vec<PathBuf>);
+	impl_set!(set_extract_modded_files, extract_modded_files, bool);
+	impl_set!(set_colourblind_mode, colourblind_mode, bool);
+	impl_set!(set_editor_connection, editor_connection, bool);
+	impl_set!(set_seen_announcements, seen_announcements, Vec<String>);
 }
 
 pub struct AppState {
@@ -118,20 +211,11 @@ pub enum EditorData {
 	}
 }
 
-#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[derive(Type, Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct QNEditorSettings {
 	pub show_reverse_parent_refs: bool,
 	pub show_changes_from_original: bool
-}
-
-impl Default for QNEditorSettings {
-	fn default() -> Self {
-		Self {
-			show_reverse_parent_refs: false,
-			show_changes_from_original: false
-		}
-	}
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -141,16 +225,10 @@ pub struct Project {
 	pub settings: ArcSwap<ProjectSettings>
 }
 
-#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[derive(Type, Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSettings {
 	pub custom_paths: Vec<String>
-}
-
-impl Default for ProjectSettings {
-	fn default() -> Self {
-		Self { custom_paths: vec![] }
-	}
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
@@ -208,14 +286,16 @@ pub struct GameBrowserEntry {
 	pub path: Option<EcoString>,
 	#[specta(type = Option<String>)]
 	pub hint: Option<EcoString>,
-	pub filetype: ResourceType,
-	pub partition: (String, String)
+	pub resource_type: ResourceType,
+	pub partition: (String, String),
+	pub order: Option<usize>
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 pub enum TextFileType {
 	Json,
 	ManifestJson,
+	Xml,
 	PlainText,
 	Markdown
 }
@@ -285,6 +365,10 @@ pub enum ResourceOverviewData {
 		#[debug(skip)]
 		json: String
 	},
+	Xml {
+		#[debug(skip)]
+		xml: String
+	},
 	Image {
 		asset_id: Uuid,
 		texture_data: Option<(String, String, Option<String>)>
@@ -327,6 +411,9 @@ pub enum ResourceOverviewData {
 	BehaviorTree {
 		#[debug(skip)]
 		pseudocode: String
+	},
+	Error {
+		message: String
 	}
 }
 
@@ -354,6 +441,11 @@ pub enum SearchFilter {
 	Models,
 	Textures,
 	Sound
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+pub enum SearchSort {
+	Size
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, Default)]
@@ -445,7 +537,8 @@ nesting::nest! {
 				},
 				Search {
 					query: String,
-					filter: SearchFilter
+					filter: SearchFilter,
+					sort: Option<(SearchSort, bool)>
 				},
 				OpenInEditor {
 					resource: Hash
@@ -457,8 +550,9 @@ nesting::nest! {
 				Initialise,
 
 				ChangeGameInstall { path: Option<PathBuf> },
+				RemoveCustomGamePath { path: PathBuf },
 				ChangeExtractModdedFiles { value: bool },
-				ChangeColourblind { value: bool },
+				ChangeColourblindMode { value: bool },
 				ChangeEditorConnection { value: bool },
 
 				ChangeCustomPaths {
@@ -725,6 +819,8 @@ nesting::nest! {
 
 					ExtractAsObj,
 
+					ExtractAsGlb,
+
 					ExtractAsTexture,
 
 					ExtractAsPseudocode
@@ -888,7 +984,7 @@ nesting::nest! {
 			pub enum SettingsRequest {
 				Initialise {
 					game_installs: Vec<GameInstall>,
-					settings: AppSettings
+					settings: SettingsInner
 				},
 
 				ChangeProjectSettings {
@@ -971,7 +1067,9 @@ nesting::nest! {
 							input_pins: Vec<EcoString>,
 							#[specta(type = Vec<String>)]
 							output_pins: Vec<EcoString>,
-							default_properties_json: String
+							default_properties_json: String,
+							#[specta(type = Vec<String>)]
+							subsets: Vec<EcoString>
 						},
 
 						SetTemplates {
@@ -1028,6 +1126,8 @@ nesting::nest! {
 							input_pins: Vec<EcoString>,
 							#[specta(type = Vec<String>)]
 							output_pins: Vec<EcoString>,
+							#[specta(type = Vec<String>)]
+							subsets: Vec<EcoString>
 						},
 
 						UpdateDecorationsAndMonacoInfo {
@@ -1124,6 +1224,8 @@ nesting::nest! {
 
 						#[specta(type = Option<String>)]
 						path_or_hint: Option<EcoString>,
+
+						size: u32,
 
 						/// Hash, type, path/hint, flags, is actually in current game version
 						#[debug(skip)]
@@ -1267,11 +1369,13 @@ nesting::nest! {
 				base: Value,
 				current: Value,
 				save_path: PathBuf,
-				file_and_type: (String, String)
+				id: RuntimeID
 			},
 			RequestLastPanicUpload,
 			LogUploadRejected,
-			SetEnums {
+			SetGameVersion {
+				version: Option<GlacierGame>,
+
 				#[debug(skip)]
 				#[specta(type = std::collections::HashMap<String, Vec<String>>)]
 				enums: HashMap<String, Vec<String>>

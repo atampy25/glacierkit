@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { event } from "$lib/utils"
 	import type { GameInstall, SettingsRequest } from "$lib/bindings"
-	import { Checkbox, TooltipIcon } from "carbon-components-svelte"
+	import { Checkbox, TooltipIcon, TileGroup, RadioTile, Button } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
+	import Close from "carbon-icons-svelte/lib/Close.svelte"
 	import ListEditor from "$lib/components/ListEditor.svelte"
 	import { help } from "$lib/helpray"
+	import { open } from "@tauri-apps/plugin-dialog"
 
 	export async function handleRequest(request: SettingsRequest) {
 		console.log("Settings tool handling request", request)
@@ -16,7 +18,8 @@
 				extractModdedFiles = request.data.settings.extractModdedFiles
 				colourblind = request.data.settings.colourblindMode
 				editorConnectionEnabled = request.data.settings.editorConnection
-				selectedGameInstall = request.data.settings.gameInstall || null
+				selectedGameInstall = request.data.settings.gamePath
+				customGamePaths = request.data.settings.customGamePaths
 				break
 
 			case "changeProjectSettings":
@@ -70,7 +73,7 @@
 				data: {
 					type: "settings",
 					data: {
-						type: "changeColourblind",
+						type: "changeColourblindMode",
 						data: { value: _target.checked }
 					}
 				}
@@ -104,6 +107,7 @@
 
 	let gameInstalls: GameInstall[] = []
 	let selectedGameInstall: string | null = null
+	let customGamePaths: string[] = []
 
 	$: if (colourblind) {
 		document.body.classList.add("colourblind-mode")
@@ -152,51 +156,92 @@
 
 	<p class="mt-1">Game</p>
 	<div class="mt-1 flex flex-wrap gap-2">
-		{#each gameInstalls as gameInstall}
-			<div
-				class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-				class:border-2={selectedGameInstall === gameInstall.path}
-				on:click={async () => {
-					selectedGameInstall = gameInstall.path
-
-					await event({
-						type: "tool",
-						data: {
-							type: "settings",
-							data: {
-								type: "changeGameInstall",
-								data: { path: gameInstall.path }
-							}
-						}
-					})
-				}}
-			>
-				<div>
-					<div class="font-bold mb-2">{gameInstall.version === "h1" ? "HITMAN™" : gameInstall.version === "h2" ? "HITMAN 2" : "HITMAN 3"} ({gameInstall.platform})</div>
-					<span class="break-all">{gameInstall.path}</span>
-				</div>
-			</div>
-		{/each}
-		<div
-			class="bg-neutral-900 p-4 flex items-center justify-center border-solid border-neutral-300 cursor-pointer"
-			class:border-2={selectedGameInstall === null}
-			on:click={async () => {
-				selectedGameInstall = null
-
+		<TileGroup
+			selected={selectedGameInstall || "null"}
+			on:select={async ({ detail }) => {
+				if (detail === "custom") return
+				selectedGameInstall = detail === "null" ? null : detail
 				await event({
 					type: "tool",
 					data: {
 						type: "settings",
 						data: {
 							type: "changeGameInstall",
-							data: { path: null }
+							data: { path: selectedGameInstall }
 						}
 					}
 				})
 			}}
 		>
-			<p>No game</p>
-		</div>
+			{#each gameInstalls as install (install.path)}
+				<RadioTile value={install.path}>
+					<div class="relative">
+						<div class="font-bold mb-2">
+							{{
+								h1: "HITMAN™",
+								h2: "HITMAN 2",
+								h3: "HITMAN 3",
+								fl: "007 First Light"
+							}[install.version]} ({{
+								steam: "Steam",
+								epic: "Epic Games",
+								microsoft: "Microsoft",
+								gog: "GOG"
+							}[install.platform]})
+						</div>
+						<span class="break-all">{install.path}</span>
+
+						<div class="absolute -bottom-1 -right-10">
+							{#if customGamePaths.includes(install.path)}
+								<Button
+									size="small"
+									kind="ghost"
+									icon={Close}
+									iconDescription="Remove"
+									on:click={async () => {
+										await event({
+											type: "tool",
+											data: {
+												type: "settings",
+												data: {
+													type: "removeCustomGamePath",
+													data: { path: install.path }
+												}
+											}
+										})
+									}}
+								/>
+							{/if}
+						</div>
+					</div>
+				</RadioTile>
+			{/each}
+			<RadioTile
+				value="custom"
+				on:click={async () => {
+					const folder = await open({
+						title: "Select Retail folder",
+						directory: true
+					})
+
+					if (folder) {
+						await event({
+							type: "tool",
+							data: {
+								type: "settings",
+								data: {
+									type: "changeGameInstall",
+									data: { path: folder as string }
+								}
+							}
+						})
+					} else {
+						selectedGameInstall = null
+					}
+				}}>Select game path</RadioTile
+			>
+			<RadioTile value="null">No game</RadioTile>
+		</TileGroup>
 	</div>
 
 	<h4 class="mt-4">Project settings</h4>

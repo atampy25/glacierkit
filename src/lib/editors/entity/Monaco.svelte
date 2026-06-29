@@ -118,7 +118,7 @@
 								$ref: null
 							}
 						},
-						platformProperties: {
+						platformSpecificProperties: {
 							additionalProperties: {
 								additionalProperties: {
 									anyOf: [
@@ -274,7 +274,7 @@
 				!editor.getModel()!.getLineContent(e.position.lineNumber).includes(`"factory":`) &&
 					(editor.getModel()!.getLineContent(e.position.lineNumber).includes("assembly:/") ||
 						editor.getModel()!.getLineContent(e.position.lineNumber).includes("modules:/") ||
-						/"00[0-9A-F]{14}"/.test(editor.getModel()!.getLineContent(e.position.lineNumber)))
+						/"0(0|x)[0-9A-F]{14}"/.test(editor.getModel()!.getLineContent(e.position.lineNumber)))
 			)
 		})
 
@@ -452,7 +452,7 @@
 		})
 	})
 
-	function updateIntellisense(data: { properties: [string, { type: string; value: any }, boolean][]; inputPins: string[]; outputPins: string[] }) {
+	function updateIntellisense(data: { properties: [string, { type: string; value: any }, boolean][]; inputPins: string[]; outputPins: string[]; subsets: string[] }) {
 		monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 			...monaco.languages.json.jsonDefaults.diagnosticsOptions,
 			schemas: [
@@ -549,6 +549,9 @@
 												}
 											])
 										)
+									},
+									subsets: {
+										required: data.subsets
 									}
 								}
 							}
@@ -635,7 +638,8 @@
 					updateIntellisense({
 						properties: request.data.properties,
 						inputPins: request.data.inputPins,
-						outputPins: request.data.outputPins
+						outputPins: request.data.outputPins,
+						subsets: request.data.subsets
 					})
 				}
 				break

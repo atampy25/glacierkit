@@ -67,6 +67,10 @@
 					monaco.editor.setModelLanguage(model, "markdown")
 					break
 
+				case "Xml":
+					monaco.editor.setModelLanguage(model, "xml")
+					break
+
 				default:
 					fileType satisfies never
 					break

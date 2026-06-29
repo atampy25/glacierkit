@@ -1,29 +1,28 @@
 use std::{
 	fs::{self, File},
-	io::{BufWriter, Cursor, Write},
+	io::{BufWriter, Cursor},
 	ops::Deref
 };
 
 use anyhow::{Context, Result, anyhow, bail};
 use ecow::EcoVec;
 use fn_error_context::context;
+use glacier_commons::{game::GlacierGame, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use glacier_texture::{
 	enums::{InterpretAs, RenderFormat, TextureType},
 	mipblock::MipblockData,
 	texture_map::TextureMap
 };
-use hitman_commons::{game::GameVersion, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
-use hitman_formats::{
+use glacier_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	sdef::SoundDefinitions,
 	texture::TextureMetadata,
 	wwev::WwiseEvent
 };
 use image::{ImageFormat, ImageReader};
+use itertools::Itertools;
 use optivorbis::{OggToOgg, Remuxer};
-use prim_rs::render_primitive::RenderPrimitive;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use rpkg_rs::GlacierResource;
 use serde::Serialize;
 use serde_json::{json, to_string, to_vec};
 use tauri::{AppHandle, Manager, State};
@@ -40,7 +39,8 @@ use crate::{
 	biome::format_json,
 	finish_task,
 	game::Game,
-	general::{UNLOCKABLES_ID, get_name, open_in_editor},
+	general::{get_name, open_in_editor},
+	geometry::{parse_prim_to_glb, parse_prim_to_obj},
 	languages::get_language_map,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
@@ -80,79 +80,6 @@ pub async fn open_resource_overview(app: &AppHandle, resource: RuntimeID) -> Res
 }
 
 #[try_fn]
-#[context("Couldn't parse PRIM file")]
-pub fn parse_prim(game: &Game, res_data: &[u8]) -> Result<(EcoVec<u8>, [f32; 6])> {
-	let model = RenderPrimitive::process_data(game.version().into(), res_data).context("Couldn't process PRIM data")?;
-
-	// Higher is less detail
-	let preferred_lod = 1;
-
-	// Get only the meshes, we don't need weight metadata for the preview
-	let meshes = model
-		.data
-		.objects
-		.iter()
-		.map(|mesh_obj| match mesh_obj {
-			prim_rs::render_primitive::MeshObject::Normal(mesh) => mesh,
-			prim_rs::render_primitive::MeshObject::Weighted(mesh) => &mesh.prim_mesh,
-			prim_rs::render_primitive::MeshObject::Linked(mesh) => &mesh.prim_mesh
-		})
-		.collect::<Vec<_>>();
-
-	// Get only the meshes for the preferred LOD level
-	let meshes = meshes
-		.iter()
-		.filter(|mesh| mesh.prim_object.lod_mask & (1 << preferred_lod) == (1 << preferred_lod));
-
-	let mut previous_vertex_count: usize = 1;
-	let mut bounding_box: [f32; 6] = [
-		f32::INFINITY,
-		f32::INFINITY,
-		f32::INFINITY,
-		f32::NEG_INFINITY,
-		f32::NEG_INFINITY,
-		f32::NEG_INFINITY
-	];
-
-	let mut obj = EcoVec::new();
-
-	for (idx, mesh) in meshes.enumerate() {
-		writeln!(obj, "o object.00{}", idx)?;
-
-		for position in &mesh.sub_mesh.buffers.position {
-			writeln!(obj, "v {} {} {}", position.x, position.y, position.z)?;
-		}
-
-		for vm in &mesh.sub_mesh.buffers.main {
-			writeln!(obj, "vn {} {} {}", vm.normal.x, vm.normal.y, vm.normal.z)?;
-		}
-
-		for idx in mesh.sub_mesh.indices.chunks(3) {
-			let [idx1, idx2, idx3] = [
-				idx[0] as usize + previous_vertex_count,
-				idx[1] as usize + previous_vertex_count,
-				idx[2] as usize + previous_vertex_count
-			];
-			writeln!(obj, "f {}//{} {}//{} {}//{}", idx1, idx1, idx2, idx2, idx3, idx3)?;
-		}
-
-		previous_vertex_count += mesh.sub_mesh.buffers.position.len();
-
-		let bb = mesh.sub_mesh.calc_bb();
-
-		bounding_box[0] = bounding_box[0].min(bb.min.x);
-		bounding_box[1] = bounding_box[1].min(bb.min.y);
-		bounding_box[2] = bounding_box[2].min(bb.min.z);
-
-		bounding_box[3] = bounding_box[3].max(bb.max.x);
-		bounding_box[4] = bounding_box[4].max(bb.max.y);
-		bounding_box[5] = bounding_box[5].max(bb.max.z);
-	}
-
-	(obj, bounding_box)
-}
-
-#[try_fn]
 #[context("Couldn't initialise resource overview {id}")]
 pub async fn initialise_resource_overview(
 	app: &AppHandle,
@@ -161,7 +88,50 @@ pub async fn initialise_resource_overview(
 	hash: RuntimeID,
 	game: &Game
 ) -> Result<()> {
-	let (filetype, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+	let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+
+	let dependencies = deps
+		.into_par_iter()
+		.map(|dep| {
+			(
+				Hash(dep.resource),
+				game.resource_type(dep.resource),
+				dep.resource.get_path_or_hint(),
+				dep.flags,
+				game.resource_exists(dep.resource)
+			)
+		})
+		.collect::<Vec<_>>();
+
+	let reverse_dependencies = game
+		.resource_reverse_references(hash)
+		.map(|hashes| {
+			hashes
+				.iter()
+				.map(|&hash| (Hash(hash), game.resource_type(hash).unwrap(), hash.get_path_or_hint()))
+				.collect_vec()
+		})
+		.unwrap_or_default();
+
+	let changelog = game.extract_resource_changelog(hash);
+
+	send_request(
+		app,
+		Request::Editor(EditorRequest {
+			editor: id,
+			data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+				hash: Hash(hash),
+				filetype: filetype.into(),
+				chunk_patch: chunk_patch.to_owned(),
+				size,
+				path_or_hint: hash.get_path_or_hint(),
+				dependencies: dependencies.to_owned(),
+				reverse_dependencies: reverse_dependencies.to_owned(),
+				changelog: changelog.to_owned(),
+				data: ResourceOverviewData::Generic
+			})
+		})
+	)?;
 
 	send_request(
 		app,
@@ -171,29 +141,11 @@ pub async fn initialise_resource_overview(
 				hash: Hash(hash),
 				filetype: filetype.into(),
 				chunk_patch,
+				size,
 				path_or_hint: hash.get_path_or_hint(),
-				dependencies: deps
-					.into_par_iter()
-					.map(|dep| {
-						(
-							Hash(dep.resource),
-							game.resource_type(dep.resource),
-							dep.resource.get_path_or_hint(),
-							dep.flags,
-							game.resource_exists(dep.resource)
-						)
-					})
-					.collect(),
-				reverse_dependencies: game
-					.resource_reverse_references(hash)
-					.map(|hashes| {
-						hashes
-							.iter()
-							.map(|&hash| (Hash(hash), game.resource_type(hash).unwrap(), hash.get_path_or_hint()))
-							.collect()
-					})
-					.unwrap_or_default(),
-				changelog: game.extract_resource_changelog(hash),
+				dependencies,
+				reverse_dependencies,
+				changelog,
 				data: match filetype.as_ref() {
 					"TEMP" => {
 						let entity = game.extract_entity(hash)?;
@@ -208,10 +160,11 @@ pub async fn initialise_resource_overview(
 						}
 					}
 
-					"ORES" if hash == UNLOCKABLES_ID => ResourceOverviewData::Unlockables,
+					"ORES" if hash == game.unlockables_id() => ResourceOverviewData::Unlockables,
 
-					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ENUM" | "GFXF"
-					| "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "ECPB" | "DSWB" | "ORES" | "TBLU" => {
+					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB" | "ENUM"
+					| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP" | "GFXA" | "KWOR"
+					| "TDAT" | "TDPK" | "WEMD" | "TBLU" | "ORES" => {
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 						ResourceOverviewData::GenericRL {
@@ -268,9 +221,9 @@ pub async fn initialise_resource_overview(
 					}
 
 					"PRIM" => {
-						let (_, res_data) = game.extract_latest_resource(hash)?;
+						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-						let (obj, bounding_box) = parse_prim(game, &res_data)?;
+						let (glb, bounding_box) = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?;
 
 						let asset_id = Uuid::new_v4();
 
@@ -280,7 +233,7 @@ pub async fn initialise_resource_overview(
 							.await
 							.context("No such editor")?
 							.assets
-							.insert(asset_id, ("model/obj".into(), obj))
+							.insert(asset_id, ("model/gltf-binary".into(), glb.into()))
 							.await;
 
 						ResourceOverviewData::Mesh { asset_id, bounding_box }
@@ -291,7 +244,7 @@ pub async fn initialise_resource_overview(
 
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-						let mut texture = TextureMap::process_data(game.version().into(), res_data)
+						let mut texture = TextureMap::from_memory(&res_data, game.version().into())
 							.context("Couldn't process texture data")?;
 
 						if let Some(texd_depend) = res_meta.core_info.references.first() {
@@ -301,21 +254,40 @@ pub async fn initialise_resource_overview(
 							texture.set_mipblock1(mipblock);
 						}
 
-						let image = glacier_texture::convert::create_dynamic_image(&texture)
-							.context("Couldn't convert texture to dynamic image")?;
+						if texture.format() == glacier_texture::enums::RenderFormat::BC5 {
+							let image = glacier_texture::convert::create_tga(&texture)
+								.context("Couldn't convert texture to TGA")?;
 
-						let mut image_data = vec![];
+							let mut image_data = vec![];
 
-						image.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
+							image::load_from_memory_with_format(&image, image::ImageFormat::Tga)?
+								.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
 
-						app_state
-							.editor_states
-							.get(&id)
-							.await
-							.context("No such editor")?
-							.assets
-							.insert(asset_id, ("image/webp".into(), image_data.into()))
-							.await;
+							app_state
+								.editor_states
+								.get(&id)
+								.await
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("image/x-targa".into(), image_data.into()))
+								.await;
+						} else {
+							let image = glacier_texture::convert::create_dynamic_image(&texture)
+								.context("Couldn't convert texture to dynamic image")?;
+
+							let mut image_data = vec![];
+
+							image.write_to(Cursor::new(&mut image_data), image::ImageFormat::WebP)?;
+
+							app_state
+								.editor_states
+								.get(&id)
+								.await
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("image/webp".into(), image_data.into()))
+								.await;
+						}
 
 						ResourceOverviewData::Image {
 							asset_id,
@@ -368,7 +340,7 @@ pub async fn initialise_resource_overview(
 
 						let mut audios = vec![];
 
-						let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+						let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
 
 						for (name, data) in wwev
 							.non_streamed
@@ -474,6 +446,10 @@ pub async fn initialise_resource_overview(
 
 					"JSON" => ResourceOverviewData::Json {
 						json: format_json(&String::from_utf8(game.extract_latest_resource(hash)?.1)?)?
+					},
+
+					"XMLB" => ResourceOverviewData::Xml {
+						xml: String::from_utf8(game.extract_latest_resource(hash)?.1)?
 					},
 
 					"CLNG" => ResourceOverviewData::HMLanguages {
@@ -836,7 +812,7 @@ pub async fn initialise_resource_overview(
 						json: {
 							let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-							let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game.version())
+							let sdef = SoundDefinitions::parse(game.version(), &res_data, &res_meta.core_info)
 								.context("Couldn't parse sound definitions")?;
 
 							let mut buf = Vec::new();
@@ -854,7 +830,7 @@ pub async fn initialise_resource_overview(
 							let (_, res_data) = game.extract_latest_resource(hash)?;
 
 							match game.version() {
-								GameVersion::H1 => format!(
+								GlacierGame::H1 => format!(
 									"{}\n---\n{:?}",
 									hash,
 									hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(
@@ -874,7 +850,7 @@ pub async fn initialise_resource_overview(
 									.root
 								),
 
-								GameVersion::H2 => format!(
+								GlacierGame::H2 => format!(
 									"{}\n---\n{:?}",
 									hash,
 									hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(
@@ -894,7 +870,7 @@ pub async fn initialise_resource_overview(
 									.root
 								),
 
-								GameVersion::H3 => format!(
+								GlacierGame::H3 => format!(
 									"{}\n---\n{:?}",
 									hash,
 									hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(
@@ -912,7 +888,9 @@ pub async fn initialise_resource_overview(
 										}
 									))?
 									.root
-								)
+								),
+
+								_ => "Unsupported game version for behavior tree".into()
 							}
 						}
 					},
@@ -940,7 +918,57 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game) = app_state.game.load().as_ref() {
-				initialise_resource_overview(app, &app_state, id, hash, game).await?;
+				match initialise_resource_overview(app, &app_state, id, hash, game).await {
+					Ok(_) => {}
+					Err(e) => {
+						let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+
+						send_request(
+							app,
+							Request::Editor(EditorRequest {
+								editor: id,
+								data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+									hash: Hash(hash),
+									filetype: filetype.into(),
+									chunk_patch,
+									size,
+									path_or_hint: hash.get_path_or_hint(),
+									dependencies: deps
+										.into_par_iter()
+										.map(|dep| {
+											(
+												Hash(dep.resource),
+												game.resource_type(dep.resource),
+												dep.resource.get_path_or_hint(),
+												dep.flags,
+												game.resource_exists(dep.resource)
+											)
+										})
+										.collect(),
+									reverse_dependencies: game
+										.resource_reverse_references(hash)
+										.map(|hashes| {
+											hashes
+												.iter()
+												.map(|&hash| {
+													(
+														Hash(hash),
+														game.resource_type(hash).unwrap(),
+														hash.get_path_or_hint()
+													)
+												})
+												.collect()
+										})
+										.unwrap_or_default(),
+									changelog: game.extract_resource_changelog(hash),
+									data: ResourceOverviewData::Error {
+										message: format!("{e:?}")
+									}
+								})
+							})
+						)?;
+					}
+				}
 			}
 
 			finish_task(app, task)?;
@@ -964,7 +992,57 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			let task = start_task(app, format!("Loading resource overview for {}", hash))?;
 
 			if let Some(game) = app_state.game.load().as_ref() {
-				initialise_resource_overview(app, &app_state, id, new_hash, game).await?;
+				match initialise_resource_overview(app, &app_state, id, new_hash, game).await {
+					Ok(_) => {}
+					Err(e) => {
+						let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(new_hash)?;
+
+						send_request(
+							app,
+							Request::Editor(EditorRequest {
+								editor: id,
+								data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+									hash: Hash(new_hash),
+									filetype: filetype.into(),
+									chunk_patch,
+									size,
+									path_or_hint: new_hash.get_path_or_hint(),
+									dependencies: deps
+										.into_par_iter()
+										.map(|dep| {
+											(
+												Hash(dep.resource),
+												game.resource_type(dep.resource),
+												dep.resource.get_path_or_hint(),
+												dep.flags,
+												game.resource_exists(dep.resource)
+											)
+										})
+										.collect(),
+									reverse_dependencies: game
+										.resource_reverse_references(new_hash)
+										.map(|hashes| {
+											hashes
+												.iter()
+												.map(|&hash| {
+													(
+														Hash(hash),
+														game.resource_type(hash).unwrap(),
+														hash.get_path_or_hint()
+													)
+												})
+												.collect()
+										})
+										.unwrap_or_default(),
+									changelog: game.extract_resource_changelog(new_hash),
+									data: ResourceOverviewData::Error {
+										message: format!("{e:?}")
+									}
+								})
+							})
+						)?;
+					}
+				}
 
 				send_request(
 					app,
@@ -1043,18 +1121,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				let (metadata, data) = game.extract_latest_resource(hash)?;
 
 				let data = match game.version() {
-					GameVersion::H1 => to_vec(
+					GlacierGame::H1 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntity>(&data)
 							.context("Couldn't deserialise factory")?
 					)?,
 
-					GameVersion::H2 => to_vec(
+					GlacierGame::H2 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityFactory>(&data)
 							.context("Couldn't deserialise factory")?
 					)?,
 
-					GameVersion::H3 => to_vec(
+					GlacierGame::H3 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityFactory>(&data)
+							.context("Couldn't deserialise factory")?
+					)?,
+
+					GlacierGame::FL => to_vec(
+						&glacier_bin1::deserialize::<glacier_bin1::game::fl::STemplateEntityFactory>(&data)
 							.context("Couldn't deserialise factory")?
 					)?
 				};
@@ -1112,18 +1195,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				let (metadata, data) = game.extract_latest_resource(game.extract_entity(hash)?.blueprint)?;
 
 				let data = match game.version() {
-					GameVersion::H1 => to_vec(
+					GlacierGame::H1 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?,
 
-					GameVersion::H2 => to_vec(
+					GlacierGame::H2 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?,
 
-					GameVersion::H3 => to_vec(
+					GlacierGame::H3 => to_vec(
 						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityBlueprint>(&data)
+							.context("Couldn't deserialise blueprint")?
+					)?,
+
+					GlacierGame::FL => to_vec(
+						&glacier_bin1::deserialize::<glacier_bin1::game::fl::STemplateEntityBlueprint>(&data)
 							.context("Couldn't deserialise blueprint")?
 					)?
 				};
@@ -1254,7 +1342,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						}
 
 						"TEXT" => {
-							let mut texture = TextureMap::process_data(game.version().into(), res_data)
+							let mut texture = TextureMap::from_memory(&res_data, game.version().into())
 								.context("Couldn't process texture data")?;
 
 							if let Some(texd_depend) = res_meta.core_info.references.first() {
@@ -1339,7 +1427,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 					let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-					let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+					let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
 
 					let non_streamed_count = wwev.non_streamed.len();
 
@@ -1428,7 +1516,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-				let wwev = WwiseEvent::parse(&res_data, &res_meta.core_info)?;
+				let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
 
 				if index < wwev.non_streamed.len() as u32 {
 					let object = wwev.non_streamed.get(index as usize).context("No such audio object")?;
@@ -1733,7 +1821,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		ResourceOverviewEvent::ExtractAsObj => {
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (_, res_data) = game.extract_latest_resource(hash)?;
-				let (obj, _) = parse_prim(game, &res_data)?;
+				let (obj, _) = parse_prim_to_obj(game, &res_data)?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
 
@@ -1743,6 +1831,23 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 
 				if let Some(path) = dialog.add_filter("OBJ mesh file", &["obj"]).blocking_save_file() {
 					fs::write(path.as_path().context("Invalid path")?, obj)?;
+				}
+			}
+		}
+
+		ResourceOverviewEvent::ExtractAsGlb => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
+				let glb = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?.0;
+
+				let mut dialog = app.dialog().file().set_title("Extract file");
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					dialog = dialog.set_directory(&project.path);
+				}
+
+				if let Some(path) = dialog.add_filter("GLTF binary file", &["glb"]).blocking_save_file() {
+					fs::write(path.as_path().context("Invalid path")?, glb)?;
 				}
 			}
 		}
@@ -1810,7 +1915,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-				let sdef = SoundDefinitions::parse(&res_data, &res_meta.core_info, game.version())
+				let sdef = SoundDefinitions::parse(game.version(), &res_data, &res_meta.core_info)
 					.context("Couldn't parse sound definitions")?;
 
 				let mut dialog = app.dialog().file().set_title("Extract file");
@@ -1835,7 +1940,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			if let Some(game) = app_state.game.load().as_ref() {
 				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-				let mut texture = TextureMap::process_data(game.version().into(), res_data)
+				let mut texture = TextureMap::from_memory(&res_data, game.version().into())
 					.context("Couldn't process texture data")?;
 
 				if let Some(texd_depend) = res_meta.core_info.references.first() {
@@ -1919,7 +2024,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				let (_, res_data) = game.extract_latest_resource(hash)?;
 
 				let pseudocode = match game.version() {
-					GameVersion::H1 => format!(
+					GlacierGame::H1 => format!(
 						"{}\n---\n{:?}",
 						hash,
 						hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
@@ -1937,7 +2042,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						.root
 					),
 
-					GameVersion::H2 => format!(
+					GlacierGame::H2 => format!(
 						"{}\n---\n{:?}",
 						hash,
 						hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
@@ -1955,7 +2060,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						.root
 					),
 
-					GameVersion::H3 => format!(
+					GlacierGame::H3 => format!(
 						"{}\n---\n{:?}",
 						hash,
 						hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
@@ -1971,7 +2076,9 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 								.unwrap()
 						}))?
 						.root
-					)
+					),
+
+					_ => bail!("Unsupported game for behavior tree")
 				};
 
 				let mut dialog = app.dialog().file().set_title("Extract file");

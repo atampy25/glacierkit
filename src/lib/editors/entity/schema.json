@@ -80,8 +80,9 @@
 					"description": "Whether the entity is only loaded in IO's editor.\n\nSetting this to true will remove the entity from the game as well as all of its organisational (but not coordinate) children.",
 					"type": "boolean"
 				},
+				"excludedPlatforms": { "description": "Platforms on which the entity will not be loaded.", "type": "array", "items": { "type": "string" } },
 				"properties": { "description": "Properties of the entity.", "type": "object", "additionalProperties": { "$ref": "#/$defs/Property" } },
-				"platformProperties": {
+				"platformSpecificProperties": {
 					"description": "Properties to apply conditionally to the entity based on platform.",
 					"type": "object",
 					"additionalProperties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/Property" } }
@@ -147,7 +148,7 @@
 				}
 			]
 		},
-		"ReferenceType": { "type": "string", "enum": ["install", "normal", "weak", "media", "state", "entityType"] },
+		"ReferenceType": { "type": "string", "enum": ["install", "normal", "weak", "streamed", "media", "state", "entityType"] },
 		"Property": {
 			"description": "A property with a type and a value. Can be marked as post-init.",
 			"type": "object",
@@ -191,7 +192,8 @@
 			"type": "object",
 			"properties": {
 				"entities": { "description": "An array of references to the entities to override the properties of.", "type": "array", "items": { "$ref": "#/$defs/Ref" } },
-				"properties": { "description": "A set of properties to override on the entities.", "type": "object", "additionalProperties": { "$ref": "#/$defs/Variant" } }
+				"properties": { "description": "A set of properties to override on the entities.", "type": "object", "additionalProperties": { "$ref": "#/$defs/Variant" } },
+				"runtimeEditable": { "description": "Which of the overridden properties can be edited at runtime.", "type": "array", "items": { "type": "string" } }
 			},
 			"required": ["entities", "properties"]
 		},

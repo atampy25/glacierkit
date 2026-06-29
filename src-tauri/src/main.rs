@@ -3,6 +3,7 @@
 // Specta creates non snake case functions
 #![allow(non_snake_case)]
 #![feature(try_blocks)]
+#![feature(unwrap_infallible)]
 #![allow(clippy::type_complexity)]
 
 pub mod bin1;
@@ -12,6 +13,7 @@ pub mod entity;
 pub mod event_handling;
 pub mod game;
 pub mod general;
+pub mod geometry;
 pub mod intellisense;
 pub mod languages;
 pub mod model;
@@ -29,10 +31,9 @@ use std::{
 };
 
 use anyhow::{Context, Error, Result, anyhow, bail};
-use arc_swap::ArcSwap;
 use fn_error_context::context;
 use futures_util::StreamExt;
-use hitman_commons::game_detection::detect_installs;
+use glacier_commons::game_detection::detect_installs;
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{LevelFilter, info, trace};
@@ -59,7 +60,7 @@ use crate::{
 		tools::handle_tool_event,
 		unlockables_patch::handle_unlockables_patch_event
 	},
-	general::{REPO_ID, UNLOCKABLES_ID, open_file},
+	general::{REPO_ID, open_file},
 	model::{
 		AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent,
 		EditorData, EditorEventData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityMetadataRequest,
@@ -75,12 +76,6 @@ pub type PapayaMap<K, V, S = rapidhash::fast::RandomState> = papaya::HashMap<K, 
 pub type PapayaSet<K, S = rapidhash::fast::RandomState> = papaya::HashSet<K, S>;
 pub type ShardMap<K, V, S = rapidhash::fast::RandomState> = whirlwind::ShardMap<K, V, S>;
 pub type ShardSet<K, S = rapidhash::fast::RandomState> = whirlwind::ShardSet<K, S>;
-
-pub const HASH_LIST_VERSION_ENDPOINT: &str =
-	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/version";
-
-pub const HASH_LIST_ENDPOINT: &str =
-	"https://github.com/glacier-modding/Hitman-Hashes/releases/latest/download/hash_list.sml";
 
 pub const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/version.json";
@@ -156,20 +151,19 @@ async fn main() {
 					flush_interval: None
 				})
 				.with_panic_hook(Box::new(move |client, info, msg| {
+					eprintln!("Panic: {msg}: {info:?}");
 					if IS_MAIN_THREAD.get() {
 						let location = info
 							.location()
 							.map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
 							.unwrap_or_default();
 
-						client
-							.track_event(
-								"Panic",
-								Some(json!({
-								  "info": format!("{} - {}", location, msg),
-								}))
-							)
-							.unwrap();
+						let _ = client.track_event(
+							"Panic",
+							Some(json!({
+							  "info": format!("{} - {}", location, msg),
+							}))
+						);
 
 						let mut panic_report = String::new();
 
@@ -357,29 +351,7 @@ async fn main() {
 
 			let game_installs = detect_installs().expect("Couldn't detect game installs");
 
-			if let Ok(read) = fs::read(app_data_path.join("settings.json"))
-				&& let Ok(mut settings) = from_slice::<AppSettings>(&read)
-			{
-				// Check if the game install is still valid
-				if settings
-					.game_install
-					.as_ref()
-					.is_some_and(|x| !game_installs.iter().any(|y| y.path == *x))
-				{
-					settings.game_install = None;
-				}
-
-				app.manage(ArcSwap::new(settings.into()));
-			} else {
-				let settings = AppSettings::default();
-				fs::create_dir_all(&app_data_path).expect("Couldn't create app data dir");
-				fs::write(
-					app_data_path.join("settings.json"),
-					to_vec(&settings).expect("Couldn't serialise default app settings")
-				)
-				.expect("Couldn't write default app settings");
-				app.manage(ArcSwap::new(settings.into()));
-			}
+			app.manage(AppSettings::load(&app_data_path).expect("Couldn't load app settings"));
 
 			info!("Loaded settings");
 
@@ -423,7 +395,7 @@ pub fn handle_event(app: &AppHandle, evt: Event) {
 
 #[try_fn]
 async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
-	let app_settings = app.state::<ArcSwap<AppSettings>>();
+	let app_settings = app.state::<AppSettings>();
 	let app_state = app.state::<AppState>();
 
 	match event {
@@ -563,16 +535,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 		Event::Global(event) => match event {
 			GlobalEvent::SetSeenAnnouncements(seen_announcements) => {
-				let mut settings = (*app_settings.load_full()).to_owned();
-				settings.seen_announcements = seen_announcements;
-				fs::write(
-					app.path()
-						.app_data_dir()
-						.context("Couldn't get app data dir")?
-						.join("settings.json"),
-					to_vec(&settings).unwrap()
-				)?;
-				app_settings.store(settings.into());
+				app_settings.set_seen_announcements(seen_announcements)?;
 			}
 
 			GlobalEvent::SelectAndOpenFile => {
@@ -1059,7 +1022,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											base,
 											current,
 											save_path: file.to_owned(),
-											file_and_type: (REPO_ID.to_string(), "REPO".into())
+											id: REPO_ID
 										})
 									)?;
 
@@ -1089,7 +1052,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												base,
 												current,
 												save_path: path.as_path().context("Invalid path")?.to_owned(),
-												file_and_type: (REPO_ID.to_string(), "REPO".into())
+												id: REPO_ID
 											})
 										)?;
 
@@ -1185,97 +1148,68 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							}
 
 							JsonPatchType::JsonPatch => {
-								let base = to_value(
-									base.iter()
-										.map(|x| {
-											(
-												x.data
-													.get("Id")
-													.expect("Unlockable did not have Id")
-													.as_str()
-													.expect("Id was not string")
-													.to_owned(),
-												{
-													let mut y = IndexMap::new();
-													y.insert("Guid".into(), to_value(x.id).unwrap());
-													y.extend(
-														x.data
-															.iter()
-															.filter(|(key, _)| *key != "Id")
-															.map(|(x, y)| (x.to_owned(), y.to_owned()))
-													);
-													y
-												}
-											)
-										})
-										.collect::<IndexMap<String, IndexMap<String, Value>>>()
-								)?;
-
-								let current = to_value(
-									current
-										.iter()
-										.map(|x| {
-											(
-												x.data
-													.get("Id")
-													.expect("Unlockable did not have Id")
-													.as_str()
-													.expect("Id was not string")
-													.to_owned(),
-												{
-													let mut y = IndexMap::new();
-													y.insert("Guid".into(), to_value(x.id).unwrap());
-													y.extend(
-														x.data
-															.iter()
-															.filter(|(key, _)| *key != "Id")
-															.map(|(x, y)| (x.to_owned(), y.to_owned()))
-													);
-													y
-												}
-											)
-										})
-										.collect::<IndexMap<String, IndexMap<String, Value>>>()
-								)?;
-
-								if let Some(file) = editor.file.as_ref() {
-									send_request(
-										&app,
-										Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-											base,
-											current,
-											save_path: file.to_owned(),
-											file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
-										})
+								if let Some(game) = app_state.game.load().as_ref() {
+									let base = to_value(
+										base.iter()
+											.map(|x| {
+												(
+													x.data
+														.get("Id")
+														.expect("Unlockable did not have Id")
+														.as_str()
+														.expect("Id was not string")
+														.to_owned(),
+													{
+														let mut y = IndexMap::new();
+														y.insert("Guid".into(), to_value(x.id).unwrap());
+														y.extend(
+															x.data
+																.iter()
+																.filter(|(key, _)| *key != "Id")
+																.map(|(x, y)| (x.to_owned(), y.to_owned()))
+														);
+														y
+													}
+												)
+											})
+											.collect::<IndexMap<String, IndexMap<String, Value>>>()
 									)?;
 
-									send_request(
-										&app,
-										Request::Tab(TabRequest {
-											tab,
-											data: TabRequestData::SetUnsaved { unsaved: false }
-										})
+									let current = to_value(
+										current
+											.iter()
+											.map(|x| {
+												(
+													x.data
+														.get("Id")
+														.expect("Unlockable did not have Id")
+														.as_str()
+														.expect("Id was not string")
+														.to_owned(),
+													{
+														let mut y = IndexMap::new();
+														y.insert("Guid".into(), to_value(x.id).unwrap());
+														y.extend(
+															x.data
+																.iter()
+																.filter(|(key, _)| *key != "Id")
+																.map(|(x, y)| (x.to_owned(), y.to_owned()))
+														);
+														y
+													}
+												)
+											})
+											.collect::<IndexMap<String, IndexMap<String, Value>>>()
 									)?;
-								} else {
-									let mut dialog = app.dialog().file().set_title("Save file");
 
-									if let Some(project) = app_state.project.load().as_ref() {
-										dialog = dialog.set_directory(&project.path);
-									}
-
-									if let Some(path) = dialog
-										.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
-										.blocking_save_file()
-									{
-										editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
-
+									if let Some(file) = editor.file.as_ref() {
 										send_request(
 											&app,
 											Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
 												base,
 												current,
-												save_path: path.as_path().context("Invalid path")?.to_owned(),
-												file_and_type: (UNLOCKABLES_ID.to_string(), "ORES".into())
+												save_path: file.to_owned(),
+												id: game.unlockables_id()
 											})
 										)?;
 
@@ -1286,12 +1220,46 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												data: TabRequestData::SetUnsaved { unsaved: false }
 											})
 										)?;
+									} else {
+										let mut dialog = app.dialog().file().set_title("Save file");
+
+										if let Some(project) = app_state.project.load().as_ref() {
+											dialog = dialog.set_directory(&project.path);
+										}
+
+										if let Some(path) = dialog
+											.add_filter("Unlockables JSON patch", &["JSON.patch.json"])
+											.blocking_save_file()
+										{
+											editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
+
+											send_request(
+												&app,
+												Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+													base,
+													current,
+													save_path: path.as_path().context("Invalid path")?.to_owned(),
+													id: game.unlockables_id()
+												})
+											)?;
+
+											send_request(
+												&app,
+												Request::Tab(TabRequest {
+													tab,
+													data: TabRequestData::SetUnsaved { unsaved: false }
+												})
+											)?;
+										}
 									}
+
+									finish_task(&app, task)?;
+
+									return Ok(());
+								} else {
+									Err(anyhow!("No game loaded"))?;
+									panic!();
 								}
-
-								finish_task(&app, task)?;
-
-								return Ok(());
 							}
 						}
 					}
@@ -1347,6 +1315,11 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 									..
 								} => "JSON file",
 
+								EditorData::Text {
+									file_type: TextFileType::Xml,
+									..
+								} => "XML file",
+
 								EditorData::QNEntity { .. } => "QuickEntity entity",
 
 								EditorData::QNPatch { .. } => "QuickEntity patch",
@@ -1391,6 +1364,11 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 									file_type: TextFileType::Json | TextFileType::ManifestJson,
 									..
 								} => "json",
+
+								EditorData::Text {
+									file_type: TextFileType::Xml,
+									..
+								} => "xml",
 
 								EditorData::QNEntity { .. } => "entity.json",
 

@@ -77,6 +77,18 @@
 		},
 		"required": ["m_nTicks"]
 	},
+	"ZResourceID": {
+		"anyOf": [
+			{
+				"$ref": "#/$defs/ResourceReference"
+			},
+			{
+				"type": "null"
+			}
+		],
+		"description": "A game resource, referenced by its path and, optionally, flags.",
+		"default": null
+	},
 	"ZRuntimeResourceID": {
 		"anyOf": [
 			{
@@ -86,8 +98,28 @@
 				"type": "null"
 			}
 		],
-		"description": "A game resource, referenced by its path and, optionally, a flag.",
+		"description": "A game resource, referenced by its path and, optionally, flags.",
 		"default": null
+	},
+	"ZEditorEnumValue": {
+		"type": "object",
+		"description": "A specific value of an ENUM resource.",
+		"properties": {
+			"enum": {
+				"anyOf": [
+					{
+						"$ref": "#/$defs/ResourceReference"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"value": {
+				"type": "integer"
+			}
+		},
+		"required": ["enum", "value"]
 	},
 	"SVector2": {
 		"type": "object",

@@ -187,7 +187,7 @@
 								case "computeJSONPatchAndSave":
 								case "requestLastPanicUpload":
 								case "logUploadRejected":
-								case "setEnums":
+								case "setGameVersion":
 									// Handled by +layout.svelte
 									break
 

@@ -21,14 +21,6 @@ export type Announcement = {
 
 export type AnnouncementKind = "info" | "success" | "warning" | "error"
 
-export type AppSettings = {
-	extractModdedFiles: boolean
-	gameInstall: string | null
-	colourblindMode: boolean
-	editorConnection: boolean
-	seenAnnouncements: string[]
-}
-
 export type ContentSearchEvent = {
 	type: "search"
 	data: {
@@ -444,6 +436,7 @@ export type EntityMonacoRequest =
 				properties: [string, VariantProxy, boolean][]
 				inputPins: string[]
 				outputPins: string[]
+				subsets: string[]
 			}
 	  }
 	| {
@@ -775,6 +768,7 @@ export type EntityTreeRequest_Deserialize =
 				inputPins: string[]
 				outputPins: string[]
 				defaultPropertiesJson: string
+				subsets: string[]
 			}
 	  }
 	| {
@@ -844,6 +838,7 @@ export type EntityTreeRequest_Serialize =
 				inputPins: string[]
 				outputPins: string[]
 				defaultPropertiesJson: string
+				subsets: string[]
 			}
 	  }
 	| {
@@ -1040,8 +1035,9 @@ export type GameBrowserEntry = {
 	hash: Hash
 	path: string | null
 	hint: string | null
-	filetype: string
+	resourceType: string
 	partition: [string, string]
+	order: number | null
 }
 
 export type GameBrowserEvent =
@@ -1056,6 +1052,7 @@ export type GameBrowserEvent =
 			data: {
 				query: string
 				filter: SearchFilter
+				sort: [SearchSort, boolean] | null
 			}
 	  }
 	| {
@@ -1081,14 +1078,12 @@ export type GameBrowserRequest =
 	  }
 
 export type GameInstall = {
-	version: GameVersion
-	platform: GamePlatform
+	version: GlacierGame
+	platform: StorePlatform
 	path: string
 }
 
-export type GamePlatform = "steam" | "epic" | "gOG" | "microsoft"
-
-export type GameVersion = "h1" | "h2" | "h3"
+export type GlacierGame = "h1" | "h2" | "h3" | "fl"
 
 export type GlobalEvent =
 	| { type: "setSeenAnnouncements"; data: string[] }
@@ -1149,14 +1144,15 @@ export type GlobalRequest =
 					| ({ Array: Value[] } & { Bool?: never; Number?: never; Object?: never; String?: never })
 					| ({ Object: { [key in string]: Value } } & { Array?: never; Bool?: never; Number?: never; String?: never })
 				savePath: string
-				fileAndType: [string, string]
+				id: string
 			}
 	  }
 	| { type: "requestLastPanicUpload" }
 	| { type: "logUploadRejected" }
 	| {
-			type: "setEnums"
+			type: "setGameVersion"
 			data: {
+				version: GlacierGame | null
 				enums: { [key in string]: string[] }
 			}
 	  }
@@ -1252,7 +1248,7 @@ export type ReferenceFlags_Serialize = {
 	languageCode?: number
 }
 
-export type ReferenceType = "install" | "normal" | "weak" | "media" | "state" | "entityType"
+export type ReferenceType = "install" | "normal" | "weak" | "streamed" | "media" | "state" | "entityType"
 
 export type RepositoryItemInformation =
 	| {
@@ -1484,6 +1480,12 @@ export type ResourceOverviewData =
 			}
 	  }
 	| {
+			type: "xml"
+			data: {
+				xml: string
+			}
+	  }
+	| {
 			type: "image"
 			data: {
 				assetId: string
@@ -1549,6 +1551,12 @@ export type ResourceOverviewData =
 				pseudocode: string
 			}
 	  }
+	| {
+			type: "error"
+			data: {
+				message: string
+			}
+	  }
 
 export type ResourceOverviewEvent =
 	| { type: "initialise" }
@@ -1585,6 +1593,7 @@ export type ResourceOverviewEvent =
 	| { type: "extractAsMaterialEntity" }
 	| { type: "extractAsSoundDefs" }
 	| { type: "extractAsObj" }
+	| { type: "extractAsGlb" }
 	| { type: "extractAsTexture" }
 	| { type: "extractAsPseudocode" }
 
@@ -1597,6 +1606,7 @@ export type ResourceOverviewRequest_Deserialize = {
 		filetype: string
 		chunkPatch: string
 		pathOrHint: string | null
+		size: number
 		// Hash, type, path/hint, flags, is actually in current game version
 		dependencies: [string, string, string | null, ReferenceFlags_Deserialize, boolean][]
 		// Hash, type, path/hint
@@ -1613,6 +1623,7 @@ export type ResourceOverviewRequest_Serialize = {
 		filetype: string
 		chunkPatch: string
 		pathOrHint: string | null
+		size: number
 		// Hash, type, path/hint, flags, is actually in current game version
 		dependencies: [string, string, string | null, ReferenceFlags_Serialize, boolean][]
 		// Hash, type, path/hint
@@ -1642,7 +1653,7 @@ export type ReverseReferenceData =
 			}
 	  }
 	| {
-			type: "platformProperty"
+			type: "platformSpecificProperty"
 			data: {
 				property_name: string
 				platform: string
@@ -1697,6 +1708,8 @@ export type ReverseReferenceData =
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
+export type SearchSort = "Size"
+
 export type SettingsEvent =
 	| { type: "initialise" }
 	| {
@@ -1706,13 +1719,19 @@ export type SettingsEvent =
 			}
 	  }
 	| {
+			type: "removeCustomGamePath"
+			data: {
+				path: string
+			}
+	  }
+	| {
 			type: "changeExtractModdedFiles"
 			data: {
 				value: boolean
 			}
 	  }
 	| {
-			type: "changeColourblind"
+			type: "changeColourblindMode"
 			data: {
 				value: boolean
 			}
@@ -1730,12 +1749,21 @@ export type SettingsEvent =
 			}
 	  }
 
+export type SettingsInner = {
+	gamePath: string | null
+	customGamePaths: string[]
+	extractModdedFiles: boolean
+	colourblindMode: boolean
+	editorConnection: boolean
+	seenAnnouncements: string[]
+}
+
 export type SettingsRequest =
 	| {
 			type: "initialise"
 			data: {
 				gameInstalls: GameInstall[]
-				settings: AppSettings
+				settings: SettingsInner
 			}
 	  }
 	| {
@@ -1744,6 +1772,8 @@ export type SettingsRequest =
 				settings: ProjectSettings
 			}
 	  }
+
+export type StorePlatform = "steam" | "epic" | "gog" | "microsoft"
 
 export type SubEntity = SubEntity_Serialize | SubEntity_Deserialize
 
@@ -1766,10 +1796,12 @@ export type SubEntity_Deserialize = {
 	 *  Setting this to true will remove the entity from the game as well as all of its organisational (but not coordinate) children.
 	 */
 	editorOnly?: boolean
+	// Platforms on which the entity will not be loaded.
+	excludedPlatforms?: string[]
 	// Properties of the entity.
 	properties?: { [key in string]: Property_Deserialize }
 	// Properties to apply conditionally to the entity based on platform.
-	platformProperties?: { [key in string]: { [key in string]: Property_Deserialize } }
+	platformSpecificProperties?: { [key in string]: { [key in string]: Property_Deserialize } }
 	// Inputs on entities to trigger when events occur.
 	events?: { [key in string]: { [key in string]: PinConnectionProxy_Deserialize[] } }
 	// Inputs on entities to trigger when this entity is given inputs.
@@ -1805,10 +1837,12 @@ export type SubEntity_Serialize = {
 	 *  Setting this to true will remove the entity from the game as well as all of its organisational (but not coordinate) children.
 	 */
 	editorOnly?: boolean
+	// Platforms on which the entity will not be loaded.
+	excludedPlatforms?: string[]
 	// Properties of the entity.
 	properties?: { [key in string]: Property_Serialize }
 	// Properties to apply conditionally to the entity based on platform.
-	platformProperties?: { [key in string]: { [key in string]: Property_Serialize } }
+	platformSpecificProperties?: { [key in string]: { [key in string]: Property_Serialize } }
 	// Inputs on entities to trigger when events occur.
 	events?: { [key in string]: { [key in string]: PinConnectionProxy_Serialize[] } }
 	// Inputs on entities to trigger when this entity is given inputs.
@@ -1878,7 +1912,7 @@ export type TextEditorRequest =
 			}
 	  }
 
-export type TextFileType = "Json" | "ManifestJson" | "PlainText" | "Markdown"
+export type TextFileType = "Json" | "ManifestJson" | "Xml" | "PlainText" | "Markdown"
 
 export type ToolEvent =
 	| { type: "fileBrowser"; data: FileBrowserEvent }
