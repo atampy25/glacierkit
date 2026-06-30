@@ -1153,7 +1153,7 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 			let default_tab_name = format!(
 				"{} ({})",
 				entity
-					.entities
+					.sub_entities
 					.get(&entity.root_entity)
 					.context("Root entity doesn't exist")?
 					.name,

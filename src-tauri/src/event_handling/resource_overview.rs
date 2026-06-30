@@ -8,16 +8,16 @@ use anyhow::{Context, Result, anyhow, bail};
 use ecow::EcoVec;
 use fn_error_context::context;
 use glacier_commons::{game::GlacierGame, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
-use glacier_texture::{
-	enums::{InterpretAs, RenderFormat, TextureType},
-	mipblock::MipblockData,
-	texture_map::TextureMap
-};
 use glacier_formats::{
 	material::{MaterialEntity, MaterialInstance},
 	sdef::SoundDefinitions,
 	texture::TextureMetadata,
 	wwev::WwiseEvent
+};
+use glacier_texture::{
+	enums::{InterpretAs, RenderFormat, TextureType},
+	mipblock::MipblockData,
+	texture_map::TextureMap
 };
 use image::{ImageFormat, ImageReader};
 use itertools::Itertools;
@@ -152,7 +152,7 @@ pub async fn initialise_resource_overview(
 
 						ResourceOverviewData::Entity {
 							root_entity_name: entity
-								.entities
+								.sub_entities
 								.get(&entity.root_entity)
 								.map_or_else(|| "Unknown".into(), |x| x.name.as_str().into()),
 							blueprint_hash: Hash(entity.blueprint),
@@ -895,7 +895,26 @@ pub async fn initialise_resource_overview(
 						}
 					},
 
-					_ => ResourceOverviewData::Generic
+					_ => {
+						if size < 1024 * 1024 {
+							let (_, res_data) = game.extract_latest_resource(hash)?;
+
+							let asset_id = Uuid::new_v4();
+
+							app_state
+								.editor_states
+								.get(&id)
+								.await
+								.context("No such editor")?
+								.assets
+								.insert(asset_id, ("application/octet-stream".into(), res_data.into()))
+								.await;
+
+							ResourceOverviewData::GenericData { asset_id }
+						} else {
+							ResourceOverviewData::Generic
+						}
+					}
 				}
 			})
 		})

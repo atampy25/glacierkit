@@ -126,13 +126,13 @@ pub fn visit_variant_mut(variant: &mut Variant, handle: &mut impl FnMut(&mut Var
 pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID, Vec<ReverseReference>>> {
 	let mut reverse_references: HashMap<EntityID, Vec<ReverseReference>> = HashMap::default();
 
-	reverse_references.reserve(entity.entities.len());
+	reverse_references.reserve(entity.sub_entities.len());
 
-	for entity_id in entity.entities.keys() {
+	for entity_id in entity.sub_entities.keys() {
 		reverse_references.insert(entity_id.to_owned(), vec![]);
 	}
 
-	for (entity_id, entity) in entity.entities.iter() {
+	for (entity_id, entity) in entity.sub_entities.iter() {
 		if let Some(ent) = entity.parent.as_ref().and_then(Ref::as_local) {
 			reverse_references.entry(ent).or_default().push(ReverseReference {
 				from: entity_id.to_owned(),
@@ -292,7 +292,7 @@ pub fn get_recursive_children(
 	reverse_references: &HashMap<EntityID, Vec<ReverseReference>>
 ) -> Result<Vec<EntityID>> {
 	let child_ents = entity
-		.entities
+		.sub_entities
 		.iter()
 		.filter(|(_, x)| x.parent.as_ref().and_then(Ref::as_local).is_some_and(|x| x == target))
 		.map(|(x, _)| x)
@@ -336,7 +336,7 @@ pub fn alter_ref_according_to_changelist(reference: &Ref, changelist: &HashMap<E
 #[context("Couldn't check whether local references refer to existing entities")]
 pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> Result<EditorValidity> {
 	if let Some(ent) = sub_entity.parent.as_ref().and_then(Ref::as_local)
-		&& !entity.entities.contains_key(&ent)
+		&& !entity.sub_entities.contains_key(&ent)
 	{
 		return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
 	}
@@ -346,7 +346,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 		visit_variant(&property_data.value, &mut |val| {
 			if let Variant::Ref(val) = val
 				&& let Some(ent) = val.as_ref().and_then(Ref::as_local)
-				&& !entity.entities.contains_key(&ent)
+				&& !entity.sub_entities.contains_key(&ent)
 			{
 				res = EditorValidity::Invalid(format!("Invalid reference {}", ent));
 			}
@@ -363,7 +363,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 			visit_variant(&property_data.value, &mut |val| {
 				if let Variant::Ref(val) = val
 					&& let Some(ent) = val.as_ref().and_then(Ref::as_local)
-					&& !entity.entities.contains_key(&ent)
+					&& !entity.sub_entities.contains_key(&ent)
 				{
 					res = EditorValidity::Invalid(format!("Invalid reference {}", ent));
 				}
@@ -381,7 +381,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 				let reference = &reference.entity_ref;
 
 				if let Some(ent) = reference.as_local()
-					&& !entity.entities.contains_key(&ent)
+					&& !entity.sub_entities.contains_key(&ent)
 				{
 					return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
 				}
@@ -396,7 +396,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	{
 		for propagate_entities in propagates.values() {
 			for reference in propagate_entities {
-				if !entity.entities.contains_key(&reference.entity_id) {
+				if !entity.sub_entities.contains_key(&reference.entity_id) {
 					return Ok(EditorValidity::Invalid(format!(
 						"Invalid reference {}",
 						reference.entity_id
@@ -408,7 +408,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 
 	for aliases in sub_entity.property_aliases.values() {
 		for alias_data in aliases {
-			if !entity.entities.contains_key(&alias_data.original_entity) {
+			if !entity.sub_entities.contains_key(&alias_data.original_entity) {
 				return Ok(EditorValidity::Invalid(format!(
 					"Invalid reference {}",
 					alias_data.original_entity
@@ -420,7 +420,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	for exposed_entity in sub_entity.exposed_entities.values() {
 		for reference in &exposed_entity.refers_to {
 			if let Some(ent) = reference.as_local()
-				&& !entity.entities.contains_key(&ent)
+				&& !entity.sub_entities.contains_key(&ent)
 			{
 				return Ok(EditorValidity::Invalid(format!("Invalid reference {}", ent)));
 			}
@@ -428,7 +428,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	}
 
 	for referenced_entity in sub_entity.exposed_interfaces.values() {
-		if !entity.entities.contains_key(referenced_entity) {
+		if !entity.sub_entities.contains_key(referenced_entity) {
 			return Ok(EditorValidity::Invalid(format!(
 				"Invalid reference {}",
 				referenced_entity
@@ -438,7 +438,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 
 	for member_of in sub_entity.subsets.values() {
 		for parental_entity in member_of {
-			if !entity.entities.contains_key(parental_entity) {
+			if !entity.sub_entities.contains_key(parental_entity) {
 				return Ok(EditorValidity::Invalid(format!(
 					"Invalid reference {}",
 					parental_entity
@@ -452,14 +452,14 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 
 pub fn get_ref_decoration(game: &Game, entity: &Entity, reference: Option<&Ref>) -> Option<(String, String)> {
 	if let Some(ent) = reference.and_then(Ref::as_local) {
-		Some((ent.to_string(), entity.entities.get(&ent)?.name.to_string()))
+		Some((ent.to_string(), entity.sub_entities.get(&ent)?.name.to_string()))
 	} else if let Some(entity_ref) = reference
 		&& let Some(external_scene) = entity_ref.external_scene
 	{
 		Some((entity_ref.entity_id.to_string(), {
 			game.extract_entity(external_scene)
 				.ok()?
-				.entities
+				.sub_entities
 				.get(&entity_ref.entity_id)?
 				.name
 				.to_string()
@@ -835,7 +835,7 @@ pub fn is_valid_entity_blueprint(resource_type: ResourceType) -> bool {
 pub fn reverse_parent_refs_set(entity: &Entity) -> HashSet<EntityID> {
 	let mut reverse_parent_refs = HashSet::default();
 
-	for entity_data in entity.entities.values() {
+	for entity_data in entity.sub_entities.values() {
 		if let Some(parent) = entity_data.parent.as_ref().and_then(Ref::as_local) {
 			reverse_parent_refs.insert(parent);
 		}
@@ -856,9 +856,9 @@ pub fn get_diff_info(
 	let old_reverse_parent_refs = reverse_parent_refs_set(original);
 
 	let removed = original
-		.entities
+		.sub_entities
 		.par_iter()
-		.filter(|&(id, _)| !modified.entities.contains_key(id))
+		.filter(|&(id, _)| !modified.sub_entities.contains_key(id))
 		.map(|(id, orig)| {
 			(
 				*id,
@@ -871,10 +871,10 @@ pub fn get_diff_info(
 		.collect();
 
 	let mut diff = modified
-		.entities
+		.sub_entities
 		.par_iter()
 		.filter_map(|(id, modif)| {
-			if let Some(orig) = original.entities.get(id) {
+			if let Some(orig) = original.sub_entities.get(id) {
 				if modif != orig { Some(("changed", *id)) } else { None }
 			} else {
 				Some(("new", *id))

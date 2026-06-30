@@ -5,8 +5,9 @@
 	"properties": {
 		"factory": { "description": "The TEMP file of this entity.", "$ref": "#/$defs/RuntimeID" },
 		"blueprint": { "description": "The TBLU file of this entity.", "$ref": "#/$defs/RuntimeID" },
+		"subType": { "description": "The type of this entity.", "$ref": "#/$defs/SubType" },
 		"rootEntity": { "description": "The root sub-entity of this entity.", "$ref": "#/$defs/EntityID" },
-		"entities": {
+		"subEntities": {
 			"description": "The sub-entities of this entity.",
 			"type": "object",
 			"additionalProperties": false,
@@ -33,7 +34,6 @@
 			"items": { "$ref": "#/$defs/PinConnectionOverrideDelete" }
 		},
 		"externalScenes": { "description": "The external scenes that this entity references.", "type": "array", "items": { "$ref": "#/$defs/RuntimeID" } },
-		"subType": { "description": "The type of this entity.", "$ref": "#/$defs/SubType" },
 		"quickEntityVersion": { "description": "The QuickEntity format version of this entity. The current version is 3.2.", "type": "number", "format": "float" },
 		"extraFactoryReferences": {
 			"description": "Extra resource references that should be added to the entity's factory when converted to the game's format.",
@@ -50,14 +50,14 @@
 	"required": [
 		"factory",
 		"blueprint",
+		"subType",
 		"rootEntity",
-		"entities",
+		"subEntities",
 		"propertyOverrides",
 		"overrideDeletes",
 		"pinConnectionOverrides",
 		"pinConnectionOverrideDeletes",
 		"externalScenes",
-		"subType",
 		"quickEntityVersion",
 		"extraFactoryReferences",
 		"extraBlueprintReferences",
@@ -65,6 +65,7 @@
 	],
 	"$defs": {
 		"RuntimeID": { "type": "string" },
+		"SubType": { "type": "string", "enum": ["brick", "scene", "template"] },
 		"EntityID": { "type": "string", "pattern": "^[0-9a-fA-F]{16}$" },
 		"SubEntity": {
 			"type": "object",
@@ -222,7 +223,6 @@
 			},
 			"required": ["fromEntity", "fromPin", "toEntity", "toPin"]
 		},
-		"SubType": { "type": "string", "enum": ["brick", "scene", "template"] },
 		"CommentEntity": {
 			"description": "A comment entity.",
 			"type": "object",

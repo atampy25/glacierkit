@@ -17,6 +17,7 @@
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
 	import { VList } from "virtua/svelte"
 	import { convertFileSrc } from "@tauri-apps/api/core"
+	import HexViewer from "$lib/components/HexViewer.svelte"
 
 	let { id }: { id: string } = $props()
 
@@ -34,6 +35,7 @@
 	let referenceTab = $state(0)
 
 	const typesWithPreview = [
+		"genericData",
 		"entity",
 		"image",
 		"mesh",
@@ -136,7 +138,11 @@
 							>
 								<Tile>
 									<h4 class="mb-1">Preview</h4>
-									{#if data.type === "entity"}
+									{#if data.type === "genericData"}
+										<div class="h-[30vh] pt-2">
+											<HexViewer src={convertFileSrc(`${id}/${data.data.assetId}`, "editor-asset")} />
+										</div>
+									{:else if data.type === "entity"}
 										<div class="text-lg">Root entity</div>
 										<div class="text-base font-semibold mb-2">{data.data.rootEntityName}</div>
 										<div class="text-lg mb-1">Blueprint</div>
@@ -921,7 +927,7 @@
 												})
 											}}>Extract file</Button
 										>
-									{:else if data.type === "json" || data.type === "xml" || data.type === "localisedLine" || data.type === "error" || data.type === "generic"}
+									{:else if data.type === "json" || data.type === "xml" || data.type === "localisedLine" || data.type === "error" || data.type === "generic" || data.type === "genericData"}
 										<Button
 											icon={DocumentExport}
 											on:click={async () => {
@@ -1050,17 +1056,14 @@
 											<div class="break-all">{path || "No path"}</div>
 										</ClickableTile>
 									{:else}
-										<div class="bg-[#303030] p-3 mb-2">
-											<div class="text-base -mt-1"
+										<div class="bg-[#303030] p-4 mb-2">
+											<div class="text-base -mt-1 mb-0.5"
 												><span class="font-bold">{hash}</span>
 												{flags.type ? flags.type[0].toUpperCase() + flags.type.slice(1) : "Install"}{flags.acquired ? ", acquired" : ""}{flags.languageCode
 													? `, language ${flags.languageCode}`
 													: ""}</div
 											>
-											<div class="break-all">Unknown resource</div>
-											{#if !inGame}
-												<div class="text-base">Not present in game files</div>
-											{/if}
+											<div class="break-all">{path || "No path"}</div>
 										</div>
 									{/if}
 								{/snippet}

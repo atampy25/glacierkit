@@ -347,7 +347,7 @@ impl Intellisense {
 		sub_entity: EntityID,
 		ignore_own: bool
 	) -> Result<Vec<(EcoString, Variant, bool)>> {
-		let targeted = entity.entities.get(&sub_entity).context("No such sub-entity")?;
+		let targeted = entity.sub_entities.get(&sub_entity).context("No such sub-entity")?;
 
 		let mut found = vec![];
 
@@ -738,7 +738,7 @@ impl Intellisense {
 		sub_entity: EntityID,
 		property_to_find: &str
 	) -> Result<Option<(Variant, bool)>> {
-		let targeted = entity.entities.get(&sub_entity).context("No such sub-entity")?;
+		let targeted = entity.sub_entities.get(&sub_entity).context("No such sub-entity")?;
 
 		if let Some(aliases) = targeted.property_aliases.get(property_to_find) {
 			for alias in aliases {
@@ -1075,7 +1075,7 @@ impl Intellisense {
 		sub_entity: EntityID,
 		ignore_own: bool
 	) -> Result<(Vec<EcoString>, Vec<EcoString>)> {
-		let targeted = entity.entities.get(&sub_entity).context("No such sub-entity")?;
+		let targeted = entity.sub_entities.get(&sub_entity).context("No such sub-entity")?;
 
 		let mut input = vec![];
 		let mut output = vec![];
@@ -1088,7 +1088,7 @@ impl Intellisense {
 			output.extend(targeted.output_forwardings.keys().cloned());
 		}
 
-		for sub_data in entity.entities.values() {
+		for sub_data in entity.sub_entities.values() {
 			for data in sub_data.events.values() {
 				for (trigger, refs) in data {
 					for reference in refs {
@@ -1391,7 +1391,7 @@ impl Intellisense {
 		let mut found = vec![];
 
 		if !ignore_own {
-			for ent in entity.entities.values() {
+			for ent in entity.sub_entities.values() {
 				found.extend(
 					ent.subsets
 						.iter()
@@ -1400,7 +1400,7 @@ impl Intellisense {
 			}
 		}
 
-		let targeted = entity.entities.get(&sub_entity).context("No such sub-entity")?;
+		let targeted = entity.sub_entities.get(&sub_entity).context("No such sub-entity")?;
 
 		for factory in if let Some(ty) = game.resource_type(targeted.factory.resource)
 			&& ty == "ASET"

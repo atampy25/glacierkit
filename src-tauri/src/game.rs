@@ -89,7 +89,7 @@ pub struct Game {
 	resource_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>>,
 	repository: Option<Vec<RepositoryItem>>,
 
-	cached_entities: Arc<PapayaMap<RuntimeID, Arc<Entity>, BuildIdentityHasher<u64>>>
+	cached_entities: PapayaMap<RuntimeID, Arc<Entity>, BuildIdentityHasher<u64>>
 }
 
 impl Game {
@@ -290,7 +290,7 @@ impl Game {
 			resource_reverse_references,
 			resource_types,
 			repository,
-			cached_entities: Arc::new(Default::default())
+			cached_entities: Default::default()
 		}
 	}
 

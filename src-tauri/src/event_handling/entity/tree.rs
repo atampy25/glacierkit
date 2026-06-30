@@ -153,7 +153,7 @@ pub async fn initialise(app: &AppHandle, editor_id: Uuid) -> Result<()> {
 	let mut entities = vec![];
 	let reverse_parent_refs = reverse_parent_refs_set(entity);
 
-	for (entity_id, entity_data) in entity.entities.iter() {
+	for (entity_id, entity_data) in entity.sub_entities.iter() {
 		entities.push((
 			entity_id.to_owned(),
 			entity_data.parent.to_owned(),
@@ -253,7 +253,7 @@ pub async fn create(app: &AppHandle, editor_id: Uuid, id: EntityID, content: Sub
 		}
 	};
 
-	entity.entities.insert(id, content);
+	entity.sub_entities.insert(id, content);
 
 	send_request(
 		app,
@@ -301,7 +301,7 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 		}
 	};
 
-	entity.entities.get_mut(&id).context("No such entity")?.name = new_name.into();
+	entity.sub_entities.get_mut(&id).context("No such entity")?.name = new_name.into();
 
 	send_request(
 		app,
@@ -318,7 +318,7 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id: id.to_owned(),
-					content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
+					content: to_string_clear(entity.sub_entities.get(&id).context("No such entity")?)?
 				}
 			))
 		})
@@ -370,7 +370,7 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 			editor: editor_id.to_owned(),
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(EntityMonacoRequest::ReplaceContent {
 				entity_id: id.to_owned(),
-				content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
+				content: to_string_clear(entity.sub_entities.get(&id).context("No such entity")?)?
 			}))
 		})
 	)?;
@@ -407,7 +407,12 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 				entity_names: reverse_refs
 					.iter()
 					.filter(|x| settings.show_reverse_parent_refs || !matches!(x.data, ReverseReferenceData::Parent))
-					.map(|x| (x.from.to_owned(), entity.entities.get(&x.from).unwrap().name.to_owned()))
+					.map(|x| {
+						(
+							x.from.to_owned(),
+							entity.sub_entities.get(&x.from).unwrap().name.to_owned()
+						)
+					})
 					.collect(),
 				reverse_refs: reverse_refs
 					.into_iter()
@@ -480,7 +485,7 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 		let decorations = get_decorations(
 			game,
 			tonytools_hash_list,
-			entity.entities.get(&id).context("No such entity")?,
+			entity.sub_entities.get(&id).context("No such entity")?,
 			entity
 		)?;
 
@@ -493,7 +498,11 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 						entity_id: id.to_owned(),
 						local_ref_entity_ids: decorations
 							.iter()
-							.filter_map(|(x, _)| x.parse::<EntityID>().ok().filter(|x| entity.entities.contains_key(x)))
+							.filter_map(|(x, _)| {
+								x.parse::<EntityID>()
+									.ok()
+									.filter(|x| entity.sub_entities.contains_key(x))
+							})
 							.collect(),
 						decorations
 					}
@@ -537,7 +546,7 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 		}
 	};
 
-	entity.entities.get_mut(&id).context("No such entity")?.parent = new_parent.map(Ref::local);
+	entity.sub_entities.get_mut(&id).context("No such entity")?.parent = new_parent.map(Ref::local);
 
 	send_request(
 		app,
@@ -554,7 +563,7 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id: id.to_owned(),
-					content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
+					content: to_string_clear(entity.sub_entities.get(&id).context("No such entity")?)?
 				}
 			))
 		})
@@ -623,7 +632,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 				}
 
 				ReverseReferenceData::Property { property_name } => {
-					let entity_props = &mut entity.entities.get_mut(&reverse_ref.from).unwrap().properties;
+					let entity_props = &mut entity.sub_entities.get_mut(&reverse_ref.from).unwrap().properties;
 
 					if let Variant::Array(_, vals) = &mut entity_props.get_mut(property_name).unwrap().value {
 						vals.retain(|item| {
@@ -645,7 +654,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 					platform
 				} => {
 					let entity_props = entity
-						.entities
+						.sub_entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
 						.platform_specific_properties
@@ -674,7 +683,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 							event.to_owned(),
 							trigger.to_owned(),
 							entity
-								.entities
+								.sub_entities
 								.get(&reverse_ref.from)
 								.unwrap()
 								.events
@@ -697,7 +706,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 							trigger.to_owned(),
 							propagate.to_owned(),
 							entity
-								.entities
+								.sub_entities
 								.get(&reverse_ref.from)
 								.unwrap()
 								.input_forwardings
@@ -720,7 +729,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 							event.to_owned(),
 							propagate.to_owned(),
 							entity
-								.entities
+								.sub_entities
 								.get(&reverse_ref.from)
 								.unwrap()
 								.output_forwardings
@@ -738,7 +747,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 				ReverseReferenceData::PropertyAlias { aliased_name, .. } => {
 					entity
-						.entities
+						.sub_entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
 						.property_aliases
@@ -749,7 +758,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 				ReverseReferenceData::ExposedEntity { exposed_name } => {
 					entity
-						.entities
+						.sub_entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
 						.exposed_entities
@@ -759,7 +768,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 						.retain(|x| x.as_local().is_some_and(|x| x != *entity_to_delete));
 
 					if entity
-						.entities
+						.sub_entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
 						.exposed_entities
@@ -769,7 +778,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 						.is_empty()
 					{
 						entity
-							.entities
+							.sub_entities
 							.get_mut(&reverse_ref.from)
 							.unwrap()
 							.exposed_entities
@@ -780,7 +789,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 				ReverseReferenceData::ExposedInterface { interface } => {
 					entity
-						.entities
+						.sub_entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
 						.exposed_interfaces
@@ -790,7 +799,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 				ReverseReferenceData::Subset { subset } => {
 					entity
-						.entities
+						.sub_entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
 						.subsets
@@ -806,7 +815,7 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	apply_patch(entity, patch, |_| {}).map_err(|x| anyhow!(x))?;
 
-	entity.entities.retain(|x, _| !entities_to_delete.contains(x));
+	entity.sub_entities.retain(|x, _| !entities_to_delete.contains(x));
 
 	finish_task(app, task)?;
 
@@ -894,7 +903,7 @@ pub async fn copy(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()> 
 	let data_to_copy = CopiedEntityData {
 		root_entity: id.to_owned(),
 		data: entity
-			.entities
+			.sub_entities
 			.iter()
 			.filter(|(x, _)| entities_to_copy.contains(*x))
 			.map(|(x, y)| (x.to_owned(), y.to_owned()))
@@ -989,7 +998,7 @@ pub async fn paste(
 					if val
 						.as_ref()
 						.and_then(Ref::as_local)
-						.is_some_and(|x| !entity.entities.contains_key(&x) && !all_paste_contents.contains(&x))
+						.is_some_and(|x| !entity.sub_entities.contains_key(&x) && !all_paste_contents.contains(&x))
 					{
 						*val = None;
 					}
@@ -1017,7 +1026,7 @@ pub async fn paste(
 						if val
 							.as_ref()
 							.and_then(Ref::as_local)
-							.is_some_and(|x| !entity.entities.contains_key(&x) && !all_paste_contents.contains(&x))
+							.is_some_and(|x| !entity.sub_entities.contains_key(&x) && !all_paste_contents.contains(&x))
 						{
 							*val = None;
 						}
@@ -1049,7 +1058,7 @@ pub async fn paste(
 
 					!underlying_ref
 						.as_local()
-						.is_some_and(|x| !entity.entities.contains_key(&x) && !all_paste_contents.contains(&x))
+						.is_some_and(|x| !entity.sub_entities.contains_key(&x) && !all_paste_contents.contains(&x))
 				});
 			}
 		}
@@ -1073,7 +1082,7 @@ pub async fn paste(
 				}
 
 				refs.retain(|reference| {
-					entity.entities.contains_key(&reference.entity_id)
+					entity.sub_entities.contains_key(&reference.entity_id)
 						|| all_paste_contents.contains(&reference.entity_id)
 				});
 			}
@@ -1088,7 +1097,7 @@ pub async fn paste(
 			}
 
 			aliases.retain(|alias_data| {
-				entity.entities.contains_key(&alias_data.original_entity)
+				entity.sub_entities.contains_key(&alias_data.original_entity)
 					|| all_paste_contents.contains(&alias_data.original_entity)
 			});
 		}
@@ -1108,7 +1117,7 @@ pub async fn paste(
 			exposed_entity.refers_to.retain(|x| {
 				// Only retain those not meeting the criteria for deletion (local ref, not in entity we're pasting into or the paste itself)
 				!x.as_local()
-					.is_some_and(|x| !entity.entities.contains_key(&x) && !all_paste_contents.contains(&x))
+					.is_some_and(|x| !entity.sub_entities.contains_key(&x) && !all_paste_contents.contains(&x))
 			});
 		}
 
@@ -1121,7 +1130,7 @@ pub async fn paste(
 
 		sub_entity
 			.exposed_interfaces
-			.retain(|_, x| entity.entities.contains_key(x) || all_paste_contents.contains(x));
+			.retain(|_, x| entity.sub_entities.contains_key(x) || all_paste_contents.contains(x));
 
 		for member_of in sub_entity.subsets.values_mut() {
 			for parental_entity in member_of.iter_mut() {
@@ -1131,7 +1140,7 @@ pub async fn paste(
 					.to_owned();
 			}
 
-			member_of.retain(|x| entity.entities.contains_key(x) || all_paste_contents.contains(x));
+			member_of.retain(|x| entity.sub_entities.contains_key(x) || all_paste_contents.contains(x));
 		}
 	}
 
@@ -1161,7 +1170,7 @@ pub async fn paste(
 			.or_else(|| Some(Ref::local(parent_id)))
 	};
 
-	entity.entities.extend(paste_data.data.to_owned());
+	entity.sub_entities.extend(paste_data.data.to_owned());
 
 	let mut new_entities = vec![];
 	let reverse_parent_refs = reverse_parent_refs_set(entity);
@@ -1183,19 +1192,19 @@ pub async fn paste(
 		new_entities.push((
 			parent_id.to_owned(),
 			entity
-				.entities
+				.sub_entities
 				.get(&parent_id)
 				.context("No such entity")?
 				.parent
 				.to_owned(),
 			entity
-				.entities
+				.sub_entities
 				.get(&parent_id)
 				.context("No such entity")?
 				.name
 				.to_owned(),
 			entity
-				.entities
+				.sub_entities
 				.get(&parent_id)
 				.context("No such entity")?
 				.factory
@@ -1284,7 +1293,7 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 			editor: editor_id,
 			data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::SearchResults {
 				results: entity
-					.entities
+					.sub_entities
 					.par_iter()
 					.filter_map(|(id, ent)| {
 						let mut s = format!("{}{}", id, to_string(ent).unwrap());
@@ -1322,7 +1331,7 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 		}
 	};
 
-	let sub_entity = entity.entities.get(&entity_id).context("No such entity")?;
+	let sub_entity = entity.sub_entities.get(&entity_id).context("No such entity")?;
 
 	if let Some(game) = app_state.game.load().as_ref() {
 		let (properties, pins, subsets) = if game
@@ -1933,7 +1942,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				})
 			)?;
 
-			entity.entities.insert(entity_id, sub_entity);
+			entity.sub_entities.insert(entity_id, sub_entity);
 
 			send_request(
 				app,
@@ -2008,7 +2017,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				})
 			)?;
 
-			entity.entities.insert(entity_id, sub_entity);
+			entity.sub_entities.insert(entity_id, sub_entity);
 
 			send_request(
 				app,
@@ -2114,7 +2123,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 	let player_transform = app_state.editor_connection.get_player_transform().await?;
 
 	if entity
-		.entities
+		.sub_entities
 		.get_mut(&entity_id)
 		.context("No such entity")?
 		.properties
@@ -2133,7 +2142,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 	}
 
 	let property = entity
-		.entities
+		.sub_entities
 		.get_mut(&entity_id)
 		.context("No such entity")?
 		.properties
@@ -2174,7 +2183,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
 		entity
-			.entities
+			.sub_entities
 			.get_mut(&entity_id)
 			.context("No such entity")?
 			.properties
@@ -2212,7 +2221,7 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
+					content: to_string_clear(entity.sub_entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2263,7 +2272,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 	let player_transform = app_state.editor_connection.get_player_transform().await?;
 
 	if entity
-		.entities
+		.sub_entities
 		.get_mut(&entity_id)
 		.context("No such entity")?
 		.properties
@@ -2282,7 +2291,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 	}
 
 	let property = entity
-		.entities
+		.sub_entities
 		.get_mut(&entity_id)
 		.context("No such entity")?
 		.properties
@@ -2323,7 +2332,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
 		entity
-			.entities
+			.sub_entities
 			.get_mut(&entity_id)
 			.context("No such entity")?
 			.properties
@@ -2361,7 +2370,7 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
+					content: to_string_clear(entity.sub_entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2412,7 +2421,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
 
 	if entity
-		.entities
+		.sub_entities
 		.get_mut(&entity_id)
 		.context("No such entity")?
 		.properties
@@ -2431,7 +2440,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 	}
 
 	let property = entity
-		.entities
+		.sub_entities
 		.get_mut(&entity_id)
 		.context("No such entity")?
 		.properties
@@ -2472,7 +2481,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
 		entity
-			.entities
+			.sub_entities
 			.get_mut(&entity_id)
 			.context("No such entity")?
 			.properties
@@ -2510,7 +2519,7 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
+					content: to_string_clear(entity.sub_entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2561,7 +2570,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
 
 	let property = entity
-		.entities
+		.sub_entities
 		.get_mut(&entity_id)
 		.context("No such entity")?
 		.properties
@@ -2602,7 +2611,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 			.any(|(name, _, _)| name == "m_eRoomBehaviour")
 	{
 		entity
-			.entities
+			.sub_entities
 			.get_mut(&entity_id)
 			.context("No such entity")?
 			.properties
@@ -2640,7 +2649,7 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 			data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 				EntityMonacoRequest::ReplaceContentIfSameEntityID {
 					entity_id,
-					content: to_string_clear(entity.entities.get(&entity_id).context("No such entity")?)?
+					content: to_string_clear(entity.sub_entities.get(&entity_id).context("No such entity")?)?
 				}
 			))
 		})
@@ -2689,7 +2698,9 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 	};
 
 	if let EditorValidity::Invalid(err) = check_local_references_exist(
-		base.entities.get(&entity_id).context("Entity didn't exist in base")?,
+		base.sub_entities
+			.get(&entity_id)
+			.context("Entity didn't exist in base")?,
 		current
 	)? {
 		send_notification(
@@ -2705,16 +2716,20 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 		return Ok(());
 	}
 
-	if let Some(previous) = current.entities.get(&entity_id).cloned() {
-		current.entities.insert(
+	if let Some(previous) = current.sub_entities.get(&entity_id).cloned() {
+		current.sub_entities.insert(
 			entity_id.to_owned(),
-			base.entities
+			base.sub_entities
 				.get(&entity_id)
 				.context("Entity didn't exist in base")?
 				.to_owned()
 		);
 
-		let sub_entity = current.entities.get(&entity_id).context("No such entity")?.to_owned();
+		let sub_entity = current
+			.sub_entities
+			.get(&entity_id)
+			.context("No such entity")?
+			.to_owned();
 
 		let reverse_parent_refs = reverse_parent_refs_set(current);
 
@@ -2794,15 +2809,19 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 			}
 		}
 	} else {
-		current.entities.insert(
+		current.sub_entities.insert(
 			entity_id.to_owned(),
-			base.entities
+			base.sub_entities
 				.get(&entity_id)
 				.context("Entity didn't exist in base")?
 				.to_owned()
 		);
 
-		let sub_entity = current.entities.get(&entity_id).context("No such entity")?.to_owned();
+		let sub_entity = current
+			.sub_entities
+			.get(&entity_id)
+			.context("No such entity")?
+			.to_owned();
 
 		let reverse_parent_refs = reverse_parent_refs_set(current);
 

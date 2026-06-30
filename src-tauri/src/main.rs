@@ -1506,7 +1506,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 									editor: editor_id.to_owned(),
 									data: EditorRequestData::Entity(EntityEditorRequest::Tree(
 										EntityTreeRequest::Select {
-											id: entity.entities.contains_key(&id).then_some(id.to_owned())
+											id: entity.sub_entities.contains_key(&id).then_some(id.to_owned())
 										}
 									))
 								})
@@ -1537,7 +1537,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					};
 
 					if entity.blueprint == tblu.0
-						&& let Some(sub_entity) = entity.entities.get_mut(&id)
+						&& let Some(sub_entity) = entity.sub_entities.get_mut(&id)
 					{
 						sub_entity.properties.insert(
 							"m_mTransform".into(),
@@ -1562,7 +1562,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 									EntityMonacoRequest::ReplaceContentIfSameEntityID {
 										entity_id: id.to_owned(),
-										content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
+										content: to_string_clear(
+											entity.sub_entities.get(&id).context("No such entity")?
+										)?
 									}
 								))
 							})
@@ -1612,7 +1614,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						_ => continue
 					};
 
-					if entity.blueprint == tblu.0 && entity.entities.contains_key(&id) {
+					if entity.blueprint == tblu.0 && entity.sub_entities.contains_key(&id) {
 						let post_init = if let Some(game) = app_state.game.load().as_ref() {
 							if let Some((_, _, post_init)) = game
 								.intellisense()
@@ -1628,7 +1630,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							false
 						};
 
-						let Some(sub_entity) = entity.entities.get_mut(&id) else {
+						let Some(sub_entity) = entity.sub_entities.get_mut(&id) else {
 							unreachable!();
 						};
 
@@ -1655,7 +1657,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
 									EntityMonacoRequest::ReplaceContentIfSameEntityID {
 										entity_id: id.to_owned(),
-										content: to_string_clear(entity.entities.get(&id).context("No such entity")?)?
+										content: to_string_clear(
+											entity.sub_entities.get(&id).context("No such entity")?
+										)?
 									}
 								))
 							})

@@ -351,6 +351,9 @@ pub struct PastableTemplateCategory {
 )]
 pub enum ResourceOverviewData {
 	Generic,
+	GenericData {
+		asset_id: Uuid
+	},
 	Entity {
 		root_entity_name: String,
 		blueprint_hash: Hash,

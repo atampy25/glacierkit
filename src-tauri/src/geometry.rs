@@ -150,33 +150,35 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 
 			let gltf_material = {
 				#[try_fn]
-				fn get_texture(game: &Game, id: RuntimeID) -> Result<image_0_24::DynamicImage> {
-					let (res_meta, res_data) = game.extract_latest_resource(id)?;
+				fn get_texture(game: &Game, id: RuntimeID) -> Result<Option<image_0_24::DynamicImage>> {
+					if let Ok((res_meta, res_data)) = game.extract_latest_resource(id) {
+						let mut texture = TextureMap::from_memory(&res_data, game.version().into())
+							.context("Couldn't process texture data")?;
 
-					let mut texture = TextureMap::from_memory(&res_data, game.version().into())
-						.context("Couldn't process texture data")?;
+						if let Some(texd_depend) = res_meta.core_info.references.first() {
+							let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
+							let mipblock = MipblockData::from_memory(&texd_data, game.version().into())
+								.context("Couldn't process TEXD data")?;
+							texture.set_mipblock1(mipblock);
+						}
 
-					if let Some(texd_depend) = res_meta.core_info.references.first() {
-						let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
-						let mipblock = MipblockData::from_memory(&texd_data, game.version().into())
-							.context("Couldn't process TEXD data")?;
-						texture.set_mipblock1(mipblock);
-					}
-
-					if texture.format() == glacier_texture::enums::RenderFormat::BC5 {
-						image_0_24::load_from_memory_with_format(
-							&glacier_texture::convert::create_tga(&texture)
-								.context("Couldn't convert texture to TGA")?,
-							image_0_24::ImageFormat::Tga
-						)?
+						if texture.format() == glacier_texture::enums::RenderFormat::BC5 {
+							Some(image_0_24::load_from_memory_with_format(
+								&glacier_texture::convert::create_tga(&texture)
+									.context("Couldn't convert texture to TGA")?,
+								image_0_24::ImageFormat::Tga
+							)?)
+						} else {
+							Some(image_0_24::load_from_memory(&{
+								let mut bytes = vec![];
+								glacier_texture::convert::create_dynamic_image(&texture)
+									.context("Couldn't convert texture to dynamic image")?
+									.write_to(Cursor::new(&mut bytes), image::ImageFormat::Png)?;
+								bytes
+							})?)
+						}
 					} else {
-						image_0_24::load_from_memory(&{
-							let mut bytes = vec![];
-							glacier_texture::convert::create_dynamic_image(&texture)
-								.context("Couldn't convert texture to dynamic image")?
-								.write_to(Cursor::new(&mut bytes), image::ImageFormat::Png)?;
-							bytes
-						})?
+						None
 					}
 				}
 
@@ -189,10 +191,6 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 									.filter_map(|(friendly, prop)| {
 										friendly.to_lowercase().contains("diffuse").then_some(prop)
 									})
-									.chain(material.binder.properties.iter().filter_map(|(name, prop)| {
-										matches!(prop, MaterialPropertyValue::Texture { enabled: true, .. })
-											.then_some(name)
-									}))
 									.filter_map(|prop| material.binder.properties.get(prop))
 									.filter_map(|prop| {
 										if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
@@ -204,7 +202,7 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 										}
 									})
 									.next()
-									.map(|id| get_texture(game, id))
+									.and_then(|id| get_texture(game, id).transpose())
 									.transpose()
 							},
 							|| {
@@ -224,7 +222,7 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 										}
 									})
 									.next()
-									.map(|id| get_texture(game, id))
+									.and_then(|id| get_texture(game, id).transpose())
 									.transpose()
 							}
 						)
@@ -253,7 +251,7 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 										}
 									})
 									.next()
-									.map(|id| get_texture(game, id))
+									.and_then(|id| get_texture(game, id).transpose())
 									.transpose()
 							},
 							|| {
@@ -273,7 +271,7 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 										}
 									})
 									.next()
-									.map(|id| get_texture(game, id))
+									.and_then(|id| get_texture(game, id).transpose())
 							}
 						)
 					}

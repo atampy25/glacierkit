@@ -1460,6 +1460,12 @@ export type ResourceChangelogOperation = "Delete" | "Init" | "Edit"
 export type ResourceOverviewData =
 	| { type: "generic" }
 	| {
+			type: "genericData"
+			data: {
+				assetId: string
+			}
+	  }
+	| {
 			type: "entity"
 			data: {
 				rootEntityName: string

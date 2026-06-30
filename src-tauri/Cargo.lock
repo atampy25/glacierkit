@@ -304,7 +304,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#c503def57bfb9996fcca6c64eccf785b178d1574"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#e3c4db4f78e3a32af7e7fe19e0462f4bd756a2a8"
 
 [[package]]
 name = "autocfg"
@@ -1847,7 +1847,7 @@ dependencies = ["binrw 0.15.1", "byteorder", "crc32fast", "extended-tea", "nalge
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = [
 	"Inflector",
 	"anyhow",
@@ -1870,13 +1870,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = ["Inflector", "codegen", "edit-distance", "lazy-regex", "rayon", "serde", "serde_json"]
 
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = [
 	"anyhow",
 	"bimap",
@@ -1902,13 +1902,13 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = ["darling", "quote", "syn 2.0.118"]
 
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1936,7 +1936,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1964,7 +1964,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -1992,7 +1992,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4d531a14b68ada02f75ce8c7c90ac9103a4c9c7a"
+source = "git+https://github.com/atampy25/glacier-bin1#b12b79d40c720f4e8a2cd5df85e6c0461fbeb60c"
 dependencies = [
 	"anyhow",
 	"codegen",
@@ -3889,7 +3889,7 @@ dependencies = ["memchr"]
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#c503def57bfb9996fcca6c64eccf785b178d1574"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#e3c4db4f78e3a32af7e7fe19e0462f4bd756a2a8"
 dependencies = [
 	"anyhow",
 	"auto_context",
@@ -5562,9 +5562,9 @@ dependencies = ["fax", "flate2", "half", "quick-error", "weezl", "zune-jpeg"]
 
 [[package]]
 name = "time"
-version = "0.3.51"
+version = "0.3.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85c17d80feb7334b40c484e45ed1a5273dfd8bfda537c3be2e74a06a6686f327"
+checksum = "0e48db7b415311b615f910b3dcaa4557bcd4bf1982379c95c223fd8c2a20e210"
 dependencies = ["deranged", "libc", "num-conv", "num_threads", "powerfmt", "serde_core", "time-core", "time-macros"]
 
 [[package]]
@@ -5575,9 +5575,9 @@ checksum = "9e1c906769ad99c88eaa54e728060edef082f8e358ff32030cb7c7d315e81109"
 
 [[package]]
 name = "time-macros"
-version = "0.2.30"
+version = "0.2.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcef1a61bdb119096e153208ec5cbec23944ce8bca13be5c7f60c634f7403935"
+checksum = "c431b87111666e491a90baa837f914fb45cd5dc3c268591b0220ff5057f2085f"
 dependencies = ["num-conv", "time-core"]
 
 [[package]]

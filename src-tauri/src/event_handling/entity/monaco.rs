@@ -259,7 +259,7 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 		Ok(sub_entity) => match check_local_references_exist(&sub_entity, entity) {
 			Ok(EditorValidity::Valid) => {
 				let previous = entity
-					.entities
+					.sub_entities
 					.get(&entity_id)
 					.context("No such sub-entity")?
 					.to_owned();
@@ -307,7 +307,7 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 						return Ok(());
 					}
 
-					entity.entities.insert(entity_id.to_owned(), sub_entity.to_owned());
+					entity.sub_entities.insert(entity_id.to_owned(), sub_entity.to_owned());
 
 					let reverse_parent_refs = reverse_parent_refs_set(entity);
 
@@ -357,7 +357,7 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 						let decorations = get_decorations(
 							game,
 							tonytools_hash_list,
-							entity.entities.get(&entity_id).context("No such entity")?,
+							entity.sub_entities.get(&entity_id).context("No such entity")?,
 							entity
 						)?;
 
@@ -371,7 +371,9 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 										local_ref_entity_ids: decorations
 											.iter()
 											.filter_map(|(x, _)| {
-												x.parse::<EntityID>().ok().filter(|x| entity.entities.contains_key(x))
+												x.parse::<EntityID>()
+													.ok()
+													.filter(|x| entity.sub_entities.contains_key(x))
 											})
 											.collect(),
 										decorations

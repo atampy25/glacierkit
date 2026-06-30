@@ -83,7 +83,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 									factory: EMPTY_ID,
 									blueprint: EMPTY_ID,
 									root_entity: 0xfffffffffffffffe.into(),
-									entities: velcro::map_iter! {
+									sub_entities: velcro::map_iter! {
 										EntityID::from(0xfffffffffffffffe): SubEntity {
 											parent: None,
 											name: "Scene".into(),
