@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { T, Canvas } from "@threlte/core"
-	import { Studio } from "@threlte/studio"
-	import { OrbitControls, useGltf } from "@threlte/extras"
+	import { OrbitControls } from "@threlte/extras"
 	import SceneGeometry from "./SceneGeometry.svelte"
 	import { Box3, Group, Vector3 } from "three"
 	import { onMount } from "svelte"
-	import { convertFileSrc } from "@tauri-apps/api/core"
 
 	let {
 		geometry,
