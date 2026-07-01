@@ -30,6 +30,7 @@ use crate::{
 	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
 	game::{Game, valid_game_path},
+	geometry::SceneGeometry,
 	ores_repo::{
 		RepositoryItem, RepositoryItemInformation, RepositoryItemKind, UnlockableInformation, UnlockableItem,
 		UnlockableKind
@@ -358,7 +359,10 @@ pub enum ResourceOverviewData {
 		root_entity_name: String,
 		blueprint_hash: Hash,
 		#[specta(type = Option<String>)]
-		blueprint_path_or_hint: Option<EcoString>
+		blueprint_path_or_hint: Option<EcoString>,
+		#[specta(type = Option<(Value, Value)>)]
+		#[debug(skip)]
+		preview: Option<(SceneGeometry, HashMap<RuntimeID, Uuid>)>
 	},
 	GenericRL {
 		#[debug(skip)]
@@ -791,6 +795,8 @@ nesting::nest! {
 					OpenInEditor,
 
 					ExtractAsQN,
+
+					ShowEntityPreview,
 
 					ExtractAsFile,
 

@@ -13,11 +13,12 @@
 	import { help } from "$lib/helpray"
 	import MeshPreview from "$lib/components/MeshPreview.svelte"
 	import { Pane, Splitpanes } from "svelte-splitpanes"
-	import { ColumnDependency, Filter, SoftwareResource, TrashCan } from "carbon-icons-svelte"
+	import { ColumnDependency, Cube, Filter, SoftwareResource, TrashCan } from "carbon-icons-svelte"
 	import AddLarge from "carbon-icons-svelte/lib/AddLarge.svelte"
 	import { VList } from "virtua/svelte"
 	import { convertFileSrc } from "@tauri-apps/api/core"
 	import HexViewer from "$lib/components/HexViewer.svelte"
+	import ScenePreview from "$lib/components/ScenePreview.svelte"
 
 	let { id }: { id: string } = $props()
 
@@ -184,6 +185,33 @@
 											>
 											<div class="break-all">{data.data.blueprintPathOrHint || "No path"}</div>
 										</ClickableTile>
+										{#if data.data.preview}
+											<div class="mt-4 h-[30vh]">
+												<ScenePreview geometry={data.data.preview[0] as any} assets={data.data.preview[1] as any} editorId={id} />
+											</div>
+										{:else}
+											<div class="mt-4">
+												<Button
+													icon={Cube}
+													on:click={async () => {
+														trackEvent("Show entity preview")
+
+														await event({
+															type: "editor",
+															data: {
+																editor: id,
+																data: {
+																	type: "resourceOverview",
+																	data: {
+																		type: "showEntityPreview"
+																	}
+																}
+															}
+														})
+													}}>Show 3D preview</Button
+												>
+											</div>
+										{/if}
 									{:else if data.type === "image"}
 										{#if previewImage}
 											<div class="text-neutral-400 mb-2 flex items-center gap-4">

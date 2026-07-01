@@ -34,13 +34,13 @@ use uuid::Uuid;
 use ww2ogg::{CodebookLibrary, WwiseRiffVorbis};
 
 use crate::{
-	Notification, NotificationKind,
+	HashMap, Notification, NotificationKind,
 	bin1::deserialize_generic,
 	biome::format_json,
 	finish_task,
 	game::Game,
 	general::{get_name, open_in_editor},
-	geometry::{parse_prim_to_glb, parse_prim_to_obj},
+	geometry::{parse_prim_to_glb, parse_prim_to_obj, parse_scene_to_glb},
 	languages::get_language_map,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
@@ -156,7 +156,8 @@ pub async fn initialise_resource_overview(
 								.get(&entity.root_entity)
 								.map_or_else(|| "Unknown".into(), |x| x.name.as_str().into()),
 							blueprint_hash: Hash(entity.blueprint),
-							blueprint_path_or_hint: entity.blueprint.get_path_or_hint()
+							blueprint_path_or_hint: entity.blueprint.get_path_or_hint(),
+							preview: None
 						}
 					}
 
@@ -1132,6 +1133,90 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 				{
 					fs::write(path.as_path().context("Invalid path")?, entity_json)?;
 				}
+			}
+		}
+
+		ResourceOverviewEvent::ShowEntityPreview => {
+			if let Some(game) = app_state.game.load().as_ref() {
+				let task = start_task(app, format!("Loading entity preview for {}", hash))?;
+
+				let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
+
+				let dependencies = deps
+					.into_par_iter()
+					.map(|dep| {
+						(
+							Hash(dep.resource),
+							game.resource_type(dep.resource),
+							dep.resource.get_path_or_hint(),
+							dep.flags,
+							game.resource_exists(dep.resource)
+						)
+					})
+					.collect::<Vec<_>>();
+
+				let reverse_dependencies = game
+					.resource_reverse_references(hash)
+					.map(|hashes| {
+						hashes
+							.iter()
+							.map(|&hash| (Hash(hash), game.resource_type(hash).unwrap(), hash.get_path_or_hint()))
+							.collect_vec()
+					})
+					.unwrap_or_default();
+
+				let changelog = game.extract_resource_changelog(hash);
+
+				let entity = game.extract_entity(hash)?;
+
+				send_request(
+					app,
+					Request::Editor(EditorRequest {
+						editor: id,
+						data: EditorRequestData::ResourceOverview(ResourceOverviewRequest::Initialise {
+							hash: Hash(hash),
+							filetype: filetype.into(),
+							chunk_patch,
+							size,
+							path_or_hint: hash.get_path_or_hint(),
+							dependencies,
+							reverse_dependencies,
+							changelog,
+							data: ResourceOverviewData::Entity {
+								root_entity_name: entity
+									.sub_entities
+									.get(&entity.root_entity)
+									.map_or_else(|| "Unknown".into(), |x| x.name.as_str().into()),
+								blueprint_hash: Hash(entity.blueprint),
+								blueprint_path_or_hint: entity.blueprint.get_path_or_hint(),
+								preview: Some({
+									let (geometry, assets) = parse_scene_to_glb(game, &[hash])?;
+
+									let mut asset_ids = HashMap::default();
+
+									for (k, v) in assets {
+										let asset_id = Uuid::new_v4();
+
+										app_state
+											.editor_states
+											.get(&id)
+											.await
+											.context("No such editor")?
+											.assets
+											.insert(asset_id, ("model/gltf-binary".into(), v.into()))
+											.await;
+
+										asset_ids.insert(k, asset_id);
+									}
+
+									(geometry, asset_ids)
+								})
+							}
+						})
+					})
+				)?;
+
+				finish_task(app, task)?;
 			}
 		}
 

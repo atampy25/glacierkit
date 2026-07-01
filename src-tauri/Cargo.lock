@@ -128,6 +128,7 @@ dependencies = [
 	"glacier-geometry",
 	"glacier-ini 0.1.0",
 	"glacier-texture",
+	"glam 0.33.2",
 	"hitman-behavior",
 	"hrtime",
 	"identity-hash",
@@ -161,6 +162,7 @@ dependencies = [
 	"serde",
 	"serde_json",
 	"showfile",
+	"slotmap",
 	"specta",
 	"specta-typescript",
 	"static_init",
@@ -2107,6 +2109,7 @@ name = "glam"
 version = "0.33.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f22fb22f065b308be0d8724e3706c7fa3fc2a6c7d6899df4cad7860e7a75436"
+dependencies = ["serde_core"]
 
 [[package]]
 name = "glib"
@@ -4871,6 +4874,13 @@ name = "slice-group-by"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826167069c09b99d56f31e9ae5c99049e932a98c9dc2dac47645b08dbbf76ba7"
+
+[[package]]
+name = "slotmap"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdd58c3c93c3d278ca835519292445cb4b0d4dc59ccfdf7ceadaab3f8aeb4038"
+dependencies = ["serde", "version_check"]
 
 [[package]]
 name = "smallvec"

@@ -91,7 +91,7 @@ impl Intellisense {
 
 	#[try_fn]
 	#[context("Couldn't get properties for CPPT {}", cppt)]
-	fn get_cppt_properties(&self, game: &Game, cppt: RuntimeID) -> Result<HashMap<EcoString, Variant>> {
+	pub fn get_cppt_properties(&self, game: &Game, cppt: RuntimeID) -> Result<HashMap<EcoString, Variant>> {
 		{
 			if let Some(cached) = self.cppt_properties.pin().get(&cppt) {
 				return Ok(cached.to_owned());
