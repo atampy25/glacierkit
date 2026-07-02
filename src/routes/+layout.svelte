@@ -558,7 +558,6 @@
 	<ModalBody>
 		It seems GlacierKit crashed the last time it was used. You can send a crash report, including your log and the error message, to Atampy26 automatically to help fix this issue. If you choose
 		not to, you can find it in <code>%appdata%\app.glacierkit</code>.
-		<pre class="mt-2 p-4 bg-neutral-800 overflow-x-auto"><code>{errorModalError}</code></pre>
 	</ModalBody>
 	<ModalFooter
 		primaryButtonText="Send crash report"

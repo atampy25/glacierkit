@@ -34,10 +34,17 @@
 	} = $props()
 
 	let centerY = $state(0)
+	let max = $state([0, 0, 0])
 </script>
 
 <Canvas>
-	<T.PerspectiveCamera makeDefault position={[5, 5, 5]}>
+	<T.PerspectiveCamera
+		makeDefault
+		position={[max[0] + 2, max[1] + 2, max[2] + 2]}
+		oncreate={(ref) => {
+			ref.lookAt(0, centerY, 0)
+		}}
+	>
 		<OrbitControls enableDamping target={[0, centerY, 0]}>
 			<Gizmo y={{ label: "Z" }} z={{ label: "Y" }} />
 		</OrbitControls>
@@ -50,6 +57,9 @@
 		y={false}
 		onalign={(data) => {
 			centerY = data.height / 2
+			max[0] = data.boundingBox.max.x
+			max[1] = data.boundingBox.max.y
+			max[2] = data.boundingBox.max.z
 		}}
 	>
 		{#each Object.entries(geometry.geometry)

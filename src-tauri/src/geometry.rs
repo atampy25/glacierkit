@@ -1251,13 +1251,10 @@ pub fn get_scene_geometry(game: &Game, scenes: &InstantiatedScenes) -> Result<Sc
 				};
 
 				if let InstantiatedEntityFactory::Factory(factory) = instance.factory
-					&& factory
-						== if game.version() == GlacierGame::FL {
-							glacier_commons::rid!("[modules:/zgeomentity.class].entitytype")
-						} else {
-							glacier_commons::rid!("[modules:/zgeomentity.class].pc_entitytype")
-						} && let Some(prim) =
-					get_property_value(game, scenes, scene_id, scene, None, id, &"m_ResourceID".into())?
+					&& (factory == crate::class_for_game!(game, "zgeomentity")
+						|| factory == crate::class_for_game!(game, "zlinkedentity"))
+					&& let Some(prim) =
+						get_property_value(game, scenes, scene_id, scene, None, id, &"m_ResourceID".into())?
 					&& let Variant::Resource(_, Some(prim)) = prim
 				{
 					let scale = if let Some(scale) =
@@ -1309,12 +1306,9 @@ pub fn get_scene_geometry(game: &Game, scenes: &InstantiatedScenes) -> Result<Sc
 			}
 
 			if let InstantiatedEntityFactory::Factory(factory) = instance.factory
-				&& factory
-					== if game.version() == GlacierGame::FL {
-						glacier_commons::rid!("[modules:/zgeomentity.class].entitytype")
-					} else {
-						glacier_commons::rid!("[modules:/zgeomentity.class].pc_entitytype")
-					} {
+				&& (factory == crate::class_for_game!(game, "zgeomentity")
+					|| factory == crate::class_for_game!(game, "zlinkedentity"))
+			{
 				process_entity(game, scenes, *scene_id, scene, id, instance, &mut ids, &mut geometry)?;
 			}
 		}
