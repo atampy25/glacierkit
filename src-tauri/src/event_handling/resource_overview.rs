@@ -1182,35 +1182,39 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 							dependencies,
 							reverse_dependencies,
 							changelog,
-							data: ResourceOverviewData::Entity {
-								root_entity_name: entity
-									.sub_entities
-									.get(&entity.root_entity)
-									.map_or_else(|| "Unknown".into(), |x| x.name.as_str().into()),
-								blueprint_hash: Hash(entity.blueprint),
-								blueprint_path_or_hint: entity.blueprint.get_path_or_hint(),
-								preview: Some({
-									let (geometry, assets) = parse_scene_to_glb(game, &[hash])?;
+							data: match parse_scene_to_glb(game, &[hash], true) {
+								Ok((geometry, assets)) => ResourceOverviewData::Entity {
+									root_entity_name: entity
+										.sub_entities
+										.get(&entity.root_entity)
+										.map_or_else(|| "Unknown".into(), |x| x.name.as_str().into()),
+									blueprint_hash: Hash(entity.blueprint),
+									blueprint_path_or_hint: entity.blueprint.get_path_or_hint(),
+									preview: Some({
+										let mut asset_ids = HashMap::default();
 
-									let mut asset_ids = HashMap::default();
+										for (k, v) in assets {
+											let asset_id = Uuid::new_v4();
 
-									for (k, v) in assets {
-										let asset_id = Uuid::new_v4();
+											app_state
+												.editor_states
+												.get(&id)
+												.await
+												.context("No such editor")?
+												.assets
+												.insert(asset_id, ("model/gltf-binary".into(), v.into()))
+												.await;
 
-										app_state
-											.editor_states
-											.get(&id)
-											.await
-											.context("No such editor")?
-											.assets
-											.insert(asset_id, ("model/gltf-binary".into(), v.into()))
-											.await;
+											asset_ids.insert(k, asset_id);
+										}
 
-										asset_ids.insert(k, asset_id);
-									}
+										(geometry, asset_ids)
+									})
+								},
 
-									(geometry, asset_ids)
-								})
+								Err(e) => ResourceOverviewData::Error {
+									message: format!("{e:?}")
+								}
 							}
 						})
 					})

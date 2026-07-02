@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { T, Canvas } from "@threlte/core"
-	import { OrbitControls } from "@threlte/extras"
+	import { OrbitControls, Grid, Gizmo, Align } from "@threlte/extras"
 	import SceneGeometry from "./SceneGeometry.svelte"
-	import { Box3, Group, Vector3 } from "three"
-	import { onMount } from "svelte"
+	import { BackSide } from "three"
 
 	let {
 		geometry,
@@ -34,40 +33,38 @@
 		editorId: string
 	} = $props()
 
-	let sceneGroup: Group | undefined = $state()
-	let position: [number, number, number] = $state([0, 0, 0])
-
-	onMount(() => {
-		const interval = setInterval(() => {
-			if (sceneGroup) {
-				const box = new Box3().setFromObject(sceneGroup, true)
-				const center = new Vector3()
-				box.getCenter(center)
-
-				if (Math.abs(position[0] - center.x) > 0.1 || Math.abs(position[1] - center.y) > 0.1 || Math.abs(position[2] - center.z) > 0.1) {
-					position = [center.x, center.y, center.z]
-				}
-			}
-		}, 500)
-
-		return () => {
-			clearInterval(interval)
-		}
-	})
+	let centerY = $state(0)
 </script>
 
 <Canvas>
-	<T.PerspectiveCamera makeDefault position={[position[0] + 5, position[1] + 5, position[2] + 5]}>
-		<OrbitControls enableDamping target={[position[0], position[1], position[2]]} />
+	<T.PerspectiveCamera makeDefault position={[5, 5, 5]}>
+		<OrbitControls enableDamping target={[0, centerY, 0]}>
+			<Gizmo y={{ label: "Z" }} z={{ label: "Y" }} />
+		</OrbitControls>
 	</T.PerspectiveCamera>
 
 	<T.AmbientLight color={0xaaaaaa} />
 
-	<T.Group bind:ref={sceneGroup}>
-		{#each Object.entries(geometry.geometry) as [key, value]}
-			{#if value?.value && !value?.value?.parent}
-				<SceneGeometry geom={key} allGeom={geometry.geometry} {assets} {editorId} />
-			{/if}
+	<Align
+		auto
+		y={false}
+		onalign={(data) => {
+			centerY = data.height / 2
+		}}
+	>
+		{#each Object.entries(geometry.geometry)
+			.filter(([_, value]) => value?.value && !value.value.parent)
+			.map(([key, _]) => key) as key (key)}
+			<SceneGeometry geom={key} allGeom={geometry.geometry} {assets} {editorId} />
 		{/each}
-	</T.Group>
+		<T.Mesh position={[0, 0, 0]}>
+			<T.SphereGeometry args={[0.1]} />
+			<T.MeshBasicMaterial color="blue" />
+		</T.Mesh>
+		<T.Mesh position={[0, 0, 0]}>
+			<T.SphereGeometry args={[0.12]} />
+			<T.MeshBasicMaterial color="white" side={BackSide} />
+		</T.Mesh>
+	</Align>
+	<Grid infiniteGrid sectionColor="white" sectionThickness={1} cellColor="gray" />
 </Canvas>

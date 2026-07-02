@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { T } from "@threlte/core"
-	import { useGltf } from "@threlte/extras"
+	import { Align, useGltf } from "@threlte/extras"
 	import SceneGeometry from "./SceneGeometry.svelte"
 	import { Matrix4 } from "three"
 	import { convertFileSrc } from "@tauri-apps/api/core"
@@ -97,7 +97,7 @@
 			<T.Group
 				oncreate={() => {
 					for (const [_, material] of Object.entries($gltf.materials)) {
-						material.metalness = 0.2
+						material.metalness = 0
 					}
 				}}
 			>
@@ -111,9 +111,9 @@
 			</T.Mesh>
 		{/if}
 	{/if}
-	{#each Object.entries(allGeom) as [key, value]}
-		{#if value?.value?.parent?.idx === +geom}
-			<SceneGeometry geom={key} {allGeom} {assets} {editorId} />
-		{/if}
+	{#each Object.entries(allGeom)
+		.filter(([_, value]) => value?.value?.parent?.idx === +geom)
+		.map(([key, _]) => key) as key (key)}
+		<SceneGeometry geom={key} {allGeom} {assets} {editorId} />
 	{/each}
 </T.Group>

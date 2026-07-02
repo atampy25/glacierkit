@@ -6,8 +6,7 @@ use fn_error_context::context;
 use glacier_bin1::game::h3::{IRenderMaterialEntity_EModifierOperation, SVector2, SVector3, SVector4, ZVariant};
 use glacier_commons::{
 	game::GlacierGame,
-	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID},
-	rid
+	metadata::{ReferenceFlags, ReferenceType, ResourceReference, RuntimeID}
 };
 use glacier_formats::material::{MaterialEntity, MaterialOverride};
 use identity_hash::BuildIdentityHasher;
@@ -47,12 +46,13 @@ pub struct Intellisense {
 	pub matt_properties: Arc<PapayaMap<RuntimeID, IndexMap<EcoString, MaterialOverride>, BuildIdentityHasher<u64>>>
 }
 
+#[macro_export]
 macro_rules! class_for_game {
 	($game:ident, $class:literal) => {
 		if $game.version() == GlacierGame::FL {
-			rid!(concat!("[modules:/", $class, ".class].entitytype"))
+			glacier_commons::rid!(concat!("[modules:/", $class, ".class].entitytype"))
 		} else {
-			rid!(concat!("[modules:/", $class, ".class].pc_entitytype"))
+			glacier_commons::rid!(concat!("[modules:/", $class, ".class].pc_entitytype"))
 		}
 	};
 }
