@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use ecow::EcoVec;
+use ecow::{EcoString, eco_format};
 use fn_error_context::context;
 use glacier_commons::{game::GlacierGame, metadata::RuntimeID, rpkg_tool::RpkgResourceMeta};
 use glacier_formats::{
@@ -21,12 +21,12 @@ use glacier_texture::{
 };
 use image::{ImageFormat, ImageReader};
 use itertools::Itertools;
+use lazy_regex::regex_captures;
 use optivorbis::{OggToOgg, Remuxer};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::Serialize;
-use serde_json::{json, to_string, to_vec};
+use serde_json::to_string;
 use tauri::{AppHandle, Manager, State};
-use tauri_plugin_aptabase::EventTracker;
 use tauri_plugin_dialog::DialogExt;
 use tonytools::hmlanguages;
 use tryvial::{try_block, try_fn};
@@ -35,7 +35,7 @@ use ww2ogg::{CodebookLibrary, WwiseRiffVorbis};
 
 use crate::{
 	HashMap, Notification, NotificationKind,
-	bin1::deserialize_generic,
+	bin1::{deserialize_generic, deserialize_generic_writer},
 	biome::format_json,
 	finish_task,
 	game::Game,
@@ -43,8 +43,9 @@ use crate::{
 	geometry::{parse_prim_to_glb, parse_prim_to_obj, parse_scene_to_glb},
 	languages::get_language_map,
 	model::{
-		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, Hash, Request,
-		ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest, TabRequest, TabRequestData
+		AppState, EditorData, EditorRequest, EditorRequestData, EditorState, EditorType, ExtractKind, Hash,
+		ImageExtractFormat, Request, ResourceOverviewData, ResourceOverviewEvent, ResourceOverviewRequest, TabRequest,
+		TabRequestData, TextureExtractFormat
 	},
 	send_notification, send_request, start_task
 };
@@ -115,6 +116,11 @@ pub async fn initialise_resource_overview(
 
 	let changelog = game.extract_resource_changelog(hash);
 
+	let extract_kinds = get_extract_kinds(game, hash)?
+		.into_iter()
+		.map(|x| (x.to_string(), x))
+		.collect_vec();
+
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -128,7 +134,8 @@ pub async fn initialise_resource_overview(
 				dependencies: dependencies.to_owned(),
 				reverse_dependencies: reverse_dependencies.to_owned(),
 				changelog: changelog.to_owned(),
-				data: ResourceOverviewData::Generic
+				data: ResourceOverviewData::Generic,
+				extract_kinds: extract_kinds.to_owned()
 			})
 		})
 	)?;
@@ -356,7 +363,7 @@ pub async fn initialise_resource_overview(
 									)?
 									.generate_ogg(&mut ogg_data)?;
 
-									let mut optimised_ogg = EcoVec::new();
+									let mut optimised_ogg = vec![];
 
 									OggToOgg::new_with_defaults()
 										.remux(&mut Cursor::new(ogg_data), &mut optimised_ogg)?;
@@ -375,7 +382,7 @@ pub async fn initialise_resource_overview(
 									WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
 										.generate_ogg(&mut ogg_data)?;
 
-									let mut optimised_ogg = EcoVec::new();
+									let mut optimised_ogg = vec![];
 
 									OggToOgg::new_with_defaults()
 										.remux(&mut Cursor::new(ogg_data), &mut optimised_ogg)?;
@@ -417,12 +424,12 @@ pub async fn initialise_resource_overview(
 						let (_, res_data) = game.extract_latest_resource(hash)?;
 
 						if res_data.starts_with(b"RIFF") {
-							let mut ogg_data = EcoVec::new();
+							let mut ogg_data = vec![];
 
 							WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
 								.generate_ogg(&mut ogg_data)?;
 
-							let mut optimised_ogg = EcoVec::new();
+							let mut optimised_ogg = vec![];
 
 							OggToOgg::new_with_defaults().remux(&mut Cursor::new(ogg_data), &mut optimised_ogg)?;
 
@@ -446,7 +453,7 @@ pub async fn initialise_resource_overview(
 					"REPO" => ResourceOverviewData::Repository,
 
 					"JSON" => ResourceOverviewData::Json {
-						json: format_json(&String::from_utf8(game.extract_latest_resource(hash)?.1)?)?
+						json: format_json(String::from_utf8(game.extract_latest_resource(hash)?.1)?)?
 					},
 
 					"XMLB" => ResourceOverviewData::Xml {
@@ -916,10 +923,728 @@ pub async fn initialise_resource_overview(
 							ResourceOverviewData::Generic
 						}
 					}
-				}
+				},
+				extract_kinds
 			})
 		})
 	)?;
+}
+
+pub struct ExtractedFile {
+	/// Extension (including the prefix dot, or potentially a suffix to the filename).
+	pub suffix: EcoString,
+
+	pub data: Vec<u8>
+}
+
+#[try_fn]
+#[context("Couldn't get extraction information for {id}")]
+pub fn get_extract_kinds(game: &Game, id: RuntimeID) -> Result<Vec<ExtractKind>> {
+	let mut kinds = vec![ExtractKind::Raw];
+
+	let resource_type = game.resource_type(id).context("No such resource")?;
+
+	match resource_type.as_ref() {
+		"TEMP" => {
+			kinds.extend([
+				ExtractKind::QN,
+				ExtractKind::Bin1Json,
+				ExtractKind::TBLUAsRaw,
+				ExtractKind::TBLUAsBin1Json
+			]);
+		}
+
+		"GFXI" => {
+			kinds.extend([
+				ExtractKind::Image {
+					format: ImageExtractFormat::Png
+				},
+				ExtractKind::Image {
+					format: ImageExtractFormat::Jpeg
+				},
+				ExtractKind::Image {
+					format: ImageExtractFormat::Tga
+				},
+				ExtractKind::Image {
+					format: ImageExtractFormat::Dds
+				}
+			]);
+		}
+
+		"TEXT" => {
+			kinds.extend([
+				ExtractKind::Texture {
+					format: TextureExtractFormat::Png
+				},
+				ExtractKind::Texture {
+					format: TextureExtractFormat::Tga
+				},
+				ExtractKind::Texture {
+					format: TextureExtractFormat::Dds
+				}
+			]);
+		}
+
+		"WWEM" | "WWES" => {
+			kinds.push(ExtractKind::Ogg);
+		}
+
+		"WWEV" => {
+			kinds.push(ExtractKind::MultiOgg);
+		}
+
+		"CLNG" | "DITL" | "DLGE" | "LOCR" | "RTLV" => {
+			kinds.push(ExtractKind::HMLanguages);
+		}
+
+		"PRIM" => {
+			kinds.extend([ExtractKind::Obj, ExtractKind::Glb]);
+		}
+
+		"MATI" => {
+			kinds.push(ExtractKind::MaterialInstance);
+		}
+
+		"MATT" => {
+			kinds.push(ExtractKind::MaterialEntity);
+		}
+
+		"SDEF" => {
+			kinds.push(ExtractKind::SoundDefs);
+		}
+
+		"AIBZ" => {
+			kinds.push(ExtractKind::Pseudocode);
+		}
+
+		_ => {}
+	}
+
+	kinds
+}
+
+#[try_fn]
+pub fn extract_file(
+	game: &Game,
+	tonytools_hash_list: &tonytools::hashlist::HashList,
+	id: RuntimeID,
+	kind: ExtractKind
+) -> Result<Vec<ExtractedFile>> {
+	match kind {
+		ExtractKind::Raw => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+			let resource_type = res_meta.core_info.resource_type;
+
+			vec![
+				ExtractedFile {
+					suffix: eco_format!(".{resource_type}"),
+					data: res_data
+				},
+				ExtractedFile {
+					suffix: eco_format!(".{resource_type}.metadata.json"),
+					data: format_json(to_string(&res_meta.core_info)?)?.into()
+				},
+			]
+		}
+
+		ExtractKind::QN => {
+			vec![ExtractedFile {
+				suffix: ".entity.json".into(),
+				data: format_json(to_string(&*game.extract_entity(id)?)?)?.into()
+			}]
+		}
+
+		ExtractKind::TBLUAsRaw => extract_file(
+			game,
+			tonytools_hash_list,
+			game.extract_entity(id)?.blueprint,
+			ExtractKind::Raw
+		)?,
+
+		ExtractKind::TBLUAsBin1Json => extract_file(
+			game,
+			tonytools_hash_list,
+			game.extract_entity(id)?.blueprint,
+			ExtractKind::Bin1Json
+		)?,
+
+		ExtractKind::Bin1Json => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+			let resource_type = res_meta.core_info.resource_type;
+
+			let mut json = vec![];
+			deserialize_generic_writer(game.version(), res_meta.core_info.resource_type, &res_data, &mut json)?;
+
+			vec![
+				ExtractedFile {
+					suffix: eco_format!(".{resource_type}.json"),
+					data: format_json(String::from_utf8(json)?)?.into()
+				},
+				ExtractedFile {
+					suffix: eco_format!(".{resource_type}.metadata.json"),
+					data: format_json(to_string(&res_meta.core_info)?)?.into()
+				},
+			]
+		}
+
+		ExtractKind::Image { format } => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+			let resource_type = res_meta.core_info.resource_type;
+
+			match resource_type.as_ref() {
+				"GFXI" => {
+					let reader = ImageReader::new(Cursor::new(res_data.to_owned())).with_guessed_format()?;
+
+					if matches!(format, ImageExtractFormat::Dds) {
+						match reader.format().context("Couldn't get format")? {
+							ImageFormat::Dds => {
+								vec![ExtractedFile {
+									suffix: ".dds".into(),
+									data: res_data
+								}]
+							}
+
+							_ => {
+								bail!("The image is not natively in DDS format and cannot be re-encoded as DDS");
+							}
+						}
+					} else {
+						let mut data = vec![];
+						reader.decode()?.write_to(
+							Cursor::new(&mut data),
+							match format {
+								ImageExtractFormat::Png => ImageFormat::Png,
+								ImageExtractFormat::Jpeg => ImageFormat::Jpeg,
+								ImageExtractFormat::Tga => ImageFormat::Tga,
+								ImageExtractFormat::Dds => unreachable!()
+							}
+						)?;
+
+						vec![ExtractedFile {
+							suffix: match format {
+								ImageExtractFormat::Png => ".png".into(),
+								ImageExtractFormat::Jpeg => ".jpeg".into(),
+								ImageExtractFormat::Tga => ".tga".into(),
+								ImageExtractFormat::Dds => unreachable!()
+							},
+							data
+						}]
+					}
+				}
+
+				"TEXT" => {
+					let mut texture = TextureMap::from_memory(&res_data, game.version().into())
+						.context("Couldn't process texture data")?;
+
+					if let Some(texd_depend) = res_meta.core_info.references.first() {
+						let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
+
+						let mip_block = MipblockData::from_memory(&texd_data, game.version().into())
+							.context("Couldn't process TEXD data")?;
+						texture.set_mipblock1(mip_block);
+					}
+
+					match format {
+						ImageExtractFormat::Dds => {
+							let data = glacier_texture::convert::create_dds(&texture)
+								.context("Couldn't convert texture to DDS")?;
+
+							vec![ExtractedFile {
+								suffix: ".dds".into(),
+								data
+							}]
+						}
+
+						ImageExtractFormat::Tga => {
+							let data = glacier_texture::convert::create_tga(&texture)
+								.context("Couldn't convert texture to TGA")?;
+
+							vec![ExtractedFile {
+								suffix: ".tga".into(),
+								data
+							}]
+						}
+
+						_ => {
+							let image = glacier_texture::convert::create_dynamic_image(&texture)
+								.context("Couldn't convert texture to dynamic image")?;
+
+							let mut data = vec![];
+							image.write_to(
+								Cursor::new(&mut data),
+								match format {
+									ImageExtractFormat::Png => ImageFormat::Png,
+									ImageExtractFormat::Jpeg => ImageFormat::Jpeg,
+									ImageExtractFormat::Tga => unreachable!(),
+									ImageExtractFormat::Dds => unreachable!()
+								}
+							)?;
+
+							vec![ExtractedFile {
+								suffix: match format {
+									ImageExtractFormat::Png => ".png".into(),
+									ImageExtractFormat::Jpeg => ".jpeg".into(),
+									ImageExtractFormat::Tga => unreachable!(),
+									ImageExtractFormat::Dds => unreachable!()
+								},
+								data
+							}]
+						}
+					}
+				}
+
+				_ => bail!("Unsupported resource type")
+			}
+		}
+
+		ExtractKind::Ogg => {
+			let (_, res_data) = game.extract_latest_resource(id)?;
+
+			let mut raw_ogg = vec![];
+
+			WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
+				.generate_ogg(&mut raw_ogg)?;
+
+			let mut data = vec![];
+
+			OggToOgg::new_with_defaults().remux(&mut Cursor::new(raw_ogg), &mut data)?;
+
+			vec![ExtractedFile {
+				suffix: ".ogg".into(),
+				data
+			}]
+		}
+
+		ExtractKind::MultiOgg => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+
+			let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
+
+			let non_streamed_count = wwev.non_streamed.len();
+
+			wwev.non_streamed
+				.into_par_iter()
+				.enumerate()
+				.map(|(idx, object)| {
+					anyhow::Ok(ExtractedFile {
+						suffix: eco_format!("~{idx}.ogg"),
+						data: if object.data.starts_with(b"RIFF") {
+							let mut raw_ogg = vec![];
+
+							WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(&mut raw_ogg)?;
+
+							let mut data = vec![];
+
+							OggToOgg::new_with_defaults().remux(&mut Cursor::new(raw_ogg), &mut data)?;
+
+							data
+						} else {
+							object.data
+						}
+					})
+				})
+				.chain(wwev.streamed.into_par_iter().enumerate().map(|(idx, object)| {
+					let (_, wem_data) = game.extract_latest_resource(object.source)?;
+
+					anyhow::Ok(ExtractedFile {
+						suffix: eco_format!("~{}.ogg", non_streamed_count + idx),
+						data: if wem_data.starts_with(b"RIFF") {
+							let mut raw_ogg = vec![];
+
+							WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+								.generate_ogg(&mut raw_ogg)?;
+
+							let mut data = vec![];
+
+							OggToOgg::new_with_defaults().remux(&mut Cursor::new(raw_ogg), &mut data)?;
+
+							data
+						} else {
+							wem_data
+						}
+					})
+				}))
+				.collect::<Result<_>>()?
+		}
+
+		ExtractKind::HMLanguages => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+			let resource_type = res_meta.core_info.resource_type;
+
+			match resource_type.as_ref() {
+				"CLNG" => {
+					let clng = {
+						let mut iteration = 0;
+
+						loop {
+							if let Ok::<_, anyhow::Error>(x) = try_block! {
+								let langmap = get_language_map(game.version(), iteration)
+									.context("No more alternate language maps available")?;
+
+								let clng =
+									hmlanguages::clng::CLNG::new(game.version().into(), langmap.1.to_owned())
+										.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+								clng.convert(
+									&res_data,
+									to_string(
+										&RpkgResourceMeta::from_resource_metadata(
+											res_meta.to_owned(),
+											false
+										)
+
+									)?
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+							} {
+								break x;
+							} else {
+								iteration += 1;
+
+								if get_language_map(game.version(), iteration).is_none() {
+									bail!("No more alternate language maps available");
+								}
+							}
+						}
+					};
+
+					vec![ExtractedFile {
+						suffix: ".clng.json".into(),
+						data: format_json(to_string(&clng)?)?.into()
+					}]
+				}
+
+				"DITL" => {
+					let ditl = hmlanguages::ditl::DITL::new(tonytools_hash_list.to_owned())
+						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+					vec![ExtractedFile {
+						suffix: ".ditl.json".into(),
+						data: format_json(to_string(
+							&ditl
+								.convert(
+									&res_data,
+									to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						)?)?
+						.into()
+					}]
+				}
+
+				"DLGE" => {
+					let dlge = {
+						let mut iteration = 0;
+
+						loop {
+							if let Ok::<_, anyhow::Error>(x) = try_block! {
+								let langmap = get_language_map(game.version(), iteration)
+									.context("No more alternate language maps available")?;
+
+								let dlge = hmlanguages::dlge::DLGE::new(
+									tonytools_hash_list
+										.to_owned(),
+									game.version().into(),
+									langmap.1.to_owned(),
+									None,
+									false
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+								dlge.convert(
+									&res_data,
+									to_string(
+										&RpkgResourceMeta::from_resource_metadata(
+											res_meta.to_owned(),
+											false
+										)
+
+									)?
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+							} {
+								break x;
+							} else {
+								iteration += 1;
+
+								if get_language_map(game.version(), iteration).is_none() {
+									bail!("No more alternate language maps available");
+								}
+							}
+						}
+					};
+
+					vec![ExtractedFile {
+						suffix: ".dlge.json".into(),
+						data: format_json(to_string(&dlge)?)?.into()
+					}]
+				}
+
+				"LOCR" => {
+					let locr = {
+						let mut iteration = 0;
+
+						loop {
+							if let Ok::<_, anyhow::Error>(x) = try_block! {
+								let langmap = get_language_map(game.version(), iteration)
+									.context("No more alternate language maps available")?;
+
+								let locr = hmlanguages::locr::LOCR::new(
+									tonytools_hash_list
+										.to_owned(),
+									game.version().into(),
+									langmap.1.to_owned(),
+									langmap.0
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+								locr.convert(
+									&res_data,
+									to_string(
+										&RpkgResourceMeta::from_resource_metadata(
+											res_meta.to_owned(),
+											false
+										)
+
+									)?
+								)
+								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+							} {
+								break x;
+							} else {
+								iteration += 1;
+
+								if get_language_map(game.version(), iteration).is_none() {
+									bail!("No more alternate language maps available");
+								}
+							}
+						}
+					};
+
+					vec![ExtractedFile {
+						suffix: ".locr.json".into(),
+						data: format_json(to_string(&locr)?)?.into()
+					}]
+				}
+
+				"RTLV" => {
+					let rtlv = hmlanguages::rtlv::RTLV::new(game.version().into(), None)
+						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
+						.convert(
+							&res_data,
+							to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
+						)
+						.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
+
+					vec![ExtractedFile {
+						suffix: ".rtlv.json".into(),
+						data: format_json(to_string(&rtlv)?)?.into()
+					}]
+				}
+
+				_ => bail!("Not a valid HMLanguages resource type")
+			}
+		}
+
+		ExtractKind::Obj => {
+			let (_, res_data) = game.extract_latest_resource(id)?;
+			let (data, _) = parse_prim_to_obj(game, &res_data)?;
+
+			vec![ExtractedFile {
+				suffix: ".obj".into(),
+				data
+			}]
+		}
+
+		ExtractKind::Glb => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+			let (data, _) = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?;
+
+			vec![ExtractedFile {
+				suffix: ".glb".into(),
+				data
+			}]
+		}
+
+		ExtractKind::MaterialInstance => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+
+			vec![ExtractedFile {
+				suffix: ".material.json".into(),
+				data: format_json(to_string(
+					&MaterialInstance::parse(&res_data, &res_meta.core_info)
+						.context("Couldn't parse material instance")?
+				)?)?
+				.into()
+			}]
+		}
+
+		ExtractKind::MaterialEntity => {
+			let (matt_meta, matt_data) = game.extract_latest_resource(id)?;
+			let (matb_meta, matb_data) = game.extract_latest_resource(
+				matt_meta
+					.core_info
+					.references
+					.get(1)
+					.context("No MATB dependency")?
+					.resource
+			)?;
+
+			vec![ExtractedFile {
+				suffix: ".material.entity.json".into(),
+				data: format_json(to_string(
+					&MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)
+						.context("Couldn't parse material entity")?
+				)?)?
+				.into()
+			}]
+		}
+
+		ExtractKind::SoundDefs => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+
+			vec![ExtractedFile {
+				suffix: ".sounddefs.json".into(),
+				data: format_json(to_string(
+					&SoundDefinitions::parse(game.version(), &res_data, &res_meta.core_info)
+						.context("Couldn't parse sound definitions")?
+				)?)?
+				.into()
+			}]
+		}
+
+		ExtractKind::Texture { format } => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+
+			let mut texture =
+				TextureMap::from_memory(&res_data, game.version().into()).context("Couldn't process texture data")?;
+
+			if let Some(texd_depend) = res_meta.core_info.references.first() {
+				let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
+
+				let mip_block = MipblockData::from_memory(&texd_data, game.version().into())
+					.context("Couldn't process TEXD data")?;
+				texture.set_mipblock1(mip_block);
+			}
+
+			let meta = TextureMetadata {
+				text: id,
+				texd: res_meta.core_info.references.first().map(|x| x.resource),
+				texture_type: texture.texture_type().into(),
+				format: texture.format().into(),
+				interpret_as: texture.interpret_as().unwrap_or(InterpretAs::Normal).into()
+			};
+
+			vec![
+				match format {
+					TextureExtractFormat::Dds => {
+						let data = glacier_texture::convert::create_dds(&texture)
+							.context("Couldn't convert texture to DDS")?;
+
+						ExtractedFile {
+							suffix: ".texture.dds".into(),
+							data
+						}
+					}
+
+					TextureExtractFormat::Tga => {
+						let data = glacier_texture::convert::create_tga(&texture)
+							.context("Couldn't convert texture to TGA")?;
+
+						ExtractedFile {
+							suffix: ".texture.tga".into(),
+							data
+						}
+					}
+
+					TextureExtractFormat::Png => {
+						let image = glacier_texture::convert::create_dynamic_image(&texture)
+							.context("Couldn't convert texture to dynamic image")?;
+
+						let mut data = vec![];
+						image.write_to(Cursor::new(&mut data), ImageFormat::Png)?;
+
+						ExtractedFile {
+							suffix: ".texture.png".into(),
+							data
+						}
+					}
+				},
+				ExtractedFile {
+					suffix: ".texture.json".into(),
+					data: format_json(to_string(&meta)?)?.into()
+				},
+			]
+		}
+
+		ExtractKind::Pseudocode => {
+			let (_, res_data) = game.extract_latest_resource(id)?;
+
+			let pseudocode = match game.version() {
+				GlacierGame::H1 => format!(
+					"{}\n---\n{:?}",
+					id,
+					hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
+						std::thread::Builder::new()
+							.stack_size(64 * 1024 * 1024)
+							.spawn(move || {
+								glacier_bin1::deserialize(&res_data)
+									.map_err(|e| format!("{e}"))
+									.unwrap()
+							})
+							.unwrap()
+							.join()
+							.unwrap()
+					}))?
+					.root
+				),
+
+				GlacierGame::H2 => format!(
+					"{}\n---\n{:?}",
+					id,
+					hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
+						std::thread::Builder::new()
+							.stack_size(64 * 1024 * 1024)
+							.spawn(move || {
+								glacier_bin1::deserialize(&res_data)
+									.map_err(|e| format!("{e}"))
+									.unwrap()
+							})
+							.unwrap()
+							.join()
+							.unwrap()
+					}))?
+					.root
+				),
+
+				GlacierGame::H3 => format!(
+					"{}\n---\n{:?}",
+					id,
+					hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
+						std::thread::Builder::new()
+							.stack_size(64 * 1024 * 1024)
+							.spawn(move || {
+								glacier_bin1::deserialize(&res_data)
+									.map_err(|e| format!("{e}"))
+									.unwrap()
+							})
+							.unwrap()
+							.join()
+							.unwrap()
+					}))?
+					.root
+				),
+
+				_ => bail!("Unsupported game for behavior tree")
+			};
+
+			vec![ExtractedFile {
+				suffix: ".txt".into(),
+				data: pseudocode.into()
+			}]
+		}
+	}
 }
 
 #[try_fn]
@@ -983,7 +1708,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 									changelog: game.extract_resource_changelog(hash),
 									data: ResourceOverviewData::Error {
 										message: format!("{e:?}")
-									}
+									},
+									extract_kinds: get_extract_kinds(game, hash)?
+										.into_iter()
+										.map(|x| (x.to_string(), x))
+										.collect()
 								})
 							})
 						)?;
@@ -1057,7 +1786,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 									changelog: game.extract_resource_changelog(new_hash),
 									data: ResourceOverviewData::Error {
 										message: format!("{e:?}")
-									}
+									},
+									extract_kinds: get_extract_kinds(game, new_hash)?
+										.into_iter()
+										.map(|x| (x.to_string(), x))
+										.collect()
 								})
 							})
 						)?;
@@ -1085,54 +1818,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 		ResourceOverviewEvent::OpenInEditor => {
 			if let Some(game) = app_state.game.load().as_ref() {
 				open_in_editor(app, game, hash).await?;
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsFile => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (metadata, data) = game.extract_latest_resource(hash)?;
-
-				let resource_type = game.resource_type(hash).context("Nonexistent resource")?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.{}", hash.to_hash(), resource_type))
-					.add_filter(format!("{} file", resource_type), &[resource_type.as_ref()])
-					.blocking_save_file()
-				{
-					fs::write(path.as_path().context("Invalid path")?, data)?;
-
-					fs::write(
-						path.as_path()
-							.context("Invalid path")?
-							.with_added_extension("metadata.json"),
-						format_json(&to_string(&metadata.core_info)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsQN => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let entity_json = to_vec(&*game.extract_entity(hash)?)?;
-
-				let mut dialog = app.dialog().file().set_title("Extract entity");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.add_filter("QuickEntity entity", &["entity.json"])
-					.blocking_save_file()
-				{
-					fs::write(path.as_path().context("Invalid path")?, entity_json)?;
-				}
 			}
 		}
 
@@ -1215,7 +1900,11 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 								Err(e) => ResourceOverviewData::Error {
 									message: format!("{e:?}")
 								}
-							}
+							},
+							extract_kinds: get_extract_kinds(game, hash)?
+								.into_iter()
+								.map(|x| (x.to_string(), x))
+								.collect()
 						})
 					})
 				)?;
@@ -1224,392 +1913,60 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 			}
 		}
 
-		ResourceOverviewEvent::ExtractTEMPAsRT => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (metadata, data) = game.extract_latest_resource(hash)?;
+		ResourceOverviewEvent::Extract { kind } => {
+			if let Some(game) = app_state.game.load().as_ref()
+				&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
+			{
+				let task = start_task(app, format!("Extracting {hash}"))?;
+				match extract_file(game, tonytools_hash_list, hash, kind) {
+					Ok(extracted) => {
+						finish_task(app, task)?;
 
-				let data = match game.version() {
-					GlacierGame::H1 => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntity>(&data)
-							.context("Couldn't deserialise factory")?
-					)?,
+						let mut last_filename = None;
+						let mut last_dir = None;
+						for file in extracted {
+							let ext = regex_captures!(r"\.(.+)$", &file.suffix).unwrap().1;
 
-					GlacierGame::H2 => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityFactory>(&data)
-							.context("Couldn't deserialise factory")?
-					)?,
+							let mut dialog = app.dialog().file().set_title("Extract file");
 
-					GlacierGame::H3 => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityFactory>(&data)
-							.context("Couldn't deserialise factory")?
-					)?,
+							if let Some(dir) = last_dir.as_ref() {
+								dialog = dialog.set_directory(dir);
+							} else if let Some(project) = app_state.project.load().as_ref() {
+								dialog = dialog.set_directory(&project.path);
+							}
 
-					GlacierGame::FL => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::fl::STemplateEntityFactory>(&data)
-							.context("Couldn't deserialise factory")?
-					)?
-				};
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.TEMP.json", hash.to_hash()))
-					.add_filter("TEMP.json file", &["TEMP.json"])
-					.blocking_save_file()
-				{
-					fs::write(path.as_path().context("Invalid path")?, data)?;
-
-					fs::write(
-						path.as_path().context("Invalid path")?.with_extension("metadata.json"),
-						format_json(&to_string(&metadata.core_info)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractTBLUAsFile => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (metadata, data) = game.extract_latest_resource(game.extract_entity(hash)?.blueprint)?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.TBLU", metadata.core_info.id.to_hash()))
-					.add_filter("TBLU file", &["TBLU"])
-					.blocking_save_file()
-				{
-					fs::write(path.as_path().context("Invalid path")?, data)?;
-
-					fs::write(
-						path.as_path()
-							.context("Invalid path")?
-							.with_added_extension("metadata.json"),
-						format_json(&to_string(&metadata.core_info)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractTBLUAsRT => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (metadata, data) = game.extract_latest_resource(game.extract_entity(hash)?.blueprint)?;
-
-				let data = match game.version() {
-					GlacierGame::H1 => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::h1::STemplateEntityBlueprint>(&data)
-							.context("Couldn't deserialise blueprint")?
-					)?,
-
-					GlacierGame::H2 => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::h2::STemplateEntityBlueprint>(&data)
-							.context("Couldn't deserialise blueprint")?
-					)?,
-
-					GlacierGame::H3 => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::h3::STemplateEntityBlueprint>(&data)
-							.context("Couldn't deserialise blueprint")?
-					)?,
-
-					GlacierGame::FL => to_vec(
-						&glacier_bin1::deserialize::<glacier_bin1::game::fl::STemplateEntityBlueprint>(&data)
-							.context("Couldn't deserialise blueprint")?
-					)?
-				};
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.TBLU.json", metadata.core_info.id.to_hash()))
-					.add_filter("TBLU.json file", &["TBLU.json"])
-					.blocking_save_file()
-				{
-					fs::write(path.as_path().context("Invalid path")?, data)?;
-
-					fs::write(
-						path.as_path().context("Invalid path")?.with_extension("metadata.json"),
-						format_json(&to_string(&metadata.core_info)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsRTGeneric => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.{}.json", hash.to_hash(), res_meta.core_info.resource_type))
-					.add_filter(
-						format!("{}.json file", res_meta.core_info.resource_type),
-						&[&format!("{}.json", res_meta.core_info.resource_type)]
-					)
-					.blocking_save_file()
-				{
-					fs::write(
-						path.as_path().context("Invalid path")?,
-						to_vec(&deserialize_generic(
-							game.version(),
-							res_meta.core_info.resource_type,
-							&res_data
-						)?)?
-					)?;
-
-					fs::write(
-						path.as_path().context("Invalid path")?.with_extension("metadata.json"),
-						format_json(&to_string(&res_meta.core_info)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsImage => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.png", hash.to_hash()))
-					.add_filter("PNG file", &["png"])
-					.add_filter("JPEG file", &["jpg"])
-					.add_filter("TGA file", &["tga"])
-					.add_filter("DDS file", &["dds"])
-					.blocking_save_file()
-				{
-					app.track_event(
-						"Extract image file as image format",
-						Some(json!({
-							"format": path.as_path().context("Invalid path")?
+							if let Some(path) = dialog
+								.set_file_name(format!(
+									"{}{}",
+									last_filename.as_ref().unwrap_or(&hash.to_hash()),
+									file.suffix
+								))
+								.add_filter(format!("{ext} file"), &[ext])
+								.blocking_save_file()
+							{
+								let path = path.as_path().context("Invalid path")?;
+								fs::write(path, file.data)?;
+								last_filename = path
 									.file_name()
-									.context("No file name")?
-									.to_str()
-									.context("Filename was invalid string")?
-									.split('.')
-									.next_back()
-									.unwrap_or("None")
-						}))
-					)
-					.unwrap();
-
-					match res_meta.core_info.resource_type.as_ref() {
-						"GFXI" => {
-							let reader = ImageReader::new(Cursor::new(res_data.to_owned())).with_guessed_format()?;
-
-							if path
-								.as_path()
-								.context("Invalid path")?
-								.file_name()
-								.context("No file name")?
-								.to_str()
-								.context("Filename was invalid string")?
-								.ends_with(".dds")
-							{
-								match reader.format().context("Couldn't get format")? {
-									ImageFormat::Dds => {
-										fs::write(path.as_path().context("Invalid path")?, res_data)?;
-									}
-
-									_ => {
-										send_notification(
-											app,
-											Notification {
-												kind: NotificationKind::Error,
-												title: "DDS encoding not supported".into(),
-												subtitle: "The image is not natively in DDS format and cannot be \
-												           re-encoded as DDS. Please choose another format."
-													.into()
-											}
-										)?;
-									}
-								}
-							} else {
-								reader.decode()?.save(path.as_path().context("Invalid path")?)?;
+									.and_then(|x| x.to_str())
+									.map(|x| x.trim_end_matches(&*file.suffix).to_owned());
+								last_dir = path.parent().map(|x| x.to_owned());
 							}
 						}
-
-						"TEXT" => {
-							let mut texture = TextureMap::from_memory(&res_data, game.version().into())
-								.context("Couldn't process texture data")?;
-
-							if let Some(texd_depend) = res_meta.core_info.references.first() {
-								let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
-
-								let mip_block = MipblockData::from_memory(&texd_data, game.version().into())
-									.context("Couldn't process TEXD data")?;
-								texture.set_mipblock1(mip_block);
-							}
-
-							if path
-								.as_path()
-								.context("Invalid path")?
-								.file_name()
-								.context("No file name")?
-								.to_str()
-								.context("Filename was invalid string")?
-								.ends_with(".dds")
-							{
-								let dds_data = glacier_texture::convert::create_dds(&texture)
-									.context("Couldn't convert texture to DDS")?;
-
-								fs::write(path.as_path().context("Invalid path")?, dds_data)?;
-							} else if path
-								.as_path()
-								.context("Invalid path")?
-								.file_name()
-								.context("No file name")?
-								.to_str()
-								.context("Filename was invalid string")?
-								.ends_with(".tga")
-							{
-								let tga_data = glacier_texture::convert::create_tga(&texture)
-									.context("Couldn't convert texture to TGA")?;
-
-								fs::write(path.as_path().context("Invalid path")?, tga_data)?;
-							} else {
-								let image = glacier_texture::convert::create_dynamic_image(&texture)
-									.context("Couldn't convert texture to dynamic image")?;
-
-								image.save(path.as_path().context("Invalid path")?)?;
-							}
-						}
-
-						_ => bail!("Unsupported resource type")
 					}
-				}
-			}
-		}
 
-		ResourceOverviewEvent::ExtractAsOgg => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let mut dialog = app.dialog().file().set_title("Extract file");
+					Err(e) => {
+						finish_task(app, task)?;
 
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.ogg", hash.to_hash()))
-					.add_filter("OGG file", &["ogg"])
-					.blocking_save_file()
-				{
-					let (_, res_data) = game.extract_latest_resource(hash)?;
-
-					WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?
-						.generate_ogg(BufWriter::new(File::create(path.as_path().context("Invalid path")?)?))?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractMultiOgg => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let mut dialog = app.dialog().file().set_title("Extract all OGGs to folder");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog.blocking_pick_folder() {
-					let task = start_task(app, format!("Extracting {hash} as OGGs"))?;
-
-					let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-
-					let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
-
-					let non_streamed_count = wwev.non_streamed.len();
-
-					wwev.non_streamed
-						.into_par_iter()
-						.enumerate()
-						.try_for_each(|(idx, object)| {
-							if object.data.starts_with(b"RIFF") {
-								let mut ogg_data = vec![];
-
-								WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
-									.generate_ogg(&mut ogg_data)?;
-
-								OggToOgg::new_with_defaults().remux(
-									&mut Cursor::new(ogg_data),
-									&mut BufWriter::new(File::create(
-										path.as_path().context("Invalid path")?.join(format!(
-											"{}~{}.ogg",
-											hash.to_hash(),
-											idx
-										))
-									)?)
-								)?;
-							} else {
-								fs::write(
-									path.as_path().context("Invalid path")?.join(format!(
-										"{}~{}.wem",
-										hash.to_hash(),
-										idx
-									)),
-									object.data
-								)?;
+						send_notification(
+							app,
+							Notification {
+								kind: NotificationKind::Error,
+								title: "Error extracting resource".into(),
+								subtitle: format!("{e:?}")
 							}
-
-							anyhow::Ok(())
-						})?;
-
-					wwev.streamed
-						.into_par_iter()
-						.enumerate()
-						.try_for_each(|(idx, object)| {
-							let (_, wem_data) = game.extract_latest_resource(object.source)?;
-
-							if wem_data.starts_with(b"RIFF") {
-								let mut ogg_data = vec![];
-
-								WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
-									.generate_ogg(&mut ogg_data)?;
-
-								OggToOgg::new_with_defaults().remux(
-									&mut Cursor::new(ogg_data),
-									&mut BufWriter::new(File::create(
-										path.as_path().context("Invalid path")?.join(format!(
-											"{}~{}.ogg",
-											hash.to_hash(),
-											non_streamed_count + idx
-										))
-									)?)
-								)?;
-							} else {
-								fs::write(
-									path.as_path().context("Invalid path")?.join(format!(
-										"{}~{}.wem",
-										hash.to_hash(),
-										non_streamed_count + idx
-									)),
-									wem_data
-								)?;
-							}
-
-							anyhow::Ok(())
-						})?;
-
-					finish_task(app, task)?;
+						)?;
+					}
 				}
 			}
 		}
@@ -1687,519 +2044,6 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 							fs::write(path.as_path().context("Invalid path")?, wem_data)?;
 						}
 					}
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsHMLanguages => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!(
-						"{}.{}.json",
-						hash.to_hash(),
-						res_meta.core_info.resource_type.as_ref().to_lowercase()
-					))
-					.add_filter(
-						format!("{}.json file", res_meta.core_info.resource_type.as_ref().to_lowercase()),
-						&[&format!(
-							"{}.json",
-							res_meta.core_info.resource_type.as_ref().to_lowercase()
-						)]
-					)
-					.blocking_save_file()
-				{
-					fs::write(
-						path.as_path().context("Invalid path")?,
-						match res_meta.core_info.resource_type.as_ref() {
-							"CLNG" => {
-								let clng = {
-									let mut iteration = 0;
-
-									loop {
-										if let Ok::<_, anyhow::Error>(x) = try_block! {
-											let langmap = get_language_map(game.version(), iteration)
-												.context("No more alternate language maps available")?;
-
-											let clng =
-												hmlanguages::clng::CLNG::new(game.version().into(), langmap.1.to_owned())
-													.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-											clng.convert(
-												&res_data,
-												to_string(
-													&RpkgResourceMeta::from_resource_metadata(
-														res_meta.to_owned(),
-														false
-													)
-
-												)?
-											)
-											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-										} {
-											break x;
-										} else {
-											iteration += 1;
-
-											if get_language_map(game.version(), iteration).is_none() {
-												bail!("No more alternate language maps available");
-											}
-										}
-									}
-								};
-
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								clng.serialize(&mut ser)?;
-
-								buf
-							}
-
-							"DITL" => {
-								let ditl = hmlanguages::ditl::DITL::new(
-									app_state
-										.tonytools_hash_list
-										.load()
-										.as_ref()
-										.context("No TonyTools hash list available")?
-										.deref()
-										.to_owned()
-								)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								ditl.convert(
-									&res_data,
-									to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
-								)
-								.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-								.serialize(&mut ser)?;
-
-								buf
-							}
-
-							"DLGE" => {
-								let dlge = {
-									let mut iteration = 0;
-
-									loop {
-										if let Ok::<_, anyhow::Error>(x) = try_block! {
-											let langmap = get_language_map(game.version(), iteration)
-												.context("No more alternate language maps available")?;
-
-											let dlge = hmlanguages::dlge::DLGE::new(
-												app_state
-													.tonytools_hash_list
-													.load()
-													.as_ref()
-													.context("No TonyTools hash list available")?
-													.deref()
-													.to_owned(),
-												game.version().into(),
-												langmap.1.to_owned(),
-												None,
-												false
-											)
-											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-											dlge.convert(
-												&res_data,
-												to_string(
-													&RpkgResourceMeta::from_resource_metadata(
-														res_meta.to_owned(),
-														false
-													)
-
-												)?
-											)
-											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-										} {
-											break x;
-										} else {
-											iteration += 1;
-
-											if get_language_map(game.version(), iteration).is_none() {
-												bail!("No more alternate language maps available");
-											}
-										}
-									}
-								};
-
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								dlge.serialize(&mut ser)?;
-
-								buf
-							}
-
-							"LOCR" => {
-								let locr = {
-									let mut iteration = 0;
-
-									loop {
-										if let Ok::<_, anyhow::Error>(x) = try_block! {
-											let langmap = get_language_map(game.version(), iteration)
-												.context("No more alternate language maps available")?;
-
-											let locr = hmlanguages::locr::LOCR::new(
-												app_state
-													.tonytools_hash_list
-													.load()
-													.as_ref()
-													.context("No TonyTools hash list available")?
-													.deref()
-													.to_owned(),
-												game.version().into(),
-												langmap.1.to_owned(),
-												langmap.0
-											)
-											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-											locr.convert(
-												&res_data,
-												to_string(
-													&RpkgResourceMeta::from_resource_metadata(
-														res_meta.to_owned(),
-														false
-													)
-
-												)?
-											)
-											.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-										} {
-											break x;
-										} else {
-											iteration += 1;
-
-											if get_language_map(game.version(), iteration).is_none() {
-												bail!("No more alternate language maps available");
-											}
-										}
-									}
-								};
-
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								locr.serialize(&mut ser)?;
-
-								buf
-							}
-
-							"RTLV" => {
-								let rtlv = hmlanguages::rtlv::RTLV::new(game.version().into(), None)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?
-									.convert(
-										&res_data,
-										to_string(&RpkgResourceMeta::from_resource_metadata(res_meta, false))?
-									)
-									.map_err(|x| anyhow!("TonyTools error: {x:?}"))?;
-
-								let mut buf = Vec::new();
-								let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-								let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-
-								rtlv.serialize(&mut ser)?;
-
-								buf
-							}
-
-							_ => bail!("Not a valid HMLanguages resource type")
-						}
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsObj => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (_, res_data) = game.extract_latest_resource(hash)?;
-				let (obj, _) = parse_prim_to_obj(game, &res_data)?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog.add_filter("OBJ mesh file", &["obj"]).blocking_save_file() {
-					fs::write(path.as_path().context("Invalid path")?, obj)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsGlb => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-				let glb = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?.0;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog.add_filter("GLTF binary file", &["glb"]).blocking_save_file() {
-					fs::write(path.as_path().context("Invalid path")?, glb)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsMaterialInstance => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-
-				let material = MaterialInstance::parse(&res_data, &res_meta.core_info)
-					.context("Couldn't parse material instance")?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.add_filter("Material JSON", &["material.json"])
-					.blocking_save_file()
-				{
-					fs::write(
-						path.as_path().context("Invalid path")?,
-						format_json(&to_string(&material)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsMaterialEntity => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (matt_meta, matt_data) = game.extract_latest_resource(hash)?;
-				let (matb_meta, matb_data) = game.extract_latest_resource(
-					matt_meta
-						.core_info
-						.references
-						.get(1)
-						.context("No MATB dependency")?
-						.resource
-				)?;
-
-				let material =
-					MaterialEntity::parse(&matt_data, &matt_meta.core_info, &matb_data, &matb_meta.core_info)
-						.context("Couldn't parse material entity")?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.add_filter("Material entity JSON", &["material.entity.json"])
-					.blocking_save_file()
-				{
-					fs::write(
-						path.as_path().context("Invalid path")?,
-						format_json(&to_string(&material)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsSoundDefs => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-
-				let sdef = SoundDefinitions::parse(game.version(), &res_data, &res_meta.core_info)
-					.context("Couldn't parse sound definitions")?;
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.add_filter("Sound definitions JSON", &["sounddefs.json"])
-					.blocking_save_file()
-				{
-					fs::write(
-						path.as_path().context("Invalid path")?,
-						format_json(&to_string(&sdef)?)?
-					)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsTexture => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (res_meta, res_data) = game.extract_latest_resource(hash)?;
-
-				let mut texture = TextureMap::from_memory(&res_data, game.version().into())
-					.context("Couldn't process texture data")?;
-
-				if let Some(texd_depend) = res_meta.core_info.references.first() {
-					let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
-					let mipblock = MipblockData::from_memory(&texd_data, game.version().into())
-						.context("Couldn't process TEXD data")?;
-					texture.set_mipblock1(mipblock);
-				}
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.set_file_name(format!("{}.texture.dds", hash.to_hash()))
-					.add_filter("DDS texture", &["texture.dds"])
-					.add_filter("TGA texture", &["texture.tga"])
-					.add_filter("PNG texture", &["texture.png"])
-					.blocking_save_file()
-				{
-					let path = path.as_path().context("Invalid path")?;
-
-					app.track_event(
-						"Extract texture as image format",
-						Some(json!({
-							"format": path
-								.extension()
-								.context("No file extension")?
-								.to_str()
-								.context("File extension was invalid string")?
-						}))
-					)
-					.unwrap();
-
-					if path
-						.file_name()
-						.context("No file name")?
-						.to_str()
-						.context("Filename was invalid string")?
-						.ends_with(".dds")
-					{
-						let dds_data = glacier_texture::convert::create_dds(&texture)
-							.context("Couldn't convert texture to DDS")?;
-
-						fs::write(path, dds_data)?;
-					} else if path
-						.file_name()
-						.context("No file name")?
-						.to_str()
-						.context("Filename was invalid string")?
-						.ends_with(".tga")
-					{
-						let tga_data = glacier_texture::convert::create_tga(&texture)
-							.context("Couldn't convert texture to TGA")?;
-
-						fs::write(path, tga_data)?;
-					} else {
-						let image = glacier_texture::convert::create_dynamic_image(&texture)
-							.context("Couldn't convert texture to dynamic image")?;
-
-						image.save(path)?;
-					}
-
-					let meta = TextureMetadata {
-						text: hash,
-						texd: res_meta.core_info.references.first().map(|x| x.resource),
-						texture_type: texture.texture_type().into(),
-						format: texture.format().into(),
-						interpret_as: texture.interpret_as().unwrap_or(InterpretAs::Normal).into()
-					};
-
-					fs::write(path.with_extension("json"), format_json(&to_string(&meta)?)?)?;
-				}
-			}
-		}
-
-		ResourceOverviewEvent::ExtractAsPseudocode => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				let (_, res_data) = game.extract_latest_resource(hash)?;
-
-				let pseudocode = match game.version() {
-					GlacierGame::H1 => format!(
-						"{}\n---\n{:?}",
-						hash,
-						hitman_behavior::h1::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
-							std::thread::Builder::new()
-								.stack_size(64 * 1024 * 1024)
-								.spawn(move || {
-									glacier_bin1::deserialize(&res_data)
-										.map_err(|e| format!("{e}"))
-										.unwrap()
-								})
-								.unwrap()
-								.join()
-								.unwrap()
-						}))?
-						.root
-					),
-
-					GlacierGame::H2 => format!(
-						"{}\n---\n{:?}",
-						hash,
-						hitman_behavior::h2::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
-							std::thread::Builder::new()
-								.stack_size(64 * 1024 * 1024)
-								.spawn(move || {
-									glacier_bin1::deserialize(&res_data)
-										.map_err(|e| format!("{e}"))
-										.unwrap()
-								})
-								.unwrap()
-								.join()
-								.unwrap()
-						}))?
-						.root
-					),
-
-					GlacierGame::H3 => format!(
-						"{}\n---\n{:?}",
-						hash,
-						hitman_behavior::h3::BehaviorTree::from_raw(tokio::task::block_in_place(move || {
-							std::thread::Builder::new()
-								.stack_size(64 * 1024 * 1024)
-								.spawn(move || {
-									glacier_bin1::deserialize(&res_data)
-										.map_err(|e| format!("{e}"))
-										.unwrap()
-								})
-								.unwrap()
-								.join()
-								.unwrap()
-						}))?
-						.root
-					),
-
-					_ => bail!("Unsupported game for behavior tree")
-				};
-
-				let mut dialog = app.dialog().file().set_title("Extract file");
-
-				if let Some(project) = app_state.project.load().as_ref() {
-					dialog = dialog.set_directory(&project.path);
-				}
-
-				if let Some(path) = dialog
-					.add_filter("Behavior tree", &["behavior.txt"])
-					.blocking_save_file()
-				{
-					fs::write(path.as_path().context("Invalid path")?, pseudocode)?;
 				}
 			}
 		}

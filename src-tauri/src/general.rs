@@ -24,7 +24,7 @@ use velcro::vec;
 
 use crate::{
 	HashMap, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
-	event_handling::resource_overview::initialise_resource_overview,
+	event_handling::resource_overview::{get_extract_kinds, initialise_resource_overview},
 	finish_task,
 	game::{Game, custom_game_install},
 	model::{
@@ -1123,7 +1123,11 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 									changelog: game.extract_resource_changelog(hash),
 									data: ResourceOverviewData::Error {
 										message: format!("{e:?}")
-									}
+									},
+									extract_kinds: get_extract_kinds(game, hash)?
+										.into_iter()
+										.map(|x| (x.to_string(), x))
+										.collect()
 								})
 							})
 						)?;

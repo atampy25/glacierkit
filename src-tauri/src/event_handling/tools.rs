@@ -10,23 +10,30 @@ use glacier_commons::{
 };
 use indexmap::IndexMap;
 use itertools::Itertools;
+use lazy_regex::{regex_captures, regex_replace};
 use quickentity_rs::{
 	apply_patch,
 	entity::{CommentEntity, Entity, EntityID, SubEntity, SubType},
 	generate_patch,
 	patch::Patch
 };
-use rayon::iter::{IntoParallelRefMutIterator, ParallelBridge, ParallelIterator};
+use rayon::iter::{
+	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelBridge, ParallelIterator
+};
 use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value, to_vec};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
+use tauri_plugin_dialog::DialogExt;
 use tryvial::try_fn;
 use uuid::Uuid;
 use velcro::vec;
 
 use crate::{
 	Notification, NotificationKind, convert_json_patch_to_merge_patch,
-	event_handling::{content_search::start_content_search, resource_overview::open_resource_overview},
+	event_handling::{
+		content_search::start_content_search,
+		resource_overview::{extract_file, get_extract_kinds, open_resource_overview}
+	},
 	finish_task,
 	game::{custom_game_install, valid_game_path},
 	general::{EMPTY_ID, REPO_ID, initialise_app, load_game_files, open_file, open_in_editor},
@@ -36,7 +43,7 @@ use crate::{
 		ToolEvent, ToolRequest
 	},
 	ores_repo::UnlockableItem,
-	send_notification, send_request, start_task
+	send_notification, send_request, start_progress, start_task, task_progress
 };
 
 #[try_fn]
@@ -911,7 +918,12 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 																.unwrap_or("<unnamed>".into())
 														)
 													},
-													order: None
+													order: None,
+													extract_kinds: get_extract_kinds(game, id)
+														.unwrap_or_default()
+														.into_iter()
+														.map(|x| (x.to_string(), x))
+														.collect()
 												}
 											)
 										})
@@ -975,7 +987,12 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 																.unwrap_or("<unnamed>".into())
 														)
 													},
-													order: None
+													order: None,
+													extract_kinds: get_extract_kinds(game, id)
+														.unwrap_or_default()
+														.into_iter()
+														.map(|x| (x.to_string(), x))
+														.collect()
 												}
 											)
 										})
@@ -1010,6 +1027,193 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			GameBrowserEvent::OpenInEditor { resource } => {
 				if let Some(game) = app_state.game.load().as_ref() {
 					open_in_editor(app, game, resource.0).await?;
+				}
+			}
+
+			GameBrowserEvent::Extract { resource, kind } => {
+				if let Some(game) = app_state.game.load().as_ref()
+					&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
+				{
+					let hash = resource.0;
+
+					let task = start_task(app, format!("Extracting {hash}"))?;
+					match extract_file(game, tonytools_hash_list, hash, kind) {
+						Ok(extracted) => {
+							finish_task(app, task)?;
+
+							let mut last_filename = None;
+							let mut last_dir = None;
+							for file in extracted {
+								let ext = regex_captures!(r"\.(.+)$", &file.suffix).unwrap().1;
+
+								let mut dialog = app.dialog().file().set_title("Extract file");
+
+								if let Some(dir) = last_dir.as_ref() {
+									dialog = dialog.set_directory(dir);
+								} else if let Some(project) = app_state.project.load().as_ref() {
+									dialog = dialog.set_directory(&project.path);
+								}
+
+								if let Some(path) = dialog
+									.set_file_name(format!(
+										"{}{}",
+										last_filename.as_ref().unwrap_or(&hash.to_hash()),
+										file.suffix
+									))
+									.add_filter(format!("{ext} file"), &[ext])
+									.blocking_save_file()
+								{
+									let path = path.as_path().context("Invalid path")?;
+									fs::write(path, file.data)?;
+									last_filename = path
+										.file_name()
+										.and_then(|x| x.to_str())
+										.map(|x| x.trim_end_matches(&*file.suffix).to_owned());
+									last_dir = path.parent().map(|x| x.to_owned());
+								}
+							}
+						}
+
+						Err(e) => {
+							finish_task(app, task)?;
+
+							send_notification(
+								app,
+								Notification {
+									kind: NotificationKind::Error,
+									title: "Error extracting resource".into(),
+									subtitle: format!("{e:?}")
+								}
+							)?;
+						}
+					}
+				}
+			}
+
+			GameBrowserEvent::MassExtract {
+				resources,
+				kinds,
+				use_paths
+			} => {
+				if let Some(game) = app_state.game.load().as_ref()
+					&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
+				{
+					let mut dialog = app.dialog().file().set_title("Extract to folder");
+
+					if let Some(project) = app_state.project.load().as_ref() {
+						dialog = dialog.set_directory(&project.path);
+					}
+
+					if let Some(path) = dialog.blocking_pick_folder() {
+						let path = path.as_path().context("Invalid path")?;
+
+						let task = start_progress(app, "Extracting resources")?;
+						let total = resources.len();
+
+						let path_prefix = if use_paths {
+							let mut paths = resources
+								.iter()
+								.filter_map(|x| x.0.get_path())
+								.map(|mut path| {
+									while let Some((_, inner)) = regex_captures!(r"^\[(.+?)\]", &path) {
+										path = inner.into();
+									}
+
+									path.split("/").map(|x| x.to_owned()).collect_vec()
+								})
+								.collect_vec();
+
+							if let Some(longest_prefix) = paths.pop() {
+								Some(
+									longest_prefix
+										.into_iter()
+										.enumerate()
+										.take_while(|(idx, element)| {
+											paths.iter().all(|arr| arr.get(*idx) == Some(element))
+										})
+										.map(|(_, x)| x)
+										.collect_vec()
+										.join("/") + "/"
+								)
+							} else {
+								None
+							}
+						} else {
+							None
+						};
+
+						resources
+							.into_par_iter()
+							.enumerate()
+							.try_for_each(|(progress, resource)| {
+								let id = resource.0;
+
+								let resource_type = game.resource_type(id).context("No such resource")?;
+
+								for kind in kinds
+									.iter()
+									.filter_map(|(ty, kind)| (*ty == resource_type).then_some(kind))
+									.cloned()
+								{
+									let extracted = extract_file(game, tonytools_hash_list, id, kind)?;
+									for file in extracted {
+										if use_paths {
+											if let Some(mut resource_path) = id.get_path() {
+												while let Some((_, inner)) =
+													regex_captures!(r"^\[(.+?)\]", &resource_path)
+												{
+													resource_path = inner.into();
+												}
+
+												let resource_path = resource_path
+													.strip_prefix(path_prefix.as_deref().unwrap_or(""))
+													.unwrap_or(&resource_path);
+
+												let (parent, filename) = resource_path
+													.rsplit_once("/")
+													.unwrap_or(("", resource_path.as_ref()));
+
+												let parent = parent
+													.split("/")
+													.map(|s| regex_replace!(r#"[/<>:"\\|?*^]|([ .]$)"#, s, ""))
+													.collect_vec()
+													.join("/");
+
+												let filename = regex_replace!(r#"[/<>:"\\|?*^]|([ .]$)"#, filename, "");
+
+												let parent_dir = path.join(&*parent);
+												fs::create_dir_all(&parent_dir)?;
+												fs::write(
+													parent_dir.join(format!("{}{}", filename, file.suffix)),
+													file.data
+												)?;
+											} else if let Some(hint) = id.get_info().and_then(|x| x.hint) {
+												fs::write(
+													path.join(format!("{} ({}){}", hint, id.to_hash(), file.suffix)),
+													file.data
+												)?;
+											} else {
+												fs::write(
+													path.join(format!("{}{}", id.to_hash(), file.suffix)),
+													file.data
+												)?;
+											}
+										} else {
+											fs::write(
+												path.join(format!("{}{}", id.to_hash(), file.suffix)),
+												file.data
+											)?;
+										}
+									}
+								}
+
+								let _ = task_progress(app, task, (progress as f32) / (total as f32));
+
+								anyhow::Ok(())
+							})?;
+
+						finish_task(&app, task)?;
+					}
 				}
 			}
 		},

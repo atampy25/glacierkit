@@ -2,23 +2,30 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { GameBrowserEntry, GameBrowserRequest, SearchFilter, SearchSort } from "$lib/bindings"
-	import { Checkbox, Dropdown, Search } from "carbon-components-svelte"
+	import type { ExtractKind, GameBrowserEntry, GameBrowserRequest, SearchFilter, SearchSort } from "$lib/bindings"
+	import { Checkbox, Dropdown, Search, Accordion, AccordionItem, Button } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"
 	import { help } from "$lib/helpray"
 	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
+	import { isEqual } from "lodash"
+	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
 
 	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 
-	export let tree: JSTree = null!
+	let tree: JSTree = $state(null!)
 
 	function compareNodes(a: any, b: any) {
 		if ((!(a.original ? a.original : a).folder && !(b.original ? b.original : b).folder) || ((a.original ? a.original : a).folder && (b.original ? b.original : b).folder)) {
 			if (a?.original?.order && b?.original?.order && a?.original?.order !== b?.original?.order) {
 				return a?.original?.order - b?.original?.order
 			} else {
-				return (a?.original?.chunk || a.text).localeCompare(b?.original?.chunk || b.text, undefined, { numeric: true, sensitivity: "base" }) > 0 ? 1 : -1
+				return (a?.original?.chunk || a.text).localeCompare(b?.original?.chunk || b.text, undefined, {
+					numeric: true,
+					sensitivity: "base"
+				}) > 0
+					? 1
+					: -1
 			}
 		} else {
 			return (a.original ? a.original : a).folder ? -1 : 1
@@ -104,7 +111,19 @@
 			},
 			contextmenu: {
 				select_node: false,
-				items: (rightClickedNode: { id: string; original: { folder: boolean; path: string | null; hint: string | null; filetype: string } }, c: any) => {
+				items: (
+					rightClickedNode: {
+						id: string
+						original: {
+							folder: boolean
+							path: string | null
+							hint: string | null
+							filetype: string
+							extractKinds: [string, ExtractKind][]
+						}
+					},
+					c: any
+				) => {
 					return rightClickedNode.original.folder
 						? {}
 						: {
@@ -189,6 +208,49 @@
 														}
 													})
 												}
+											}
+										}
+									: {}),
+								...(rightClickedNode.original.extractKinds
+									? {
+											extract: {
+												separator_before: true,
+												separator_after: false,
+												label: "Extract",
+												icon: "fa-regular fa-save",
+												action: false,
+												submenu: Object.fromEntries(
+													rightClickedNode.original.extractKinds.map(([name, kind], idx) => [
+														idx.toString(),
+														{
+															separator_before: false,
+															separator_after: false,
+															_disabled: false,
+															label: `${name[0].toUpperCase()}${name.slice(1)}`,
+															icon: "fa-regular fa-save",
+															action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
+																const tree = jQuery.jstree!.reference(b.reference)
+																const selected_node = tree.get_node(b.reference)
+
+																trackEvent(`Extract ${name} from game tree`, {
+																	hash: rightClickedNode.id,
+																	filetype: rightClickedNode.original.filetype
+																})
+
+																await event({
+																	type: "tool",
+																	data: {
+																		type: "gameBrowser",
+																		data: {
+																			type: "extract",
+																			data: { resource: selected_node.id, kind }
+																		}
+																	}
+																})
+															}
+														}
+													])
+												)
 											}
 										}
 									: {}),
@@ -415,7 +477,8 @@
 					folder: false,
 					path: entry.path,
 					filetype: entry.resourceType,
-					order: entry.order
+					order: entry.order,
+					extractKinds: entry.extractKinds
 				})
 			} else {
 				tree.settings!.core.data.push({
@@ -473,7 +536,8 @@
 					path: null,
 					hint: entry.hint || null,
 					filetype: entry.resourceType,
-					order: entry.order
+					order: entry.order,
+					extractKinds: entry.extractKinds
 				})
 			}
 		}
@@ -484,7 +548,11 @@
 	async function search() {
 		if (searchQuery.length >= 3) {
 			searchFeedback = ""
-			await trackEvent("Search game files", { filter: searchFilter, sort: String(searchSort), separate_partitions: String(separatePartitions) })
+			await trackEvent("Search game files", {
+				filter: searchFilter,
+				sort: String(searchSort),
+				separate_partitions: String(separatePartitions)
+			})
 			await event({
 				type: "tool",
 				data: {
@@ -523,20 +591,27 @@
 		await search()
 	}
 
-	let enabled = false
-	let gameDescription = "Search for a game file above to get started"
-	let searchFeedback = ""
-	let searchFilter: SearchFilter = "All"
-	let searchSort: "none" | "sizeAsc" | "sizeDesc" = "none"
-	let searchQuery = ""
-	let separatePartitions = false
-	let entries: GameBrowserEntry[] = []
+	let enabled = $state(false)
+	let gameDescription = $state("Search for a game file above to get started")
+	let searchFeedback = $state("")
+	let searchFilter: SearchFilter = $state("All")
+	let searchSort: "none" | "sizeAsc" | "sizeDesc" = $state("none")
+	let searchQuery = $state("")
+	let separatePartitions = $state(false)
+	let entries: GameBrowserEntry[] = $state([])
 
-	$: (separatePartitions,
-		(async () => {
-			await refreshTree()
-			await trackEvent("Search game files", { filter: searchFilter, sort: String(searchSort), separate_partitions: String(separatePartitions) })
-		})())
+	$effect(() => {
+		if (separatePartitions !== null) {
+			;(async () => {
+				await refreshTree()
+				await trackEvent("Search game files", {
+					filter: searchFilter,
+					sort: String(searchSort),
+					separate_partitions: String(separatePartitions)
+				})
+			})()
+		}
+	})
 </script>
 
 <div
@@ -627,4 +702,84 @@
 	<div class="flex-grow overflow-y-auto">
 		<div class="w-full h-full" id={elemID}></div>
 	</div>
+
+	{#if entries.some((a) => a.extractKinds.length)}
+		<div class="mt-2 bg-neutral-800">
+			<Accordion class="accordion-single w-full ">
+				<AccordionItem title="Extract all">
+					{#key entries}
+						{const kinds: [string, ExtractKind][] = $state([])}
+						{let usePaths = $state(false)}
+
+						<div class="flex flex-col gap-2 max-h-[50vh] w-full overflow-y-auto pr-2 -mb-4">
+							<div>
+								<Checkbox labelText="Extract to paths" bind:checked={usePaths} />
+							</div>
+
+							{#each [...new Set(entries.flatMap((a) => a.resourceType))].sort((a, b) => entries.filter((c) => c.resourceType === b).length - entries.filter((c) => c.resourceType === a).length) as type}
+								<div class="font-semibold">{type}</div>
+								<div class="flex flex-wrap items-center gap-x-4">
+									{#each entries
+										.filter((a) => a.resourceType === type)
+										.flatMap((a) => a.extractKinds)
+										.filter((a, idx, arr) => arr.findIndex((b) => isEqual(a, b)) === idx) as [name, kind]}
+										<div>
+											<Checkbox
+												labelText="{name[0].toUpperCase()}{name.slice(1)}"
+												on:check={({ detail }) => {
+													if (detail) {
+														kinds.push([type, kind])
+													} else {
+														kinds.splice(
+															kinds.findIndex((a) => a[0] === type && isEqual(a[1], kind)),
+															1
+														)
+													}
+												}}
+											/>
+										</div>
+									{/each}
+								</div>
+							{/each}
+
+							{const resourcesCount = $derived(entries.filter((a) => kinds.some((b) => b[0] === a.resourceType)).length)}
+							<Button
+								icon={DocumentExport}
+								on:click={async () => {
+									trackEvent("Mass extract", { files: resourcesCount })
+
+									await event({
+										type: "tool",
+										data: {
+											type: "gameBrowser",
+											data: {
+												type: "massExtract",
+												data: { resources: entries.map((a) => a.hash), kinds, usePaths }
+											}
+										}
+									})
+								}}
+								>Extract {resourcesCount} resource{resourcesCount !== 1 ? "s" : ""}
+							</Button>
+						</div>
+					{/key}
+				</AccordionItem>
+			</Accordion>
+		</div>
+	{/if}
 </div>
+
+<style>
+	:global(.accordion-single .bx--accordion__item) {
+		border: none;
+	}
+
+	:global(.accordion-single .bx--accordion__heading) {
+		min-height: 0;
+		padding: 0.75rem 0 0.5rem 0;
+	}
+
+	:global(.accordion-single .bx--accordion__content) {
+		padding-right: 0;
+	}
+</style>

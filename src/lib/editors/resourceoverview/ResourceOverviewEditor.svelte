@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ReferenceFlags, ResourceChangelogEntry, ResourceOverviewData, ResourceOverviewRequest } from "$lib/bindings"
+	import type { ReferenceFlags, ResourceChangelogEntry, ResourceOverviewData, ResourceOverviewRequest, ExtractKind } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import { Button, ClickableTile, DataTable, Search, Tab, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, Tile } from "carbon-components-svelte"
 	import { onMount } from "svelte"
@@ -31,6 +31,7 @@
 	let reverseDependencies: [string, string, string | null][] = $state([])
 	let changelog: ResourceChangelogEntry[] = $state([])
 	let data: ResourceOverviewData | null = $state(null)
+	let extractKinds: [string, ExtractKind][] = $state([])
 
 	let previewImage: HTMLImageElement | null = $state(null)
 	let referenceTab = $state(0)
@@ -83,6 +84,7 @@
 				reverseDependencies = request.data.reverseDependencies
 				changelog = request.data.changelog
 				data = request.data.data
+				extractKinds = request.data.extractKinds
 				break
 
 			// No exhaustivity check, only one request type
@@ -181,8 +183,8 @@
 										>
 											<div class="text-base -mt-1"
 												><span class="font-bold">{data.data.blueprintHash}.TBLU</span>
-												Install</div
-											>
+												Install
+											</div>
 											<div class="break-all">{data.data.blueprintPathOrHint || "No path"}</div>
 										</ClickableTile>
 										{#if data.data.preview}
@@ -208,8 +210,9 @@
 																}
 															}
 														})
-													}}>Show 3D preview</Button
-												>
+													}}
+													>Show 3D preview
+												</Button>
 											</div>
 										{/if}
 									{:else if data.type === "image"}
@@ -329,282 +332,9 @@
 														}
 													}
 												})
-											}}>Open in editor</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract entity to QN JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsQN"
-															}
-														}
-													}
-												})
-											}}>Extract as QuickEntity JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract TEMP as binary file")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract TEMP as binary file</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract TEMP as JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractTEMPAsRT"
-															}
-														}
-													}
-												})
-											}}>Extract TEMP as JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract TBLU as binary file")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractTBLUAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract TBLU as binary file</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract TBLU as JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractTBLUAsRT"
-															}
-														}
-													}
-												})
-											}}>Extract TBLU as JSON</Button
-										>
-									{:else if data.type === "image"}
-										{#if data.data.textureData}
-											<Button
-												icon={DocumentExport}
-												on:click={async () => {
-													// Analytics tracked on Rust end
-
-													await event({
-														type: "editor",
-														data: {
-															editor: id,
-															data: {
-																type: "resourceOverview",
-																data: {
-																	type: "extractAsTexture"
-																}
-															}
-														}
-													})
-												}}>Extract texture</Button
-											>
-										{/if}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												// Analytics tracked on Rust end
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsImage"
-															}
-														}
-													}
-												})
-											}}>Extract image</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract image file as original")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "audio"}
-										{#if data.data.assetId}
-											<Button
-												icon={DocumentExport}
-												on:click={async () => {
-													trackEvent("Extract audio file as OGG")
-
-													await event({
-														type: "editor",
-														data: {
-															editor: id,
-															data: {
-																type: "resourceOverview",
-																data: {
-																	type: "extractAsOgg"
-																}
-															}
-														}
-													})
-												}}>Extract as OGG</Button
-											>
-										{/if}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract audio file as original")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "multiAudio"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract WWEV file as OGGs")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractMultiOgg"
-															}
-														}
-													}
-												})
-											}}>Extract all as OGGs</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract WWEV file as original")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "genericRL"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract generic BIN1 file as JSON", { hash, filetype })
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsRTGeneric"
-															}
-														}
-													}
-												})
-											}}>Extract as JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract generic BIN1 file as binary", { hash, filetype })
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
+											}}
+											>Open in editor
+										</Button>
 									{:else if data.type === "repository"}
 										<Button
 											icon={Edit}
@@ -623,27 +353,9 @@
 														}
 													}
 												})
-											}}>Open in editor</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract repository to file")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
+											}}
+											>Open in editor
+										</Button>
 									{:else if data.type === "unlockables"}
 										<Button
 											icon={Edit}
@@ -662,320 +374,35 @@
 														}
 													}
 												})
-											}}>Open in editor</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract unlockables as JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsRTGeneric"
-															}
-														}
-													}
-												})
-											}}>Extract as JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract unlockables as binary")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "hMLanguages"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract HMLanguages file as JSON", { filetype })
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsHMLanguages"
-															}
-														}
-													}
-												})
-											}}>Extract as JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract HMLanguages file as binary", { hash, filetype })
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "mesh"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract mesh file as GLB")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsGlb"
-															}
-														}
-													}
-												})
-											}}>Extract as GLB</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract mesh file as OBJ")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsObj"
-															}
-														}
-													}
-												})
-											}}>Extract as OBJ</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract mesh file as original")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "materialInstance"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract material instance file as JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsMaterialInstance"
-															}
-														}
-													}
-												})
-											}}>Extract as JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract material instance file as original")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "materialEntity"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract material entity file as JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsMaterialEntity"
-															}
-														}
-													}
-												})
-											}}>Extract as JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract material entity file as original")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "soundDefinitions"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract sound definitions as JSON")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsSoundDefs"
-															}
-														}
-													}
-												})
-											}}>Extract as JSON</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract sound definitions file as original")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "behaviorTree"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract behavior tree as pseudocode")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsPseudocode"
-															}
-														}
-													}
-												})
-											}}>Extract as TXT</Button
-										>
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract behavior tree as binary")
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
-									{:else if data.type === "json" || data.type === "xml" || data.type === "localisedLine" || data.type === "error" || data.type === "generic" || data.type === "genericData"}
-										<Button
-											icon={DocumentExport}
-											on:click={async () => {
-												trackEvent("Extract generic file", { hash, filetype })
-
-												await event({
-													type: "editor",
-													data: {
-														editor: id,
-														data: {
-															type: "resourceOverview",
-															data: {
-																type: "extractAsFile"
-															}
-														}
-													}
-												})
-											}}>Extract file</Button
-										>
+											}}
+											>Open in editor
+										</Button>
 									{/if}
+									{#each extractKinds as [name, kind]}
+										<Button
+											icon={DocumentExport}
+											on:click={async () => {
+												trackEvent(`Extract ${name}`, { hash, filetype })
+
+												await event({
+													type: "editor",
+													data: {
+														editor: id,
+														data: {
+															type: "resourceOverview",
+															data: {
+																type: "extract",
+																data: {
+																	kind
+																}
+															}
+														}
+													}
+												})
+											}}
+											>Extract {name}
+										</Button>
+									{/each}
 								</div>
 							</Tile>
 						</div>

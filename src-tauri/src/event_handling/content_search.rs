@@ -283,8 +283,8 @@ pub async fn start_content_search(
 										} else {
 											filetype
 										},
-										&mut matcher,
-										&partition.read_resource(resource_id).ok()?
+										&partition.read_resource(resource_id).ok()?,
+										&mut matcher
 									)
 									.ok()?;
 								}

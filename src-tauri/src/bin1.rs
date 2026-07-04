@@ -222,8 +222,8 @@ pub fn deserialize_generic(game_version: GlacierGame, resource_type: ResourceTyp
 pub fn deserialize_generic_writer(
 	game_version: GlacierGame,
 	resource_type: ResourceType,
-	writer: &mut impl std::io::Write,
-	data: &[u8]
+	data: &[u8],
+	writer: &mut impl std::io::Write
 ) -> Result<()> {
 	macro_rules! impl_convert {
 		($resource_type:ident, $ty:literal, $res:ty) => {

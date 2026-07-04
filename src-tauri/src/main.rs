@@ -919,11 +919,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						let unformatted = serde_json::to_string(&entity).context("Entity is invalid")?;
 
-						if unformatted.len() < 1024 * 1024 {
-							format_json(&unformatted)?.into_bytes()
-						} else {
-							unformatted.into_bytes()
-						}
+						format_json(unformatted)?.into_bytes()
 					}
 
 					EditorData::QNPatch {
@@ -960,11 +956,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						)
 						.context("Entity is invalid")?;
 
-						if unformatted.len() < 1024 * 1024 {
-							format_json(&unformatted)?.into_bytes()
-						} else {
-							unformatted.into_bytes()
-						}
+						format_json(unformatted)?.into_bytes()
 					}
 
 					EditorData::RepositoryPatch {

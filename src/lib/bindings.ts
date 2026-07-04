@@ -913,6 +913,34 @@ export type ExposedEntity_Serialize = {
 	refersTo: RefProxy_Serialize[]
 }
 
+export type ExtractKind =
+	| { type: "raw" }
+	| { type: "qN" }
+	| { type: "tBLUAsRaw" }
+	| { type: "tBLUAsBin1Json" }
+	| { type: "bin1Json" }
+	| {
+			type: "image"
+			data: {
+				format: ImageExtractFormat
+			}
+	  }
+	| { type: "ogg" }
+	| { type: "multiOgg" }
+	| { type: "hMLanguages" }
+	| { type: "materialInstance" }
+	| { type: "materialEntity" }
+	| { type: "soundDefs" }
+	| { type: "obj" }
+	| { type: "glb" }
+	| {
+			type: "texture"
+			data: {
+				format: TextureExtractFormat
+			}
+	  }
+	| { type: "pseudocode" }
+
 export type FileBrowserEvent =
 	| {
 			type: "select"
@@ -1038,6 +1066,7 @@ export type GameBrowserEntry = {
 	resourceType: string
 	partition: [string, string]
 	order: number | null
+	extractKinds: [string, ExtractKind][]
 }
 
 export type GameBrowserEvent =
@@ -1059,6 +1088,21 @@ export type GameBrowserEvent =
 			type: "openInEditor"
 			data: {
 				resource: Hash
+			}
+	  }
+	| {
+			type: "extract"
+			data: {
+				resource: Hash
+				kind: ExtractKind
+			}
+	  }
+	| {
+			type: "massExtract"
+			data: {
+				resources: Hash[]
+				kinds: [string, ExtractKind][]
+				usePaths: boolean
 			}
 	  }
 
@@ -1158,6 +1202,8 @@ export type GlobalRequest =
 	  }
 
 export type Hash = string
+
+export type ImageExtractFormat = { type: "png" } | { type: "jpeg" } | { type: "tga" } | { type: "dds" }
 
 export type JsonPatchType = "MergePatch" | "JsonPatch"
 
@@ -1603,30 +1649,19 @@ export type ResourceOverviewEvent =
 			}
 	  }
 	| { type: "openInEditor" }
-	| { type: "extractAsQN" }
 	| { type: "showEntityPreview" }
-	| { type: "extractAsFile" }
-	| { type: "extractTEMPAsRT" }
-	| { type: "extractTBLUAsFile" }
-	| { type: "extractTBLUAsRT" }
-	| { type: "extractAsRTGeneric" }
-	| { type: "extractAsImage" }
-	| { type: "extractAsOgg" }
-	| { type: "extractMultiOgg" }
+	| {
+			type: "extract"
+			data: {
+				kind: ExtractKind
+			}
+	  }
 	| {
 			type: "extractSpecificMultiOgg"
 			data: {
 				index: number
 			}
 	  }
-	| { type: "extractAsHMLanguages" }
-	| { type: "extractAsMaterialInstance" }
-	| { type: "extractAsMaterialEntity" }
-	| { type: "extractAsSoundDefs" }
-	| { type: "extractAsObj" }
-	| { type: "extractAsGlb" }
-	| { type: "extractAsTexture" }
-	| { type: "extractAsPseudocode" }
 
 export type ResourceOverviewRequest = ResourceOverviewRequest_Serialize | ResourceOverviewRequest_Deserialize
 
@@ -1644,6 +1679,7 @@ export type ResourceOverviewRequest_Deserialize = {
 		reverseDependencies: [string, string, string | null][]
 		changelog: ResourceChangelogEntry[]
 		data: ResourceOverviewData
+		extractKinds: [string, ExtractKind][]
 	}
 }
 
@@ -1661,6 +1697,7 @@ export type ResourceOverviewRequest_Serialize = {
 		reverseDependencies: [string, string, string | null][]
 		changelog: ResourceChangelogEntry[]
 		data: ResourceOverviewData
+		extractKinds: [string, ExtractKind][]
 	}
 }
 
@@ -1944,6 +1981,8 @@ export type TextEditorRequest =
 	  }
 
 export type TextFileType = "Json" | "ManifestJson" | "Xml" | "PlainText" | "Markdown"
+
+export type TextureExtractFormat = { type: "dds" } | { type: "png" } | { type: "tga" }
 
 export type ToolEvent =
 	| { type: "fileBrowser"; data: FileBrowserEvent }

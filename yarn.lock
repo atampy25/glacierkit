@@ -784,6 +784,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@sveltejs/acorn-typescript@npm:^1.0.10":
+  version: 1.0.10
+  resolution: "@sveltejs/acorn-typescript@npm:1.0.10"
+  peerDependencies:
+    acorn: ^8.9.0
+  checksum: eb7e16789f16a6a183ef7c541f99885afbf4daf6f773b2b21fe978619be8b05763ba0705357639b671aa7604783d056ba0d317f806839f5b7ea87a7b9bc1d18e
+  languageName: node
+  linkType: hard
+
 "@sveltejs/acorn-typescript@npm:^1.0.5":
   version: 1.0.9
   resolution: "@sveltejs/acorn-typescript@npm:1.0.9"
@@ -1910,6 +1919,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"devalue@npm:^5.8.1":
+  version: 5.8.1
+  resolution: "devalue@npm:5.8.1"
+  checksum: fad0c5aeb615e0ddea3385923389991652b285cd2adcd84e10f07a930f735127d94621751f7ef5249a7fe2c7c666ec7c02bb95c3901da337c91f45ef4da18dea
+  languageName: node
+  linkType: hard
+
 "didyoumean@npm:^1.2.2":
   version: 1.2.2
   resolution: "didyoumean@npm:1.2.2"
@@ -2192,9 +2208,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"esrap@npm:^2.2.4":
-  version: 2.2.6
-  resolution: "esrap@npm:2.2.6"
+"esrap@npm:^2.2.12":
+  version: 2.2.13
+  resolution: "esrap@npm:2.2.13"
   dependencies:
     "@jridgewell/sourcemap-codec": "npm:^1.4.15"
   peerDependencies:
@@ -2202,7 +2218,7 @@ __metadata:
   peerDependenciesMeta:
     "@typescript-eslint/types":
       optional: true
-  checksum: a52dd2d1497722d3f9961404d6a043ffc396d5e3b2fd543ec0786298c6382ac796ddb8d9f3965583bda98f8e23d54449e847fb707b19c9393e8ef49f91e664f5
+  checksum: 8a11fc5524326f6537faad25c9cd7039246537e1d3c9c559c0087624ec97da794dbb35f2986de3101443a8d433d54b653edbc21d02ed48f8ac1d5ca1483ba3b4
   languageName: node
   linkType: hard
 
@@ -3167,10 +3183,10 @@ __metadata:
     mousetrap: "npm:^1.6.5"
     postcss: "npm:^8.4.32"
     prettier: "npm:^3.8.3"
-    prettier-plugin-svelte: "npm:^3.5.2"
+    prettier-plugin-svelte: "npm:^4.1.1"
     prettier-plugin-toml: "npm:^2.0.6"
     rfc6902: "npm:^5.1.1"
-    svelte: "npm:^5.55.5"
+    svelte: "npm:^5.56.4"
     svelte-check: "npm:^4.4.8"
     svelte-splitpanes: "npm:0.8.0"
     tailwindcss: "npm:^3.4.0"
@@ -3643,13 +3659,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier-plugin-svelte@npm:^3.5.2":
-  version: 3.5.2
-  resolution: "prettier-plugin-svelte@npm:3.5.2"
+"prettier-plugin-svelte@npm:^4.1.1":
+  version: 4.1.1
+  resolution: "prettier-plugin-svelte@npm:4.1.1"
   peerDependencies:
     prettier: ^3.0.0
-    svelte: ^3.2.0 || ^4.0.0-next.0 || ^5.0.0-next.0
-  checksum: d0d4a817588efad41b4bc7c7ea41d42bc1068fd52be63b5b6698563fb27eb38ade3007a396a9cd9da875783c5cb489123635c685f20ec9f57b924894732c5f26
+    svelte: ^5.0.0
+  checksum: 23a1c2f6fb64e152f1ad72e646860b67171f1f9d70081a676103a2ad41052c2f9e48f3567b52612c764a9fd06b44128ab098d4c1da4e88c726af5e6503545b67
   languageName: node
   linkType: hard
 
@@ -4190,27 +4206,27 @@ __metadata:
   languageName: node
   linkType: hard
 
-"svelte@npm:^5.55.5":
-  version: 5.55.5
-  resolution: "svelte@npm:5.55.5"
+"svelte@npm:^5.56.4":
+  version: 5.56.4
+  resolution: "svelte@npm:5.56.4"
   dependencies:
     "@jridgewell/remapping": "npm:^2.3.4"
     "@jridgewell/sourcemap-codec": "npm:^1.5.0"
-    "@sveltejs/acorn-typescript": "npm:^1.0.5"
+    "@sveltejs/acorn-typescript": "npm:^1.0.10"
     "@types/estree": "npm:^1.0.5"
     "@types/trusted-types": "npm:^2.0.7"
     acorn: "npm:^8.12.1"
     aria-query: "npm:5.3.1"
     axobject-query: "npm:^4.1.0"
     clsx: "npm:^2.1.1"
-    devalue: "npm:^5.6.4"
+    devalue: "npm:^5.8.1"
     esm-env: "npm:^1.2.1"
-    esrap: "npm:^2.2.4"
+    esrap: "npm:^2.2.12"
     is-reference: "npm:^3.0.3"
     locate-character: "npm:^3.0.0"
     magic-string: "npm:^0.30.11"
     zimmerframe: "npm:^1.1.2"
-  checksum: 4ac6b31ba24b68ef8fdc6c765819c676a107e5dd2221c849ca7b712f522fd195241c4bbfb2a355da0d6dc1646ed52ed0b2a7e8efe472d14bc86cd14bce3ecb44
+  checksum: 949e07077cd1a2bd4ab96bd09fe536c925064bcc3cbb3f0d4ac39f3acef56c0bbb61e49765b08c2e63bddfd05aa0d4f3ef3f3a79c87d84b2d5b23bb2a9158f7a
   languageName: node
   linkType: hard
 

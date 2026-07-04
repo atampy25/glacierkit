@@ -1,4 +1,5 @@
 use std::{
+	fmt::{Display, Formatter},
 	fs,
 	ops::Deref,
 	path::{Path, PathBuf},
@@ -7,7 +8,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use arc_swap::{ArcSwap, ArcSwapOption};
-use ecow::{EcoString, EcoVec};
+use ecow::EcoString;
 use glacier_commons::{
 	game::GlacierGame,
 	game_detection::GameInstall,
@@ -164,7 +165,7 @@ pub struct EditorState {
 	pub data: EditorData,
 
 	/// For the frontend to access without costly serialisation/deserialisation; ID -> (MIME type, data)
-	pub assets: ShardMap<Uuid, (EcoString, EcoVec<u8>)>
+	pub assets: ShardMap<Uuid, (EcoString, Vec<u8>)>
 }
 
 impl Default for EditorState {
@@ -289,7 +290,8 @@ pub struct GameBrowserEntry {
 	pub hint: Option<EcoString>,
 	pub resource_type: ResourceType,
 	pub partition: (String, String),
-	pub order: Option<usize>
+	pub order: Option<usize>,
+	pub extract_kinds: Vec<(String, ExtractKind)>
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
@@ -484,6 +486,98 @@ pub enum AnnouncementKind {
 nesting::nest! {
 	#![derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
 	#![enums(serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type", content = "data"))]
+	#![structs(serde(rename_all = "camelCase"))]
+	#[derive(PartialEq, Eq, Hash)]
+	pub enum ExtractKind {
+		Raw,
+
+		QN,
+
+		TBLUAsRaw,
+
+		TBLUAsBin1Json,
+
+		Bin1Json,
+
+		Image {
+			format: ImageExtractFormat
+		},
+
+		#[derive(PartialEq, Eq, Hash)]
+		pub enum ImageExtractFormat {
+			Png,
+			Jpeg,
+			Tga,
+			Dds
+		}
+
+		Ogg,
+
+		MultiOgg,
+
+		HMLanguages,
+
+		MaterialInstance,
+
+		MaterialEntity,
+
+		SoundDefs,
+
+		Obj,
+
+		Glb,
+
+		Texture {
+			format: TextureExtractFormat
+		},
+
+		#[derive(PartialEq, Eq, Hash)]
+		pub enum TextureExtractFormat {
+			Dds,
+			Png,
+			Tga
+		}
+
+		Pseudocode
+	}
+}
+
+impl Display for ExtractKind {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		match self {
+			ExtractKind::Raw => write!(f, "as file"),
+			ExtractKind::QN => write!(f, "as QuickEntity JSON"),
+			ExtractKind::TBLUAsRaw => write!(f, "blueprint as file"),
+			ExtractKind::TBLUAsBin1Json => write!(f, "blueprint as JSON"),
+			ExtractKind::Bin1Json => write!(f, "as JSON"),
+			ExtractKind::Image { format } => match format {
+				ImageExtractFormat::Png => write!(f, "as PNG"),
+				ImageExtractFormat::Jpeg => write!(f, "as JPEG"),
+				ImageExtractFormat::Tga => write!(f, "as TGA"),
+				ImageExtractFormat::Dds => write!(f, "as DDS")
+			},
+			ExtractKind::Ogg => write!(f, "as OGG"),
+			ExtractKind::MultiOgg => write!(f, "all as OGGs"),
+			ExtractKind::HMLanguages => write!(f, "as JSON"),
+			ExtractKind::MaterialInstance => write!(f, "as JSON"),
+			ExtractKind::MaterialEntity => write!(f, "as JSON"),
+			ExtractKind::SoundDefs => write!(f, "as JSON"),
+			ExtractKind::Obj => write!(f, "as OBJ"),
+			ExtractKind::Glb => write!(f, "as GLB"),
+			ExtractKind::Texture { format } => match format {
+				TextureExtractFormat::Png => write!(f, "as PNG"),
+				TextureExtractFormat::Tga => write!(f, "as TGA"),
+				TextureExtractFormat::Dds => write!(f, "as DDS")
+			},
+			ExtractKind::Pseudocode => write!(f, "as TXT")
+		}
+	}
+}
+
+nesting::nest! {
+	#![derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
+	#![enums(serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type", content = "data"))]
+	#![structs(serde(rename_all = "camelCase"))]
 	pub enum Event {
 		Tool(ToolEvent)
 
@@ -549,6 +643,15 @@ nesting::nest! {
 				},
 				OpenInEditor {
 					resource: Hash
+				},
+				Extract {
+					resource: Hash,
+					kind: ExtractKind
+				},
+				MassExtract {
+					resources: Vec<Hash>,
+					kinds: Vec<(ResourceType, ExtractKind)>,
+					use_paths: bool
 				}
 			}
 
@@ -794,45 +897,15 @@ nesting::nest! {
 
 					OpenInEditor,
 
-					ExtractAsQN,
-
 					ShowEntityPreview,
 
-					ExtractAsFile,
-
-					ExtractTEMPAsRT,
-
-					ExtractTBLUAsFile,
-
-					ExtractTBLUAsRT,
-
-					ExtractAsRTGeneric,
-
-					ExtractAsImage,
-
-					ExtractAsOgg,
-
-					ExtractMultiOgg,
+					Extract {
+						kind: ExtractKind
+					},
 
 					ExtractSpecificMultiOgg {
 						index: u32
-					},
-
-					ExtractAsHMLanguages,
-
-					ExtractAsMaterialInstance,
-
-					ExtractAsMaterialEntity,
-
-					ExtractAsSoundDefs,
-
-					ExtractAsObj,
-
-					ExtractAsGlb,
-
-					ExtractAsTexture,
-
-					ExtractAsPseudocode
+					}
 				}
 
 				RepositoryPatch(RepositoryPatchEditorEvent)
@@ -1248,7 +1321,9 @@ nesting::nest! {
 
 						changelog: Vec<ResourceChangelogEntry>,
 
-						data: ResourceOverviewData
+						data: ResourceOverviewData,
+
+						extract_kinds: Vec<(String, ExtractKind)>
 					}
 				}
 

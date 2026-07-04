@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use ecow::{EcoString, EcoVec};
+use ecow::EcoString;
 use fn_error_context::context;
 use glacier_commons::{
 	game::GlacierGame,
@@ -36,7 +36,7 @@ use crate::{HashMap, game::Game};
 
 #[try_fn]
 #[context("Couldn't convert PRIM file to OBJ")]
-pub fn parse_prim_to_obj(game: &Game, res_data: &[u8]) -> Result<(EcoVec<u8>, [f32; 6])> {
+pub fn parse_prim_to_obj(game: &Game, res_data: &[u8]) -> Result<(Vec<u8>, [f32; 6])> {
 	let model = RenderPrimitive::parse_bytes(
 		&mut Cursor::new(res_data),
 		match game.version() {
@@ -58,7 +58,7 @@ pub fn parse_prim_to_obj(game: &Game, res_data: &[u8]) -> Result<(EcoVec<u8>, [f
 		f32::NEG_INFINITY
 	];
 
-	let mut obj = EcoVec::new();
+	let mut obj = vec![];
 
 	for (idx, mesh) in model.iter_primitive_of_lod(LodLevel::LEVEL8).enumerate() {
 		writeln!(obj, "o object.{idx:03}")?;
