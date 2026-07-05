@@ -1020,6 +1020,25 @@ pub fn get_extract_kinds(game: &Game, id: RuntimeID) -> Result<Vec<ExtractKind>>
 		_ => {}
 	}
 
+	if matches!(
+		resource_type.as_ref(),
+		"AIBB"
+			| "AIRG" | "ASVA"
+			| "ATMD" | "BMSK"
+			| "CBLU" | "CPPT"
+			| "CRMD" | "ECPB"
+			| "ENUM" | "GFXF"
+			| "GIDX" | "UICB"
+			| "VIDB" | "WSGB"
+			| "WSWB" | "DSWB"
+			| "CLRP" | "GFXA"
+			| "KWOR" | "TDAT"
+			| "TDPK" | "WEMD"
+			| "TBLU" | "ORES"
+	) {
+		kinds.push(ExtractKind::Bin1Json);
+	}
+
 	kinds
 }
 
