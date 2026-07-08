@@ -1239,48 +1239,52 @@ pub fn extract_file(
 
 			let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
 
-			let non_streamed_count = wwev.non_streamed.len();
-
 			wwev.non_streamed
 				.into_par_iter()
 				.enumerate()
 				.map(|(idx, object)| {
-					anyhow::Ok(ExtractedFile {
-						suffix: eco_format!("~{idx}.ogg"),
-						data: if object.data.starts_with(b"RIFF") {
-							let mut raw_ogg = vec![];
+					anyhow::Ok(if object.data.starts_with(b"RIFF") {
+						let mut raw_ogg = vec![];
 
-							WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
-								.generate_ogg(&mut raw_ogg)?;
+						WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(&mut raw_ogg)?;
 
-							let mut data = vec![];
+						let mut data = vec![];
 
-							OggToOgg::new_with_defaults().remux(&mut Cursor::new(raw_ogg), &mut data)?;
+						OggToOgg::new_with_defaults().remux(&mut Cursor::new(raw_ogg), &mut data)?;
 
+						ExtractedFile {
+							suffix: eco_format!("~{}.ogg", object.wem_id),
 							data
-						} else {
-							object.data
+						}
+					} else {
+						ExtractedFile {
+							suffix: eco_format!("~{}.wem", object.wem_id),
+							data: object.data
 						}
 					})
 				})
 				.chain(wwev.streamed.into_par_iter().enumerate().map(|(idx, object)| {
 					let (_, wem_data) = game.extract_latest_resource(object.source)?;
 
-					anyhow::Ok(ExtractedFile {
-						suffix: eco_format!("~{}.ogg", non_streamed_count + idx),
-						data: if wem_data.starts_with(b"RIFF") {
-							let mut raw_ogg = vec![];
+					anyhow::Ok(if wem_data.starts_with(b"RIFF") {
+						let mut raw_ogg = vec![];
 
-							WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
-								.generate_ogg(&mut raw_ogg)?;
+						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(&mut raw_ogg)?;
 
-							let mut data = vec![];
+						let mut data = vec![];
 
-							OggToOgg::new_with_defaults().remux(&mut Cursor::new(raw_ogg), &mut data)?;
+						OggToOgg::new_with_defaults().remux(&mut Cursor::new(raw_ogg), &mut data)?;
 
+						ExtractedFile {
+							suffix: eco_format!("~{}.ogg", object.wem_id),
 							data
-						} else {
-							wem_data
+						}
+					} else {
+						ExtractedFile {
+							suffix: eco_format!("~{}.wem", object.wem_id),
+							data: wem_data
 						}
 					})
 				}))
@@ -2006,7 +2010,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 					let object = wwev.non_streamed.get(index as usize).context("No such audio object")?;
 					if object.data.starts_with(b"RIFF") {
 						if let Some(path) = dialog
-							.set_file_name(format!("{}~{}.ogg", hash.to_hash(), index))
+							.set_file_name(format!("{}~{}.ogg", hash.to_hash(), object.wem_id))
 							.add_filter("OGG file", &["ogg"])
 							.blocking_save_file()
 						{
@@ -2022,7 +2026,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						}
 					} else {
 						if let Some(path) = dialog
-							.set_file_name(format!("{}~{}.wem", hash.to_hash(), index))
+							.set_file_name(format!("{}~{}.wem", hash.to_hash(), object.wem_id))
 							.add_filter("WEM file", &["wem"])
 							.blocking_save_file()
 						{
@@ -2030,17 +2034,18 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						}
 					}
 				} else {
-					let wwem_hash = wwev
+					let object = wwev
 						.streamed
 						.get(index as usize - wwev.non_streamed.len())
-						.context("No such audio object")?
-						.source;
+						.context("No such audio object")?;
+
+					let wwem_hash = object.source;
 
 					let (_, wem_data) = game.extract_latest_resource(wwem_hash)?;
 
 					if wem_data.starts_with(b"RIFF") {
 						if let Some(path) = dialog
-							.set_file_name(format!("{}~{}.ogg", hash.to_hash(), index))
+							.set_file_name(format!("{}~{}.ogg", hash.to_hash(), object.wem_id))
 							.add_filter("OGG file", &["ogg"])
 							.blocking_save_file()
 						{
@@ -2056,7 +2061,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 						}
 					} else {
 						if let Some(path) = dialog
-							.set_file_name(format!("{}~{}.wem", hash.to_hash(), index))
+							.set_file_name(format!("{}~{}.wem", hash.to_hash(), object.wem_id))
 							.add_filter("WEM file", &["wem"])
 							.blocking_save_file()
 						{

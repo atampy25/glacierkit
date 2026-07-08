@@ -712,7 +712,7 @@
 						{let usePaths = $state(false)}
 
 						<div class="flex flex-col gap-2 max-h-[50vh] w-full overflow-y-auto pr-2 -mb-4">
-							<div>
+							<div class="mb-2">
 								<Checkbox labelText="Extract to paths" bind:checked={usePaths} />
 							</div>
 
@@ -759,7 +759,8 @@
 										}
 									})
 								}}
-								>Extract {resourcesCount} resource{resourcesCount !== 1 ? "s" : ""}
+							>
+								Extract {resourcesCount} resource{resourcesCount !== 1 ? "s" : ""}
 							</Button>
 						</div>
 					{/key}
@@ -777,6 +778,7 @@
 	:global(.accordion-single .bx--accordion__heading) {
 		min-height: 0;
 		padding: 0.75rem 0 0.5rem 0;
+		z-index: 0;
 	}
 
 	:global(.accordion-single .bx--accordion__content) {

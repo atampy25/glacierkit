@@ -1155,7 +1155,10 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 									.filter_map(|(ty, kind)| (*ty == resource_type).then_some(kind))
 									.cloned()
 								{
-									let extracted = extract_file(game, tonytools_hash_list, id, kind)?;
+									let Ok(extracted) = extract_file(game, tonytools_hash_list, id, kind) else {
+										return Ok(());
+									};
+
 									for file in extracted {
 										if use_paths {
 											if let Some(mut resource_path) = id.get_path() {
