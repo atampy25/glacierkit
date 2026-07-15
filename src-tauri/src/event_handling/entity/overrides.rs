@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use itertools::Itertools;
@@ -14,6 +16,7 @@ use crate::{
 	biome::to_string_clear,
 	entity::{get_ref_decoration, visit_variant},
 	finish_task,
+	game::GameFiles,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityOverridesEvent,
 		EntityOverridesRequest, Request, TabRequest, TabRequestData
@@ -174,6 +177,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 								.zip(b.properties.iter())
 								.any(|(a, b)| a.0 != b.0 || !a.1.rough_eq(b.1))
 					})) {
+				let entity = Arc::make_mut(entity);
+
 				entity.property_overrides = deserialised;
 
 				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
@@ -208,6 +213,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 			if let Ok(deserialised) = from_str(&content)
 				&& entity.override_deletes != deserialised
 			{
+				let entity = Arc::make_mut(entity);
+
 				entity.override_deletes = deserialised;
 
 				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
@@ -257,6 +264,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 									.zip(b.value.as_ref())
 									.is_some_and(|(a, b)| a.rough_eq(b)))
 						})) {
+				let entity = Arc::make_mut(entity);
+
 				entity.pin_connection_overrides = deserialised;
 
 				send_overrides_decorations(app, editor_id.to_owned(), entity)?;
@@ -306,6 +315,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 									.zip(b.value.as_ref())
 									.is_some_and(|(a, b)| a.rough_eq(b)))
 						})) {
+				let entity = Arc::make_mut(entity);
+
 				entity.pin_connection_override_deletes = deserialised;
 
 				send_overrides_decorations(app, editor_id.to_owned(), entity)?;

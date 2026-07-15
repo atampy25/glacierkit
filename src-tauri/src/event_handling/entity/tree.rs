@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
@@ -36,6 +36,7 @@ use crate::{
 		random_entity_id, reverse_parent_refs_set, visit_variant_mut
 	},
 	finish_task,
+	game::GameFiles,
 	general::EMPTY_ID,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
@@ -253,6 +254,8 @@ pub async fn create(app: &AppHandle, editor_id: Uuid, id: EntityID, content: Sub
 		}
 	};
 
+	let entity = Arc::make_mut(entity);
+
 	entity.sub_entities.insert(id, content);
 
 	send_request(
@@ -300,6 +303,8 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 			panic!();
 		}
 	};
+
+	let entity = Arc::make_mut(entity);
 
 	entity.sub_entities.get_mut(&id).context("No such entity")?.name = new_name.into();
 
@@ -522,6 +527,10 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 			.await?;
 	}
 
+	if app_state.scene_renderer.is_active() {
+		app_state.scene_renderer.select_entity(entity.factory, id);
+	}
+
 	finish_task(app, task)?;
 }
 
@@ -545,6 +554,8 @@ pub async fn reparent(app: &AppHandle, editor_id: Uuid, id: EntityID, new_parent
 			panic!();
 		}
 	};
+
+	let entity = Arc::make_mut(entity);
 
 	entity.sub_entities.get_mut(&id).context("No such entity")?.parent = new_parent.map(Ref::local);
 
@@ -608,6 +619,8 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 			panic!();
 		}
 	};
+
+	let entity = Arc::make_mut(entity);
 
 	let reverse_refs = calculate_reverse_references(entity)?;
 
@@ -952,6 +965,8 @@ pub async fn paste(
 			panic!();
 		}
 	};
+
+	let entity = Arc::make_mut(entity);
 
 	let mut changed_entity_ids = HashMap::default();
 	let mut added_external_scenes = 0;
@@ -1427,6 +1442,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 			panic!();
 		}
 	};
+
+	let entity = Arc::make_mut(entity);
 
 	if let Some(game) = app_state.game.load().as_ref() {
 		let resource_type = game.resource_type(file).context("Nonexistent resource")?;
@@ -2120,6 +2137,8 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 		}
 	};
 
+	let entity = Arc::make_mut(entity);
+
 	let player_transform = app_state.editor_connection.get_player_transform().await?;
 
 	if entity
@@ -2268,6 +2287,8 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 			panic!();
 		}
 	};
+
+	let entity = Arc::make_mut(entity);
 
 	let player_transform = app_state.editor_connection.get_player_transform().await?;
 
@@ -2418,6 +2439,8 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 		}
 	};
 
+	let entity = Arc::make_mut(entity);
+
 	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
 
 	if entity
@@ -2567,6 +2590,8 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 		}
 	};
 
+	let entity = Arc::make_mut(entity);
+
 	let camera_transform = app_state.editor_connection.get_camera_transform().await?;
 
 	let property = entity
@@ -2696,6 +2721,8 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 		Err(anyhow!("Editor {} is not a QN patch editor", editor_id))?;
 		panic!();
 	};
+
+	let current = Arc::make_mut(current);
 
 	if let EditorValidity::Invalid(err) = check_local_references_exist(
 		base.sub_entities

@@ -23,6 +23,7 @@ use crate::{
 	HashMap, HashSet,
 	bin1::deserialize_generic_writer,
 	finish_task,
+	game::GameFiles,
 	languages::get_language_map,
 	model::{AppState, EditorData, EditorState, EditorType, Request, TabRequest, TabRequestData},
 	send_request, start_progress, start_task, task_progress
@@ -276,7 +277,7 @@ pub async fn start_content_search(
 								"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB"
 								| "ENUM" | "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP"
 								| "GFXA" | "KWOR" | "TDAT" | "TDPK" | "WEMD" => {
-									deserialize_generic_writer(
+									let _ = deserialize_generic_writer(
 										game.version(),
 										if filetype == "DSWB" {
 											"WSWB".try_into().ok()?
@@ -285,8 +286,7 @@ pub async fn start_content_search(
 										},
 										&partition.read_resource(resource_id).ok()?,
 										&mut matcher
-									)
-									.ok()?;
+									);
 								}
 
 								"JSON" | "REPO" | "XMLB" => {

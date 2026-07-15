@@ -271,6 +271,7 @@ export type EntityGeneralEvent =
 				showChangesFromOriginal: boolean
 			}
 	  }
+	| { type: "startSceneRenderer" }
 
 export type EntityGeneralRequest = {
 	type: "setIsPatchEditor"
@@ -875,12 +876,14 @@ export type Event_Deserialize =
 	| { type: "editor"; data: EditorEvent_Deserialize }
 	| { type: "global"; data: GlobalEvent }
 	| { type: "editorConnection"; data: EditorConnectionEvent_Deserialize }
+	| { type: "sceneRenderer"; data: SceneRendererEvent }
 
 export type Event_Serialize =
 	| { type: "tool"; data: ToolEvent }
 	| { type: "editor"; data: EditorEvent_Serialize }
 	| { type: "global"; data: GlobalEvent }
 	| { type: "editorConnection"; data: EditorConnectionEvent_Serialize }
+	| { type: "sceneRenderer"; data: SceneRendererEvent }
 
 /**
  *  An exposed entity.
@@ -1773,6 +1776,13 @@ export type ReverseReferenceData =
 				subset: string
 			}
 	  }
+
+export type SceneRendererEvent = {
+	type: "entitiesSelected"
+	data: {
+		entities: [string, string][]
+	}
+}
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 

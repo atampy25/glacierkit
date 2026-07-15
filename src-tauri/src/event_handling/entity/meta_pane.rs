@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use quickentity_rs::entity::CommentEntity;
@@ -47,6 +49,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetaPaneEvent
 					panic!();
 				}
 			};
+
+			let entity = Arc::make_mut(entity);
 
 			// Remove comment referring to given entity
 			entity.comments.retain(|x| x.parent.is_none_or(|x| x != entity_id));

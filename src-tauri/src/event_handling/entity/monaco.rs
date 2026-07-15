@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use glacier_commons::metadata::RuntimeID;
@@ -16,6 +18,7 @@ use crate::{
 	},
 	event_handling::resource_overview::open_resource_overview,
 	finish_task,
+	game::GameFiles,
 	general::open_in_editor,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest, EntityMonacoEvent,
@@ -306,6 +309,8 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 
 						return Ok(());
 					}
+
+					let entity = Arc::make_mut(entity);
 
 					entity.sub_entities.insert(entity_id.to_owned(), sub_entity.to_owned());
 

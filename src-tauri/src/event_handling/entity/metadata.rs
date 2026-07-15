@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use tauri::{AppHandle, Manager};
@@ -89,6 +91,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 					}
 				};
 
+				let entity = Arc::make_mut(entity);
+
 				entity.factory = factory;
 			}
 
@@ -158,6 +162,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 					}
 				};
 
+				let entity = Arc::make_mut(entity);
+
 				entity.blueprint = blueprint;
 			}
 
@@ -220,6 +226,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 				}
 			};
 
+			let entity = Arc::make_mut(entity);
+
 			entity.root_entity = root_entity;
 
 			send_request(
@@ -248,6 +256,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 				}
 			};
 
+			let entity = Arc::make_mut(entity);
+
 			entity.sub_type = sub_type;
 
 			send_request(
@@ -275,6 +285,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMetadataEvent
 					panic!();
 				}
 			};
+
+			let entity = Arc::make_mut(entity);
 
 			entity.external_scenes = external_scenes;
 

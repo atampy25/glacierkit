@@ -3,7 +3,7 @@ use std::{fs, path::Path, time::Duration};
 use anyhow::{Context, Result, anyhow};
 use ecow::{EcoString, eco_format};
 use fn_error_context::context;
-use glacier_commons::{game::GlacierGame, hash_list::HASH_LIST, metadata::RuntimeID, resource_type, rid};
+use glacier_commons::{game::GlacierGame, metadata::RuntimeID, resource_type, rid};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lazy_regex::regex_captures;
@@ -26,7 +26,7 @@ use crate::{
 	HashMap, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
 	event_handling::resource_overview::{get_extract_kinds, initialise_resource_overview},
 	finish_task,
-	game::{Game, custom_game_install},
+	game::{Game, GameFiles, custom_game_install},
 	model::{
 		AppSettings, AppState, ContentSearchRequest, EditorData, EditorRequest, EditorRequestData, EditorState,
 		EditorType, FileBrowserRequest, GameBrowserRequest, GlobalRequest, Hash, JsonPatchType, Request,
@@ -908,8 +908,6 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 
 			let app_data_dir = app.path().app_data_dir().context("Couldn't get data dir")?;
 
-			HASH_LIST.load_latest().await?;
-
 			let app_state = app.state::<AppState>();
 			let current_version = app_state
 				.tonytools_hash_list
@@ -1183,8 +1181,8 @@ pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Re
 					EditorState {
 						file: None,
 						data: EditorData::QNPatch {
-							current: Box::new((*entity).to_owned()),
-							base: entity,
+							base: entity.clone(),
+							current: entity,
 							settings: Default::default()
 						},
 						..Default::default()

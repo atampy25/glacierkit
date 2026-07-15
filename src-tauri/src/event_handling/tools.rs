@@ -35,7 +35,7 @@ use crate::{
 		resource_overview::{extract_file, get_extract_kinds, open_resource_overview}
 	},
 	finish_task,
-	game::{custom_game_install, valid_game_path},
+	game::{GameFiles, custom_game_install, valid_game_path},
 	general::{EMPTY_ID, REPO_ID, initialise_app, load_game_files, open_file, open_in_editor},
 	model::{
 		AppSettings, AppState, ContentSearchEvent, FileBrowserEvent, GameBrowserEntry, GameBrowserEvent,

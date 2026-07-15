@@ -4,11 +4,12 @@
 	import Tree from "./Tree.svelte"
 	import Monaco from "./Monaco.svelte"
 	import MetaPane from "./MetaPane.svelte"
-	import { Checkbox } from "carbon-components-svelte"
-	import { event } from "$lib/utils"
+	import { Checkbox, Button } from "carbon-components-svelte"
+	import { event, trackEvent } from "$lib/utils"
 	import Metadata from "./Metadata.svelte"
 	import Overrides from "./Overrides.svelte"
 	import { help } from "$lib/helpray"
+	import { Cube } from "carbon-icons-svelte"
 
 	export let id: string
 
@@ -120,6 +121,31 @@
 				>
 			{/each}
 		</div>
+		<Button
+			icon={Cube}
+			size="field"
+			on:click={async () => {
+				trackEvent("Open scene renderer")
+
+				await event({
+					type: "editor",
+					data: {
+						editor: id,
+						data: {
+							type: "entity",
+							data: {
+								type: "general",
+								data: {
+									type: "startSceneRenderer"
+								}
+							}
+						}
+					}
+				})
+			}}
+		>
+			Open in 3D
+		</Button>
 		<div use:help={{ title: "Show reverse parent references", description: "Whether to show parent references in the reverse references list. This is off by default to reduce clutter." }}>
 			<Checkbox checked={showReverseParentRefs} on:change={showReverseParentRefsChanged} labelText="Show reverse parent references" />
 		</div>

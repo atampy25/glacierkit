@@ -23,7 +23,7 @@ use mesh_tools::{
 };
 use quickentity_rs::{
 	entity::{Entity, EntityID, Ref},
-	variant::{Transform, Variant}
+	variant::{RawVariant, Transform, Variant}
 };
 use rayon::iter::{
 	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator
@@ -32,7 +32,10 @@ use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use tryvial::try_fn;
 
-use crate::{HashMap, game::Game};
+use crate::{
+	HashMap, HashSet,
+	game::{Game, GameFiles}
+};
 
 #[try_fn]
 #[context("Couldn't convert PRIM file to OBJ")]
@@ -334,7 +337,7 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 						.render_state
 						.alpha_test_enabled
 						.unwrap_or(false)
-						.then(|| (1 - material.binder.render_state.alpha_reference.unwrap_or(255)) as f32 / 255.0)
+						.then(|| material.binder.render_state.alpha_reference.unwrap_or(255) as f32 / 255.0)
 				)
 			};
 
@@ -522,7 +525,7 @@ pub struct InstantiatedEntity {
 	pub exposed_entities: HashMap<EcoString, Vec<InstantiatedEntityRef>>
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InstantiatedEntityFactory {
 	Factory(RuntimeID),
 	Factories(Vec<InstantiatedEntityID>)
@@ -549,18 +552,36 @@ pub struct PropertySource {
 
 #[try_fn]
 #[context("Couldn't instantiate scene")]
-pub fn instantiate_scene(game: &Game, entity: &Entity) -> Result<InstantiatedScene> {
+pub fn instantiate_scene(game: &impl GameFiles, entity: &Entity) -> Result<InstantiatedScene> {
 	let mut entities = SlotMap::default();
 
 	#[try_fn]
 	fn process_entity(
-		game: &Game,
+		game: &impl GameFiles,
 		entity: &Entity,
 		entities: &mut SlotMap<InstantiatedEntityID, InstantiatedEntity>
 	) -> Result<InstantiatedEntityID> {
 		let mut entity_instantiations = HashMap::new();
 
+		let mut exclude = HashSet::default();
 		for (id, sub_entity) in &entity.sub_entities {
+			if sub_entity.editor_only {
+				exclude.insert(*id);
+
+				fn remove_children(exclude: &mut HashSet<EntityID>, entity: &Entity, parent: EntityID) {
+					for (id, sub_entity) in &entity.sub_entities {
+						if sub_entity.parent.as_ref().is_some_and(|x| x.as_local() == Some(parent)) {
+							exclude.insert(*id);
+							remove_children(exclude, entity, *id);
+						}
+					}
+				}
+
+				remove_children(&mut exclude, entity, *id);
+			}
+		}
+
+		for (id, sub_entity) in entity.sub_entities.iter().filter(|(id, _)| !exclude.contains(id)) {
 			let factories = if let Some(ty) = game.resource_type(sub_entity.factory.resource)
 				&& ty == "ASET"
 			{
@@ -680,7 +701,7 @@ pub fn instantiate_scene(game: &Game, entity: &Entity) -> Result<InstantiatedSce
 			}
 		}
 
-		for (id, sub_entity) in &entity.sub_entities {
+		for (id, sub_entity) in entity.sub_entities.iter().filter(|(id, _)| !exclude.contains(id)) {
 			let instance = entity_instantiations[id];
 
 			entities[instance].parent = sub_entity.parent.as_ref().map(|parent| {
@@ -712,9 +733,11 @@ pub fn instantiate_scene(game: &Game, entity: &Entity) -> Result<InstantiatedSce
 										exposed_entity: reference.exposed_entity.to_owned()
 									})
 								} else {
-									Some(InstantiatedEntityRef::Local {
-										entity: entity_instantiations[&reference.entity_id],
-										exposed_entity: reference.exposed_entity.to_owned()
+									entity_instantiations.get(&reference.entity_id).copied().map(|entity| {
+										InstantiatedEntityRef::Local {
+											entity,
+											exposed_entity: reference.exposed_entity.to_owned()
+										}
 									})
 								}
 							} else {
@@ -740,9 +763,11 @@ pub fn instantiate_scene(game: &Game, entity: &Entity) -> Result<InstantiatedSce
 												exposed_entity: reference.exposed_entity.to_owned()
 											})
 										} else {
-											Some(InstantiatedEntityRef::Local {
-												entity: entity_instantiations[&reference.entity_id],
-												exposed_entity: reference.exposed_entity.to_owned()
+											entity_instantiations.get(&reference.entity_id).copied().map(|entity| {
+												InstantiatedEntityRef::Local {
+													entity,
+													exposed_entity: reference.exposed_entity.to_owned()
+												}
 											})
 										}
 									} else {
@@ -758,15 +783,39 @@ pub fn instantiate_scene(game: &Game, entity: &Entity) -> Result<InstantiatedSce
 
 			for (alias_name, aliases) in &sub_entity.property_aliases {
 				for alias in aliases {
-					entities[entity_instantiations[&alias.original_entity]]
-						.properties
-						.insert(
+					if let Some(original) = entity_instantiations.get(&alias.original_entity).copied() {
+						entities[original].properties.insert(
 							alias.original_property.to_owned(),
 							PropertySource {
 								entity: instance,
 								property: alias_name.to_owned()
 							}
 						);
+					}
+				}
+			}
+
+			// Treat events like property aliases if the property is known
+			// Allows for better handling of LampCore
+			for (event_name, connections) in sub_entity
+				.events
+				.iter()
+				.filter(|&(x, _)| x == "DiffuseColor" || x == "DiffusePower" || x == "GlowPower")
+			{
+				for (input, targets) in connections {
+					for target in targets {
+						if let Some(local) = target.entity_ref.as_local()
+							&& let Some(original) = entity_instantiations.get(&local).copied()
+						{
+							entities[original].properties.insert(
+								input.to_owned(),
+								PropertySource {
+									entity: instance,
+									property: event_name.to_owned()
+								}
+							);
+						}
+					}
 				}
 			}
 
@@ -776,18 +825,20 @@ pub fn instantiate_scene(game: &Game, entity: &Entity) -> Result<InstantiatedSce
 					exposed_entity
 						.refers_to
 						.iter()
-						.map(|entity_ref| {
+						.filter_map(|entity_ref| {
 							if let Some(external_scene) = entity_ref.external_scene {
-								InstantiatedEntityRef::External {
+								Some(InstantiatedEntityRef::External {
 									external_scene,
 									entity_id: entity_ref.entity_id,
 									exposed_entity: entity_ref.exposed_entity.to_owned()
-								}
+								})
 							} else {
-								InstantiatedEntityRef::Local {
-									entity: entity_instantiations[&entity_ref.entity_id],
-									exposed_entity: entity_ref.exposed_entity.to_owned()
-								}
+								entity_instantiations.get(&entity_ref.entity_id).copied().map(|entity| {
+									InstantiatedEntityRef::Local {
+										entity,
+										exposed_entity: entity_ref.exposed_entity.to_owned()
+									}
+								})
 							}
 						})
 						.collect()
@@ -934,9 +985,9 @@ pub fn resolve_ref(
 
 #[try_fn]
 #[context("Couldn't instantiate scenes")]
-pub fn instantiate_scenes(game: &Game, scenes: &[RuntimeID]) -> Result<InstantiatedScenes> {
+pub fn instantiate_scenes(game: &impl GameFiles, scenes: &[RuntimeID]) -> Result<InstantiatedScenes> {
 	let mut scenes = scenes
-		.iter()
+		.par_iter()
 		.map(|&id| {
 			Ok((id, {
 				let entity = game.extract_entity(id)?;
@@ -1022,41 +1073,107 @@ slotmap::new_key_type! { pub struct GeomEntityID; }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SceneGeometry {
-	pub geometry: SlotMap<GeomEntityID, GeomEntity>
+	pub geometry: SlotMap<GeomEntityID, GeomEntity>,
+	pub global_material_overrides: HashMap<RuntimeID, (RuntimeID, HashMap<EcoString, Variant>)>
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct GeomEntity {
+	/// The instantiated entity which this geometry entity was created from.
+	pub source: (RuntimeID, InstantiatedEntityID),
+
+	/// Transform parent of the entity. NOT the logical parent.
+	pub parent: Option<GeomEntityID>,
+
+	/// Transform relative to parent (or world if no parent).
+	pub transform: Affine3,
+
+	#[serde(flatten)]
+	pub data: GeomEntityData
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type")]
-pub enum GeomEntity {
-	Spatial {
-		/// Transform parent of the entity. NOT the logical parent.
-		parent: Option<GeomEntityID>,
-
-		/// Transform relative to parent (or world if no parent).
-		transform: Affine3
-	},
+pub enum GeomEntityData {
+	Spatial,
 
 	Geometry {
-		/// Transform parent of the entity. NOT the logical parent.
-		parent: Option<GeomEntityID>,
-
-		/// Transform relative to parent (or world if no parent).
-		transform: Affine3,
-
 		/// Primitive scale.
 		scale: Vec3,
 
 		/// PRIM resource containing geometry for this entity.
-		prim: RuntimeID
+		prim: RuntimeID,
+
+		/// Overridden materials and properties, set by material entities and overwrite aspects.
+		/// TODO: Consider operations, Enab
+		material_overrides: HashMap<RuntimeID, (RuntimeID, HashMap<EcoString, Variant>)>
+	},
+
+	Light {
+		diffuse_color: Vec3,
+
+		diffuse_power: f32,
+
+		cast_shadows: bool,
+
+		light_kind: LightKind
+	}
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(tag = "type")]
+pub enum LightKind {
+	Point,
+	Spot { inner_angle: f32, outer_angle: f32 },
+	Directional,
+	Ambient
+}
+
+pub struct RenderSettings {
+	/// Whether to add light entities.
+	pub lighting: bool,
+
+	/// LOD level to use for geometry.
+	pub lod: LodLevel
+}
+
+impl Default for RenderSettings {
+	fn default() -> Self {
+		RenderSettings {
+			lighting: false,
+			lod: LodLevel::LEVEL7
+		}
+	}
+}
+
+impl Clone for RenderSettings {
+	fn clone(&self) -> Self {
+		Self {
+			lighting: self.lighting,
+			lod: match self.lod {
+				LodLevel::LEVEL1 => LodLevel::LEVEL1,
+				LodLevel::LEVEL2 => LodLevel::LEVEL2,
+				LodLevel::LEVEL3 => LodLevel::LEVEL3,
+				LodLevel::LEVEL4 => LodLevel::LEVEL4,
+				LodLevel::LEVEL5 => LodLevel::LEVEL5,
+				LodLevel::LEVEL6 => LodLevel::LEVEL6,
+				LodLevel::LEVEL7 => LodLevel::LEVEL7,
+				LodLevel::LEVEL8 => LodLevel::LEVEL8
+			}
+		}
 	}
 }
 
 #[try_fn]
 #[context("Couldn't get scene geometry")]
-pub fn get_scene_geometry(game: &Game, scenes: &InstantiatedScenes) -> Result<SceneGeometry> {
+pub fn get_scene_geometry(
+	game: &impl GameFiles,
+	scenes: &InstantiatedScenes,
+	settings: RenderSettings
+) -> Result<SceneGeometry> {
 	#[try_fn]
 	fn get_property_value(
-		game: &Game,
+		game: &impl GameFiles,
 		scenes: &InstantiatedScenes,
 		scene_id: RuntimeID,
 		scene: &InstantiatedScene,
@@ -1203,118 +1320,669 @@ pub fn get_scene_geometry(game: &Game, scenes: &InstantiatedScenes) -> Result<Sc
 		value
 	}
 
+	#[try_fn]
+	fn get_ref_array_property_value(
+		scenes: &InstantiatedScenes,
+		scene_id: RuntimeID,
+		scene: &InstantiatedScene,
+		no_traverse: Option<InstantiatedEntityID>,
+		entity: InstantiatedEntityID,
+		property: &EcoString
+	) -> Result<Option<Vec<Option<(RuntimeID, InstantiatedEntityID)>>>> {
+		if let Some(override_val) = scenes.property_overrides.get(&(scene_id, entity, property.into())) {
+			let Variant::Array(_, items) = override_val else {
+				bail!("Value should be an array of references");
+			};
+
+			return Ok(Some(
+				items
+					.iter()
+					.map(|item| {
+						let Variant::Ref(reference) = item else {
+							bail!("Value should be an array of references");
+						};
+
+						reference
+							.as_ref()
+							.map(|reference| resolve_ref(&scenes.scenes, scene_id, reference))
+							.transpose()
+							.map(|x| match x {
+								None => vec![None],
+								Some(x) => x.into_iter().map(Some).collect()
+							})
+					})
+					.flatten_ok()
+					.collect::<Result<_>>()?
+			));
+		}
+
+		let instance = &scene.entities[entity];
+
+		let mut value = None;
+
+		// If this entity is an expansion of a parent, the parent takes precedence
+		if instance.is_parent_factory {
+			let Some(InstantiatedEntityRef::Local {
+				entity: parent_entity, ..
+			}) = &instance.parent
+			else {
+				unreachable!();
+			};
+
+			if !no_traverse.is_some_and(|x| x == *parent_entity) {
+				value = get_ref_array_property_value(scenes, scene_id, scene, Some(entity), *parent_entity, property)?;
+			}
+		}
+
+		// Otherwise there may be a property alias from elsewhere
+		if value.is_none()
+			&& let Some(source) = instance.properties.get(property)
+			&& !(source.entity == entity && source.property == *property)
+			&& !no_traverse.is_some_and(|x| x == source.entity)
+		{
+			value =
+				get_ref_array_property_value(scenes, scene_id, scene, Some(entity), source.entity, &source.property)?;
+		}
+
+		// Otherwise use the entity's own property value
+		if value.is_none()
+			&& let Some(val) = instance.ref_properties.get(property)
+		{
+			value = Some(
+				val.iter()
+					.map(|reference| {
+						reference
+							.to_owned()
+							.map(|reference| resolve_instantiated_ref(&scenes.scenes, scene_id, reference))
+							.transpose()
+							.map(|x| match x {
+								None => vec![None],
+								Some(x) => x.into_iter().map(Some).collect()
+							})
+					})
+					.flatten_ok()
+					.collect::<Result<_>>()?
+			);
+		}
+
+		// Finally, try child expansions of this entity
+		if value.is_none()
+			&& let InstantiatedEntityFactory::Factories(children) = &instance.factory
+		{
+			for child in children {
+				if value.is_none() && !no_traverse.is_some_and(|x| x == *child) {
+					value = get_ref_array_property_value(scenes, scene_id, scene, Some(entity), *child, &property)?;
+				}
+			}
+		}
+
+		value
+	}
+
 	let mut geometry = SlotMap::default();
 	let mut ids: HashMap<(RuntimeID, InstantiatedEntityID), GeomEntityID> = HashMap::default();
 
+	let mut global_material_overrides: HashMap<RuntimeID, (RuntimeID, HashMap<EcoString, Variant>)> =
+		HashMap::default();
+
+	let matt_props = game
+		.intellisense()
+		.get_cppt_properties(game, crate::class_for_game!(game, "zrendermaterialentity"))?
+		.into_iter()
+		.map(|(x, _)| x)
+		.collect::<HashSet<_>>();
+
 	for (scene_id, (_, scene)) in &scenes.scenes {
 		for (id, instance) in &scene.entities {
-			#[try_fn]
-			fn process_entity(
-				game: &Game,
-				scenes: &InstantiatedScenes,
-				scene_id: RuntimeID,
-				scene: &InstantiatedScene,
-				id: InstantiatedEntityID,
-				instance: &InstantiatedEntity,
-				ids: &mut HashMap<(RuntimeID, InstantiatedEntityID), GeomEntityID>,
-				geometry: &mut SlotMap<GeomEntityID, GeomEntity>
-			) -> Result<GeomEntityID> {
-				let transform = if let Some(transform) =
-					get_property_value(game, scenes, scene_id, scene, None, id, &"m_mTransform".into())?
-				{
-					let Variant::Transform(transform) = transform else {
-						bail!("m_mTransform should be a transform")
-					};
+			if let InstantiatedEntityFactory::Factory(factory) = instance.factory
+				&& game.resource_type(factory).is_some_and(|ty| ty == "MATT")
+				&& get_property_value(game, scenes, *scene_id, scene, None, id, &"Global".into())?
+					.map(|val| {
+						if let Variant::Raw(val) = val
+							&& val.variant_type() == "bool"
+						{
+							val.to_serde().unwrap().as_bool().unwrap()
+						} else {
+							false
+						}
+					})
+					.unwrap_or(false)
+				&& get_property_value(game, scenes, *scene_id, scene, None, id, &"Active".into())?
+					.map(|val| {
+						if let Variant::Raw(val) = val
+							&& val.variant_type() == "bool"
+						{
+							val.to_serde().unwrap().as_bool().unwrap()
+						} else {
+							true
+						}
+					})
+					.unwrap_or(true)
+			{
+				let this_material = game
+					.extract_latest_metadata(factory)?
+					.core_info
+					.references
+					.iter()
+					.find_map(|x| {
+						game.resource_type(x.resource)
+							.is_some_and(|ty| ty == "MATI")
+							.then_some(x.resource)
+					})
+					.context("No MATI present on MATT")?;
 
-					transform.to_glam()
-				} else {
-					Affine3::IDENTITY
-				};
-
-				let parent = if let Some(value) =
-					get_ref_property_value(scenes, scene_id, scene, None, id, &"m_eidParent".into())?
-					&& let Some((parent_scene_id, parent_id)) = value
-				{
-					let parent_scene = &scenes.scenes[&parent_scene_id].1;
-					Some(process_entity(
+				let overridden_material =
+					if get_property_value(game, scenes, *scene_id, scene, None, id, &"Override".into())?
+						.map(|val| {
+							if let Variant::Raw(val) = val
+								&& val.variant_type() == "bool"
+							{
+								val.to_serde().unwrap().as_bool().unwrap()
+							} else {
+								false
+							}
+						})
+						.unwrap_or(false) && let Some(dest) = get_property_value(
 						game,
 						scenes,
-						parent_scene_id,
-						parent_scene,
-						parent_id,
-						&parent_scene.entities[parent_id],
-						ids,
-						geometry
-					)?)
-				} else {
-					None
-				};
-
-				if let InstantiatedEntityFactory::Factory(factory) = instance.factory
-					&& (factory == crate::class_for_game!(game, "zgeomentity")
-						|| factory == crate::class_for_game!(game, "zlinkedentity"))
-					&& let Some(prim) =
-						get_property_value(game, scenes, scene_id, scene, None, id, &"m_ResourceID".into())?
-					&& let Variant::Resource(_, Some(prim)) = prim
-				{
-					let scale = if let Some(scale) =
-						get_property_value(game, scenes, scene_id, scene, None, id, &"m_PrimitiveScale".into())?
+						*scene_id,
+						scene,
+						None,
+						id,
+						&"MaterialInstanceOverrideDest".into()
+					)?
+					.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
 					{
-						let Variant::Raw(scale) = scale else {
-							bail!("m_PrimitiveScale should be a vector")
-						};
-
-						let scale = scale.to_serde()?;
-						Vec3 {
-							x: scale
-								.get("x")
-								.context("Scale should have an x component")?
-								.as_f64()
-								.context("Scale x component should be a float")? as f32,
-							y: scale
-								.get("y")
-								.context("Scale should have a y component")?
-								.as_f64()
-								.context("Scale y component should be a float")? as f32,
-							z: scale
-								.get("z")
-								.context("Scale should have a z component")?
-								.as_f64()
-								.context("Scale z component should be a float")? as f32
-						}
+						dest.resource
 					} else {
-						Vec3::ONE
+						this_material
 					};
 
-					let added = geometry.insert(GeomEntity::Geometry {
-						parent,
-						transform,
-						scale,
-						prim: prim.resource
-					});
+				let overrides = &mut global_material_overrides
+					.entry(overridden_material)
+					.or_insert_with(|| (this_material, Default::default()))
+					.1;
 
-					ids.insert((scene_id, id), added);
-
-					added
-				} else {
-					let added = geometry.insert(GeomEntity::Spatial { parent, transform });
-
-					ids.insert((scene_id, id), added);
-
-					added
+				for property in instance.properties.keys().filter(|x| !matt_props.contains(*x)) {
+					if let Some(value) = get_property_value(game, scenes, *scene_id, scene, None, id, property)? {
+						overrides.insert(property.to_owned(), value);
+					}
 				}
-			}
-
-			if let InstantiatedEntityFactory::Factory(factory) = instance.factory
-				&& (factory == crate::class_for_game!(game, "zgeomentity")
-					|| factory == crate::class_for_game!(game, "zlinkedentity"))
-			{
-				process_entity(game, scenes, *scene_id, scene, id, instance, &mut ids, &mut geometry)?;
 			}
 		}
 	}
 
-	SceneGeometry { geometry }
+	#[try_fn]
+	fn process_entity(
+		game: &impl GameFiles,
+		scenes: &InstantiatedScenes,
+		settings: &RenderSettings,
+		scene_id: RuntimeID,
+		scene: &InstantiatedScene,
+		id: InstantiatedEntityID,
+		instance: &InstantiatedEntity,
+		ids: &mut HashMap<(RuntimeID, InstantiatedEntityID), GeomEntityID>,
+		geometry: &mut SlotMap<GeomEntityID, GeomEntity>
+	) -> Result<GeomEntityID> {
+		if let Some(existing) = ids.get(&(scene_id, id)) {
+			return Ok(*existing);
+		}
+
+		// Return a geomentity if possible, otherwise spatial/light
+		if let InstantiatedEntityFactory::Factories(children) = &instance.factory {
+			fn find_geom(
+				geometry: &SlotMap<GeomEntityID, GeomEntity>,
+				ids: &HashMap<(RuntimeID, InstantiatedEntityID), GeomEntityID>,
+				scene_id: RuntimeID,
+				scene: &InstantiatedScene,
+				id: InstantiatedEntityID
+			) -> Option<GeomEntityID> {
+				if let InstantiatedEntityFactory::Factories(children) = &scene.entities[id].factory {
+					children
+						.iter()
+						.find_map(|&child| find_geom(geometry, ids, scene_id, scene, child))
+				} else if let Some(existing) = ids.get(&(scene_id, id))
+					&& matches!(geometry[*existing].data, GeomEntityData::Geometry { .. })
+				{
+					Some(*existing)
+				} else {
+					None
+				}
+			}
+
+			if let Some(existing) = children
+				.iter()
+				.find_map(|&child| find_geom(geometry, ids, scene_id, scene, child))
+			{
+				return Ok(existing);
+			}
+
+			fn find_existing(
+				ids: &HashMap<(RuntimeID, InstantiatedEntityID), GeomEntityID>,
+				scene_id: RuntimeID,
+				scene: &InstantiatedScene,
+				id: InstantiatedEntityID
+			) -> Option<GeomEntityID> {
+				if let InstantiatedEntityFactory::Factories(children) = &scene.entities[id].factory {
+					children
+						.iter()
+						.find_map(|&child| find_existing(ids, scene_id, scene, child))
+				} else if let Some(existing) = ids.get(&(scene_id, id)) {
+					Some(*existing)
+				} else {
+					None
+				}
+			}
+
+			if let Some(existing) = children
+				.iter()
+				.find_map(|&child| find_existing(ids, scene_id, scene, child))
+			{
+				return Ok(existing);
+			}
+		}
+
+		let transform = if let Some(transform) =
+			get_property_value(game, scenes, scene_id, scene, None, id, &"m_mTransform".into())?
+		{
+			let Variant::Transform(transform) = transform else {
+				bail!("m_mTransform should be a transform")
+			};
+
+			transform.to_glam()
+		} else {
+			Affine3::IDENTITY
+		};
+
+		let parent = if let Some(value) =
+			get_ref_property_value(scenes, scene_id, scene, None, id, &"m_eidParent".into())?
+			&& let Some((parent_scene_id, parent_id)) = value
+		{
+			let parent_scene = &scenes.scenes[&parent_scene_id].1;
+			Some(process_entity(
+				game,
+				scenes,
+				settings,
+				parent_scene_id,
+				parent_scene,
+				parent_id,
+				&parent_scene.entities[parent_id],
+				ids,
+				geometry
+			)?)
+		} else {
+			None
+		};
+
+		if let InstantiatedEntityFactory::Factory(factory) = instance.factory
+			&& [
+				crate::class_for_game!(game, "zgeomentity"),
+				crate::class_for_game!(game, "zlinkedentity"),
+				crate::class_for_game!(game, "zprimitiveproxyentity")
+			]
+			.contains(&factory)
+			&& let Variant::Raw(visible) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_bVisible".into())?
+					.unwrap_or_else(|| Variant::Raw(RawVariant::H3(glacier_bin1::game::h3::ZVariant::new(true))))
+			&& visible.variant_type() == "bool"
+			&& visible.to_serde()?.as_bool().unwrap()
+			&& let Some(prim) = get_property_value(game, scenes, scene_id, scene, None, id, &"m_ResourceID".into())?
+			&& let Variant::Resource(_, Some(prim)) = prim
+		{
+			let scale = if let Some(scale) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_PrimitiveScale".into())?
+			{
+				let Variant::Raw(scale) = scale else {
+					bail!("m_PrimitiveScale should be a vector")
+				};
+
+				let scale = scale.to_serde()?;
+				Vec3 {
+					x: scale
+						.get("x")
+						.context("Scale should have an x component")?
+						.as_f64()
+						.context("Scale x component should be a float")? as f32,
+					y: scale
+						.get("y")
+						.context("Scale should have a y component")?
+						.as_f64()
+						.context("Scale y component should be a float")? as f32,
+					z: scale
+						.get("z")
+						.context("Scale should have a z component")?
+						.as_f64()
+						.context("Scale z component should be a float")? as f32
+				}
+			} else {
+				Vec3::ONE
+			};
+
+			let mut material_overrides: HashMap<RuntimeID, (RuntimeID, HashMap<EcoString, Variant>)> =
+				Default::default();
+
+			if instance.is_parent_factory {
+				for (parent_scene, parent_id) in
+					resolve_instantiated_ref(&scenes.scenes, scene_id, instance.parent.to_owned().unwrap())?
+				{
+					if let InstantiatedEntityFactory::Factories(siblings) =
+						&scenes.scenes[&parent_scene].1.entities[parent_id].factory
+					{
+						for sibling in siblings {
+							let sibling = &scenes.scenes[&parent_scene].1.entities[*sibling];
+							if let InstantiatedEntityFactory::Factory(factory) = &sibling.factory
+								&& game.resource_type(*factory).is_some_and(|ty| ty == "ECPT")
+							{
+								let ecpb_data = game
+									.extract_latest_resource(
+										game.extract_latest_metadata(*factory)?
+											.core_info
+											.references
+											.into_iter()
+											.find(|x| game.resource_type(x.resource).is_some_and(|ty| ty == "ECPB"))
+											.context("No blueprint dependency on ECPT")?
+											.resource
+									)?
+									.1;
+
+								let mut properties = vec![];
+
+								macro_rules! generate {
+									($game:ident) => {{
+										for entry in glacier_bin1::deserialize::<
+											glacier_bin1::game::$game::SExtendedCppEntityBlueprint
+										>(&ecpb_data)?
+										.properties
+										{
+											use glacier_bin1::game::$game::EExtendedPropertyType;
+											if entry.property_type == EExtendedPropertyType::Resourceptr {
+												properties.push((entry.property_name, entry.extra_data));
+											}
+										}
+									}};
+								}
+
+								match game.version() {
+									GlacierGame::H1 => {
+										// ECPB files don't exist in H1
+									}
+									GlacierGame::H2 => generate!(h2),
+									GlacierGame::H3 => generate!(h3),
+									GlacierGame::FL => generate!(fl)
+								}
+
+								for (property, to_overwrite) in properties {
+									if let Some(value) =
+										get_property_value(game, scenes, scene_id, scene, None, id, &property)?
+										&& let Variant::Resource(_, Some(new_material)) = value
+									{
+										material_overrides.insert(
+											to_overwrite.try_into()?,
+											(new_material.resource, Default::default())
+										);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			let added = geometry.insert(GeomEntity {
+				source: (scene_id, id),
+				parent,
+				transform,
+				data: GeomEntityData::Geometry {
+					scale,
+					prim: prim.resource,
+					material_overrides
+				}
+			});
+
+			ids.insert((scene_id, id), added);
+
+			added
+		} else if settings.lighting
+			&& let InstantiatedEntityFactory::Factory(factory) = instance.factory
+			&& factory == crate::class_for_game!(game, "zlightentity")
+			&& let Variant::Raw(visible) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_bVisible".into())?
+					.unwrap_or_else(|| Variant::Raw(RawVariant::H3(glacier_bin1::game::h3::ZVariant::new(true))))
+			&& visible.variant_type() == "bool"
+			&& visible.to_serde()?.as_bool().unwrap()
+		{
+			let light_type = if let Some(Variant::Raw(visible)) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_eLightType".into())?
+				&& let Some(light_type) = visible.to_serde()?.as_str()
+			{
+				light_type.to_owned()
+			} else {
+				"LT_SPOT".into()
+			};
+
+			let diffuse_color = if let Some(Variant::ColorRGB(diffuse_color)) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_diffuseColor".into())?
+			{
+				Vec3::new(diffuse_color.r, diffuse_color.g, diffuse_color.b)
+			} else {
+				Vec3::new(1.0, 1.0, 1.0)
+			};
+
+			let diffuse_power = if let Some(Variant::Raw(diffuse_power)) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_fDiffusePower".into())?
+				&& let Some(diffuse_power) = diffuse_power.to_serde()?.as_f64()
+			{
+				diffuse_power as f32
+			} else {
+				1.0
+			};
+
+			let cast_shadows = if let Some(Variant::Raw(value)) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_bCastShadows".into())?
+			{
+				value.to_serde()?.as_bool().unwrap()
+			} else {
+				true
+			};
+
+			let added = geometry.insert(GeomEntity {
+				source: (scene_id, id),
+				parent,
+				transform,
+				data: GeomEntityData::Light {
+					diffuse_color,
+					diffuse_power,
+					cast_shadows,
+					light_kind: match light_type.as_ref() {
+						"LT_DIRECTIONAL" => LightKind::Directional,
+
+						"LT_SPOT" => {
+							let (inner_angle, outer_angle) = if let Some(Variant::Raw(angular_attenuation)) =
+								get_property_value(
+									game,
+									scenes,
+									scene_id,
+									scene,
+									None,
+									id,
+									&"m_vAngularAttenuation".into()
+								)? {
+								let angular_attenuation = angular_attenuation.to_serde()?;
+								(
+									angular_attenuation
+										.get("x")
+										.context("Angular attenuation should be Vector2")?
+										.as_f64()
+										.context("Angular attenuation should be Vector2")? as f32,
+									angular_attenuation
+										.get("y")
+										.context("Angular attenuation should be Vector2")?
+										.as_f64()
+										.context("Angular attenuation should be Vector2")? as f32
+								)
+							} else {
+								(0.6981316804885864, std::f32::consts::FRAC_PI_4)
+							};
+
+							LightKind::Spot {
+								inner_angle,
+								outer_angle
+							}
+						}
+
+						"LT_OMNI" => LightKind::Point,
+
+						"LT_ENVIRONMENT" => LightKind::Ambient,
+
+						_ => LightKind::Point
+					}
+				}
+			});
+
+			ids.insert((scene_id, id), added);
+
+			added
+		} else {
+			let added = geometry.insert(GeomEntity {
+				source: (scene_id, id),
+				parent,
+				transform,
+				data: GeomEntityData::Spatial
+			});
+
+			ids.insert((scene_id, id), added);
+
+			added
+		}
+	}
+
+	for (scene_id, (_, scene)) in &scenes.scenes {
+		for (id, instance) in &scene.entities {
+			if let InstantiatedEntityFactory::Factory(factory) = instance.factory {
+				if [
+					crate::class_for_game!(game, "zgeomentity"),
+					crate::class_for_game!(game, "zlinkedentity"),
+					crate::class_for_game!(game, "zprimitiveproxyentity")
+				]
+				.contains(&factory)
+					|| (settings.lighting && factory == crate::class_for_game!(game, "zlightentity"))
+				{
+					process_entity(
+						game,
+						scenes,
+						&settings,
+						*scene_id,
+						scene,
+						id,
+						instance,
+						&mut ids,
+						&mut geometry
+					)?;
+				}
+			}
+		}
+	}
+
+	for (scene_id, (_, scene)) in &scenes.scenes {
+		for (id, instance) in &scene.entities {
+			if let InstantiatedEntityFactory::Factory(factory) = instance.factory {
+				if game.resource_type(factory).is_some_and(|ty| ty == "MATT")
+					&& get_property_value(game, scenes, *scene_id, scene, None, id, &"Active".into())?
+						.map(|val| {
+							if let Variant::Raw(val) = val
+								&& val.variant_type() == "bool"
+							{
+								val.to_serde().unwrap().as_bool().unwrap()
+							} else {
+								true
+							}
+						})
+						.unwrap_or(true)
+					&& let Some(clients) =
+						get_ref_array_property_value(scenes, *scene_id, scene, None, id, &"Clients".into())?
+					&& !clients.is_empty()
+				{
+					let this_material = game
+						.extract_latest_metadata(factory)?
+						.core_info
+						.references
+						.iter()
+						.find_map(|x| {
+							game.resource_type(x.resource)
+								.is_some_and(|ty| ty == "MATI")
+								.then_some(x.resource)
+						})
+						.context("No MATI present on MATT")?;
+
+					let overridden_material =
+						if get_property_value(game, scenes, *scene_id, scene, None, id, &"Override".into())?
+							.map(|val| {
+								if let Variant::Raw(val) = val
+									&& val.variant_type() == "bool"
+								{
+									val.to_serde().unwrap().as_bool().unwrap()
+								} else {
+									false
+								}
+							})
+							.unwrap_or(false) && let Some(dest) = get_property_value(
+							game,
+							scenes,
+							*scene_id,
+							scene,
+							None,
+							id,
+							&"MaterialInstanceOverrideDest".into()
+						)?
+						.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
+						{
+							dest.resource
+						} else {
+							this_material
+						};
+
+					for client in clients {
+						if let Some((client_scene_id, client_id)) = client {
+							let client = {
+								let client_scene = &scenes.scenes[&client_scene_id].1;
+								process_entity(
+									game,
+									scenes,
+									&settings,
+									client_scene_id,
+									client_scene,
+									client_id,
+									&client_scene.entities[client_id],
+									&mut ids,
+									&mut geometry
+								)?
+							};
+
+							if let GeomEntityData::Geometry { material_overrides, .. } = &mut geometry[client].data {
+								let overrides = &mut material_overrides
+									.entry(overridden_material)
+									.or_insert_with(|| (this_material, Default::default()))
+									.1;
+
+								for property in instance.properties.keys().filter(|x| !matt_props.contains(*x)) {
+									if let Some(value) =
+										get_property_value(game, scenes, *scene_id, scene, None, id, property)?
+									{
+										overrides.insert(property.to_owned(), value);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	SceneGeometry {
+		geometry,
+		global_material_overrides
+	}
 }
 
 #[try_fn]
@@ -1335,13 +2003,20 @@ pub fn parse_scene_to_glb(
 		}
 	}
 
-	let geometry = get_scene_geometry(game, &scenes)?;
+	let geometry = get_scene_geometry(
+		game,
+		&scenes,
+		RenderSettings {
+			lighting: false,
+			..Default::default()
+		}
+	)?;
 
 	let glbs = geometry
 		.geometry
 		.values()
 		.filter_map(|ent| {
-			if let GeomEntity::Geometry { prim, .. } = ent {
+			if let GeomEntityData::Geometry { prim, .. } = &ent.data {
 				Some(prim)
 			} else {
 				None

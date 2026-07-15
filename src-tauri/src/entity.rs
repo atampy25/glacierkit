@@ -19,7 +19,12 @@ use tonytools::hmlanguages;
 use tryvial::{try_block, try_fn};
 use velcro::vec;
 
-use crate::{HashMap, HashSet, game::Game, languages::get_language_map, model::EditorValidity};
+use crate::{
+	HashMap, HashSet,
+	game::{Game, GameFiles},
+	languages::get_language_map,
+	model::EditorValidity
+};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]

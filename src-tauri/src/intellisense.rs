@@ -21,7 +21,7 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use serde::{Deserialize, Serialize};
 use tryvial::try_fn;
 
-use crate::{HashMap, PapayaMap, game::Game};
+use crate::{HashMap, PapayaMap, game::GameFiles};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CPPTPinsInfo {
@@ -91,7 +91,7 @@ impl Intellisense {
 
 	#[try_fn]
 	#[context("Couldn't get properties for CPPT {}", cppt)]
-	pub fn get_cppt_properties(&self, game: &Game, cppt: RuntimeID) -> Result<HashMap<EcoString, Variant>> {
+	pub fn get_cppt_properties(&self, game: &impl GameFiles, cppt: RuntimeID) -> Result<HashMap<EcoString, Variant>> {
 		{
 			if let Some(cached) = self.cppt_properties.pin().get(&cppt) {
 				return Ok(cached.to_owned());
@@ -300,7 +300,11 @@ impl Intellisense {
 
 	#[try_fn]
 	#[context("Couldn't get properties for MATT {}", matt)]
-	fn get_matt_properties(&self, game: &Game, matt: RuntimeID) -> Result<IndexMap<EcoString, MaterialOverride>> {
+	fn get_matt_properties(
+		&self,
+		game: &impl GameFiles,
+		matt: RuntimeID
+	) -> Result<IndexMap<EcoString, MaterialOverride>> {
 		{
 			if let Some(x) = self.matt_properties.pin().get(&matt) {
 				return Ok(x.to_owned());
@@ -342,7 +346,7 @@ impl Intellisense {
 	#[context("Couldn't get properties for sub-entity {} in {}", sub_entity, entity.factory)]
 	pub fn get_properties(
 		&self,
-		game: &Game,
+		game: &impl GameFiles,
 		entity: &Entity,
 		sub_entity: EntityID,
 		ignore_own: bool
@@ -733,7 +737,7 @@ impl Intellisense {
 	#[context("Couldn't get property {} of sub-entity {} in {}", property_to_find, sub_entity, entity.factory)]
 	pub fn get_specific_property(
 		&self,
-		game: &Game,
+		game: &impl GameFiles,
 		entity: &Entity,
 		sub_entity: EntityID,
 		property_to_find: &str
@@ -1070,7 +1074,7 @@ impl Intellisense {
 	#[context("Couldn't get pins for sub-entity {} in {}", sub_entity, entity.factory)]
 	pub fn get_pins(
 		&self,
-		game: &Game,
+		game: &impl GameFiles,
 		entity: &Entity,
 		sub_entity: EntityID,
 		ignore_own: bool
@@ -1383,7 +1387,7 @@ impl Intellisense {
 	#[context("Couldn't get subsets for sub-entity {} in {}", sub_entity, entity.factory)]
 	pub fn get_subsets(
 		&self,
-		game: &Game,
+		game: &impl GameFiles,
 		entity: &Entity,
 		sub_entity: EntityID,
 		ignore_own: bool

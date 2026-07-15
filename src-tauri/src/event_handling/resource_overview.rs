@@ -23,7 +23,7 @@ use image::{ImageFormat, ImageReader};
 use itertools::Itertools;
 use lazy_regex::regex_captures;
 use optivorbis::{OggToOgg, Remuxer};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::Serialize;
 use serde_json::to_string;
 use tauri::{AppHandle, Manager, State};
@@ -38,7 +38,7 @@ use crate::{
 	bin1::{deserialize_generic, deserialize_generic_writer},
 	biome::format_json,
 	finish_task,
-	game::Game,
+	game::{Game, GameFiles},
 	general::{get_name, open_in_editor},
 	geometry::{parse_prim_to_glb, parse_prim_to_obj, parse_scene_to_glb},
 	languages::get_language_map,
@@ -1241,8 +1241,7 @@ pub fn extract_file(
 
 			wwev.non_streamed
 				.into_par_iter()
-				.enumerate()
-				.map(|(idx, object)| {
+				.map(|object| {
 					anyhow::Ok(if object.data.starts_with(b"RIFF") {
 						let mut raw_ogg = vec![];
 
@@ -1264,7 +1263,7 @@ pub fn extract_file(
 						}
 					})
 				})
-				.chain(wwev.streamed.into_par_iter().enumerate().map(|(idx, object)| {
+				.chain(wwev.streamed.into_par_iter().map(|object| {
 					let (_, wem_data) = game.extract_latest_resource(object.source)?;
 
 					anyhow::Ok(if wem_data.starts_with(b"RIFF") {

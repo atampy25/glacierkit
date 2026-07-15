@@ -35,7 +35,8 @@ use crate::{
 	ores_repo::{
 		RepositoryItem, RepositoryItemInformation, RepositoryItemKind, UnlockableInformation, UnlockableItem,
 		UnlockableKind
-	}
+	},
+	render::SceneRenderer
 };
 
 pub struct AppSettings {
@@ -157,7 +158,9 @@ pub struct AppState {
 
 	pub game: ArcSwapOption<Game>,
 
-	pub editor_connection: EditorConnection
+	pub editor_connection: EditorConnection,
+
+	pub scene_renderer: SceneRenderer
 }
 
 pub struct EditorState {
@@ -178,7 +181,6 @@ impl Default for EditorState {
 	}
 }
 
-#[derive(Debug, Clone)]
 pub enum EditorData {
 	Nil,
 	ResourceOverview {
@@ -190,12 +192,12 @@ pub enum EditorData {
 	},
 	QNEntity {
 		settings: QNEditorSettings,
-		entity: Box<Entity>
+		entity: Arc<Entity>
 	},
 	QNPatch {
 		settings: QNEditorSettings,
 		base: Arc<Entity>,
-		current: Box<Entity>
+		current: Arc<Entity>
 	},
 	RepositoryPatch {
 		base: Vec<RepositoryItem>,
@@ -708,7 +710,9 @@ nesting::nest! {
 
 						SetShowChangesFromOriginal {
 							show_changes_from_original: bool
-						}
+						},
+
+						StartSceneRenderer
 					}
 
 					Tree(EntityTreeEvent)
@@ -1000,6 +1004,13 @@ nesting::nest! {
 				tblu: Hash,
 				property_name: String,
 				property_value: Variant
+			}
+		}
+
+		SceneRenderer(SceneRendererEvent)
+		pub enum SceneRendererEvent {
+			EntitiesSelected {
+				entities: Vec<(RuntimeID, EntityID)>
 			}
 		}
 	}

@@ -18,6 +18,7 @@ pub mod intellisense;
 pub mod languages;
 pub mod model;
 pub mod ores_repo;
+pub mod render;
 
 use std::{
 	backtrace::{Backtrace, BacktraceStatus},
@@ -33,7 +34,7 @@ use std::{
 use anyhow::{Context, Error, Result, anyhow, bail};
 use fn_error_context::context;
 use futures_util::StreamExt;
-use glacier_commons::game_detection::detect_installs;
+use glacier_commons::{game_detection::detect_installs, hash_list::HASH_LIST};
 use indexmap::IndexMap;
 use json_patch::Patch;
 use log::{LevelFilter, info, trace};
@@ -60,13 +61,14 @@ use crate::{
 		tools::handle_tool_event,
 		unlockables_patch::handle_unlockables_patch_event
 	},
+	game::GameFiles,
 	general::{REPO_ID, open_file},
 	model::{
 		AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent,
 		EditorData, EditorEventData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityMetadataRequest,
 		EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
-		Project, ProjectSettings, Request, SettingsRequest, TabRequest, TabRequestData, TextEditorEvent,
-		TextEditorRequest, TextFileType, ToolRequest
+		Project, ProjectSettings, Request, SceneRendererEvent, SettingsRequest, TabRequest, TabRequestData,
+		TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
 	}
 };
 
@@ -112,7 +114,11 @@ impl RunCommandExt for tauri_plugin_shell::process::Command {
 async fn main() {
 	IS_MAIN_THREAD.set(true);
 
-	tauri::async_runtime::set(tokio::runtime::Handle::current());
+	async_runtime::set(tokio::runtime::Handle::current());
+
+	async_runtime::spawn(async {
+		HASH_LIST.load_latest().await.unwrap();
+	});
 
 	let specta = tauri_specta::Builder::<tauri::Wry>::new()
 		.commands(tauri_specta::collect_commands![event, show_in_folder])
@@ -223,6 +229,15 @@ async fn main() {
 				.level_for("mio", LevelFilter::Off)
 				.level_for("optivorbis", LevelFilter::Off)
 				.level_for("reqwest", LevelFilter::Off)
+				.level_for("naga", LevelFilter::Warn)
+				.level_for("wgpu_core", LevelFilter::Warn)
+				.level_for("wgpu_hal", LevelFilter::Warn)
+				.level_for("calloop", LevelFilter::Warn)
+				.level_for("bevy_app", LevelFilter::Warn)
+				.level_for("bevy_time", LevelFilter::Warn)
+				.level_for("offset_allocator", LevelFilter::Warn)
+				.level_for("sctk", LevelFilter::Warn)
+				.level_for("tracing", LevelFilter::Warn)
 				.build()
 		)
 		.invoke_handler(specta.invoke_handler())
@@ -372,7 +387,8 @@ async fn main() {
 				editor_states: Arc::new(ShardMap::with_hasher(Default::default())),
 				editor_removal: Arc::new(ShardMap::with_hasher(Default::default())),
 				game: None.into(),
-				editor_connection: EditorConnection::new(app.handle().clone())
+				editor_connection: EditorConnection::new(app.handle().clone()),
+				scene_renderer: Default::default()
 			});
 
 			info!("Managed state");
@@ -381,10 +397,13 @@ async fn main() {
 		})
 		.build(tauri::generate_context!())
 		.expect("error while building tauri application")
-		.run(|handler, event| {
+		.run(|app, event| {
 			if let tauri::RunEvent::Exit = event {
-				handler.track_event("App exited", None).unwrap();
-				handler.flush_events_blocking();
+				app.track_event("App exited", None).unwrap();
+				app.flush_events_blocking();
+
+				let app_state = app.state::<AppState>();
+				app_state.scene_renderer.exit();
 			}
 		});
 }
@@ -428,7 +447,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							.await
 							.context("No such editor")?;
 
-						let EditorData::Text { content, file_type } = editor_state.data.to_owned() else {
+						let EditorData::Text { content, file_type } = &editor_state.data else {
 							Err(anyhow!("Editor {} is not a text editor", event.editor))?;
 							panic!();
 						};
@@ -437,7 +456,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							&app,
 							Request::Editor(EditorRequest {
 								editor: event.editor,
-								data: EditorRequestData::Text(TextEditorRequest::ReplaceContent { content })
+								data: EditorRequestData::Text(TextEditorRequest::ReplaceContent {
+									content: content.to_owned()
+								})
 							})
 						)?;
 
@@ -445,7 +466,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							&app,
 							Request::Editor(EditorRequest {
 								editor: event.editor,
-								data: EditorRequestData::Text(TextEditorRequest::SetFileType { file_type })
+								data: EditorRequestData::Text(TextEditorRequest::SetFileType {
+									file_type: file_type.to_owned()
+								})
 							})
 						)?;
 					}
@@ -460,14 +483,17 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						let EditorData::Text {
 							file_type,
 							content: old_content
-						} = editor_state.data.to_owned()
+						} = &editor_state.data
 						else {
 							Err(anyhow!("Editor {} is not a text editor", event.editor))?;
 							panic!();
 						};
 
-						if content != old_content {
-							editor_state.data = EditorData::Text { content, file_type };
+						if content != *old_content {
+							editor_state.data = EditorData::Text {
+								content: content.to_owned(),
+								file_type: file_type.to_owned()
+							};
 
 							send_request(
 								&app,
@@ -907,7 +933,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						content.as_bytes().to_owned()
 					}
 
-					EditorData::QNEntity { entity, settings } => {
+					EditorData::QNEntity { entity, settings, .. } => {
 						app.track_event(
 							"Editor saved",
 							Some(json!({
@@ -925,7 +951,8 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					EditorData::QNPatch {
 						base,
 						current,
-						settings
+						settings,
+						..
 					} => {
 						app.track_event(
 							"Editor saved",
@@ -1528,6 +1555,8 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						_ => continue
 					};
 
+					let entity = Arc::make_mut(entity);
+
 					if entity.blueprint == tblu.0
 						&& let Some(sub_entity) = entity.sub_entities.get_mut(&id)
 					{
@@ -1606,6 +1635,8 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						_ => continue
 					};
 
+					let entity = Arc::make_mut(entity);
+
 					if entity.blueprint == tblu.0 && entity.sub_entities.contains_key(&id) {
 						let post_init = if let Some(game) = app_state.game.load().as_ref() {
 							if let Some((_, _, post_init)) = game
@@ -1669,6 +1700,36 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 										let (new, modified, removed) = get_diff_info(base, current);
 										EntityTreeRequest::SetDiffInfo { new, modified, removed }
 									}))
+								})
+							)?;
+						}
+					}
+				}
+			}
+		},
+
+		Event::SceneRenderer(event) => match event {
+			SceneRendererEvent::EntitiesSelected { entities } => {
+				let mut editor_states = pin!(app_state.editor_states.stream_shards());
+				while let Some(shard) = editor_states.next().await {
+					for (editor_id, editor) in shard.iter() {
+						let entity = match editor.data {
+							EditorData::QNEntity { ref entity, .. } => entity,
+							EditorData::QNPatch { ref current, .. } => current,
+
+							_ => continue
+						};
+
+						if let Some(id) = entities.iter().find_map(|(factory, id)| {
+							(entity.factory == *factory && entity.sub_entities.contains_key(id)).then_some(*id)
+						}) {
+							send_request(
+								&app,
+								Request::Editor(EditorRequest {
+									editor: editor_id.to_owned(),
+									data: EditorRequestData::Entity(EntityEditorRequest::Tree(
+										EntityTreeRequest::Select { id: Some(id) }
+									))
 								})
 							)?;
 						}
