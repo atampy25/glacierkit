@@ -445,7 +445,13 @@ fn process_material(
 					if let Some(val) = overrides
 						.get(prop.as_str())
 						.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
-					{
+						.or_else(|| {
+							prop.strip_prefix("map").and_then(|prop| {
+								overrides
+									.get(prop)
+									.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+							})
+						}) {
 						if let Variant::Resource(_, value) = val {
 							value.as_ref().map(|x| x.resource)
 						} else {
@@ -533,7 +539,13 @@ fn process_material(
 						if let Some(val) = overrides
 							.get(prop.as_str())
 							.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
-						{
+							.or_else(|| {
+								prop.strip_prefix("map").and_then(|prop| {
+									overrides
+										.get(prop)
+										.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+								})
+							}) {
 							if let Variant::Resource(_, value) = val {
 								value.as_ref().map(|x| x.resource)
 							} else {
@@ -571,7 +583,13 @@ fn process_material(
 					if let Some(val) = overrides
 						.get(prop.as_str())
 						.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
-					{
+						.or_else(|| {
+							prop.strip_prefix("map").and_then(|prop| {
+								overrides
+									.get(prop)
+									.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+							})
+						}) {
 						if let Variant::Resource(_, value) = val {
 							value.as_ref().map(|x| x.resource)
 						} else {
@@ -600,7 +618,13 @@ fn process_material(
 					if let Some(val) = overrides
 						.get(prop.as_str())
 						.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
-					{
+						.or_else(|| {
+							prop.strip_prefix("map").and_then(|prop| {
+								overrides
+									.get(prop)
+									.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+							})
+						}) {
 						if let Variant::Resource(_, value) = val {
 							value.as_ref().map(|x| x.resource)
 						} else {
@@ -949,7 +973,12 @@ fn convert_transform(transform: Affine3) -> Transform {
 
 /// Convert a Vec3 describing measurements in the game's Z+ up system to Bevy's Y+ up system.
 fn convert_size(vec: Vec3) -> Vec3 {
-	Vec3::new(vec.x, vec.z, vec.y)
+	// Prevent degenerate transformation
+	Vec3::new(
+		if vec.x == 0.0 { 0.001 } else { vec.x },
+		if vec.z == 0.0 { 0.001 } else { vec.z },
+		if vec.y == 0.0 { 0.001 } else { vec.y }
+	)
 }
 
 /// Convert a Quat describing a rotation in the game's Z+ up system to Bevy's Y+ up system.
@@ -1015,8 +1044,8 @@ fn get_entity_hierarchy(
 
 		check = entity
 			.parent
-			.to_owned()
-			.and_then(|parent| resolve_instantiated_ref(&scenes.scenes, scene, parent).ok())
+			.as_ref()
+			.map(|parent| resolve_instantiated_ref(&scenes.scenes, scene, parent))
 			.and_then(|mut parents| (!parents.is_empty()).then(|| parents.swap_remove(0)));
 	}
 
@@ -1327,8 +1356,8 @@ fn start_render_system(
 
 				let cached = if let Some(parent) = entity
 					.parent
-					.to_owned()
-					.and_then(|parent| resolve_instantiated_ref(&scenes.scenes, scene, parent).ok())
+					.as_ref()
+					.map(|parent| resolve_instantiated_ref(&scenes.scenes, scene, parent))
 					.and_then(|mut parents| (!parents.is_empty()).then(|| parents.swap_remove(0)))
 				{
 					std::iter::once(entity.source)
@@ -1486,20 +1515,24 @@ fn start_render_system(
 
 		let pool = AsyncComputeTaskPool::get();
 
+		log::info!("Spawning {} top-level entities", to_spawn.len());
+
 		for (parent_id, geom_entity_id) in to_spawn {
-			log::info!("Spawning top-level entity {parent_id:?} -> {geom_entity_id:?}");
 			let geom_entity = render.geometry.geometry[geom_entity_id].to_owned();
+
+			let hierarchy = get_hierarchy(&render.scenes, &mut new_entities_hierarchy, geom_entity.source);
+
+			// log::info!(
+			// 	"Spawning top-level entity {parent_id:?} -> {geom_entity_id:?} {:?}",
+			// 	hierarchy.iter().take(5).collect_vec()
+			// );
 
 			let mut entity = commands.spawn((
 				Clearable,
 				Transform::IDENTITY,
 				Visibility::default(),
 				SourceEntity(geom_entity_id),
-				SourceEntityHierarchy(get_hierarchy(
-					&render.scenes,
-					&mut new_entities_hierarchy,
-					geom_entity.source
-				))
+				SourceEntityHierarchy(hierarchy)
 			));
 
 			if let Some(parent_id) = parent_id {

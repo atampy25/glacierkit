@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[try_fn]
-#[context("Couldn't handle update content event")]
+#[context("Couldn't handle general event")]
 pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityGeneralEvent) -> Result<()> {
 	let app_state = app.state::<AppState>();
 

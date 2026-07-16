@@ -37,7 +37,7 @@ use futures_util::StreamExt;
 use glacier_commons::{game_detection::detect_installs, hash_list::HASH_LIST};
 use indexmap::IndexMap;
 use json_patch::Patch;
-use log::{LevelFilter, info, trace};
+use log::{LevelFilter, debug, info};
 use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
 use quickentity_rs::{entity::Property, generate_patch, variant::Variant};
@@ -433,7 +433,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 				app_state.editor_removal.get(&event.editor).await.unwrap()
 			} else {
-				trace!("Received event for non-existent editor {}", event.editor);
+				debug!("Received event for non-existent editor {}", event.editor);
 				return Ok(());
 			};
 
@@ -857,7 +857,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				let task = start_task(&app, "Closing tab")?;
 
 				{
-					trace!("Waiting to remove editor {}", tab);
+					debug!("Waiting to remove editor {}", tab);
 					let lock = app_state.editor_removal.get(&tab).await;
 					let _guard = if let Some(lock) = lock.as_ref() {
 						Some(lock.write().await)
@@ -865,7 +865,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						None
 					};
 
-					trace!("Removing editor {}", tab);
+					debug!("Removing editor {}", tab);
 					let old = app_state.editor_states.remove(&tab).await.context("No such editor")?;
 
 					if old.file.is_some() {
@@ -1744,7 +1744,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 #[specta::specta]
 fn event(app: AppHandle, event: Event) {
 	async_runtime::spawn(async move {
-		trace!("Handling event: {:?}", event);
+		debug!("Handling event: {:?}", event);
 
 		let cloned_app = app.clone();
 
@@ -1976,7 +1976,7 @@ pub fn convert_json_patch_to_merge_patch(new: &Value, patch: &Patch) -> Result<V
 #[context("Couldn't send task start event for {:?} to frontend", name.as_ref())]
 pub fn start_task(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 	let task_id = Uuid::new_v4();
-	trace!("Starting task {}: {}", task_id, name.as_ref());
+	debug!("Starting task {}: {}", task_id, name.as_ref());
 	app.emit("start-task", (&task_id, name.as_ref()))?;
 	task_id
 }
@@ -1988,7 +1988,7 @@ static PROGRESSES: PapayaMap<Uuid, (Instant, f32)> = Default::default();
 #[context("Couldn't send progress task start event for {:?} to frontend", name.as_ref())]
 pub fn start_progress(app: &AppHandle, name: impl AsRef<str>) -> Result<Uuid> {
 	let task_id = Uuid::new_v4();
-	trace!("Starting progress task {}: {}", task_id, name.as_ref());
+	debug!("Starting progress task {}: {}", task_id, name.as_ref());
 	PROGRESSES.pin().insert(task_id, (Instant::now(), 0.0));
 	app.emit("start-progress-task", (&task_id, name.as_ref()))?;
 	task_id
@@ -2001,7 +2001,7 @@ pub fn task_progress(app: &AppHandle, task: Uuid, progress: f32) -> Result<()> {
 		&& progress > *last_progress
 		&& (last_emit.elapsed().as_secs() > 1 || (progress * 100.0).round() != (last_progress * 100.0).round())
 	{
-		trace!("Updating progress for task {}: {}", task, progress);
+		debug!("Updating progress for task {}: {}", task, progress);
 		PROGRESSES.pin().insert(task, (Instant::now(), progress));
 		app.emit("task-progress", (&task, progress))?;
 	}
@@ -2010,7 +2010,7 @@ pub fn task_progress(app: &AppHandle, task: Uuid, progress: f32) -> Result<()> {
 #[try_fn]
 #[context("Couldn't send task finish event for {:?} to frontend", task)]
 pub fn finish_task(app: &AppHandle, task: Uuid) -> Result<()> {
-	trace!("Ending task {}", task);
+	debug!("Ending task {}", task);
 	PROGRESSES.pin().remove(&task);
 	app.emit("finish-task", &task)?;
 }
@@ -2034,14 +2034,14 @@ pub struct Notification {
 #[try_fn]
 #[context("Couldn't send notification {:?} to frontend", notification)]
 pub fn send_notification(app: &AppHandle, notification: Notification) -> Result<()> {
-	trace!("Sending notification: {:?}", notification);
+	debug!("Sending notification: {:?}", notification);
 	app.emit("send-notification", (Uuid::new_v4(), &notification))?;
 }
 
 #[try_fn]
 #[context("Couldn't send request {:?} to frontend", request)]
 pub fn send_request(app: &AppHandle, request: Request) -> Result<()> {
-	trace!("Sending request: {:?}", request);
+	debug!("Sending request: {:?}", request);
 	app.emit("request", &request)?;
 }
 

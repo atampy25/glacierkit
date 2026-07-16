@@ -511,7 +511,8 @@ slotmap::new_key_type! { pub struct InstantiatedEntityID; }
 #[derive(Debug, Clone)]
 pub struct InstantiatedScene {
 	pub root_entity: InstantiatedEntityID,
-	pub entities: SlotMap<InstantiatedEntityID, InstantiatedEntity>
+	pub entities: SlotMap<InstantiatedEntityID, InstantiatedEntity>,
+	pub instantiations: HashMap<EntityID, Vec<InstantiatedEntityID>>
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -554,30 +555,40 @@ pub struct PropertySource {
 #[context("Couldn't instantiate scene")]
 pub fn instantiate_scene(game: &impl GameFiles, entity: &Entity) -> Result<InstantiatedScene> {
 	let mut entities = SlotMap::default();
+	let mut instantiations = HashMap::default();
 
 	#[try_fn]
 	fn process_entity(
 		game: &impl GameFiles,
 		entity: &Entity,
-		entities: &mut SlotMap<InstantiatedEntityID, InstantiatedEntity>
+		entities: &mut SlotMap<InstantiatedEntityID, InstantiatedEntity>,
+		instantiations: &mut HashMap<EntityID, Vec<InstantiatedEntityID>>
 	) -> Result<InstantiatedEntityID> {
 		let mut entity_instantiations = HashMap::new();
 
-		let mut exclude = HashSet::default();
+		let mut exclude: HashSet<EntityID> = HashSet::default();
+		let mut reverse_parents = entity
+			.sub_entities
+			.iter()
+			.flat_map(|(id, sub_entity)| {
+				sub_entity
+					.parent
+					.as_ref()
+					.and_then(|parent| parent.as_local())
+					.map(|local_parent| (local_parent, *id))
+			})
+			.into_group_map();
+
 		for (id, sub_entity) in &entity.sub_entities {
 			if sub_entity.editor_only {
-				exclude.insert(*id);
-
-				fn remove_children(exclude: &mut HashSet<EntityID>, entity: &Entity, parent: EntityID) {
-					for (id, sub_entity) in &entity.sub_entities {
-						if sub_entity.parent.as_ref().is_some_and(|x| x.as_local() == Some(parent)) {
-							exclude.insert(*id);
-							remove_children(exclude, entity, *id);
-						}
+				let mut to_remove = vec![*id];
+				while let Some(child) = to_remove.pop() {
+					if let Some(children) = reverse_parents.remove(&child) {
+						to_remove.extend(children);
 					}
-				}
 
-				remove_children(&mut exclude, entity, *id);
+					exclude.insert(child);
+				}
 			}
 		}
 
@@ -610,6 +621,7 @@ pub fn instantiate_scene(game: &impl GameFiles, entity: &Entity) -> Result<Insta
 				});
 
 				entity_instantiations.insert(*id, instance);
+				instantiations.entry(*id).or_default().push(instance);
 
 				entities[instance]
 					.properties
@@ -634,6 +646,7 @@ pub fn instantiate_scene(game: &impl GameFiles, entity: &Entity) -> Result<Insta
 				});
 
 				entity_instantiations.insert(*id, instance);
+				instantiations.entry(*id).or_default().push(instance);
 
 				entities[instance]
 					.properties
@@ -649,7 +662,8 @@ pub fn instantiate_scene(game: &impl GameFiles, entity: &Entity) -> Result<Insta
 
 				for factory in factories {
 					if game.resource_type(factory).is_some_and(|x| x == "TEMP") {
-						let new_added = process_entity(game, &*game.extract_entity(factory)?, entities)?;
+						let new_added =
+							process_entity(game, &*game.extract_entity(factory)?, entities, instantiations)?;
 
 						entities[new_added].parent = Some(InstantiatedEntityRef::Local {
 							entity: instance,
@@ -849,9 +863,13 @@ pub fn instantiate_scene(game: &impl GameFiles, entity: &Entity) -> Result<Insta
 		entity_instantiations[&entity.root_entity]
 	}
 
-	let root_entity = process_entity(game, entity, &mut entities)?;
+	let root_entity = process_entity(game, entity, &mut entities, &mut instantiations)?;
 
-	InstantiatedScene { root_entity, entities }
+	InstantiatedScene {
+		root_entity,
+		entities,
+		instantiations
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -860,126 +878,102 @@ pub struct InstantiatedScenes {
 	pub property_overrides: HashMap<(RuntimeID, InstantiatedEntityID, EcoString), Variant>
 }
 
-#[try_fn]
-#[context("Couldn't resolve reference")]
 pub fn resolve_instantiated_ref(
 	scenes: &HashMap<RuntimeID, (Arc<Entity>, InstantiatedScene)>,
 	scene_id: RuntimeID,
-	reference: InstantiatedEntityRef
-) -> Result<Vec<(RuntimeID, InstantiatedEntityID)>> {
-	let mut check = vec![(scene_id, reference)];
+	reference: &InstantiatedEntityRef
+) -> Vec<(RuntimeID, InstantiatedEntityID)> {
+	let Some((_, scene)) = scenes.get(&scene_id) else {
+		return vec![];
+	};
 
-	while check.iter().any(|check| {
-		matches!(
-			check,
-			(
-				_,
-				InstantiatedEntityRef::Local {
-					exposed_entity: Some(_),
-					..
-				}
-			) | (_, InstantiatedEntityRef::External { .. })
-		)
-	}) {
-		let mut new = vec![];
-		for check in check {
-			if let (
-				_,
-				InstantiatedEntityRef::External {
-					external_scene,
-					entity_id,
-					exposed_entity
-				}
-			) = check
-			{
-				let Some((_, scene)) = scenes.get(&external_scene) else {
-					continue;
-				};
-
-				let Some(entity) = scene
-					.entities
-					.iter()
-					.find_map(|(id, x)| (x.source.1 == entity_id && !x.is_parent_factory).then_some(id))
-				else {
-					bail!("Couldn't find referenced entity");
-				};
-
-				new.push((external_scene, InstantiatedEntityRef::Local { entity, exposed_entity }));
-			} else if let (
-				scene_id,
-				InstantiatedEntityRef::Local {
-					entity,
-					exposed_entity: Some(exposed_entity)
-				}
-			) = check
-			{
-				let Some((_, scene)) = scenes.get(&scene_id) else {
-					continue;
-				};
-
-				new.extend(
-					scene.entities[entity]
-						.exposed_entities
-						.get(&exposed_entity)
-						.unwrap_or(&vec![])
-						.iter()
-						.map(|x| (scene_id, x.to_owned()))
-				);
+	match reference {
+		InstantiatedEntityRef::Local {
+			entity,
+			exposed_entity: None
+		} => {
+			if scene.entities.contains_key(*entity) {
+				vec![(scene_id, *entity)]
+			} else {
+				vec![]
 			}
 		}
-		check = new;
+
+		InstantiatedEntityRef::Local {
+			entity,
+			exposed_entity: Some(exposed_entity)
+		} => scene.entities[*entity]
+			.exposed_entities
+			.get(exposed_entity)
+			.unwrap_or(&vec![])
+			.iter()
+			.flat_map(|reference| resolve_instantiated_ref(scenes, scene_id, reference))
+			.collect(),
+
+		InstantiatedEntityRef::External {
+			external_scene,
+			entity_id,
+			exposed_entity
+		} => scenes
+			.get(external_scene)
+			.map(|(_, scene)| {
+				scene
+					.instantiations
+					.get(entity_id)
+					.unwrap_or(&vec![])
+					.into_iter()
+					.flat_map(|&entity| {
+						resolve_instantiated_ref(
+							scenes,
+							*external_scene,
+							&InstantiatedEntityRef::Local {
+								entity,
+								exposed_entity: exposed_entity.to_owned()
+							}
+						)
+					})
+					.collect()
+			})
+			.unwrap_or_default()
 	}
-
-	check
-		.into_iter()
-		.map(|(id, reference)| {
-			let InstantiatedEntityRef::Local { entity, .. } = reference else {
-				unreachable!()
-			};
-
-			(id, entity)
-		})
-		.collect()
 }
 
-#[try_fn]
-#[context("Couldn't resolve reference")]
 pub fn resolve_ref(
 	scenes: &HashMap<RuntimeID, (Arc<Entity>, InstantiatedScene)>,
 	scene_id: RuntimeID,
 	reference: &Ref
-) -> Result<Vec<(RuntimeID, InstantiatedEntityID)>> {
+) -> Vec<(RuntimeID, InstantiatedEntityID)> {
 	if let Some(external_scene) = reference.external_scene {
 		resolve_instantiated_ref(
 			scenes,
 			scene_id,
-			InstantiatedEntityRef::External {
+			&InstantiatedEntityRef::External {
 				entity_id: reference.entity_id,
 				external_scene,
 				exposed_entity: reference.exposed_entity.to_owned()
 			}
-		)?
+		)
 	} else {
 		let Some((_, scene)) = scenes.get(&scene_id) else {
-			bail!("Couldn't find scene for reference");
+			return vec![];
 		};
 
-		let Some(entity) = scene
-			.entities
+		scene
+			.instantiations
+			.get(&reference.entity_id)
+			.unwrap_or(&vec![])
 			.iter()
-			.find_map(|(id, x)| (x.source.1 == reference.entity_id && !x.is_parent_factory).then_some(id))
-		else {
-			bail!("Couldn't find referenced entity");
-		};
-
-		resolve_instantiated_ref(
-			scenes,
-			scene_id,
-			InstantiatedEntityRef::Local {
-				entity,
-				exposed_entity: reference.exposed_entity.to_owned()
-			}
-		)?
+			.flat_map(|&entity| {
+				resolve_instantiated_ref(
+					scenes,
+					scene_id,
+					&InstantiatedEntityRef::Local {
+						entity,
+						exposed_entity: reference.exposed_entity.to_owned()
+					}
+				)
+			})
+			.collect()
 	}
 }
 
@@ -999,42 +993,45 @@ pub fn instantiate_scenes(game: &impl GameFiles, scenes: &[RuntimeID]) -> Result
 
 	// Override deletes
 	{
-		let override_deletes = scenes
+		let mut to_delete = scenes
+			.par_iter()
+			.flat_map(|(id, (entity, _))| entity.override_deletes.par_iter().map(|x| (*id, x.to_owned())))
+			.flat_map(|(scene_id, override_delete)| resolve_ref(&scenes, scene_id, &override_delete))
+			.collect::<Vec<_>>();
+
+		let mut reverse_parents = scenes
 			.iter()
-			.flat_map(|(id, (entity, _))| entity.override_deletes.iter().map(|x| (*id, x.to_owned())))
-			.collect_vec();
-
-		for (scene_id, override_delete) in override_deletes {
-			let override_delete = resolve_ref(&scenes, scene_id, &override_delete)
-				.context("Couldn't resolve reference for override delete")?;
-
-			for (scene_id, entity) in override_delete {
-				let Some((_, scene)) = scenes.get_mut(&scene_id) else {
-					continue;
-				};
-
-				let mut reverse_parents = scene
+			.flat_map(|(scene_id, (_, scene))| {
+				scene
 					.entities
 					.iter()
 					.filter_map(|(id, entity)| {
-						if let Some(InstantiatedEntityRef::Local { entity: parent, .. }) = &entity.parent {
-							Some((*parent, id))
+						if let Some(reference) = &entity.parent {
+							Some(
+								resolve_instantiated_ref(&scenes, *scene_id, reference)
+									.into_iter()
+									.map(move |reference| (reference, (*scene_id, id)))
+							)
 						} else {
 							None
 						}
 					})
-					.into_group_map();
+					.flatten()
+					.collect_vec()
+			})
+			.into_group_map();
 
-				// Delete entity and all its children
-				let mut to_delete = vec![entity];
-				while let Some(entity) = to_delete.pop() {
-					if let Some(children) = reverse_parents.remove(&entity) {
-						to_delete.extend(children);
-					}
+		// Delete entities and all their children
+		while let Some((scene_id, entity)) = to_delete.pop() {
+			let Some((_, scene)) = scenes.get_mut(&scene_id) else {
+				continue;
+			};
 
-					scene.entities.remove(entity);
-				}
+			if let Some(children) = reverse_parents.remove(&(scene_id, entity)) {
+				to_delete.extend(children);
 			}
+
+			scene.entities.remove(entity);
 		}
 	}
 
@@ -1047,9 +1044,8 @@ pub fn instantiate_scenes(game: &impl GameFiles, scenes: &[RuntimeID]) -> Result
 			.collect_vec();
 
 		for (scene_id, property_override) in scene_property_overrides {
-			for overriden_entity in property_override.entities {
-				let overridden_entity = resolve_ref(&scenes, scene_id, &overriden_entity)
-					.context("Couldn't resolve reference for property override")?;
+			for overridden_entity in property_override.entities {
+				let overridden_entity = resolve_ref(&scenes, scene_id, &overridden_entity);
 
 				for (scene_id, overridden_entity) in overridden_entity {
 					for (overridden_property, val) in &property_override.properties {
@@ -1258,7 +1254,7 @@ pub fn get_scene_geometry(
 			};
 
 			if let Some(reference) = reference {
-				return Ok(Some(resolve_ref(&scenes.scenes, scene_id, reference)?.first().copied()));
+				return Ok(Some(resolve_ref(&scenes.scenes, scene_id, reference).first().copied()));
 			} else {
 				return Ok(Some(None));
 			}
@@ -1295,9 +1291,9 @@ pub fn get_scene_geometry(
 		if value.is_none()
 			&& let Some(val) = instance.ref_properties.get(property)
 		{
-			if let Some(reference) = val.first().context("Value should be a reference")?.to_owned() {
+			if let Some(reference) = val.first().context("Value should be a reference")? {
 				value = Some(
-					resolve_instantiated_ref(&scenes.scenes, scene_id, reference)?
+					resolve_instantiated_ref(&scenes.scenes, scene_id, reference)
 						.first()
 						.copied()
 				);
@@ -1328,7 +1324,7 @@ pub fn get_scene_geometry(
 		no_traverse: Option<InstantiatedEntityID>,
 		entity: InstantiatedEntityID,
 		property: &EcoString
-	) -> Result<Option<Vec<Option<(RuntimeID, InstantiatedEntityID)>>>> {
+	) -> Result<Option<Vec<(RuntimeID, InstantiatedEntityID)>>> {
 		if let Some(override_val) = scenes.property_overrides.get(&(scene_id, entity, property.into())) {
 			let Variant::Array(_, items) = override_val else {
 				bail!("Value should be an array of references");
@@ -1342,14 +1338,10 @@ pub fn get_scene_geometry(
 							bail!("Value should be an array of references");
 						};
 
-						reference
+						Ok(reference
 							.as_ref()
 							.map(|reference| resolve_ref(&scenes.scenes, scene_id, reference))
-							.transpose()
-							.map(|x| match x {
-								None => vec![None],
-								Some(x) => x.into_iter().map(Some).collect()
-							})
+							.unwrap_or_default())
 					})
 					.flatten_ok()
 					.collect::<Result<_>>()?
@@ -1390,18 +1382,13 @@ pub fn get_scene_geometry(
 		{
 			value = Some(
 				val.iter()
-					.map(|reference| {
+					.flat_map(|reference| {
 						reference
-							.to_owned()
+							.as_ref()
 							.map(|reference| resolve_instantiated_ref(&scenes.scenes, scene_id, reference))
-							.transpose()
-							.map(|x| match x {
-								None => vec![None],
-								Some(x) => x.into_iter().map(Some).collect()
-							})
+							.unwrap_or_default()
 					})
-					.flatten_ok()
-					.collect::<Result<_>>()?
+					.collect()
 			);
 		}
 
@@ -1663,7 +1650,7 @@ pub fn get_scene_geometry(
 
 			if instance.is_parent_factory {
 				for (parent_scene, parent_id) in
-					resolve_instantiated_ref(&scenes.scenes, scene_id, instance.parent.to_owned().unwrap())?
+					resolve_instantiated_ref(&scenes.scenes, scene_id, instance.parent.as_ref().unwrap())
 				{
 					if let InstantiatedEntityFactory::Factories(siblings) =
 						&scenes.scenes[&parent_scene].1.entities[parent_id].factory
@@ -1941,35 +1928,33 @@ pub fn get_scene_geometry(
 							this_material
 						};
 
-					for client in clients {
-						if let Some((client_scene_id, client_id)) = client {
-							let client = {
-								let client_scene = &scenes.scenes[&client_scene_id].1;
-								process_entity(
-									game,
-									scenes,
-									&settings,
-									client_scene_id,
-									client_scene,
-									client_id,
-									&client_scene.entities[client_id],
-									&mut ids,
-									&mut geometry
-								)?
-							};
+					for (client_scene_id, client_id) in clients {
+						let client = {
+							let client_scene = &scenes.scenes[&client_scene_id].1;
+							process_entity(
+								game,
+								scenes,
+								&settings,
+								client_scene_id,
+								client_scene,
+								client_id,
+								&client_scene.entities[client_id],
+								&mut ids,
+								&mut geometry
+							)?
+						};
 
-							if let GeomEntityData::Geometry { material_overrides, .. } = &mut geometry[client].data {
-								let overrides = &mut material_overrides
-									.entry(overridden_material)
-									.or_insert_with(|| (this_material, Default::default()))
-									.1;
+						if let GeomEntityData::Geometry { material_overrides, .. } = &mut geometry[client].data {
+							let overrides = &mut material_overrides
+								.entry(overridden_material)
+								.or_insert_with(|| (this_material, Default::default()))
+								.1;
 
-								for property in instance.properties.keys().filter(|x| !matt_props.contains(*x)) {
-									if let Some(value) =
-										get_property_value(game, scenes, *scene_id, scene, None, id, property)?
-									{
-										overrides.insert(property.to_owned(), value);
-									}
+							for property in instance.properties.keys().filter(|x| !matt_props.contains(*x)) {
+								if let Some(value) =
+									get_property_value(game, scenes, *scene_id, scene, None, id, property)?
+								{
+									overrides.insert(property.to_owned(), value);
 								}
 							}
 						}

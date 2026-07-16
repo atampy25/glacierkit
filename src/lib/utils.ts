@@ -19,7 +19,8 @@ export function typedEntries<T extends {}>(object: T): ReadonlyArray<ObjectEntry
 }
 
 export async function event(event: Event) {
-	trace(`Sending event ${JSON.stringify(event, undefined, "\t")}`)
+	const data = JSON.stringify(event, undefined, "\t")
+	trace(`Sending event ${data.length < 5000 ? data : "{ ... }"}`)
 	await commands.event(event)
 }
 

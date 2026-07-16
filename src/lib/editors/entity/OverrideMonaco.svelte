@@ -4,7 +4,7 @@
 	import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 	import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker"
 	import baseSchema from "./schema.json"
-	import { cloneDeep, debounce, merge } from "lodash"
+	import { cloneDeep, debounce, escapeRegExp, merge } from "lodash"
 	import propertyTypeSchemas from "./property-type-schemas.json"
 	import { event, enums } from "$lib/utils"
 
@@ -183,25 +183,29 @@
 					}
 				}
 			})
+
+			updateDecorations()
 		}, 1000)
 
 		editor.onDidChangeModelContent(() => {
 			debounced(editor.getValue({ preserveBOM: true, lineEnding: "\n" }))
-			updateDecorations()
 		})
 	})
 
 	function updateDecorations() {
 		const newDecorations: monaco.editor.IModelDeltaDecoration[] = []
 
+		const searcher = new RegExp(decorationsToCheck.map((a) => `(${escapeRegExp(a[0])})`).join("|"), "g")
+		const decoText = Object.fromEntries(decorationsToCheck)
+
 		for (const [no, line] of editor.getValue().split("\n").entries()) {
-			for (const [check, deco] of decorationsToCheck) {
-				if (line.includes(check)) {
+			for (const check of line.matchAll(searcher)) {
+				if (decoText[check[0]]) {
 					newDecorations.push({
 						options: {
 							isWholeLine: true,
 							after: {
-								content: " " + deco,
+								content: " " + decoText[check[0]],
 								cursorStops: monaco.editor.InjectedTextCursorStops.Left,
 								inlineClassName: "monacoDecorationGray"
 							}

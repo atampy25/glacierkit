@@ -7,6 +7,7 @@ use quickentity_rs::{
 	entity::{Entity, PinConnectionOverride, PinConnectionOverrideDelete, PropertyOverride},
 	variant::Variant
 };
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::from_str;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
@@ -32,66 +33,73 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 	if let Some(game) = app_state.game.load().as_ref() {
 		let task = start_task(app, "Updating override decorations")?;
 
-		let mut decorations = vec![];
+		let decorations = entity
+			.property_overrides
+			.par_iter()
+			.flat_map(|property_override| {
+				property_override
+					.entities
+					.par_iter()
+					.flat_map(|reference| get_ref_decoration(game, entity, Some(reference)))
+					.chain(property_override.properties.par_values().flat_map(|property_data| {
+						let mut decorations = vec![];
 
-		for property_override in entity.property_overrides.iter() {
-			for reference in property_override.entities.iter() {
-				if let Some(decoration) = get_ref_decoration(game, entity, Some(reference)) {
-					decorations.push(decoration);
-				}
-			}
+						visit_variant(property_data, &mut |val| match val {
+							Variant::Ref(val) => {
+								if let Some(decoration) = get_ref_decoration(game, entity, val.as_ref()) {
+									decorations.push(decoration);
+								}
+							}
 
-			for property_data in property_override.properties.values() {
-				visit_variant(property_data, &mut |val| match val {
-					Variant::Ref(val) => {
-						if let Some(decoration) = get_ref_decoration(game, entity, val.as_ref()) {
-							decorations.push(decoration);
-						}
-					}
+							Variant::Uuid(uuid) => {
+								if let Some(repo) = game.repository()
+									&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
+									&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
+								{
+									decorations.push((
+										uuid.to_string(),
+										name.as_str().unwrap_or("Non-string value").to_owned()
+									));
+								}
+							}
 
-					Variant::Uuid(uuid) => {
-						if let Some(repo) = game.repository()
-							&& let Some(repo_item) = repo.iter().find(|x| x.id == *uuid)
-							&& let Some(name) = repo_item.data.get("Name").or(repo_item.data.get("CommonName"))
-						{
-							decorations
-								.push((uuid.to_string(), name.as_str().unwrap_or("Non-string value").to_owned()));
-						}
-					}
+							_ => {}
+						});
 
-					_ => {}
-				});
-			}
-		}
-
-		for reference in entity.override_deletes.iter() {
-			if let Some(decoration) = get_ref_decoration(game, entity, Some(reference)) {
-				decorations.push(decoration);
-			}
-		}
-
-		for pin_connection_override in entity.pin_connection_overrides.iter() {
-			if let Some(decoration) = get_ref_decoration(game, entity, Some(&pin_connection_override.from_entity)) {
-				decorations.push(decoration);
-			}
-
-			if let Some(decoration) = get_ref_decoration(game, entity, Some(&pin_connection_override.to_entity)) {
-				decorations.push(decoration);
-			}
-		}
-
-		for pin_connection_override_delete in entity.pin_connection_override_deletes.iter() {
-			if let Some(decoration) =
-				get_ref_decoration(game, entity, Some(&pin_connection_override_delete.from_entity))
-			{
-				decorations.push(decoration);
-			}
-
-			if let Some(decoration) = get_ref_decoration(game, entity, Some(&pin_connection_override_delete.to_entity))
-			{
-				decorations.push(decoration);
-			}
-		}
+						decorations
+					}))
+			})
+			.chain(
+				entity
+					.override_deletes
+					.par_iter()
+					.flat_map(|reference| get_ref_decoration(game, entity, Some(reference)))
+			)
+			.chain(
+				entity
+					.pin_connection_overrides
+					.par_iter()
+					.flat_map(|pin_connection_override| {
+						[
+							get_ref_decoration(game, entity, Some(&pin_connection_override.from_entity)),
+							get_ref_decoration(game, entity, Some(&pin_connection_override.to_entity))
+						]
+					})
+					.flatten()
+			)
+			.chain(
+				entity
+					.pin_connection_override_deletes
+					.par_iter()
+					.flat_map(|pin_connection_override_delete| {
+						[
+							get_ref_decoration(game, entity, Some(&pin_connection_override_delete.from_entity)),
+							get_ref_decoration(game, entity, Some(&pin_connection_override_delete.to_entity))
+						]
+					})
+					.flatten()
+			)
+			.collect::<Vec<_>>();
 
 		send_request(
 			app,
@@ -176,6 +184,7 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 								.iter()
 								.zip(b.properties.iter())
 								.any(|(a, b)| a.0 != b.0 || !a.1.rough_eq(b.1))
+							|| a.runtime_editable != b.runtime_editable
 					})) {
 				let entity = Arc::make_mut(entity);
 
