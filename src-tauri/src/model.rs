@@ -1011,6 +1011,13 @@ nesting::nest! {
 		pub enum SceneRendererEvent {
 			EntitiesSelected {
 				entities: Vec<(RuntimeID, EntityID)>
+			},
+
+			EntityPropertyChanged {
+				entity: (RuntimeID, EntityID),
+				#[specta(type = String)]
+				property: EcoString,
+				value: Variant
 			}
 		}
 	}

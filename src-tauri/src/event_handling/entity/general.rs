@@ -161,8 +161,19 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityGeneralEvent)
 									);
 								}
 
-								crate::render::scene::EditorEvent::UpdateTransform { entity, transform } => {
-									// TODO
+								crate::render::scene::EditorEvent::UpdateProperty {
+									entity,
+									property,
+									value
+								} => {
+									handle_event(
+										&app,
+										Event::SceneRenderer(SceneRendererEvent::EntityPropertyChanged {
+											entity,
+											property,
+											value
+										})
+									);
 								}
 							}
 						}

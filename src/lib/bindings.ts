@@ -1777,12 +1777,21 @@ export type ReverseReferenceData =
 			}
 	  }
 
-export type SceneRendererEvent = {
-	type: "entitiesSelected"
-	data: {
-		entities: [string, string][]
-	}
-}
+export type SceneRendererEvent =
+	| {
+			type: "entitiesSelected"
+			data: {
+				entities: [string, string][]
+			}
+	  }
+	| {
+			type: "entityPropertyChanged"
+			data: {
+				entity: [string, string]
+				property: string
+				value: VariantProxy
+			}
+	  }
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 

@@ -1,4 +1,4 @@
-use std::{io::Cursor, sync::Arc, time::Duration};
+use std::{io::Cursor, ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, bail};
 use bevy::{
@@ -31,9 +31,12 @@ use glacier_commons::{game::GlacierGame, metadata::RuntimeID};
 use glacier_formats::material::{BlendMode, MaterialInstance, MaterialPropertyValue};
 use glacier_geometry::render_primitive::{LodLevel, RenderPrimitive};
 use glacier_texture::{mipblock::MipblockData, texture_map::TextureMap};
-use glam::Affine3;
+use glam::{Affine3, Affine3A};
 use itertools::Itertools;
-use quickentity_rs::{entity::SubType, variant::Variant};
+use quickentity_rs::{
+	entity::SubType,
+	variant::{RawVariant, Variant}
+};
 use tryvial::try_fn;
 
 use crate::{
@@ -74,8 +77,9 @@ mod to_bevy {
 
 /// Messages from Bevy
 mod from_bevy {
+	use ecow::EcoString;
 	use glacier_commons::metadata::RuntimeID;
-	use quickentity_rs::entity::EntityID;
+	use quickentity_rs::{entity::EntityID, variant::Variant};
 
 	use super::super::from_bevy;
 
@@ -85,9 +89,10 @@ mod from_bevy {
 			Select {
 				entities: Vec<(RuntimeID, EntityID)>
 			},
-			UpdateTransform {
+			UpdateProperty {
 				entity: (RuntimeID, EntityID),
-				transform: glam::Affine3
+				property: EcoString,
+				value: Variant
 			}
 		}
 	);
@@ -95,7 +100,7 @@ mod from_bevy {
 
 pub use from_bevy::EditorEvent;
 
-use crate::geometry::{GeomEntity, InstantiatedEntityFactory, LightKind, RenderSettings};
+use crate::geometry::{GeomEntity, InstantiatedEntityFactory, LightKind, RenderSettings, get_property_source};
 
 pub fn configure(app: &mut App) {
 	app.insert_resource(ImageCache(Default::default()))
@@ -104,6 +109,7 @@ pub fn configure(app: &mut App) {
 		.insert_resource(PrimCache(Default::default()))
 		.insert_resource(Scenes(Default::default()))
 		.insert_resource(Geometry(Default::default()))
+		.insert_resource(TransformDebounce(Timer::from_seconds(0.5, TimerMode::Once), None))
 		.add_systems(Startup, init_system)
 		.add_systems(
 			Update,
@@ -112,9 +118,11 @@ pub fn configure(app: &mut App) {
 				handle_select_system,
 				handle_tasks_system,
 				keybind_center_system,
-				keybind_switch_cam_system // keybind_switch_transform_mode_system,
-				                          // keybind_switch_transform_space_system,
-				                          // gizmo_transform_react_system
+				keybind_switch_cam_system,
+				keybind_switch_transform_mode_system,
+				keybind_switch_transform_space_system,
+				gizmo_transform_react_system,
+				transform_debounce_system
 			)
 		);
 
@@ -123,42 +131,49 @@ pub fn configure(app: &mut App) {
 }
 
 pub fn window_closed(commands: &mut Commands) {
-	commands.insert_resource(ImageCache(Default::default()));
-	commands.insert_resource(SpecularCache(Default::default()));
-	commands.insert_resource(MaterialCache(Default::default()));
-	commands.insert_resource(PrimCache(Default::default()));
-	commands.insert_resource(Scenes(Default::default()));
 	commands.queue(|world: &mut World| {
-		let mut meshes = world.resource_mut::<Assets<Mesh>>();
-		meshes
-			.iter()
-			.map(|(id, _)| id)
-			.collect_vec()
-			.into_iter()
-			.for_each(|id| {
-				meshes.remove(id);
-			});
+		{
+			let prim = world.remove_resource::<PrimCache>().unwrap();
+			let mut meshes = world.resource_mut::<Assets<Mesh>>();
 
-		let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
-		materials
-			.iter()
-			.map(|(id, _)| id)
-			.collect_vec()
-			.into_iter()
-			.for_each(|id| {
-				materials.remove(id);
-			});
+			for prim in prim.0.iter() {
+				for (mesh, _) in prim.value() {
+					meshes.remove(mesh.id());
+				}
+			}
+		}
 
-		let mut images = world.resource_mut::<Assets<Image>>();
-		images
-			.iter()
-			.map(|(id, _)| id)
-			.collect_vec()
-			.into_iter()
-			.for_each(|id| {
-				images.remove(id);
-			});
-	})
+		{
+			let material = world.remove_resource::<MaterialCache>().unwrap();
+			let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
+
+			for material in material.0.iter() {
+				materials.remove(material.id());
+			}
+		}
+
+		{
+			let image = world.remove_resource::<ImageCache>().unwrap();
+			let specular = world.remove_resource::<SpecularCache>().unwrap();
+			let mut images = world.resource_mut::<Assets<Image>>();
+
+			for image in image.0.iter() {
+				images.remove(image.id());
+			}
+
+			for specular in specular.0.iter() {
+				images.remove(specular.0.id());
+				images.remove(specular.1.id());
+			}
+		}
+
+		world.insert_resource(ImageCache(Default::default()));
+		world.insert_resource(SpecularCache(Default::default()));
+		world.insert_resource(MaterialCache(Default::default()));
+		world.insert_resource(PrimCache(Default::default()));
+		world.insert_resource(Scenes(Default::default()));
+		world.insert_resource(Geometry(Default::default()));
+	});
 }
 
 impl SceneRenderer {
@@ -939,6 +954,18 @@ fn process_prim(
 		.clone()
 }
 
+fn get_box_mesh(world: &mut World) -> (Handle<Mesh>, Handle<StandardMaterial>) {
+	let cache = world.resource::<PrimCache>().0.clone();
+
+	cache.entry((1.try_into().unwrap(), None)).or_insert_with(move || {
+		vec![(
+			world.resource_mut::<Assets<Mesh>>().add(Cuboid::new(1.0, 1.0, 1.0)),
+			world.resource_mut::<Assets<StandardMaterial>>().add(Color::NONE)
+		)]
+	})[0]
+		.to_owned()
+}
+
 #[derive(Debug)]
 struct ErrorWrapper(anyhow::Error);
 
@@ -990,6 +1017,33 @@ fn convert_rotation(quat: Quat) -> Quat {
 /// Convert a Vec3 describing a point or direction in the game's Z+ up system to Bevy's Y+ up system.
 fn convert_point(vec: Vec3) -> Vec3 {
 	Vec3::new(vec.x, vec.z, -vec.y)
+}
+
+/// Convert a transform from Bevy's Y+ up system to the game's Z+ up system.
+fn unconvert_transform(transform: Affine3A) -> Affine3 {
+	let (scale, rotation, translation) = transform.to_scale_rotation_translation();
+
+	Affine3::from_scale_rotation_translation(
+		unconvert_size(scale),
+		unconvert_rotation(rotation),
+		unconvert_point(translation)
+	)
+}
+
+/// Convert a Vec3 describing measurements in Bevy's Y+ up system to the game's Z+ up system.
+fn unconvert_size(vec: Vec3) -> Vec3 {
+	Vec3::new(vec.x, vec.z, vec.y)
+}
+
+/// Convert a Quat describing a rotation in Bevy's Y+ up system to the game's Z+ up system.
+fn unconvert_rotation(quat: Quat) -> Quat {
+	let (axis, angle) = quat.to_axis_angle();
+	Quat::from_axis_angle(unconvert_point(axis), angle).conjugate()
+}
+
+/// Convert a Vec3 describing a point or direction in Bevy's Y+ up system to the game's Z+ up system.
+fn unconvert_point(vec: Vec3) -> Vec3 {
+	Vec3::new(vec.x, -vec.z, vec.y)
 }
 
 #[derive(Clone, Copy, Reflect, Component)]
@@ -1088,6 +1142,43 @@ fn process_geom(
 			let transform = convert_transform(transform);
 			commands.push(move |world: &mut World| {
 				world.entity_mut(entity).insert(transform);
+			});
+		}
+
+		GeomEntityData::BoxVolume { size } => {
+			let transform = convert_transform(transform).with_scale(convert_size(size));
+			commands.push(move |world: &mut World| {
+				world.entity_mut(entity).insert(transform);
+
+				let (mesh, material) = get_box_mesh(world);
+				world.spawn((
+					Transform::IDENTITY,
+					Visibility::default(),
+					ChildOf(entity),
+					Mesh3d(mesh),
+					MeshMaterial3d(material),
+					Pickable::IGNORE
+				));
+			});
+		}
+
+		GeomEntityData::CoverPlane { length, depth } => {
+			let transform = convert_transform(transform).with_scale(convert_size(Vec3::new(length, depth, 0.5)));
+			commands.push(move |world: &mut World| {
+				world.entity_mut(entity).insert(transform);
+
+				let (mesh, material) = get_box_mesh(world);
+				world.spawn((
+					Transform {
+						translation: Vec3::new(0.0, 0.5, 0.0),
+						..default()
+					},
+					Visibility::default(),
+					ChildOf(entity),
+					Mesh3d(mesh),
+					MeshMaterial3d(material),
+					Pickable::IGNORE
+				));
 			});
 		}
 
@@ -1257,7 +1348,7 @@ fn start_render_system(
 	geometry: Res<Geometry>,
 	existing_query: Query<(Entity, &SourceEntity, &SourceEntityHierarchy, Option<&ChildOf>), With<Clearable>>,
 	descendants: Query<&Children>,
-	mut camera: Query<Entity, With<Camera3d>>
+	mut camera: Query<Entity, With<TransformGizmoCamera>>
 ) {
 	if let Ok(render) = receiver.0.try_recv() {
 		// Initialise basics
@@ -1327,7 +1418,11 @@ fn start_render_system(
 				OcclusionCulling,
 				#[cfg(feature = "bevy-inspector-egui")]
 				bevy_inspector_egui::bevy_egui::PrimaryEguiContext::default(),
-				PanOrbitCamera::default(),
+				PanOrbitCamera {
+					button_orbit: MouseButton::Right,
+					modifier_pan: Some(KeyCode::ShiftLeft),
+					..default()
+				},
 				ambient_light
 			))
 		};
@@ -1600,7 +1695,7 @@ fn handle_tasks_system(mut commands: Commands, mut tasks: Query<(Entity, &mut Lo
 fn keybind_center_system(
 	mut commands: Commands,
 	keyboard_input: Res<ButtonInput<KeyCode>>,
-	mut camera: Query<(Entity, Option<&mut PanOrbitCamera>), With<Camera>>,
+	mut camera: Query<(Entity, Option<&mut PanOrbitCamera>), With<TransformGizmoCamera>>,
 	free_camera: Query<(&Transform, &PreferredRadius), With<FreeCamera>>,
 	selected: Query<Entity, With<Selected>>,
 	transform: Query<&GlobalTransform>,
@@ -1650,6 +1745,8 @@ fn keybind_center_system(
 							.remove::<FreeCamera>()
 							.insert(PanOrbitCamera {
 								focus: transform.translation + (transform.forward() * preferred_radius.0),
+								button_orbit: MouseButton::Right,
+								modifier_pan: Some(KeyCode::ShiftLeft),
 								..default()
 							})
 							.remove::<PreferredRadius>();
@@ -1693,6 +1790,8 @@ fn keybind_switch_cam_system(
 				.remove::<FreeCamera>()
 				.insert(PanOrbitCamera {
 					focus: transform.translation + (transform.forward() * preferred_radius.0),
+					button_orbit: MouseButton::Right,
+					modifier_pan: Some(KeyCode::ShiftLeft),
 					..default()
 				})
 				.remove::<PreferredRadius>();
@@ -1725,14 +1824,147 @@ fn keybind_switch_transform_space_system(
 	}
 }
 
+#[derive(Resource)]
+struct TransformDebounce(Timer, Option<Vec<EditorEvent>>);
+
 fn gizmo_transform_react_system(
-	query: Query<(&SourceEntityHierarchy, &Transform), (With<TransformGizmoFocus>, Changed<Transform>)>,
+	query: Single<(&SourceEntity, &Transform), (With<TransformGizmoFocus>, Changed<Transform>)>,
+	game_files: Res<GameFiles>,
+	scenes: Res<Scenes>,
+	geometry: Res<Geometry>,
+	mut debounce: ResMut<TransformDebounce>
+) {
+	if let Some(scenes) = scenes.0.as_ref()
+		&& let Some(geometry) = geometry.0.as_ref()
+		&& let Some(game_files) = game_files.0.read().as_ref()
+	{
+		let (source, transform) = query.deref();
+		let geom = &geometry.geometry[source.0];
+		let (scene, id) = geom.source;
+
+		let mut events = vec![];
+
+		if let Ok(Some((factory, id, property))) = get_property_source(
+			game_files,
+			scenes,
+			scene,
+			&scenes.scenes[&scene].1,
+			None,
+			id,
+			&"m_mTransform".into()
+		) {
+			let mut transform =
+				quickentity_rs::variant::Transform::from_glam(unconvert_transform(transform.compute_affine()), false);
+
+			transform.scale = None;
+
+			events.push(EditorEvent::UpdateProperty {
+				entity: (factory, id),
+				property,
+				value: Variant::Transform(transform)
+			});
+		}
+
+		if let GeomEntityData::CoverPlane { .. } = &geom.data {
+			if let Ok(Some((factory, id, property))) = get_property_source(
+				game_files,
+				scenes,
+				scene,
+				&scenes.scenes[&scene].1,
+				None,
+				id,
+				&"m_fCoverLength".into()
+			) {
+				let (Vec3 { x, .. }, _, _) =
+					unconvert_transform(transform.compute_affine()).to_scale_rotation_translation();
+
+				if (x * 100.0).round() != 100.0 {
+					events.push(EditorEvent::UpdateProperty {
+						entity: (factory, id),
+						property,
+						value: Variant::Raw(RawVariant::Unknown("float32".into(), serde_json::json!(x)))
+					});
+				}
+			}
+
+			if let Ok(Some((factory, id, property))) = get_property_source(
+				game_files,
+				scenes,
+				scene,
+				&scenes.scenes[&scene].1,
+				None,
+				id,
+				&"m_fCoverDepth".into()
+			) {
+				let (Vec3 { mut y, .. }, _, _) =
+					unconvert_transform(transform.compute_affine()).to_scale_rotation_translation();
+
+				if y < 0.02 {
+					y = 0.0;
+				}
+
+				if (y * 100.0).round() != 0.0 {
+					events.push(EditorEvent::UpdateProperty {
+						entity: (factory, id),
+						property,
+						value: Variant::Raw(RawVariant::Unknown("float32".into(), serde_json::json!(y)))
+					});
+				}
+			}
+		} else {
+			let scale_prop = if let GeomEntityData::BoxVolume { .. } = &geom.data {
+				"m_vGlobalSize"
+			} else {
+				"m_PrimitiveScale"
+			};
+
+			if let Ok(Some((factory, id, property))) = get_property_source(
+				game_files,
+				scenes,
+				scene,
+				&scenes.scenes[&scene].1,
+				None,
+				id,
+				&scale_prop.into()
+			) {
+				let (Vec3 { x, y, z }, _, _) =
+					unconvert_transform(transform.compute_affine()).to_scale_rotation_translation();
+
+				if (x * 100.0).round() != 100.0 || (y * 100.0).round() != 100.0 || (z * 100.0).round() != 100.0 {
+					events.push(EditorEvent::UpdateProperty {
+						entity: (factory, id),
+						property,
+						value: Variant::Raw(RawVariant::Unknown("SVector3".into(), {
+							serde_json::json!({
+								"x": x,
+								"y": y,
+								"z": z
+							})
+						}))
+					});
+				}
+			}
+		}
+
+		debounce.0.reset();
+		debounce.1 = Some(events);
+	}
+}
+
+fn transform_debounce_system(
+	mut debounce: ResMut<TransformDebounce>,
+	time: Res<Time>,
 	sender: Res<BevySender<EditorEvent>>
 ) {
-	for (source, transform) in query.iter() {
-		let _ = sender.0.send(EditorEvent::UpdateTransform {
-			entity: source.0.first().unwrap().to_owned(),
-			transform: transform.compute_affine().into()
-		});
+	if debounce.1.is_some() {
+		debounce.0.tick(time.delta());
+
+		if debounce.0.just_finished() {
+			if let Some(events) = debounce.1.take() {
+				for event in events {
+					let _ = sender.0.send(event);
+				}
+			}
+		}
 	}
 }

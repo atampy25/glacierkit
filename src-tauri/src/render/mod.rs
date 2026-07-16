@@ -175,11 +175,11 @@ impl Default for SceneRenderer {
 						bevy::pbr::diagnostic::MaterialAllocatorDiagnosticPlugin::<StandardMaterial>::default()
 					),
 					MeshPickingPlugin,
-					// TransformGizmoPlugin,
 					FreeCameraPlugin,
 					PanOrbitCameraPlugin,
 					InfiniteGridPlugin,
-					OutlinePlugin::JUMP_FLOOD
+					OutlinePlugin::JUMP_FLOOD,
+					TransformGizmoPlugin
 				))
 				.insert_resource(IsActive(is_active.clone()))
 				.insert_resource(GameFiles(game.clone()))

@@ -1113,6 +1113,15 @@ pub enum GeomEntityData {
 		cast_shadows: bool,
 
 		light_kind: LightKind
+	},
+
+	BoxVolume {
+		size: Vec3
+	},
+
+	CoverPlane {
+		length: f32,
+		depth: f32
 	}
 }
 
@@ -1158,6 +1167,81 @@ impl Clone for RenderSettings {
 			}
 		}
 	}
+}
+
+#[try_fn]
+pub fn get_property_source(
+	game: &impl GameFiles,
+	scenes: &InstantiatedScenes,
+	scene_id: RuntimeID,
+	scene: &InstantiatedScene,
+	no_traverse: Option<InstantiatedEntityID>,
+	entity: InstantiatedEntityID,
+	property: &EcoString
+) -> Result<Option<(RuntimeID, EntityID, EcoString)>> {
+	if scenes
+		.property_overrides
+		.contains_key(&(scene_id, entity, property.into()))
+	{
+		return Ok(None);
+	}
+
+	let instance = &scene.entities[entity];
+
+	let mut value = None;
+
+	// If this entity is an expansion of a parent, the parent takes precedence
+	if instance.is_parent_factory {
+		let Some(InstantiatedEntityRef::Local {
+			entity: parent_entity, ..
+		}) = &instance.parent
+		else {
+			unreachable!();
+		};
+
+		if !no_traverse.is_some_and(|x| x == *parent_entity) {
+			value = get_property_source(game, scenes, scene_id, scene, Some(entity), *parent_entity, property)?;
+		}
+	}
+
+	// Otherwise there may be a property alias from elsewhere
+	if value.is_none()
+		&& let Some(source) = instance.properties.get(property)
+		&& !(source.entity == entity && source.property == *property)
+		&& !no_traverse.is_some_and(|x| x == source.entity)
+	{
+		value = get_property_source(
+			game,
+			scenes,
+			scene_id,
+			scene,
+			Some(entity),
+			source.entity,
+			&source.property
+		)?;
+	}
+
+	// Otherwise use the entity's own property value
+	if value.is_none()
+		&& game.extract_entity(instance.source.0)?.sub_entities[&instance.source.1]
+			.properties
+			.contains_key(property)
+	{
+		value = Some((instance.source.0, instance.source.1, property.to_owned()));
+	}
+
+	// Finally, try child expansions of this entity
+	if value.is_none()
+		&& let InstantiatedEntityFactory::Factories(children) = &instance.factory
+	{
+		for child in children {
+			if value.is_none() && !no_traverse.is_some_and(|x| x == *child) {
+				value = get_property_source(game, scenes, scene_id, scene, Some(entity), *child, &property)?;
+			}
+		}
+	}
+
+	value
 }
 
 #[try_fn]
@@ -1829,6 +1913,79 @@ pub fn get_scene_geometry(
 			ids.insert((scene_id, id), added);
 
 			added
+		} else if let InstantiatedEntityFactory::Factory(factory) = instance.factory
+			&& factory == crate::class_for_game!(game, "zboxvolumeentity")
+		{
+			let size = if let Some(size) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_vGlobalSize".into())?
+			{
+				let Variant::Raw(size) = size else {
+					bail!("m_vGlobalSize should be a vector")
+				};
+
+				let size = size.to_serde()?;
+				Vec3 {
+					x: size
+						.get("x")
+						.context("Scale should have an x component")?
+						.as_f64()
+						.context("Scale x component should be a float")? as f32,
+					y: size
+						.get("y")
+						.context("Scale should have a y component")?
+						.as_f64()
+						.context("Scale y component should be a float")? as f32,
+					z: size
+						.get("z")
+						.context("Scale should have a z component")?
+						.as_f64()
+						.context("Scale z component should be a float")? as f32
+				}
+			} else {
+				Vec3::ONE
+			};
+
+			let added = geometry.insert(GeomEntity {
+				source: (scene_id, id),
+				parent,
+				transform,
+				data: GeomEntityData::BoxVolume { size }
+			});
+
+			ids.insert((scene_id, id), added);
+
+			added
+		} else if let InstantiatedEntityFactory::Factory(factory) = instance.factory
+			&& factory == crate::class_for_game!(game, "zcoverplane")
+		{
+			let length = if let Some(Variant::Raw(length)) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_fCoverLength".into())?
+				&& let Some(length) = length.to_serde()?.as_f64()
+			{
+				length as f32
+			} else {
+				1.0
+			};
+
+			let depth = if let Some(Variant::Raw(depth)) =
+				get_property_value(game, scenes, scene_id, scene, None, id, &"m_fCoverDepth".into())?
+				&& let Some(depth) = depth.to_serde()?.as_f64()
+			{
+				depth as f32
+			} else {
+				0.0
+			};
+
+			let added = geometry.insert(GeomEntity {
+				source: (scene_id, id),
+				parent,
+				transform,
+				data: GeomEntityData::CoverPlane { length, depth }
+			});
+
+			ids.insert((scene_id, id), added);
+
+			added
 		} else {
 			let added = geometry.insert(GeomEntity {
 				source: (scene_id, id),
@@ -1849,7 +2006,9 @@ pub fn get_scene_geometry(
 				if [
 					crate::class_for_game!(game, "zgeomentity"),
 					crate::class_for_game!(game, "zlinkedentity"),
-					crate::class_for_game!(game, "zprimitiveproxyentity")
+					crate::class_for_game!(game, "zprimitiveproxyentity"),
+					crate::class_for_game!(game, "zboxvolumeentity"),
+					crate::class_for_game!(game, "zcoverplane")
 				]
 				.contains(&factory)
 					|| (settings.lighting && factory == crate::class_for_game!(game, "zlightentity"))

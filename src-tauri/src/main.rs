@@ -25,7 +25,7 @@ use std::{
 	cell::Cell,
 	fmt::Write,
 	fs,
-	path::{Path, PathBuf},
+	path::PathBuf,
 	pin::pin,
 	sync::Arc,
 	time::{Duration, Instant, SystemTime, UNIX_EPOCH}
@@ -125,7 +125,7 @@ async fn main() {
 		.typ::<Request>();
 
 	#[cfg(debug_assertions)]
-	if Path::new("../src/lib").is_dir() {
+	if std::path::Path::new("../src/lib").is_dir() {
 		specta
 			.export(
 				specta_typescript::Typescript::default().header("/* eslint-disable */"),
@@ -1730,6 +1730,102 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 									data: EditorRequestData::Entity(EntityEditorRequest::Tree(
 										EntityTreeRequest::Select { id: Some(id) }
 									))
+								})
+							)?;
+						}
+					}
+				}
+			}
+
+			SceneRendererEvent::EntityPropertyChanged {
+				entity: (factory, id),
+				property,
+				value
+			} => {
+				let mut qn_editors = vec![];
+				let mut editor_states = pin!(app_state.editor_states.stream_shards());
+				while let Some(shard) = editor_states.next().await {
+					for (id, editor) in shard.iter() {
+						if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
+							qn_editors.push(id.to_owned());
+						}
+					}
+				}
+
+				for editor_id in qn_editors {
+					let mut editor_state = app_state.editor_states.get_mut(&editor_id).await.unwrap();
+					let entity = match editor_state.data {
+						EditorData::QNEntity { ref mut entity, .. } => entity,
+						EditorData::QNPatch { ref mut current, .. } => current,
+
+						_ => continue
+					};
+
+					let entity = Arc::make_mut(entity);
+
+					if entity.factory == factory && entity.sub_entities.contains_key(&id) {
+						let post_init = if let Some(game) = app_state.game.load().as_ref() {
+							if let Some((_, _, post_init)) = game
+								.intellisense()
+								.get_properties(game, entity, id, true)?
+								.into_iter()
+								.find(|(name, _, _)| *name == property)
+							{
+								post_init
+							} else {
+								false
+							}
+						} else {
+							false
+						};
+
+						let Some(sub_entity) = entity.sub_entities.get_mut(&id) else {
+							unreachable!();
+						};
+
+						sub_entity.properties.insert(
+							property.to_owned().into(),
+							Property {
+								value: value.to_owned(),
+								post_init
+							}
+						);
+
+						send_request(
+							&app,
+							Request::Tab(TabRequest {
+								tab: editor_id.to_owned(),
+								data: TabRequestData::SetUnsaved { unsaved: true }
+							})
+						)?;
+
+						send_request(
+							&app,
+							Request::Editor(EditorRequest {
+								editor: editor_id.to_owned(),
+								data: EditorRequestData::Entity(EntityEditorRequest::Monaco(
+									EntityMonacoRequest::ReplaceContentIfSameEntityID {
+										entity_id: id.to_owned(),
+										content: to_string_clear(
+											entity.sub_entities.get(&id).context("No such entity")?
+										)?
+									}
+								))
+							})
+						)?;
+
+						if let EditorData::QNPatch {
+							ref base, ref current, ..
+						} = editor_state.data
+						{
+							send_request(
+								&app,
+								Request::Editor(EditorRequest {
+									editor: editor_id.to_owned(),
+									data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+										let (new, modified, removed) = get_diff_info(base, current);
+										EntityTreeRequest::SetDiffInfo { new, modified, removed }
+									}))
 								})
 							)?;
 						}
