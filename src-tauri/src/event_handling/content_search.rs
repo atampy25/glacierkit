@@ -12,7 +12,6 @@ use glacier_commons::{
 use itertools::Itertools;
 use quickentity_rs::entity::Entity;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelBridge, ParallelIterator};
-use regex_automata::dfa::Automaton;
 use serde_json::{to_string, to_writer};
 use tauri::{AppHandle, Manager};
 use tonytools::{hmlanguages, locr::LocrJson};
@@ -20,92 +19,51 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
-	HashMap, HashSet,
+	HashMap, HashSet, Notification, NotificationKind,
 	bin1::deserialize_generic_writer,
 	finish_task,
 	game::GameFiles,
 	languages::get_language_map,
-	model::{AppState, EditorData, EditorState, EditorType, Request, TabRequest, TabRequestData},
-	send_request, start_progress, start_task, task_progress
+	model::{AppState, EditorData, EditorState, EditorType, Request, SearchQuery, TabRequest, TabRequestData},
+	send_notification, send_request, start_progress, start_task, task_progress
 };
-
-struct Pattern {
-	automaton: regex_automata::dfa::dense::DFA<Vec<u32>>
-}
-
-impl Pattern {
-	#[try_fn]
-	pub fn new(pattern: &str) -> Result<Self> {
-		Self {
-			automaton: regex_automata::dfa::dense::DFA::new(pattern)?
-		}
-	}
-
-	pub fn matcher<'a>(&'a self) -> Result<Matcher<'a>> {
-		Ok(Matcher {
-			automaton: &self.automaton,
-			state: self.automaton.start_state_forward(&regex_automata::Input::new(""))?,
-			matched: false
-		})
-	}
-}
-
-struct Matcher<'a> {
-	automaton: &'a regex_automata::dfa::dense::DFA<Vec<u32>>,
-	state: regex_automata::util::primitives::StateID,
-	matched: bool
-}
-
-impl<'a> Matcher<'a> {
-	pub fn matched(&self) -> bool {
-		self.matched
-	}
-}
-
-impl<'a> Write for Matcher<'a> {
-	fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-		for &byte in buf {
-			// SAFETY: The state is initialized to a valid start state by Pattern::matcher and only ever updated using the automaton's transition function.
-			self.state = unsafe { self.automaton.next_state_unchecked(self.state, byte) };
-			if self.automaton.is_match_state(self.state) {
-				self.matched = true;
-				return Err(std::io::Error::other("pattern matched"));
-			} else if self.automaton.is_dead_state(self.state) {
-				return Err(std::io::Error::other("pattern not matched"));
-			}
-		}
-
-		Ok(buf.len())
-	}
-
-	fn flush(&mut self) -> std::io::Result<()> {
-		Ok(())
-	}
-}
 
 #[try_fn]
 #[context("Couldn't perform content search")]
 pub async fn start_content_search(
 	app: &AppHandle,
-	query: String,
+	query: SearchQuery,
 	filetypes: Vec<ResourceType>,
 	partitions_to_search: Vec<String>
 ) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	let pattern = Pattern::new(&query).context("Invalid regex")?;
+	let pattern = match query.pattern() {
+		Ok(pattern) => pattern,
+		Err(e) => {
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Error,
+					title: "Invalid search query".into(),
+					subtitle: format!("{e:?}")
+				}
+			)?;
+
+			return Ok(());
+		}
+	};
+
+	let task = start_progress(app, format!("Searching game files for {query}"))?;
 
 	let filetypes = filetypes.into_iter().collect::<HashSet<ResourceType>>();
 
 	let matching_ids = tokio::task::spawn_blocking({
 		let app = app.clone();
-		let query = query.to_owned();
 		move || {
 			let app_state = app.state::<AppState>();
 
 			if let Some(game) = app_state.game.load().as_ref() {
-				let task = start_progress(&app, format!("Searching game files for \"{query}\""))?;
-
 				let resources = game
 					.partition_manager()
 					.partitions
@@ -458,7 +416,7 @@ pub async fn start_content_search(
 	.await??;
 
 	if let Some(game) = app_state.game.load().as_ref() {
-		let task = start_task(app, format!("Preparing search results for \"{}\"", query))?;
+		let task = start_task(app, format!("Preparing search results for {query}"))?;
 
 		let results = matching_ids
 			.into_iter()
@@ -492,7 +450,7 @@ pub async fn start_content_search(
 			Request::Tab(TabRequest {
 				tab: id,
 				data: TabRequestData::Create {
-					name: format!("Search results for \"{query}\""),
+					name: format!("Search results for {query}"),
 					editor_type: EditorType::ContentSearchResults
 				}
 			})

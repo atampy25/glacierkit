@@ -150,8 +150,6 @@ pub struct Game {
 impl Game {
 	#[try_fn]
 	pub fn load(app: &AppHandle, path: &Path) -> Result<Self> {
-		let task = start_task(app, "Loading game files")?;
-
 		let install = app
 			.state::<AppState>()
 			.game_installs
@@ -217,8 +215,6 @@ impl Game {
 				partition.set_max_patch_level(9);
 			}
 		}
-
-		finish_task(app, task)?;
 
 		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
 

@@ -9,7 +9,7 @@ use tryvial::try_fn;
 use uuid::Uuid;
 
 use crate::{
-	HashMap,
+	HashMap, Notification, NotificationKind,
 	biome::to_string_clear,
 	finish_task,
 	model::{
@@ -17,7 +17,7 @@ use crate::{
 		RepositoryPatchEditorRequest, Request, TabRequest, TabRequestData
 	},
 	ores_repo::{RepositoryItem, RepositoryItemInformation},
-	send_request, start_task
+	send_notification, send_request, start_task
 };
 
 #[try_fn]
@@ -491,6 +491,24 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 				}
 			};
 
+			let query = match query.compile() {
+				Ok(query) => query,
+				Err(e) => {
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Error,
+							title: "Invalid search query".into(),
+							subtitle: format!("{e:?}")
+						}
+					)?;
+
+					finish_task(app, task)?;
+
+					return Ok(());
+				}
+			};
+
 			let items = repository
 				.par_iter()
 				.filter_map(|item| {
@@ -503,7 +521,7 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 
 					let mut s = format!("{}{}", item.id, serde_json::to_string(&item.data).unwrap());
 					s.make_ascii_lowercase();
-					query.split(' ').all(|q| s.contains(q)).then_some(item.id)
+					query.is_match(s).then_some(item.id)
 				})
 				.collect();
 

@@ -2,8 +2,8 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { EntityTreeRequest, PastableTemplateCategory, RefProxy } from "$lib/bindings"
-	import { Modal, Search } from "carbon-components-svelte"
+	import type { EntityTreeRequest, PastableTemplateCategory, RefProxy, SearchQuery } from "$lib/bindings"
+	import { Modal } from "carbon-components-svelte"
 	import { event, game } from "$lib/utils"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { changeReferenceToLocalEntity, genRandHex, getReferencedLocalEntity } from "./utils"
@@ -11,6 +11,7 @@
 	import HighlightMonaco from "./HighlightMonaco.svelte"
 	import { v4 } from "uuid"
 	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
+	import SearchBar from "$lib/components/SearchBar.svelte"
 
 	interface Props {
 		editorID: string
@@ -1144,33 +1145,6 @@
 		}
 	}
 
-	async function searchInput(evt: any) {
-		const _event = evt as { target: HTMLInputElement }
-
-		if (_event.target.value.length === 0) {
-			tree.clear_search()
-		} else {
-			await event({
-				type: "editor",
-				data: {
-					editor: editorID,
-					data: {
-						type: "entity",
-						data: {
-							type: "tree",
-							data: {
-								type: "search",
-								data: {
-									query: _event.target.value.toLowerCase()
-								}
-							}
-						}
-					}
-				}
-			})
-		}
-	}
-
 	function fixSelection() {
 		tree.deselect_all(true)
 
@@ -1190,13 +1164,39 @@
 			fixSelection()
 		}
 	})
+
+	let searchQuery: SearchQuery = $state({ type: "simple", data: "" })
 </script>
 
-<Search
+<SearchBar
 	placeholder="Filter..."
 	icon={Filter}
 	size="lg"
-	on:change={searchInput}
+	bind:query={searchQuery}
+	on:change={async () => {
+		if (searchQuery.data.length === 0) {
+			tree.clear_search()
+		} else {
+			await event({
+				type: "editor",
+				data: {
+					editor: editorID,
+					data: {
+						type: "entity",
+						data: {
+							type: "tree",
+							data: {
+								type: "search",
+								data: {
+									query: { type: searchQuery.type, data: searchQuery.data.toLowerCase() }
+								}
+							}
+						}
+					}
+				}
+			})
+		}
+	}}
 	on:clear={() => {
 		tree.clear_search()
 	}}

@@ -101,6 +101,8 @@ arc-trait = "0.1.2"
 inventory = "0.3.24"
 serde-brief = { version = "0.2.0", features = ["std"] }
 bevy_tasks = { version = "0.19.0", features = ["multi_threaded"] }
+memchr = "2.8.3"
+aho-corasick = "1.1.4"
 
 [dependencies.tokio]
 version = "1.43.0"

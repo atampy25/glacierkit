@@ -2,14 +2,15 @@
 	import jQuery from "jquery"
 	import "jstree"
 	import { onMount } from "svelte"
-	import type { ExtractKind, GameBrowserEntry, GameBrowserRequest, SearchFilter, SearchSort } from "$lib/bindings"
-	import { Checkbox, Dropdown, Search, Accordion, AccordionItem, Button } from "carbon-components-svelte"
+	import type { ExtractKind, GameBrowserEntry, GameBrowserRequest, SearchFilter, SearchQuery, SearchSort } from "$lib/bindings"
+	import { Checkbox, Dropdown, Accordion, AccordionItem, Button } from "carbon-components-svelte"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"
 	import { help } from "$lib/helpray"
 	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
 	import { isEqual } from "lodash"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
+	import SearchBar from "$lib/components/SearchBar.svelte"
 
 	export const elemID = "tree-" + Math.random().toString(36).replace(".", "")
 
@@ -546,7 +547,7 @@
 	}
 
 	async function search() {
-		if (searchQuery.length >= 3) {
+		if (searchQuery.data.length >= 3) {
 			searchFeedback = ""
 			await trackEvent("Search game files", {
 				filter: searchFilter,
@@ -560,7 +561,7 @@
 					data: {
 						type: "search",
 						data: {
-							query: searchQuery.toLowerCase(),
+							query: { type: searchQuery.type, data: searchQuery.data.toLowerCase() },
 							filter: searchFilter,
 							sort: {
 								none: null,
@@ -571,7 +572,7 @@
 					}
 				}
 			})
-		} else if (searchQuery.length === 0) {
+		} else if (searchQuery.data.length === 0) {
 			searchFeedback = ""
 			gameDescription = "Search for a game file above to get started"
 			entries = []
@@ -584,19 +585,12 @@
 		}
 	}
 
-	async function searchInput(evt: any) {
-		const _event = evt as { target: HTMLInputElement }
-
-		searchQuery = _event.target.value
-		await search()
-	}
-
 	let enabled = $state(false)
 	let gameDescription = $state("Search for a game file above to get started")
 	let searchFeedback = $state("")
 	let searchFilter: SearchFilter = $state("All")
 	let searchSort: "none" | "sizeAsc" | "sizeDesc" = $state("none")
-	let searchQuery = $state("")
+	let searchQuery: SearchQuery = $state({ type: "simple", data: "" })
 	let separatePartitions = $state(false)
 	let entries: GameBrowserEntry[] = $state([])
 
@@ -635,18 +629,18 @@
 						description: 'You can separate multiple queries with spaces. For example, "agent47 default" matches only files containing both "agent47" and "default" in their path.'
 					}}
 				>
-					<Search
+					<SearchBar
 						placeholder="Search game files..."
 						size="lg"
-						on:change={searchInput}
+						bind:query={searchQuery}
+						on:change={search}
 						on:clear={async () => {
 							searchFeedback = ""
 							gameDescription = ""
 							entries = []
 							await refreshTree()
-							searchQuery = ""
+							searchQuery.data = ""
 						}}
-						bind:value={searchQuery}
 					/>
 				</div>
 				<div class="mt-2 flex gap-2">

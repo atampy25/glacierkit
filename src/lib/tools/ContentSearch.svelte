@@ -1,12 +1,13 @@
 <script lang="ts">
-	import type { ContentSearchRequest } from "$lib/bindings"
+	import type { ContentSearchRequest, SearchQuery } from "$lib/bindings"
 	import { help } from "$lib/helpray"
 	import { event } from "$lib/utils"
 	import { trackEvent } from "$lib/utils"
-	import { Button, Checkbox, Search } from "carbon-components-svelte"
+	import { Button, Checkbox } from "carbon-components-svelte"
 	import SearchIcon from "carbon-icons-svelte/lib/Search.svelte"
 	import CheckboxIcon from "carbon-icons-svelte/lib/Checkbox.svelte"
 	import CheckboxCheckedIcon from "carbon-icons-svelte/lib/CheckboxChecked.svelte"
+	import SearchBar from "$lib/components/SearchBar.svelte"
 
 	export async function handleRequest(request: ContentSearchRequest) {
 		console.log("Content search tool handling request", request)
@@ -30,7 +31,7 @@
 	let allPartitions: [string, string][] = $state([])
 
 	let enabled = $state(false)
-	let searchQuery = $state("")
+	let searchQuery: SearchQuery = $state({ type: "simple", data: "" })
 	let searchEntities = $state(false)
 	let searchRL = $state(false)
 	let searchText = $state(false)
@@ -50,7 +51,7 @@
 	{:else}
 		<div class="pt-2 pb-1 px-2 text-base">
 			<div class="mb-3">Search through the contents of resources - not just their names.</div>
-			<div class="mb-3"><Search placeholder="Search query (supports regex)" size="lg" bind:value={searchQuery} /></div>
+			<div class="mb-3"><SearchBar placeholder="Search query" size="lg" bind:query={searchQuery} /></div>
 			<div class="mb-4">
 				<Checkbox labelText="Search entities" bind:checked={searchEntities} />
 				<Checkbox labelText="Search BIN1 resources" bind:checked={searchRL} />

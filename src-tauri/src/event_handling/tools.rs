@@ -829,7 +829,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			GameBrowserEvent::Search { query, filter, sort } => {
-				let task = start_task(app, format!("Searching game files for {}", query))?;
+				let task = start_task(app, format!("Searching game files for {query}"))?;
 
 				if let Some(game) = app_state.game.load().as_ref() {
 					let filter_includes: &[ResourceType] = match filter {
@@ -859,7 +859,23 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 						]
 					};
 
-					let query_terms = query.split(' ').collect_vec();
+					let query = match query.compile() {
+						Ok(query) => query,
+						Err(e) => {
+							send_notification(
+								app,
+								Notification {
+									kind: NotificationKind::Error,
+									title: "Invalid search query".into(),
+									subtitle: format!("{e:?}")
+								}
+							)?;
+
+							finish_task(app, task)?;
+
+							return Ok(());
+						}
+					};
 
 					send_request(
 						app,
@@ -873,17 +889,17 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 										.filter(|(id, info, resource_type)| {
 											let mut s = if let Some(info) = &info {
 												format!(
-													"{}{}{}.{}",
+													"!{}.{}!{}!{}",
+													id.to_hash(),
+													resource_type,
 													info.path.as_deref().unwrap_or(""),
 													info.hint.as_deref().unwrap_or(""),
-													id.to_hash(),
-													resource_type
 												)
 											} else {
-												format!("{}.{}", id.to_hash(), resource_type)
+												format!("!{}.{}", id.to_hash(), resource_type)
 											};
 											s.make_ascii_lowercase();
-											query_terms.iter().all(|&y| s.contains(y))
+											query.is_match(s)
 										})
 										.map(|(id, info, resource_type)| {
 											let (path, hint) = if let Some(info) = info {
@@ -942,17 +958,17 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 										.filter(|(id, info, resource_type)| {
 											let mut s = if let Some(info) = &info {
 												format!(
-													"{}{}{}.{}",
+													"!{}.{}!{}!{}",
 													info.path.as_deref().unwrap_or(""),
 													info.hint.as_deref().unwrap_or(""),
 													id.to_hash(),
 													resource_type
 												)
 											} else {
-												format!("{}.{}", id.to_hash(), resource_type)
+												format!("!{}.{}", id.to_hash(), resource_type)
 											};
 											s.make_ascii_lowercase();
-											query_terms.iter().all(|&y| s.contains(y))
+											query.is_match(s)
 										})
 										.map(|(id, info, resource_type)| {
 											let (path, hint) = if let Some(info) = info {
@@ -1006,8 +1022,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 												let size =
 													partition.get_resource_info(&game.to_rrid(entry.hash.0))?.size();
 
-												entry.order =
-													Some(if descending { u32::MAX - size } else { size } as usize);
+												entry.order = Some(if descending { u32::MAX - size } else { size });
 
 												anyhow::Ok(())
 											})?;

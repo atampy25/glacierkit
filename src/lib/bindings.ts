@@ -24,7 +24,7 @@ export type AnnouncementKind = "info" | "success" | "warning" | "error"
 export type ContentSearchEvent = {
 	type: "search"
 	data: {
-		query: string
+		query: SearchQuery
 		resourceTypes: string[]
 		partitionsToSearch: string[]
 	}
@@ -557,7 +557,7 @@ export type EntityTreeEvent_Deserialize =
 	| {
 			type: "search"
 			data: {
-				query: string
+				query: SearchQuery
 			}
 	  }
 	| {
@@ -667,7 +667,7 @@ export type EntityTreeEvent_Serialize =
 	| {
 			type: "search"
 			data: {
-				query: string
+				query: SearchQuery
 			}
 	  }
 	| {
@@ -1082,7 +1082,7 @@ export type GameBrowserEvent =
 	| {
 			type: "search"
 			data: {
-				query: string
+				query: SearchQuery
 				filter: SearchFilter
 				sort: [SearchSort, boolean] | null
 			}
@@ -1434,7 +1434,7 @@ export type RepositoryPatchEditorEvent =
 	| {
 			type: "search"
 			data: {
-				query: string
+				query: SearchQuery
 				ty: RepositoryItemKind | null
 			}
 	  }
@@ -1795,6 +1795,14 @@ export type SceneRendererEvent =
 
 export type SearchFilter = "All" | "Templates" | "Classes" | "Models" | "Textures" | "Sound"
 
+export type SearchQuery =
+	// The query must be contained exactly as written.
+	| { type: "raw"; data: string }
+	// All components of the query (separated by spaces, optionally double-quoted) must be contained somewhere.
+	| { type: "simple"; data: string }
+	// The query as regex must match.
+	| { type: "regex"; data: string }
+
 export type SearchSort = "Size"
 
 export type SettingsEvent =
@@ -2123,7 +2131,7 @@ export type UnlockablesPatchEditorEvent =
 	| {
 			type: "search"
 			data: {
-				query: string
+				query: SearchQuery
 				ty: UnlockableKind | null
 			}
 	  }

@@ -44,7 +44,6 @@ pub fn get_language_map(version: GlacierGame, iteration: u8) -> Option<(bool, Op
 			_ => None
 		},
 		GlacierGame::FL => match iteration {
-			// TODO
 			0 => Some((false, None)),
 			1 => Some((
 				false,

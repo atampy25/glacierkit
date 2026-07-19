@@ -210,7 +210,7 @@ pub enum EditorData {
 		patch_type: JsonPatchType
 	},
 	ContentSearchResults {
-		query: String,
+		query: SearchQuery,
 		results: Vec<(String, String, Option<String>)>
 	}
 }
@@ -292,7 +292,7 @@ pub struct GameBrowserEntry {
 	pub hint: Option<EcoString>,
 	pub resource_type: ResourceType,
 	pub partition: (String, String),
-	pub order: Option<usize>,
+	pub order: Option<u32>,
 	pub extract_kinds: Vec<(String, ExtractKind)>
 }
 
@@ -580,6 +580,22 @@ nesting::nest! {
 	#![derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
 	#![enums(serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type", content = "data"))]
 	#![structs(serde(rename_all = "camelCase"))]
+	pub enum SearchQuery {
+		/// The query must be contained exactly as written.
+		Raw(#[specta(type = String)] EcoString)
+
+		/// All components of the query (separated by spaces, optionally double-quoted) must be contained somewhere.
+		Simple(#[specta(type = String)] EcoString),
+
+		/// The query as regex must match.
+		Regex(#[specta(type = String)] EcoString)
+	}
+}
+
+nesting::nest! {
+	#![derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
+	#![enums(serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type", content = "data"))]
+	#![structs(serde(rename_all = "camelCase"))]
 	pub enum Event {
 		Tool(ToolEvent)
 
@@ -639,7 +655,7 @@ nesting::nest! {
 					resource: Hash
 				},
 				Search {
-					query: String,
+					query: SearchQuery,
 					filter: SearchFilter,
 					sort: Option<(SearchSort, bool)>
 				},
@@ -676,7 +692,7 @@ nesting::nest! {
 			ContentSearch(ContentSearchEvent)
 			pub enum ContentSearchEvent {
 				Search {
-					query: String,
+					query: SearchQuery,
 					resource_types: Vec<ResourceType>,
 					partitions_to_search: Vec<String>
 				}
@@ -751,7 +767,7 @@ nesting::nest! {
 						},
 
 						Search {
-							query: String
+							query: SearchQuery
 						},
 
 						ShowHelpMenu {
@@ -932,7 +948,7 @@ nesting::nest! {
 					},
 
 					Search {
-						query: String,
+						query: SearchQuery,
 						ty: Option<RepositoryItemKind>
 					}
 				}
@@ -957,7 +973,7 @@ nesting::nest! {
 					},
 
 					Search {
-						query: String,
+						query: SearchQuery,
 						ty: Option<UnlockableKind>
 					}
 				}

@@ -544,7 +544,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 								editor: event.editor,
 								data: EditorRequestData::ContentSearchResults(
 									ContentSearchResultsRequest::Initialise {
-										query: query.to_owned(),
+										query: query.to_string(),
 										results: results.to_owned()
 									}
 								)

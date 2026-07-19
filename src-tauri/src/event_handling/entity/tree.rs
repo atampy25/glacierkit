@@ -41,7 +41,7 @@ use crate::{
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
 		EntityGeneralRequest, EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Request,
-		TabRequest, TabRequestData
+		SearchQuery, TabRequest, TabRequestData
 	},
 	send_notification, send_request, start_task
 };
@@ -1281,7 +1281,7 @@ pub async fn paste(
 
 #[try_fn]
 #[context("Couldn't handle search event")]
-pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<()> {
+pub async fn search(app: &AppHandle, editor_id: Uuid, query: SearchQuery) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Searching for {}", query))?;
@@ -1302,6 +1302,24 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 		}
 	};
 
+	let query = match query.compile() {
+		Ok(query) => query,
+		Err(e) => {
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Error,
+					title: "Invalid search query".into(),
+					subtitle: format!("{e:?}")
+				}
+			)?;
+
+			finish_task(app, task)?;
+
+			return Ok(());
+		}
+	};
+
 	send_request(
 		app,
 		Request::Editor(EditorRequest {
@@ -1311,9 +1329,9 @@ pub async fn search(app: &AppHandle, editor_id: Uuid, query: String) -> Result<(
 					.sub_entities
 					.par_iter()
 					.filter_map(|(id, ent)| {
-						let mut s = format!("{}{}", id, to_string(ent).unwrap());
+						let mut s = to_string(ent).unwrap();
 						s.make_ascii_lowercase();
-						query.split(' ').all(|q| s.contains(q)).then_some(*id)
+						query.is_match(format!("!{id}!{s}")).then_some(*id)
 					})
 					.collect()
 			}))

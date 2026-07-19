@@ -1,6 +1,6 @@
-use std::{fs, path::Path, time::Duration};
+use std::{fmt::Formatter, fs, path::Path, time::Duration};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use ecow::{EcoString, eco_format};
 use fn_error_context::context;
 use glacier_commons::{game::GlacierGame, metadata::RuntimeID, resource_type, rid};
@@ -14,6 +14,7 @@ use quickentity_rs::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::Regex;
+use regex_automata::dfa::Automaton;
 use serde_json::{Value, from_slice, from_str, from_value, to_value};
 use tauri::{AppHandle, Manager, async_runtime};
 use tauri_plugin_aptabase::EventTracker;
@@ -30,8 +31,8 @@ use crate::{
 	model::{
 		AppSettings, AppState, ContentSearchRequest, EditorData, EditorRequest, EditorRequestData, EditorState,
 		EditorType, FileBrowserRequest, GameBrowserRequest, GlobalRequest, Hash, JsonPatchType, Request,
-		ResourceOverviewData, ResourceOverviewRequest, SettingsRequest, TabRequest, TabRequestData, TextFileType,
-		ToolRequest
+		ResourceOverviewData, ResourceOverviewRequest, SearchQuery, SettingsRequest, TabRequest, TabRequestData,
+		TextFileType, ToolRequest
 	},
 	ores_repo::{RepositoryItem, UnlockableItem},
 	send_notification, send_request, start_task
@@ -100,6 +101,264 @@ pub fn get_name(path: &str) -> String {
 		}
 	} else {
 		path.split('/').next_back().unwrap_or("").into()
+	}
+}
+
+impl std::fmt::Display for SearchQuery {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Raw(query) => write!(f, "\"{query}\""),
+			Self::Simple(query) => write!(f, "'{query}'"),
+			Self::Regex(query) => write!(f, "/{query}/")
+		}
+	}
+}
+
+impl SearchQuery {
+	#[try_fn]
+	fn parse_simple(query: &str) -> Result<Vec<String>> {
+		let mut needles = vec![String::new()];
+		let mut quote = false;
+		let mut escape = false;
+		for chr in query.chars() {
+			if chr == '\\' && !escape {
+				escape = true;
+			} else {
+				match chr {
+					'"' if !escape => {
+						quote = !quote;
+					}
+
+					' ' if !quote => {
+						if !needles.last().unwrap().is_empty() {
+							needles.push(String::new());
+						}
+					}
+
+					chr => {
+						let last = needles.last_mut().unwrap();
+						if escape && chr != '"' && chr != '\\' {
+							last.push('\\');
+						}
+						last.push(chr);
+					}
+				}
+
+				escape = false;
+			}
+		}
+
+		if quote {
+			bail!("Unclosed double-quoted query component");
+		}
+
+		if escape {
+			needles.last_mut().unwrap().push('\\');
+		}
+
+		needles
+	}
+
+	/// Compile the search query to a [`CompiledSearchQuery`] capable of testing strings for matches.
+	#[try_fn]
+	pub fn compile(&self) -> Result<CompiledSearchQuery> {
+		match self {
+			Self::Raw(needle) => CompiledSearchQuery(CompiledSearchQueryInner::Raw(
+				memchr::memmem::Finder::new(needle).into_owned()
+			)),
+
+			Self::Simple(query) => CompiledSearchQuery(CompiledSearchQueryInner::Simple(
+				aho_corasick::AhoCorasick::new(Self::parse_simple(query)?)?
+			)),
+
+			Self::Regex(pattern) => {
+				CompiledSearchQuery(CompiledSearchQueryInner::Regex(regex::bytes::Regex::new(pattern)?))
+			}
+		}
+	}
+
+	/// Compile the search query to a [`SearchQueryPattern`] capable of creating [`SearchQueryMatcher`]s to test streams for matches.
+	#[try_fn]
+	pub fn pattern(&self) -> Result<SearchQueryPattern> {
+		match self {
+			Self::Raw(needle) => SearchQueryPattern(SearchQueryPatternInner::Regex(
+				regex_automata::dfa::dense::DFA::new(&regex::escape(needle))?
+			)),
+
+			Self::Simple(query) => SearchQueryPattern(SearchQueryPatternInner::MultiRegex(
+				Self::parse_simple(query)?
+					.into_iter()
+					.map(|needle| regex_automata::dfa::dense::DFA::new(&regex::escape(&needle)))
+					.collect::<Result<_, _>>()?
+			)),
+
+			Self::Regex(pattern) => SearchQueryPattern(SearchQueryPatternInner::Regex(
+				regex_automata::dfa::dense::DFA::new(pattern)?
+			))
+		}
+	}
+}
+
+pub struct CompiledSearchQuery(CompiledSearchQueryInner);
+
+enum CompiledSearchQueryInner {
+	Raw(memchr::memmem::Finder<'static>),
+	Simple(aho_corasick::AhoCorasick),
+	Regex(regex::bytes::Regex)
+}
+
+impl CompiledSearchQueryInner {
+	pub fn is_match(&self, haystack: impl AsRef<[u8]>) -> bool {
+		let haystack = haystack.as_ref();
+		match self {
+			Self::Raw(finder) => finder.find(haystack).is_some(),
+
+			Self::Simple(searcher) => {
+				let mut matched = vec![false; searcher.patterns_len()];
+				for mat in searcher.find_iter(haystack) {
+					matched[mat.pattern()] = true;
+				}
+				matched.into_iter().all(|x| x)
+			}
+
+			Self::Regex(regex) => regex.is_match(haystack)
+		}
+	}
+}
+
+impl CompiledSearchQuery {
+	/// Test if the query matches the given haystack.
+	pub fn is_match(&self, haystack: impl AsRef<[u8]>) -> bool {
+		self.0.is_match(haystack)
+	}
+}
+
+pub struct SearchQueryPattern(SearchQueryPatternInner);
+
+enum SearchQueryPatternInner {
+	Regex(regex_automata::dfa::dense::DFA<Vec<u32>>),
+	MultiRegex(Vec<regex_automata::dfa::dense::DFA<Vec<u32>>>)
+}
+
+impl SearchQueryPattern {
+	pub fn matcher<'a>(&'a self) -> Result<SearchQueryMatcher<'a>> {
+		Ok(SearchQueryMatcher(match &self.0 {
+			SearchQueryPatternInner::Regex(automaton) => SearchQueryMatcherInner::Regex {
+				automaton,
+				state: automaton.start_state_forward(&regex_automata::Input::new(""))?,
+				matched: false
+			},
+
+			SearchQueryPatternInner::MultiRegex(automata) => SearchQueryMatcherInner::And {
+				matchers: automata
+					.iter()
+					.map(|automaton| {
+						anyhow::Ok((
+							SearchQueryMatcherInner::Regex {
+								automaton,
+								state: automaton.start_state_forward(&regex_automata::Input::new(""))?,
+								matched: false
+							},
+							false
+						))
+					})
+					.collect::<Result<_>>()?
+			}
+		}))
+	}
+}
+
+/// A matcher for testing whether an arbitrary stream of input matches a query.
+/// Implements std::io::Write to allow feeding input to the matcher; you can test at any point whether the query has matched with [`Self::matched`].
+/// Will throw an I/O error from Write upon matching (or failing to match, if the query can reach a dead state) the query, to allow short-circuiting.
+pub struct SearchQueryMatcher<'a>(SearchQueryMatcherInner<'a>);
+
+enum SearchQueryMatcherInner<'a> {
+	Regex {
+		automaton: &'a regex_automata::dfa::dense::DFA<Vec<u32>>,
+		state: regex_automata::util::primitives::StateID,
+		matched: bool
+	},
+
+	And {
+		matchers: Vec<(SearchQueryMatcherInner<'a>, bool)>
+	}
+}
+
+impl<'a> SearchQueryMatcher<'a> {
+	pub fn matched(&self) -> bool {
+		self.0.matched()
+	}
+}
+
+impl<'a> std::io::Write for SearchQueryMatcher<'a> {
+	fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+		self.0.write(buf)
+	}
+
+	fn flush(&mut self) -> std::io::Result<()> {
+		self.0.flush()
+	}
+}
+
+impl<'a> SearchQueryMatcherInner<'a> {
+	pub fn matched(&self) -> bool {
+		match self {
+			Self::Regex { matched, .. } => *matched,
+			Self::And { matchers } => matchers.iter().all(|(x, _)| x.matched())
+		}
+	}
+}
+
+impl<'a> std::io::Write for SearchQueryMatcherInner<'a> {
+	fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+		match self {
+			Self::Regex {
+				automaton,
+				state,
+				matched
+			} => {
+				for &byte in buf {
+					// SAFETY: The state is initialized to a valid start state by SearchQueryPattern::matcher and only ever updated using the automaton's transition function.
+					*state = unsafe { automaton.next_state_unchecked(*state, byte) };
+					if automaton.is_match_state(*state) {
+						*matched = true;
+						return Err(std::io::Error::other("pattern matched"));
+					} else if automaton.is_dead_state(*state) {
+						return Err(std::io::Error::other("pattern not matched"));
+					}
+				}
+
+				Ok(buf.len())
+			}
+
+			Self::And { matchers } => {
+				for (matcher, finished) in matchers.iter_mut() {
+					if !*finished {
+						if matcher.write(buf).is_err() {
+							*finished = true;
+						}
+					}
+				}
+
+				if matchers.iter().all(|(matcher, _)| matcher.matched()) {
+					return Err(std::io::Error::other("pattern matched"));
+				}
+
+				if matchers
+					.iter()
+					.any(|(matcher, finished)| *finished && !matcher.matched())
+				{
+					return Err(std::io::Error::other("pattern not matched"));
+				}
+
+				Ok(buf.len())
+			}
+		}
+	}
+
+	fn flush(&mut self) -> std::io::Result<()> {
+		Ok(())
 	}
 }
 

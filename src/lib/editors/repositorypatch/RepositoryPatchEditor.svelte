@@ -1,15 +1,16 @@
 <script lang="ts">
-	import type { RepositoryItemInformation, RepositoryPatchEditorRequest } from "$lib/bindings"
+	import type { RepositoryItemInformation, RepositoryPatchEditorRequest, SearchQuery } from "$lib/bindings"
 	import { event } from "$lib/utils"
 	import { onMount } from "svelte"
 	import Monaco from "./Monaco.svelte"
 	import { debounce } from "lodash"
-	import { Button, Dropdown, Search } from "carbon-components-svelte"
+	import { Button, Dropdown } from "carbon-components-svelte"
 	import Undo from "carbon-icons-svelte/lib/Undo.svelte"
 	import Add from "carbon-icons-svelte/lib/Add.svelte"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { help } from "$lib/helpray"
 	import { VList } from "virtua/svelte"
+	import SearchBar from "$lib/components/SearchBar.svelte"
 
 	export let id: string
 
@@ -115,26 +116,7 @@
 		})
 	})
 
-	function searchInput(evt: any) {
-		const _event = evt as { target: HTMLInputElement }
-
-		void event({
-			type: "editor",
-			data: {
-				editor: id,
-				data: {
-					type: "repositoryPatch",
-					data: {
-						type: "search",
-						data: {
-							query: _event.target.value.toLowerCase(),
-							ty: searchFilter === "All" ? null : searchFilter
-						}
-					}
-				}
-			}
-		})
-	}
+	let searchQuery: SearchQuery = { type: "simple", data: "" }
 </script>
 
 <div class="grid grid-cols-4 gap-4 w-full h-full">
@@ -379,11 +361,29 @@
 		<div class="h-2/3 flex flex-col" use:help={{ title: "Unmodified repository items", description: "Repository items that have not been touched by your edits." }}>
 			<h2>Unmodified</h2>
 			<div class="mt-1 flex gap-2">
-				<Search
+				<SearchBar
 					placeholder="Filter..."
 					icon={Filter}
 					size="lg"
-					on:input={searchInput}
+					bind:query={searchQuery}
+					on:input={async () => {
+						await event({
+							type: "editor",
+							data: {
+								editor: id,
+								data: {
+									type: "repositoryPatch",
+									data: {
+										type: "search",
+										data: {
+											query: { type: searchQuery.type, data: searchQuery.data.toLowerCase() },
+											ty: searchFilter === "All" ? null : searchFilter
+										}
+									}
+								}
+							}
+						})
+					}}
 					on:clear={() => {
 						searchResults = null
 					}}
