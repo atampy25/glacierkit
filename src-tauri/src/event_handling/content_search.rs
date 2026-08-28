@@ -233,8 +233,8 @@ pub async fn start_content_search(
 								}
 
 								"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB"
-								| "ENUM" | "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP"
-								| "GFXA" | "KWOR" | "TDAT" | "TDPK" | "WEMD" => {
+								| "ENUM" | "GFXF" | "GIDX" | "UICB" | "VIDB" | "VOXL" | "WSGB" | "WSWB" | "DSWB"
+								| "CLRP" | "GFXA" | "KWOR" | "TDAT" | "TDPK" | "WEMD" => {
 									let _ = deserialize_generic_writer(
 										game.version(),
 										if filetype == "DSWB" {

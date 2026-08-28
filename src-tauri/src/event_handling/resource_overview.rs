@@ -171,8 +171,8 @@ pub async fn initialise_resource_overview(
 					"ORES" if hash == game.unlockables_id() => ResourceOverviewData::Unlockables,
 
 					"AIBB" | "AIRG" | "ASVA" | "ATMD" | "BMSK" | "CBLU" | "CPPT" | "CRMD" | "ECPB" | "ENUM"
-					| "GFXF" | "GIDX" | "UICB" | "VIDB" | "WSGB" | "WSWB" | "DSWB" | "CLRP" | "GFXA" | "KWOR"
-					| "TDAT" | "TDPK" | "WEMD" | "TBLU" | "ORES" => {
+					| "GFXF" | "GIDX" | "UICB" | "VIDB" | "VOXL" | "WSGB" | "WSWB" | "DSWB" | "CLRP" | "GFXA"
+					| "KWOR" | "TDAT" | "TDPK" | "WEMD" | "TBLU" | "ORES" => {
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
 						ResourceOverviewData::GenericRL {
@@ -1029,12 +1029,13 @@ pub fn get_extract_kinds(game: &Game, id: RuntimeID) -> Result<Vec<ExtractKind>>
 			| "CRMD" | "ECPB"
 			| "ENUM" | "GFXF"
 			| "GIDX" | "UICB"
-			| "VIDB" | "WSGB"
-			| "WSWB" | "DSWB"
-			| "CLRP" | "GFXA"
-			| "KWOR" | "TDAT"
-			| "TDPK" | "WEMD"
-			| "TBLU" | "ORES"
+			| "VIDB" | "VOXL"
+			| "WSGB" | "WSWB"
+			| "DSWB" | "CLRP"
+			| "GFXA" | "KWOR"
+			| "TDAT" | "TDPK"
+			| "WEMD" | "TBLU"
+			| "ORES"
 	) {
 		kinds.push(ExtractKind::Bin1Json);
 	}

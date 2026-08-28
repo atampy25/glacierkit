@@ -37,6 +37,7 @@ pub fn deserialize_generic(game_version: GlacierGame, resource_type: ResourceTyp
 
 			impl_convert!($resource_type, "TEMP", h3::STemplateEntityFactory);
 			impl_convert!($resource_type, "ECPB", h3::SExtendedCppEntityBlueprint);
+			impl_convert!($resource_type, "VOXL", h3::SVoxelSpaceData);
 		}};
 
 		($resource_type:ident, fl) => {{
@@ -256,6 +257,7 @@ pub fn deserialize_generic_writer(
 
 			impl_convert!($resource_type, "TEMP", h3::STemplateEntityFactory);
 			impl_convert!($resource_type, "ECPB", h3::SExtendedCppEntityBlueprint);
+			impl_convert!($resource_type, "VOXL", h3::SVoxelSpaceData);
 		}};
 
 		($resource_type:ident, fl) => {{
