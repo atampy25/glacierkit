@@ -5064,7 +5064,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -5087,7 +5087,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "Inflector",
  "codegen",
@@ -5101,7 +5101,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "anyhow",
  "bimap",
@@ -5127,7 +5127,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "darling",
  "quote",
@@ -5137,7 +5137,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5165,7 +5165,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5193,7 +5193,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5221,7 +5221,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#3e894cc75c0e0b49353f1e9427fc45fb0bb3d72d"
+source = "git+https://github.com/atampy25/glacier-bin1#b973649f44daf939fdb4d1e44a40c3e73257ba8d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5389,9 +5389,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.33.5"
+version = "0.33.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c426daf70099baff33fac0ba85151c42424861c56828cef9ba02dacb78eb6b26"
+checksum = "21fef0953c54fd3de2f44b743fbf77e044c81a25faee03636dfccc0d35135e23"
 
 [[package]]
 name = "glib"
@@ -5877,9 +5877,9 @@ checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
 name = "hyper"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d22053281f852e11534f5198498373cbb59295120a20771d90f7ed1897490a72"
+checksum = "27b501faa50e7a26c3d3560ca625132f4078a17771f4810baf70475ae48cbe43"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -7266,7 +7266,7 @@ dependencies = [
  "glam 0.30.10",
  "glam 0.31.1",
  "glam 0.32.1",
- "glam 0.33.5",
+ "glam 0.33.6",
  "matrixmultiply",
  "nalgebra-macros 0.3.0",
  "num-complex",
