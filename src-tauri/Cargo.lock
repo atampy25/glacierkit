@@ -667,7 +667,7 @@ dependencies = [
 [[package]]
 name = "auto_context"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#8feac53b9a57285af2806f988ace57019798abaa"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#920d8f0fcb448c7ac97385dc9378611e0ad9a827"
 
 [[package]]
 name = "autocfg"
@@ -8986,7 +8986,7 @@ dependencies = [
 [[package]]
 name = "quickentity-rs"
 version = "1.0.0"
-source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#8feac53b9a57285af2806f988ace57019798abaa"
+source = "git+https://github.com/atampy25/quickentity-rs?branch=v3.2#920d8f0fcb448c7ac97385dc9378611e0ad9a827"
 dependencies = [
  "anyhow",
  "auto_context",
@@ -11273,9 +11273,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-http"
-version = "2.7.0"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa402aca4e2ec043f4ced841b74f24b2b8c5bf8c16e2ae2fa494b651da765e07"
+checksum = "d4c07d3be2c68e22e64012eb6c4ec969247e3800da26ef3f3856afbcd07a1ce6"
 dependencies = [
  "bytes",
  "cookie_store",
