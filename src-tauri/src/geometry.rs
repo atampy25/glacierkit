@@ -14,7 +14,7 @@ use glacier_commons::{
 use glacier_formats::material::{MaterialInstance, MaterialPropertyValue};
 use glacier_geometry::render_primitive::{LodLevel, RenderPrimitive};
 use glacier_texture::{mipblock::MipblockData, texture_map::TextureMap};
-use glam::{Affine3, Vec3};
+use glam::{Affine3, DAffine3, Vec3};
 use itertools::Itertools;
 use mesh_tools::{
 	GltfBuilder, PbrSpecularGlossiness, TextureInfo, Triangle,
@@ -1660,7 +1660,7 @@ pub fn get_scene_geometry(
 				bail!("m_mTransform should be a transform")
 			};
 
-			transform.to_glam()
+			transform.to_glam().as_affine3()
 		} else {
 			Affine3::IDENTITY
 		};
@@ -2142,7 +2142,7 @@ pub fn parse_scene_to_glb(
 		for (scene_id, (_, scene)) in &scenes.scenes {
 			scenes.property_overrides.insert(
 				(*scene_id, scene.root_entity, "m_mTransform".into()),
-				Variant::Transform(Transform::from_glam(Affine3::IDENTITY, false))
+				Variant::Transform(Transform::from_glam(DAffine3::IDENTITY, false))
 			);
 		}
 	}

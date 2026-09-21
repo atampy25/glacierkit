@@ -31,7 +31,7 @@ use glacier_commons::{game::GlacierGame, metadata::RuntimeID};
 use glacier_formats::material::{BlendMode, MaterialInstance, MaterialPropertyValue};
 use glacier_geometry::render_primitive::{LodLevel, RenderPrimitive};
 use glacier_texture::{mipblock::MipblockData, texture_map::TextureMap};
-use glam::{Affine3, Affine3A};
+use glam::{Affine3, Affine3A, DAffine3};
 use itertools::Itertools;
 use quickentity_rs::{
 	entity::SubType,
@@ -189,7 +189,7 @@ impl SceneRenderer {
 				if entity.sub_type == SubType::Template {
 					scenes.property_overrides.insert(
 						(*scene_id, scene.root_entity, "m_mTransform".into()),
-						Variant::Transform(quickentity_rs::variant::Transform::from_glam(Affine3::IDENTITY, false))
+						Variant::Transform(quickentity_rs::variant::Transform::from_glam(DAffine3::IDENTITY, false))
 					);
 				}
 			}
@@ -1853,8 +1853,10 @@ fn gizmo_transform_react_system(
 			id,
 			&"m_mTransform".into()
 		) {
-			let mut transform =
-				quickentity_rs::variant::Transform::from_glam(unconvert_transform(transform.compute_affine()), false);
+			let mut transform = quickentity_rs::variant::Transform::from_glam(
+				unconvert_transform(transform.compute_affine()).as_daffine3(),
+				false
+			);
 
 			transform.scale = None;
 

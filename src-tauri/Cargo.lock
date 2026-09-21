@@ -298,7 +298,6 @@ dependencies = [
  "glacier-texture",
  "glam 0.32.1",
  "hitman-behavior",
- "hrtime",
  "identity-hash",
  "image 0.24.9",
  "image 0.25.10",
@@ -5839,12 +5838,6 @@ name = "hotpath-macros"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ac39b5517f540cab511bdbd5a4dc8cfc62858d6cd26a095463c1d2acfb3f290"
-
-[[package]]
-name = "hrtime"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a80870ee775a6b862265eb04a8d61d1b1ef8e4c423154a52ba6a1e3ff24836c"
 
 [[package]]
 name = "html5ever"
