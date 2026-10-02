@@ -3027,14 +3027,13 @@ dependencies = [
 
 [[package]]
 name = "calloop"
-version = "0.14.4"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dbf9978365bac10f54d1d4b04f7ce4427e51f71d61f2fe15e3fed5166474df7"
+checksum = "43b32313e937c8721c9d17ee9bf60699a6402b4b7c2cb6ac1bee0ffcaa4b4e5e"
 dependencies = [
  "bitflags 2.13.2",
  "polling",
  "rustix 1.1.5",
- "slab",
  "tracing",
 ]
 
@@ -3056,7 +3055,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138efcf0940a02ebf0cc8d1eff41a1682a46b431630f4c52450d6265876021fa"
 dependencies = [
- "calloop 0.14.4",
+ "calloop 0.14.5",
  "rustix 1.1.5",
  "wayland-backend",
  "wayland-client",
@@ -5092,7 +5091,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -5115,7 +5114,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "Inflector",
  "codegen",
@@ -5129,7 +5128,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "anyhow",
  "bimap",
@@ -5155,7 +5154,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "darling 0.23.0",
  "quote",
@@ -5165,7 +5164,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5193,7 +5192,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5221,7 +5220,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5249,7 +5248,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#4c76d4e70bcf158dceb548ad0fff3fe03b0a3c56"
+source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
 dependencies = [
  "anyhow",
  "codegen",
@@ -10500,7 +10499,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0512da38f5e2b31201a93524adb8d3136276fa4fe4aafab4e1f727a82b534cc0"
 dependencies = [
  "bitflags 2.13.2",
- "calloop 0.14.4",
+ "calloop 0.14.5",
  "calloop-wayland-source 0.4.1",
  "cursor-icon",
  "libc",
