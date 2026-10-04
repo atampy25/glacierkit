@@ -3106,9 +3106,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.5.1"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f360145194ee8e21db5ee7f3fcd4fe52210864c75c985dae33218202c8bbe040"
+checksum = "f74872d07caf508b30a21f6836e7d7016a2eaf7d9ff4f48deaa58cd8a0407630"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -4610,9 +4610,9 @@ dependencies = [
 
 [[package]]
 name = "font-types"
-version = "0.12.5"
+version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8eb065f3251655b3c90e22e5e363f310fc5332fb3402e37bbc94752283248f6"
+checksum = "6c92d9081c7ab3bd83ef1eecdfad090f3d966e3ce74106779664114cfe1a6274"
 dependencies = [
  "bytemuck",
 ]
@@ -5091,7 +5091,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -5114,7 +5114,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "Inflector",
  "codegen",
@@ -5128,7 +5128,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "anyhow",
  "bimap",
@@ -5154,7 +5154,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "darling 0.23.0",
  "quote",
@@ -5164,7 +5164,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5192,7 +5192,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5220,7 +5220,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5248,7 +5248,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#52e72e6fe4609a1b4aa40a74c626154072d11027"
+source = "git+https://github.com/atampy25/glacier-bin1#4755928a6c7c5c2845d5a8c845cefc7301dfc40e"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5276,7 +5276,7 @@ dependencies = [
 [[package]]
 name = "glacier-commons"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-commons#5843a1e347a815a3761469cedeedee49d810081a"
+source = "git+https://github.com/atampy25/glacier-commons#36f0c2b2c7921994e57a677d77de03055fb262a1"
 dependencies = [
  "arc-swap",
  "brotli-decompressor 5.0.3",
@@ -6691,9 +6691,9 @@ dependencies = [
 
 [[package]]
 name = "lazy-regex"
-version = "3.6.1"
+version = "3.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4994ba703f78b083e2f7946dac9251abd83fd43a0365f030e99b69be5b4b9ef9"
+checksum = "f0a2cce8a22920a29fdcc8c9170aa5d29edd9fbcf8bea856e24c2cb1c2419f67"
 dependencies = [
  "lazy-regex-proc_macros",
  "once_cell",
@@ -6702,14 +6702,14 @@ dependencies = [
 
 [[package]]
 name = "lazy-regex-proc_macros"
-version = "3.6.1"
+version = "3.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd97232314824e6dbef1918a871bb93f51070455e3715bf26e19a6d01aa977a0"
+checksum = "6f1e4b1f1d8c71edb4ff2b2150ec4606445fd2ddf67ddc097655daf59286baa6"
 dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "syn 2.0.119",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -6767,9 +6767,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.189"
+version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
 name = "libdbus-sys"
@@ -7149,9 +7149,9 @@ checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
 
 [[package]]
 name = "mio"
-version = "1.2.3"
+version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b18443e9c262bfe8fa82f51666e2642c53393f7e5c27b3e1aeab922cff5b9d8"
+checksum = "1788edb87fdc09c7e26304471e2f5be8cdefb1b6930d6e3985fc02ff53bf86ee"
 dependencies = [
  "libc",
  "log",
@@ -9275,7 +9275,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "046a7d674daf459825b32f5062056d6882db0d2f5a479fbd76ccfc870ac18709"
 dependencies = [
  "bytemuck",
- "font-types 0.12.5",
+ "font-types 0.12.6",
  "once_cell",
 ]
 
@@ -11654,9 +11654,9 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tokio"
-version = "1.53.1"
+version = "1.53.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+checksum = "e95f91fcc7a621e8b030f6aa23c71fe9838ae2fb4d8118b75602a328f5144044"
 dependencies = [
  "bytes",
  "libc",
@@ -12275,9 +12275,9 @@ checksum = "133bf74f01486773317ddfcde8e2e20d2933cc3b68ab797e5d718bef996a81de"
 
 [[package]]
 name = "uuid"
-version = "1.26.1"
+version = "1.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ef6dac1e96601b4fb3acccccff2139741fcb757cb9a36089bf5be91cfb285ce"
+checksum = "97277d36b9c3ace13e58fa6e753f8b0bbbf302a18dd193240d70f9e29681059a"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
