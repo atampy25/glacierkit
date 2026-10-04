@@ -196,7 +196,7 @@
 				let manifestSchema = {}
 
 				try {
-					manifestSchema = await (await fetch("https://raw.githubusercontent.com/atampy25/simple-mod-framework/main/Mod%20Manager/src/lib/manifest-schema.json")).json()
+					manifestSchema = await (await fetch("https://raw.githubusercontent.com/hitman-rs/simple-mod-framework/main/docs/.gitbook/assets/manifest-schema.json")).json()
 				} catch (e) {
 					info(`Couldn't get manifest schema: ${String(e)}, ${e.stack}`)
 				}
