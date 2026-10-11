@@ -1192,7 +1192,7 @@ pub fn extract_file(
 							let mut data = vec![];
 							if image.as_rgba32f().is_some() {
 								image.into_rgba16().write_to(
-									Cursor::new(&mut data),
+									&mut Cursor::new(&mut data),
 									match format {
 										ImageExtractFormat::Png => ImageFormat::Png,
 										ImageExtractFormat::Jpeg => ImageFormat::Jpeg,
@@ -1599,7 +1599,9 @@ pub fn extract_file(
 
 						let mut data = vec![];
 						if image.as_rgba32f().is_some() {
-							image.into_rgba16().write_to(Cursor::new(&mut data), ImageFormat::Png)?;
+							image
+								.into_rgba16()
+								.write_to(&mut Cursor::new(&mut data), ImageFormat::Png)?;
 						} else {
 							image.write_to(Cursor::new(&mut data), ImageFormat::Png)?;
 						}

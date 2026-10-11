@@ -3,7 +3,6 @@
 // Specta creates non snake case functions
 #![allow(non_snake_case)]
 #![feature(try_blocks)]
-#![feature(unwrap_infallible)]
 #![allow(clippy::type_complexity)]
 
 pub mod bin1;
