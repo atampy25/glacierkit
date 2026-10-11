@@ -1190,15 +1190,27 @@ pub fn extract_file(
 								.context("Couldn't convert texture to dynamic image")?;
 
 							let mut data = vec![];
-							image.write_to(
-								Cursor::new(&mut data),
-								match format {
-									ImageExtractFormat::Png => ImageFormat::Png,
-									ImageExtractFormat::Jpeg => ImageFormat::Jpeg,
-									ImageExtractFormat::Tga => unreachable!(),
-									ImageExtractFormat::Dds => unreachable!()
-								}
-							)?;
+							if image.as_rgba32f().is_some() {
+								image.into_rgba16().write_to(
+									Cursor::new(&mut data),
+									match format {
+										ImageExtractFormat::Png => ImageFormat::Png,
+										ImageExtractFormat::Jpeg => ImageFormat::Jpeg,
+										ImageExtractFormat::Tga => unreachable!(),
+										ImageExtractFormat::Dds => unreachable!()
+									}
+								)?;
+							} else {
+								image.write_to(
+									Cursor::new(&mut data),
+									match format {
+										ImageExtractFormat::Png => ImageFormat::Png,
+										ImageExtractFormat::Jpeg => ImageFormat::Jpeg,
+										ImageExtractFormat::Tga => unreachable!(),
+										ImageExtractFormat::Dds => unreachable!()
+									}
+								)?;
+							}
 
 							vec![ExtractedFile {
 								suffix: match format {
@@ -1586,7 +1598,11 @@ pub fn extract_file(
 							.context("Couldn't convert texture to dynamic image")?;
 
 						let mut data = vec![];
-						image.write_to(Cursor::new(&mut data), ImageFormat::Png)?;
+						if image.as_rgba32f().is_some() {
+							image.into_rgba16().write_to(Cursor::new(&mut data), ImageFormat::Png)?;
+						} else {
+							image.write_to(Cursor::new(&mut data), ImageFormat::Png)?;
+						}
 
 						ExtractedFile {
 							suffix: ".texture.png".into(),
