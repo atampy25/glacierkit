@@ -1553,16 +1553,17 @@ pub fn get_scene_geometry(
 								false
 							}
 						})
-						.unwrap_or(false) && let Some(dest) = get_property_value(
-						game,
-						scenes,
-						*scene_id,
-						scene,
-						None,
-						id,
-						&"MaterialInstanceOverrideDest".into()
-					)?
-					.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
+						.unwrap_or(false)
+						&& let Some(dest) = get_property_value(
+							game,
+							scenes,
+							*scene_id,
+							scene,
+							None,
+							id,
+							&"MaterialInstanceOverrideDest".into()
+						)?
+						.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
 					{
 						dest.resource
 					} else {
@@ -1884,12 +1885,14 @@ pub fn get_scene_geometry(
 										.get("x")
 										.context("Angular attenuation should be Vector2")?
 										.as_f64()
-										.context("Angular attenuation should be Vector2")? as f32,
+										.context("Angular attenuation should be Vector2")?
+										as f32,
 									angular_attenuation
 										.get("y")
 										.context("Angular attenuation should be Vector2")?
 										.as_f64()
-										.context("Angular attenuation should be Vector2")? as f32
+										.context("Angular attenuation should be Vector2")?
+										as f32
 								)
 							} else {
 								(0.6981316804885864, std::f32::consts::FRAC_PI_4)
@@ -2071,16 +2074,17 @@ pub fn get_scene_geometry(
 									false
 								}
 							})
-							.unwrap_or(false) && let Some(dest) = get_property_value(
-							game,
-							scenes,
-							*scene_id,
-							scene,
-							None,
-							id,
-							&"MaterialInstanceOverrideDest".into()
-						)?
-						.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
+							.unwrap_or(false)
+							&& let Some(dest) = get_property_value(
+								game,
+								scenes,
+								*scene_id,
+								scene,
+								None,
+								id,
+								&"MaterialInstanceOverrideDest".into()
+							)?
+							.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
 						{
 							dest.resource
 						} else {

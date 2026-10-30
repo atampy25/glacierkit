@@ -175,7 +175,8 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 						.iter()
 						.zip(b.1.iter())
 						.all(|(a, b)| a.0 == b.0 && a.1.post_init == b.1.post_init && a.1.value.rough_eq(&b.1.value))
-			}) && entity1.events.len() == entity2.events.len()
+			})
+		&& entity1.events.len() == entity2.events.len()
 		&& entity1.events.iter().zip(entity2.events.iter()).all(|(a, b)| {
 			a.0 == b.0
 				&& a.1.len() == b.1.len()
@@ -191,7 +192,8 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 										.is_some_and(|(a, b)| a.rough_eq(b)))
 						})
 				})
-		}) && entity1.input_forwardings.len() == entity2.input_forwardings.len()
+		})
+		&& entity1.input_forwardings.len() == entity2.input_forwardings.len()
 		&& entity1
 			.input_forwardings
 			.iter()
@@ -211,7 +213,8 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 											.is_some_and(|(a, b)| a.rough_eq(b)))
 							})
 					})
-			}) && entity1.output_forwardings.len() == entity2.output_forwardings.len()
+			})
+		&& entity1.output_forwardings.len() == entity2.output_forwardings.len()
 		&& entity1
 			.output_forwardings
 			.iter()
@@ -231,7 +234,8 @@ pub fn sub_entity_rough_eq(entity1: &SubEntity, entity2: &SubEntity) -> bool {
 											.is_some_and(|(a, b)| a.rough_eq(b)))
 							})
 					})
-			}) && entity1.property_aliases == entity2.property_aliases
+			})
+		&& entity1.property_aliases == entity2.property_aliases
 		&& entity1.exposed_entities == entity2.exposed_entities
 		&& entity1.exposed_interfaces == entity2.exposed_interfaces
 		&& entity1.subsets == entity2.subsets

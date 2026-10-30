@@ -265,7 +265,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 							a.from_entity != b.from_entity
 								|| a.to_entity != b.to_entity
 								|| a.from_pin != b.from_pin
-								|| a.to_pin != b.to_pin || (a.value.is_some() && b.value.is_none())
+								|| a.to_pin != b.to_pin
+								|| (a.value.is_some() && b.value.is_none())
 								|| (a.value.is_none() && b.value.is_some())
 								|| (!a
 									.value
@@ -316,7 +317,8 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityOverridesEven
 							a.from_entity != b.from_entity
 								|| a.to_entity != b.to_entity
 								|| a.from_pin != b.from_pin
-								|| a.to_pin != b.to_pin || (a.value.is_some() && b.value.is_none())
+								|| a.to_pin != b.to_pin
+								|| (a.value.is_some() && b.value.is_none())
 								|| (a.value.is_none() && b.value.is_some())
 								|| (!a
 									.value

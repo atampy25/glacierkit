@@ -226,7 +226,8 @@ fn process_texture(world: &mut World, text: RuntimeID) -> Handle<Image> {
 					.geometry
 					.values()
 					.filter(|ent| matches!(ent.data, GeomEntityData::Geometry { .. }))
-					.count() < FULL_RES_THRESHOLD
+					.count()
+					< FULL_RES_THRESHOLD
 			} else {
 				false
 			};
@@ -290,7 +291,8 @@ fn process_specular_texture(world: &mut World, text: RuntimeID) -> (Handle<Image
 					.geometry
 					.values()
 					.filter(|ent| matches!(ent.data, GeomEntityData::Geometry { .. }))
-					.count() < FULL_RES_THRESHOLD
+					.count()
+					< FULL_RES_THRESHOLD
 			} else {
 				false
 			};
@@ -545,7 +547,8 @@ fn process_material(
 					.geometry
 					.values()
 					.filter(|ent| matches!(ent.data, GeomEntityData::Geometry { .. }))
-					.count() < FULL_RES_THRESHOLD
+					.count()
+					< FULL_RES_THRESHOLD
 			{
 				friendly_names
 					.iter()
@@ -1368,10 +1371,11 @@ fn start_render_system(
 									game_files,
 									"zgloballightentity"
 								))
-						}) && let Some(value) = game_files.extract_entity(entity.source.0).unwrap().sub_entities
-					[&entity.source.1]
-					.properties
-					.get("m_GlobalLightFrontColor")
+						})
+					&& let Some(value) = game_files.extract_entity(entity.source.0).unwrap().sub_entities
+						[&entity.source.1]
+						.properties
+						.get("m_GlobalLightFrontColor")
 					&& let Variant::ColorRGB(value) = &value.value
 				{
 					Color::srgb(value.r, value.g, value.b)
@@ -1390,10 +1394,11 @@ fn start_render_system(
 									game_files,
 									"zgloballightentity"
 								))
-						}) && let Some(value) = game_files.extract_entity(entity.source.0).unwrap().sub_entities
-					[&entity.source.1]
-					.properties
-					.get("m_fGlobalLightFrontIntensity")
+						})
+					&& let Some(value) = game_files.extract_entity(entity.source.0).unwrap().sub_entities
+						[&entity.source.1]
+						.properties
+						.get("m_fGlobalLightFrontIntensity")
 					&& let Variant::Raw(value) = &value.value
 					&& let Some(value) = value.to_serde().unwrap().as_f64()
 				{

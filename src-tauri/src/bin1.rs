@@ -92,8 +92,10 @@ pub fn deserialize_generic(game_version: GlacierGame, resource_type: ResourceTyp
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
-					to_value(glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
-						.context("Couldn't convert resource to JSON value")?
+					serde_json::from_str(
+						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+					)
+					.context("Couldn't convert resource to JSON value")?
 				} else {
 					glacier_bin1::deserialize::<Vec<h1::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
@@ -119,8 +121,10 @@ pub fn deserialize_generic(game_version: GlacierGame, resource_type: ResourceTyp
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
-					to_value(glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
-						.context("Couldn't convert resource to JSON value")?
+					serde_json::from_str(
+						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+					)
+					.context("Couldn't convert resource to JSON value")?
 				} else {
 					glacier_bin1::deserialize::<Vec<h2::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
@@ -146,8 +150,10 @@ pub fn deserialize_generic(game_version: GlacierGame, resource_type: ResourceTyp
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
-					to_value(glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
-						.context("Couldn't convert resource to JSON value")?
+					serde_json::from_str(
+						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+					)
+					.context("Couldn't convert resource to JSON value")?
 				} else {
 					glacier_bin1::deserialize::<Vec<h3::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
@@ -180,8 +186,10 @@ pub fn deserialize_generic(game_version: GlacierGame, resource_type: ResourceTyp
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
-					to_value(glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?)
-						.context("Couldn't convert resource to JSON value")?
+					serde_json::from_str(
+						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+					)
+					.context("Couldn't convert resource to JSON value")?
 				} else {
 					glacier_bin1::deserialize::<Vec<fl::SContractConfigResourceEntry>>(data)
 						.context("Couldn't deserialise resource as SContractConfigResourceEntry")
@@ -315,7 +323,10 @@ pub fn deserialize_generic_writer(
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
 					to_writer(
 						writer,
-						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						&serde_json::from_str::<Value>(
+							&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						)
+						.context("Couldn't convert resource to JSON value")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else {
@@ -346,7 +357,10 @@ pub fn deserialize_generic_writer(
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
 					to_writer(
 						writer,
-						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						&serde_json::from_str::<Value>(
+							&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						)
+						.context("Couldn't convert resource to JSON value")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else {
@@ -377,7 +391,10 @@ pub fn deserialize_generic_writer(
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
 					to_writer(
 						writer,
-						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						&serde_json::from_str::<Value>(
+							&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						)
+						.context("Couldn't convert resource to JSON value")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else {
@@ -412,7 +429,10 @@ pub fn deserialize_generic_writer(
 				} else if data.windows(9).any(|x| x == b"GamePrice") {
 					to_writer(
 						writer,
-						&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						&serde_json::from_str::<Value>(
+							&glacier_bin1::deserialize::<EcoString>(data).context("Couldn't deserialise resource")?
+						)
+						.context("Couldn't convert resource to JSON value")?
 					)
 					.context("Couldn't convert resource to JSON value")?
 				} else {

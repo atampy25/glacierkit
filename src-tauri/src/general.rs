@@ -670,12 +670,11 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				if let Some(game) = app_state.game.load().as_ref()
 					&& let Some(repo) = game.repository()
 				{
-					let mut repository = to_value(
-						repo.iter()
-							.cloned()
-							.map(|x| (x.id, x.data))
-							.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
-					)?;
+					let mut repository = to_value(repo.iter().cloned().map(|x| (x.id, x.data)).collect::<IndexMap<
+						Uuid,
+						IndexMap<String, Value>
+					>>(
+					))?;
 
 					let base = to_value(game.repository())?;
 
@@ -854,12 +853,12 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 					) {
 						Some(ty) if ty == resource_type!("REPO") => {
 							if let Some(repo) = game.repository() {
-								let mut repository = to_value(
-									repo.iter()
-										.cloned()
-										.map(|x| (x.id, x.data))
-										.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
-								)?;
+								let mut repository =
+									to_value(repo.iter().cloned().map(|x| (x.id, x.data)).collect::<IndexMap<
+										Uuid,
+										IndexMap<String, Value>
+									>>(
+									))?;
 
 								let base = to_value(repo)?;
 

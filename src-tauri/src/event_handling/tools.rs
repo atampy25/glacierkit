@@ -512,12 +512,11 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 							.context("id key was invalid")?
 					) == Some(resource_type!("REPO"))
 					{
-						let mut current = to_value(
-							repo.iter()
-								.cloned()
-								.map(|x| (x.id, x.data))
-								.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
-						)?;
+						let mut current = to_value(repo.iter().cloned().map(|x| (x.id, x.data)).collect::<IndexMap<
+							Uuid,
+							IndexMap<String, Value>
+						>>(
+						))?;
 
 						let base = current.to_owned();
 
@@ -1148,7 +1147,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 										})
 										.map(|(_, x)| x)
 										.collect_vec()
-										.join("/") + "/"
+										.join("/")
+										+ "/"
 								)
 							} else {
 								None
