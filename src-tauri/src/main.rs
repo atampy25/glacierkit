@@ -152,7 +152,7 @@ async fn main() {
 		.plugin(
 			tauri_plugin_aptabase::Builder::new("A-SH-1393169212")
 				.with_options(InitOptions {
-					host: Some("http://159.13.49.212".into()),
+					host: Some("https://atampy26-aptabase.duckdns.org".into()),
 					flush_interval: None
 				})
 				.with_panic_hook(Box::new(move |client, info, msg| {
