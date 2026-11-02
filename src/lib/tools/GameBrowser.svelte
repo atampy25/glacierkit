@@ -8,7 +8,7 @@
 	import { trackEvent } from "$lib/utils"
 	import { help } from "$lib/helpray"
 	import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
-	import { isEqual } from "lodash"
+	import { isEqual, escapeRegExp } from "lodash"
 	import DocumentExport from "carbon-icons-svelte/lib/DocumentExport.svelte"
 	import SearchBar from "$lib/components/SearchBar.svelte"
 
@@ -47,7 +47,7 @@
 					parents: parsedInner.parents,
 					name: name.match(/^\[(.*)\]\..*$/)![1]
 				}
-			} else if (name.match(new RegExp(`^\\[.*${RegExp.escape(type)}\\]\\(.*\\)${RegExp.escape(type)}$`))) {
+			} else if (name.match(new RegExp(`^\\[.*${escapeRegExp(type)}\\]\\(.*\\)${escapeRegExp(type)}$`))) {
 				return {
 					parents: parsedInner.parents,
 					name: `[${name.match(/^\[(.*)\]\(.*\)..*$/)![1]}](${params})`
