@@ -391,6 +391,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ar_archive_writer"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73cd58deff2140a0a8eae87e417bd01db68a33e148aa93d1e8cd837e55e312b6"
+dependencies = [
+ "object 0.39.1",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -539,9 +548,9 @@ dependencies = [
 
 [[package]]
 name = "async-executor"
-version = "1.14.0"
+version = "1.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c96bf972d85afc50bf5ab8fe2d54d1586b4e0b46c97c50a0c9e71e2f7bcd812a"
+checksum = "f426a31126c735126297bc5ea7a521263c9faff4f63ca415267ee625651c4f37"
 dependencies = [
  "async-task",
  "concurrent-queue",
@@ -582,9 +591,9 @@ dependencies = [
 
 [[package]]
 name = "async-lock"
-version = "3.4.2"
+version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290f7f2596bd5b78a9fec8088ccd89180d7f9f55b94b0576823bbbdc72ee8311"
+checksum = "0876700b0d007ad25d5508865a4259c3af9af6d296bf663a0d586d0bc3369f6f"
 dependencies = [
  "event-listener",
  "event-listener-strategy",
@@ -762,7 +771,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "miniz_oxide 0.9.1",
- "object",
+ "object 0.40.0",
  "rustc-demangle",
  "windows-link",
 ]
@@ -5066,7 +5075,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -5089,7 +5098,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-codegen"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "Inflector",
  "codegen",
@@ -5103,7 +5112,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-core"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "anyhow",
  "bimap",
@@ -5129,7 +5138,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-derive"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "darling 0.23.0",
  "quote",
@@ -5139,7 +5148,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-fl"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5167,7 +5176,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h1"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5195,7 +5204,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h2"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5223,7 +5232,7 @@ dependencies = [
 [[package]]
 name = "glacier-bin1-h3"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-bin1#7b7288dda7f6e3ff5804f74042738cbc52c5d6e5"
+source = "git+https://github.com/atampy25/glacier-bin1#4f724f259aa8fd6e0bf461223721708240deea3d"
 dependencies = [
  "anyhow",
  "codegen",
@@ -5783,7 +5792,7 @@ dependencies = [
 [[package]]
 name = "hitman-behavior"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/hitman-behavior#9bf1613ec531f031d2a0578dee1871d729cbf449"
+source = "git+https://github.com/atampy25/hitman-behavior#3d2db3b5b9aacfa378df95781c03fe2225545650"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -5791,6 +5800,7 @@ dependencies = [
  "ecow",
  "glacier-bin1",
  "lazy-regex",
+ "rayon",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -6373,9 +6383,9 @@ dependencies = [
 
 [[package]]
 name = "jiff"
-version = "0.2.38"
+version = "0.2.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2b005715dcbeb0089a3c0dab99f2ff1cc3b2525323552703d648585d342a383"
+checksum = "3ac703058abac89e5c39b0b879dce2b6b14a4ba36600c7e7e3d0c60a6883ef3c"
 dependencies = [
  "defmt",
  "jiff-core",
@@ -6390,9 +6400,9 @@ dependencies = [
 
 [[package]]
 name = "jiff-core"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e52fe76043ccecc9005d2305ebaadf7d7fc0cc89ca6baa10a94d6bc68c7128c"
+checksum = "aee43309eb53bafb8c36d35d6e444769c8f8e6206a9fbf7546f5db9d7d4a0e93"
 dependencies = [
  "defmt",
  "log",
@@ -6400,9 +6410,9 @@ dependencies = [
 
 [[package]]
 name = "jiff-static"
-version = "0.2.38"
+version = "0.2.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cc9817253cf7c7ee4684451bd327e88d6f3658014e54a29198625590650695c"
+checksum = "6dc32470c67eb7d0e9ccb74303fa925313dc04cecb1aa048beaa6f391e36a93d"
 dependencies = [
  "jiff-core",
  "proc-macro2",
@@ -8051,6 +8061,15 @@ dependencies = [
 
 [[package]]
 name = "object"
+version = "0.39.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "object"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd229a0361b9d0d4396176e02d65897f487eebeab7caa6d443855ee152ca0b9c"
@@ -8443,9 +8462,9 @@ dependencies = [
 
 [[package]]
 name = "pest_stack_guard"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97e6cd2217057fa86b6eaa512917e58089d875b957a31e35e7ab729977e0a5f2"
+checksum = "9ac6154fd4418b8f0b82532c59c26f303f9ca59a64c883e8ce3971fd82733439"
 dependencies = [
  "psm",
  "stacker",
@@ -8808,10 +8827,11 @@ checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
 
 [[package]]
 name = "psm"
-version = "0.1.24"
+version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "200b9ff220857e53e184257720a14553b2f4aa02577d2ed9842d45d4b9654810"
+checksum = "4dcd034599e63b970727f70d79e02d62390a4a84f7c6b827c27c46d5ac3fa622"
 dependencies = [
+ "ar_archive_writer",
  "cc",
 ]
 
@@ -13807,9 +13827,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "9.2.2"
+version = "9.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e408c6cc4699dd017d53dc080cd51c2cea2b5354af57a1479bd265ed42911487"
+checksum = "eaeb7f16d2605b49aef586996ded29e65642fab7259a3077e537351df6d80426"
 dependencies = [
  "crc32fast",
  "getrandom 0.4.3",
