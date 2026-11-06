@@ -39,6 +39,7 @@
 	import { getVersion } from "@tauri-apps/api/app"
 	import { relaunch } from "@tauri-apps/plugin-process"
 	import { event } from "$lib/utils"
+	import { invoke } from "@tauri-apps/api/core"
 
 	let { children } = $props()
 
@@ -53,7 +54,12 @@
 
 	window.addEventListener("error", (evt) => {
 		if (evt.error) {
-			void trackEvent("Frontend error", { error: String(evt.error), stack: evt.error.stack })
+			void invoke<string>("plugin:aptabase|track_error", {
+				errorType: "Frontend",
+				message: String(evt.error),
+				stackTrace: evt.error.stack ?? null,
+				fatal: false
+			})
 
 			errorModalError = `${String(evt.error)}, ${evt.error.stack}`
 			errorModalOpen = true
@@ -121,7 +127,12 @@
 						if (request.data.type === "errorReport") {
 							console.log("Layout handling request", request)
 
-							void trackEvent("Error", { error: request.data.data.error })
+							void invoke<string>("plugin:aptabase|track_error", {
+								errorType: "Backend",
+								message: request.data.data.error,
+								stackTrace: null,
+								fatal: false
+							})
 
 							errorModalError = request.data.data.error
 							errorModalOpen = true

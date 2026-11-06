@@ -81,6 +81,7 @@
 		"dialog:default",
 		"process:default",
 		"log:default",
-		"aptabase:allow-track-event"
+		"aptabase:allow-track-event",
+		"aptabase:allow-track-error"
 	]
 }

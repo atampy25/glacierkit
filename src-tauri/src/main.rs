@@ -155,6 +155,7 @@ async fn main() {
 					host: Some("https://atampy26-aptabase.duckdns.org".into()),
 					flush_interval: None
 				})
+				.with_crash_reporting()
 				.with_panic_hook(Box::new(move |client, info, msg| {
 					eprintln!("Panic: {msg}: {info:?}");
 					if IS_MAIN_THREAD.get() {
@@ -162,13 +163,6 @@ async fn main() {
 							.location()
 							.map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
 							.unwrap_or_default();
-
-						let _ = client.track_event(
-							"Panic",
-							Some(json!({
-							  "info": format!("{} - {}", location, msg),
-							}))
-						);
 
 						let mut panic_report = String::new();
 

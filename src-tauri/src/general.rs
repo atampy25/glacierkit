@@ -1306,18 +1306,15 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 					Some(GlacierGame::FL) => glacier_bin1::game::fl::VARIANT_TYPES.values(),
 					None => empty.values()
 				}
-				.filter_map(|(ty, shape)| {
-					shape.and_then(|shape| match shape.ty {
-						facet::Type::User(facet::UserType::Enum(enum_ty)) => Some((
+				.filter_map(|(ty, _, variants)| {
+					variants.map(|variants| {
+						(
 							(*ty).to_owned(),
-							enum_ty
-								.variants
+							variants
 								.iter()
-								.map(|variant| variant.effective_name().to_owned())
+								.map(|(_, variant_name, _)| (*variant_name).to_owned())
 								.collect::<Vec<_>>()
-						)),
-
-						_ => None
+						)
 					})
 				})
 				.collect()

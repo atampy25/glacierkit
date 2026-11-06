@@ -662,6 +662,10 @@ impl Intellisense {
 															EExtendedPropertyType::Variant => {
 																Variant::Variant(Variant::Ref(None).into())
 															}
+															_ => bail!(
+																"Unknown ECPT property type {:?}",
+																entry.property_type
+															)
 														},
 														false
 													));
@@ -1011,6 +1015,7 @@ impl Intellisense {
 												EExtendedPropertyType::Variant => {
 													Variant::Variant(Variant::Ref(None).into())
 												}
+												_ => bail!("Unknown ECPT property type {:?}", entry.property_type)
 											},
 											false
 										)));
