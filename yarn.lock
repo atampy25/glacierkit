@@ -1033,12 +1033,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/plugin-dialog@npm:^2.8.3":
-  version: 2.8.3
-  resolution: "@tauri-apps/plugin-dialog@npm:2.8.3"
+"@tauri-apps/plugin-dialog@npm:^2.8.4":
+  version: 2.8.4
+  resolution: "@tauri-apps/plugin-dialog@npm:2.8.4"
   dependencies:
     "@tauri-apps/api": "npm:^2.12.0"
-  checksum: b527bd260841b56df32b707867c537e0035508bc58d71c5cd2183c56f687378d140b90190bb9e2eb9d9d658af43a34d7a52b381ae7bd02eb3d64e301cdd1e107
+  checksum: 45210576621c0d0c592cd1e0d00b045f267ff5bd5f3263816f069f3ba78d8851efb36b71990180a5b6d0baf92e70df96e5af474a1c02552244cd7f1891de3bd3
   languageName: node
   linkType: hard
 
@@ -1060,12 +1060,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/plugin-http@npm:^2.8.3":
-  version: 2.8.3
-  resolution: "@tauri-apps/plugin-http@npm:2.8.3"
+"@tauri-apps/plugin-http@npm:^2.9.0":
+  version: 2.9.0
+  resolution: "@tauri-apps/plugin-http@npm:2.9.0"
   dependencies:
     "@tauri-apps/api": "npm:^2.12.0"
-  checksum: 306401227844daf21f16c550becb939f962aba0d69081e528a4b8523afb78551b9c18704a5ff1e10baf5ca18b46a1a2c0a6b4c0306c3cee130cf4e016219f1b2
+  checksum: 1da2f2ec4602c071b18d3609b8963cdbfa34c3d4b6f1633501f51f9450fb4539871536f6af31022436488794899522970b570922cc6cd8bf2a8165b5801abd5a
   languageName: node
   linkType: hard
 
@@ -1105,12 +1105,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tauri-apps/plugin-updater@npm:^2.14.0":
-  version: 2.14.0
-  resolution: "@tauri-apps/plugin-updater@npm:2.14.0"
+"@tauri-apps/plugin-updater@npm:^2.14.1":
+  version: 2.14.1
+  resolution: "@tauri-apps/plugin-updater@npm:2.14.1"
   dependencies:
     "@tauri-apps/api": "npm:^2.12.0"
-  checksum: 6fe90e33d5a11749331e4e0862e7be7e95aed7319011b39850354392883f4f9d46aad0a8b28ce72cb0b53459422915562de53a0cf0d607f68100ca0187f9f57d
+  checksum: 8b498dbe72e94c6c1be35a5686c57ec2dff24e6b1b3ab12bf07ee053ce3b50ad32b0c58ff448f1cfd4d96188acc65adc883502df0354ef89593d2b27ac9a63f9
   languageName: node
   linkType: hard
 
@@ -3144,15 +3144,15 @@ __metadata:
     "@tauri-apps/api": "npm:^2.12.4"
     "@tauri-apps/cli": "npm:^2.12.4"
     "@tauri-apps/plugin-clipboard-manager": "npm:^2.5.0"
-    "@tauri-apps/plugin-dialog": "npm:^2.8.3"
+    "@tauri-apps/plugin-dialog": "npm:^2.8.4"
     "@tauri-apps/plugin-fs": "npm:^2.7.1"
     "@tauri-apps/plugin-global-shortcut": "npm:~2"
-    "@tauri-apps/plugin-http": "npm:^2.8.3"
+    "@tauri-apps/plugin-http": "npm:^2.9.0"
     "@tauri-apps/plugin-notification": "npm:~2"
     "@tauri-apps/plugin-os": "npm:^2.4.0"
     "@tauri-apps/plugin-process": "npm:^2.4.0"
     "@tauri-apps/plugin-shell": "npm:^2.6.0"
-    "@tauri-apps/plugin-updater": "npm:^2.14.0"
+    "@tauri-apps/plugin-updater": "npm:^2.14.1"
     "@threlte/core": "npm:^8.5.13"
     "@threlte/extras": "npm:^9.15.2"
     "@types/eslint": "npm:8.56.0"
