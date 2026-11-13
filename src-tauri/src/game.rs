@@ -471,10 +471,18 @@ impl GameFiles for Game {
 					},
 					info.references()
 						.iter()
-						.map(|(res_id, flag)| {
+						.map(|(res_id, flags)| {
 							Ok(ResourceReference {
 								resource: res_id.try_into()?,
-								flags: ReferenceFlags::from_any(flag.as_byte())
+								flags: match flags {
+									rpkg_rs::resource::resource_package::ResourceReferenceFlags::Legacy(_) => {
+										ReferenceFlags::from_legacy(flags.as_byte())
+									}
+
+									rpkg_rs::resource::resource_package::ResourceReferenceFlags::Standard(_) => {
+										ReferenceFlags::from_modern(flags.as_byte())
+									}
+								}
 							})
 						})
 						.collect::<Result<_>>()

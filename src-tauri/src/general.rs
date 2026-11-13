@@ -1176,9 +1176,9 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 
 			if let Ok(data) = reqwest::get(TONYTOOLS_HASH_LIST_VERSION_ENDPOINT).await
 				&& let Ok(data) = data.text().await
+				&& let Ok(data) = from_str::<Value>(&data)
 			{
-				let new_version = from_str::<Value>(&data)
-					.context("Couldn't parse online version data as JSON")?
+				let new_version = data
 					.get("version")
 					.context("No version key in online version data")?
 					.as_u64()

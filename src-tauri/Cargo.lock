@@ -5294,7 +5294,7 @@ dependencies = [
 [[package]]
 name = "glacier-commons"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-commons#d5f4778902d2a67d1f61735c7d9c6585f02f722b"
+source = "git+https://github.com/atampy25/glacier-commons#2ba06500b325158021b304e2363465202cef1c57"
 dependencies = [
  "arc-swap",
  "brotli-decompressor 5.0.3",
