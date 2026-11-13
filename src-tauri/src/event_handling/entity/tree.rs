@@ -15,7 +15,7 @@ use log::debug;
 use ordermap::OrderMap;
 use quickentity_rs::{
 	apply_patch,
-	entity::{EntityID, LocalPinConnection, PinConnection, Property, Ref, SubEntity},
+	entity::{EntityID, ExposedEntity, LocalPinConnection, PinConnection, Property, Ref, SubEntity},
 	patch::{Patch, PatchOperation, SubEntityOperation},
 	variant::{Transform, Variant, Vec3}
 };
@@ -770,33 +770,23 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 				}
 
 				ReverseReferenceData::ExposedEntity { exposed_name } => {
-					entity
+					match entity
 						.sub_entities
 						.get_mut(&reverse_ref.from)
 						.unwrap()
 						.exposed_entities
 						.get_mut(exposed_name)
 						.unwrap()
-						.refers_to
-						.retain(|x| x.as_local().is_some_and(|x| x != *entity_to_delete));
-
-					if entity
-						.sub_entities
-						.get_mut(&reverse_ref.from)
-						.unwrap()
-						.exposed_entities
-						.get_mut(exposed_name)
-						.unwrap()
-						.refers_to
-						.is_empty()
 					{
-						entity
-							.sub_entities
-							.get_mut(&reverse_ref.from)
-							.unwrap()
-							.exposed_entities
-							.remove(exposed_name)
-							.unwrap();
+						ExposedEntity::Single(target) => {
+							*target = target
+								.take()
+								.filter(|x| x.as_local().is_some_and(|x| x != *entity_to_delete));
+						}
+
+						ExposedEntity::Array(targets) => {
+							targets.retain(|x| x.as_local().is_some_and(|x| x != *entity_to_delete))
+						}
 					}
 				}
 
@@ -1118,22 +1108,50 @@ pub async fn paste(
 		}
 
 		for exposed_entity in sub_entity.exposed_entities.values_mut() {
-			for reference in exposed_entity.refers_to.iter_mut() {
-				*reference = alter_ref_according_to_changelist(reference, &changed_entity_ids);
+			match exposed_entity {
+				ExposedEntity::Single(None) => {}
 
-				if let Some(scene) = &reference.external_scene
-					&& !entity.external_scenes.contains(scene)
-				{
-					entity.external_scenes.push(scene.to_owned());
-					added_external_scenes += 1;
+				ExposedEntity::Single(opt) => {
+					let should_remove = {
+						let reference = opt.as_mut().unwrap();
+						*reference = alter_ref_according_to_changelist(reference, &changed_entity_ids);
+
+						if let Some(scene) = &reference.external_scene
+							&& !entity.external_scenes.contains(scene)
+						{
+							entity.external_scenes.push(scene.to_owned());
+							added_external_scenes += 1;
+						}
+
+						reference
+							.as_local()
+							.is_some_and(|x| !entity.sub_entities.contains_key(&x) && !all_paste_contents.contains(&x))
+					};
+
+					if should_remove {
+						*opt = None;
+					}
+				}
+
+				ExposedEntity::Array(targets) => {
+					for reference in targets.iter_mut() {
+						*reference = alter_ref_according_to_changelist(reference, &changed_entity_ids);
+
+						if let Some(scene) = &reference.external_scene
+							&& !entity.external_scenes.contains(scene)
+						{
+							entity.external_scenes.push(scene.to_owned());
+							added_external_scenes += 1;
+						}
+					}
+
+					targets.retain(|x| {
+						// Only retain those not meeting the criteria for deletion (local ref, not in entity we're pasting into or the paste itself)
+						!x.as_local()
+							.is_some_and(|x| !entity.sub_entities.contains_key(&x) && !all_paste_contents.contains(&x))
+					});
 				}
 			}
-
-			exposed_entity.refers_to.retain(|x| {
-				// Only retain those not meeting the criteria for deletion (local ref, not in entity we're pasting into or the paste itself)
-				!x.as_local()
-					.is_some_and(|x| !entity.sub_entities.contains_key(&x) && !all_paste_contents.contains(&x))
-			});
 		}
 
 		for referenced_entity in sub_entity.exposed_interfaces.values_mut() {

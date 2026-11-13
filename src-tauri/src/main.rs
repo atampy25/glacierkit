@@ -156,7 +156,7 @@ async fn main() {
 					flush_interval: None
 				})
 				.with_crash_reporting()
-				.with_panic_hook(Box::new(move |client, info, msg| {
+				.with_panic_hook(Box::new(move |_, info, msg| {
 					eprintln!("Panic: {msg}: {info:?}");
 					if IS_MAIN_THREAD.get() {
 						let location = info

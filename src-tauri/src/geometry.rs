@@ -22,7 +22,7 @@ use mesh_tools::{
 	texture::TextureFormat
 };
 use quickentity_rs::{
-	entity::{Entity, EntityID, Ref},
+	entity::{Entity, EntityID, ExposedEntity, Ref},
 	variant::{RawVariant, Transform, Variant}
 };
 use rayon::iter::{
@@ -836,26 +836,29 @@ pub fn instantiate_scene(game: &impl GameFiles, entity: &Entity) -> Result<Insta
 			for (name, exposed_entity) in &sub_entity.exposed_entities {
 				entities[instance].exposed_entities.insert(
 					name.to_owned(),
-					exposed_entity
-						.refers_to
-						.iter()
-						.filter_map(|entity_ref| {
-							if let Some(external_scene) = entity_ref.external_scene {
-								Some(InstantiatedEntityRef::External {
-									external_scene,
-									entity_id: entity_ref.entity_id,
+					match exposed_entity {
+						ExposedEntity::Single(None) => vec![],
+						ExposedEntity::Single(Some(target)) => vec![target],
+						ExposedEntity::Array(targets) => targets.iter().collect()
+					}
+					.into_iter()
+					.filter_map(|entity_ref| {
+						if let Some(external_scene) = entity_ref.external_scene {
+							Some(InstantiatedEntityRef::External {
+								external_scene,
+								entity_id: entity_ref.entity_id,
+								exposed_entity: entity_ref.exposed_entity.to_owned()
+							})
+						} else {
+							entity_instantiations.get(&entity_ref.entity_id).copied().map(|entity| {
+								InstantiatedEntityRef::Local {
+									entity,
 									exposed_entity: entity_ref.exposed_entity.to_owned()
-								})
-							} else {
-								entity_instantiations.get(&entity_ref.entity_id).copied().map(|entity| {
-									InstantiatedEntityRef::Local {
-										entity,
-										exposed_entity: entity_ref.exposed_entity.to_owned()
-									}
-								})
-							}
-						})
-						.collect()
+								}
+							})
+						}
+					})
+					.collect()
 				);
 			}
 		}

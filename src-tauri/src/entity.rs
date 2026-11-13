@@ -8,7 +8,7 @@ use glacier_commons::{
 use indexmap::IndexMap;
 use itertools::Itertools;
 use quickentity_rs::{
-	entity::{Entity, EntityID, Ref, SubEntity},
+	entity::{Entity, EntityID, ExposedEntity, Ref, SubEntity},
 	variant::{EnumValue, Variant}
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -246,7 +246,11 @@ pub fn calculate_reverse_references(entity: &Entity) -> Result<HashMap<EntityID,
 		}
 
 		for (exposed_name, exposed_entity) in &entity.exposed_entities {
-			for reference in &exposed_entity.refers_to {
+			for reference in match exposed_entity {
+				ExposedEntity::Single(None) => vec![],
+				ExposedEntity::Single(Some(target)) => vec![target],
+				ExposedEntity::Array(targets) => targets.iter().collect()
+			} {
 				if let Some(ent) = reference.as_local() {
 					reverse_references.entry(ent).or_default().push(ReverseReference {
 						from: entity_id.to_owned(),
@@ -423,7 +427,11 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	}
 
 	for exposed_entity in sub_entity.exposed_entities.values() {
-		for reference in &exposed_entity.refers_to {
+		for reference in match exposed_entity {
+			ExposedEntity::Single(None) => vec![],
+			ExposedEntity::Single(Some(target)) => vec![target],
+			ExposedEntity::Array(targets) => targets.iter().collect()
+		} {
 			if let Some(ent) = reference.as_local()
 				&& !entity.sub_entities.contains_key(&ent)
 			{
@@ -740,7 +748,11 @@ pub fn get_decorations(
 	}
 
 	for exposed_entity in sub_entity.exposed_entities.values() {
-		for reference in &exposed_entity.refers_to {
+		for reference in match exposed_entity {
+			ExposedEntity::Single(None) => vec![],
+			ExposedEntity::Single(Some(target)) => vec![target],
+			ExposedEntity::Array(targets) => targets.iter().collect()
+		} {
 			if let Some(decoration) = get_ref_decoration(game, entity, Some(reference)) {
 				decorations.push(decoration);
 			}
