@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, path::Path};
 
 use anyhow::{Context, Result, anyhow};
 use ecow::{EcoString, eco_format};
@@ -8,6 +8,7 @@ use glacier_commons::{
 	metadata::{ResourceReference, ResourceType, RuntimeID},
 	resource_type, rid
 };
+use glacier_formats::material::{MaterialEntity, MaterialInstance, MaterialOverride, MaterialPropertyValue};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lazy_regex::{regex_captures, regex_replace};
@@ -20,7 +21,9 @@ use quickentity_rs::{
 use rayon::iter::{
 	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelBridge, ParallelIterator
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value, to_vec};
+use specta::Type;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_aptabase::EventTracker;
 use tauri_plugin_dialog::DialogExt;
@@ -29,7 +32,9 @@ use uuid::Uuid;
 use velcro::vec;
 
 use crate::{
-	Notification, NotificationKind, convert_json_patch_to_merge_patch,
+	Notification, NotificationKind,
+	biome::format_json,
+	convert_json_patch_to_merge_patch,
 	event_handling::{
 		content_search::start_content_search,
 		resource_overview::{extract_file, get_extract_kinds, open_resource_overview}
@@ -45,6 +50,792 @@ use crate::{
 	ores_repo::UnlockableItem,
 	send_notification, send_request, start_progress, start_task, task_progress
 };
+
+#[derive(Type, Serialize, Deserialize, Clone, derive_more::Debug, PartialEq, Eq, Hash)]
+#[serde(
+	rename_all = "camelCase",
+	rename_all_fields = "camelCase",
+	tag = "type",
+	content = "data"
+)]
+pub enum FileAction {
+	NormaliseQN,
+	ConvertEntityToPatch,
+	ConvertPatchToEntity,
+	ConvertRepoPatchToMergePatch,
+	ConvertRepoPatchToJsonPatch,
+	ConvertUnlockablesPatchToMergePatch,
+	ConvertUnlockablesPatchToJsonPatch,
+	CreateMaterialEntity
+}
+
+impl std::fmt::Display for FileAction {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::NormaliseQN => write!(f, "Normalise"),
+			Self::ConvertEntityToPatch => write!(f, "Convert to Patch"),
+			Self::ConvertPatchToEntity => write!(f, "Convert to Entity"),
+			Self::ConvertRepoPatchToMergePatch => write!(f, "Convert to repository.json"),
+			Self::ConvertRepoPatchToJsonPatch => write!(f, "Convert to JSON.patch.json"),
+			Self::ConvertUnlockablesPatchToMergePatch => {
+				write!(f, "Convert to unlockables.json")
+			}
+			Self::ConvertUnlockablesPatchToJsonPatch => {
+				write!(f, "Convert to JSON.patch.json")
+			}
+			Self::CreateMaterialEntity => write!(f, "Create Material Entity")
+		}
+	}
+}
+
+impl FileAction {
+	#[try_fn]
+	pub fn all_available(path: &Path) -> Result<Vec<Self>> {
+		let extension = path.file_name().context("No file name")?.to_string_lossy();
+
+		let Some((_, extension)) = extension.split_once('.') else {
+			return Ok(vec![]);
+		};
+
+		match extension {
+			"entity.json" => vec![Self::NormaliseQN, Self::ConvertEntityToPatch],
+			"entity.patch.json" => vec![Self::NormaliseQN, Self::ConvertPatchToEntity],
+			"repository.json" => vec![Self::ConvertRepoPatchToJsonPatch],
+			"unlockables.json" => vec![Self::ConvertUnlockablesPatchToJsonPatch],
+			"JSON.patch.json" => vec![
+				Self::ConvertRepoPatchToMergePatch,
+				Self::ConvertUnlockablesPatchToMergePatch,
+			],
+			"material.json" => vec![Self::CreateMaterialEntity],
+			_ => vec![]
+		}
+	}
+
+	pub fn icon(&self) -> String {
+		match self {
+			Self::NormaliseQN => "fa-solid fa-rotate".into(),
+			Self::ConvertEntityToPatch => "fa-solid fa-right-left".into(),
+			Self::ConvertPatchToEntity => "fa-solid fa-right-left".into(),
+			Self::ConvertRepoPatchToMergePatch => "fa-solid fa-right-left".into(),
+			Self::ConvertRepoPatchToJsonPatch => "fa-solid fa-right-left".into(),
+			Self::ConvertUnlockablesPatchToMergePatch => "fa-solid fa-right-left".into(),
+			Self::ConvertUnlockablesPatchToJsonPatch => "fa-solid fa-right-left".into(),
+			Self::CreateMaterialEntity => "fa fa-plus".into()
+		}
+	}
+
+	pub fn perform(self, app: &AppHandle, path: &Path) -> Result<()> {
+		match self {
+			Self::NormaliseQN => normalise_qn_file(app, path),
+			Self::ConvertEntityToPatch => convert_entity_to_patch(app, path),
+			Self::ConvertPatchToEntity => convert_patch_to_entity(app, path),
+			Self::ConvertRepoPatchToMergePatch => convert_repo_to_merge_patch(app, path),
+			Self::ConvertRepoPatchToJsonPatch => convert_repo_to_json_patch(app, path),
+			Self::ConvertUnlockablesPatchToMergePatch => convert_unlockables_to_merge_patch(app, path),
+			Self::ConvertUnlockablesPatchToJsonPatch => convert_unlockables_to_json_patch(app, path),
+			Self::CreateMaterialEntity => create_material_entity(app, path)
+		}
+	}
+}
+
+#[try_fn]
+pub fn normalise_qn_file(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(
+		app,
+		format!("Normalising {}", path.file_name().unwrap().to_string_lossy())
+	)?;
+
+	let extension = path
+		.file_name()
+		.context("No file name")?
+		.to_string_lossy()
+		.split('.')
+		.skip(1)
+		.collect_vec()
+		.join(".");
+
+	if let Some(game) = app_state.game.load().as_ref() {
+		match extension.as_ref() {
+			"entity.json" => {
+				let mut entity: Entity =
+					from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+
+				// Normalise comments to form used by GlacierKit (single comment for each entity)
+				let mut comments: Vec<CommentEntity> = vec![];
+				for comment in entity.comments {
+					if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+						x.text = eco_format!("{}\n\n{}", x.text, comment.text);
+					} else {
+						comments.push(CommentEntity {
+							parent: comment.parent,
+							name: "Notes".into(),
+							text: comment.text
+						});
+					}
+				}
+				entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
+
+				let mut reconverted = match game.version() {
+					GlacierGame::H1 => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::h1::STemplateEntity, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+
+					GlacierGame::H2 => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::h2::STemplateEntityFactory, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+
+					GlacierGame::H3 => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::h3::STemplateEntityFactory, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+
+					GlacierGame::FL => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::fl::STemplateEntityFactory, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+				};
+
+				reconverted.comments = comments;
+
+				fs::write(path, format_json(to_string(&reconverted)?)?)?;
+
+				send_notification(
+					app,
+					Notification {
+						kind: NotificationKind::Success,
+						title: "File normalised".into(),
+						subtitle: "The entity file has been re-saved in canonical format.".into()
+					}
+				)?;
+			}
+
+			"entity.patch.json" => {
+				let patch: Patch =
+					from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+
+				let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
+
+				let base = entity.to_owned();
+
+				apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+				// Normalise comments to form used by GlacierKit (single comment for each entity)
+				let mut comments: Vec<CommentEntity> = vec![];
+				for comment in entity.comments {
+					if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+						x.text = eco_format!("{}\n\n{}", x.text, comment.text);
+					} else {
+						comments.push(CommentEntity {
+							parent: comment.parent,
+							name: "Notes".into(),
+							text: comment.text
+						});
+					}
+				}
+				entity.comments = vec![];
+
+				let mut reconverted = match game.version() {
+					GlacierGame::H1 => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::h1::STemplateEntity, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+
+					GlacierGame::H2 => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::h2::STemplateEntityFactory, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+
+					GlacierGame::H3 => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::h3::STemplateEntityFactory, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+
+					GlacierGame::FL => {
+						let (fac, fac_meta, blu, blu_meta): (glacier_bin1::game::fl::STemplateEntityFactory, _, _, _) =
+							entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+						Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
+							.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}
+				};
+
+				reconverted.comments = comments;
+
+				fs::write(
+					path,
+					format_json(to_string(
+						&generate_patch(&base, &reconverted).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					)?)?
+				)?;
+
+				send_notification(
+					app,
+					Notification {
+						kind: NotificationKind::Success,
+						title: "File normalised".into(),
+						subtitle: "The patch file has been re-saved in canonical format.".into()
+					}
+				)?;
+			}
+
+			_ => {
+				Err(anyhow!("Can't normalise non-QN files"))?;
+				panic!();
+			}
+		}
+	} else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "No game selected".into(),
+				subtitle: "You can't normalise QuickEntity files without a copy of the game selected.".into()
+			}
+		)?;
+	}
+
+	finish_task(app, task)?;
+}
+
+#[try_fn]
+pub fn convert_entity_to_patch(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	if let Some(game) = app_state.game.load().as_ref() {
+		let mut entity: Entity =
+			from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+
+		// Normalise comments to form used by GlacierKit (single comment for each entity)
+		let mut comments: Vec<CommentEntity> = vec![];
+		for comment in entity.comments {
+			if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+				x.text = eco_format!("{}\n\n{}", x.text, comment.text);
+			} else {
+				comments.push(CommentEntity {
+					parent: comment.parent,
+					name: "Notes".into(),
+					text: comment.text
+				});
+			}
+		}
+		entity.comments = comments;
+
+		let base = game.extract_entity(entity.factory)?;
+
+		fs::write(
+			{
+				let mut x = path.to_owned();
+				x.pop();
+				x.push(
+					path.file_name()
+						.context("No file name")?
+						.to_string_lossy()
+						.replace(".entity.json", ".entity.patch.json")
+				);
+				x
+			},
+			format_json(to_string(
+				&generate_patch(&base, &entity).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+			)?)?
+		)?;
+
+		fs::remove_file(&path)?;
+
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Success,
+				title: "File converted to patch".into(),
+				subtitle: "The entity.json file has been converted into a patch file.".into()
+			}
+		)?;
+	} else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "No game selected".into(),
+				subtitle: "You can't convert between entity and patch without a copy of the game selected.".into()
+			}
+		)?;
+	}
+}
+
+#[try_fn]
+pub fn convert_patch_to_entity(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+
+	if let Some(game) = app_state.game.load().as_ref() {
+		let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
+
+		apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+		// Normalise comments to form used by GlacierKit (single comment for each entity)
+		let mut comments: Vec<CommentEntity> = vec![];
+		for comment in entity.comments {
+			if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+				x.text = eco_format!("{}\n\n{}", x.text, comment.text);
+			} else {
+				comments.push(CommentEntity {
+					parent: comment.parent,
+					name: "Notes".into(),
+					text: comment.text
+				});
+			}
+		}
+		entity.comments = comments;
+
+		fs::write(
+			{
+				let mut x = path.to_owned();
+				x.pop();
+				x.push(
+					path.file_name()
+						.context("No file name")?
+						.to_string_lossy()
+						.replace(".entity.patch.json", ".entity.json")
+				);
+				x
+			},
+			format_json(to_string(&entity)?)?
+		)?;
+
+		fs::remove_file(&path)?;
+
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Success,
+				title: "File converted to entity.json".into(),
+				subtitle: "The patch file has been converted into an entity.json file.".into()
+			}
+		)?;
+	} else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "No game selected".into(),
+				subtitle: "You can't convert between entity and patch without a copy of the game selected.".into()
+			}
+		)?;
+	}
+}
+
+#[try_fn]
+pub fn convert_repo_to_merge_patch(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	if let Some(game) = app_state.game.load().as_ref()
+		&& let Some(repo) = game.repository()
+	{
+		if game.resource_type(
+			from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+				.context("Invalid JSON")?
+				.get("id")
+				.context("Patch had no id key")?
+				.as_str()
+				.context("id key was not string")?
+				.parse::<RuntimeID>()
+				.context("id key was invalid")?
+		) == Some(resource_type!("REPO"))
+		{
+			let mut current = to_value(
+				repo.iter()
+					.cloned()
+					.map(|x| (x.id, x.data))
+					.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+			)?;
+
+			let base = current.to_owned();
+
+			let patch: Vec<json_patch::PatchOperation> = from_value(
+				from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+					.context("Invalid JSON")?
+					.get("patch")
+					.context("No patch key")?
+					.to_owned()
+			)
+			.context("Invalid JSON patch")?;
+
+			json_patch::patch(&mut current, &patch)?;
+
+			let patch = json_patch::diff(&base, &current);
+
+			fs::write(
+				{
+					let mut x = path.to_owned();
+					x.pop();
+					x.push(
+						path.file_name()
+							.context("No file name")?
+							.to_string_lossy()
+							.replace(".JSON.patch.json", ".repository.json")
+					);
+					x
+				},
+				format_json(to_string(&convert_json_patch_to_merge_patch(&current, &patch)?)?)?
+			)?;
+
+			fs::remove_file(&path)?;
+
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Success,
+					title: "File converted to repository.json".into(),
+					subtitle: "The patch file has been converted into a repository.json file.".into()
+				}
+			)?;
+		} else {
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Error,
+					title: "Not a repository patch".into(),
+					subtitle: "This patch is for a different type of file, so it can't be converted to a \
+					           repository.json file."
+						.into()
+				}
+			)?;
+		}
+	} else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "No game selected".into(),
+				subtitle: "You can't convert between patch formats without a copy of the game selected.".into()
+			}
+		)?;
+	}
+}
+
+#[try_fn]
+pub fn convert_repo_to_json_patch(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	if let Some(game) = app_state.game.load().as_ref()
+		&& let Some(repo) = game.repository()
+	{
+		let mut current = to_value(
+			repo.iter()
+				.cloned()
+				.map(|x| (x.id, x.data))
+				.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+		)?;
+
+		let base = current.to_owned();
+
+		let patch: Value = from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid JSON")?;
+
+		json_patch::merge(&mut current, &patch);
+
+		send_request(
+			app,
+			Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+				base,
+				current,
+				save_path: {
+					let mut x = path.to_owned();
+					x.pop();
+					x.push(
+						path.file_name()
+							.context("No file name")?
+							.to_string_lossy()
+							.replace(".repository.json", ".JSON.patch.json")
+					);
+					x
+				},
+				id: REPO_ID
+			})
+		)?;
+
+		fs::remove_file(&path)?;
+
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Success,
+				title: "File converted to JSON.patch.json".into(),
+				subtitle: "The patch file has been converted into a JSON.patch.json file.".into()
+			}
+		)?;
+	} else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "No game selected".into(),
+				subtitle: "You can't convert between patch formats without a copy of the game selected.".into()
+			}
+		)?;
+	}
+}
+
+#[try_fn]
+pub fn convert_unlockables_to_merge_patch(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	if let Some(game) = app_state.game.load().as_ref() {
+		if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+			.context("Invalid JSON")?
+			.get("file")
+			.context("Patch had no file key")?
+			.as_str()
+			.context("File key was not string")?
+			.parse::<RuntimeID>()
+			.context("File key was invalid")?
+			== game.unlockables_id()
+		{
+			let mut current = to_value(
+				from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
+					&game.extract_latest_resource(game.unlockables_id())?.1
+				)?)?
+				.into_iter()
+				.map(|x| {
+					(
+						x.data
+							.get("Id")
+							.expect("Unlockable did not have Id")
+							.as_str()
+							.expect("Id was not string")
+							.to_owned(),
+						{
+							let mut y = IndexMap::new();
+							y.insert("Guid".into(), to_value(x.id).unwrap());
+							y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
+							y
+						}
+					)
+				})
+				.collect::<IndexMap<String, IndexMap<String, Value>>>()
+			)?;
+
+			let base = current.to_owned();
+
+			let patch: Vec<json_patch::PatchOperation> = from_value(
+				from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+					.context("Invalid JSON")?
+					.get("patch")
+					.context("No patch key")?
+					.to_owned()
+			)
+			.context("Invalid JSON patch")?;
+
+			json_patch::patch(&mut current, &patch)?;
+
+			let patch = json_patch::diff(&base, &current);
+
+			fs::write(
+				{
+					let mut x = path.to_owned();
+					x.pop();
+					x.push(
+						path.file_name()
+							.context("No file name")?
+							.to_string_lossy()
+							.replace(".JSON.patch.json", ".unlockables.json")
+					);
+					x
+				},
+				format_json(to_string(&convert_json_patch_to_merge_patch(&current, &patch)?)?)?
+			)?;
+
+			fs::remove_file(&path)?;
+
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Success,
+					title: "File converted to unlockables.json".into(),
+					subtitle: "The patch file has been converted into a unlockables.json file.".into()
+				}
+			)?;
+		} else {
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Error,
+					title: "Not an unlockables patch".into(),
+					subtitle: "This patch is for a different type of file, so it can't be converted to a \
+					           unlockables.json file."
+						.into()
+				}
+			)?;
+		}
+	} else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "No game selected".into(),
+				subtitle: "You can't convert between patch formats without a copy of the game selected.".into()
+			}
+		)?;
+	}
+}
+
+#[try_fn]
+pub fn convert_unlockables_to_json_patch(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	if let Some(game) = app_state.game.load().as_ref() {
+		let mut current = to_value(
+			from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
+				&game.extract_latest_resource(game.unlockables_id())?.1
+			)?)?
+			.into_iter()
+			.map(|x| {
+				(
+					x.data
+						.get("Id")
+						.expect("Unlockable did not have Id")
+						.as_str()
+						.expect("Id was not string")
+						.to_owned(),
+					{
+						let mut y = IndexMap::new();
+						y.insert("Guid".into(), to_value(x.id).unwrap());
+						y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
+						y
+					}
+				)
+			})
+			.collect::<IndexMap<String, IndexMap<String, Value>>>()
+		)?;
+
+		let base = current.to_owned();
+
+		let patch: Value = from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid JSON")?;
+
+		json_patch::merge(&mut current, &patch);
+
+		send_request(
+			app,
+			Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
+				base,
+				current,
+				save_path: {
+					let mut x = path.to_owned();
+					x.pop();
+					x.push(
+						path.file_name()
+							.context("No file name")?
+							.to_string_lossy()
+							.replace(".unlockables.json", ".JSON.patch.json")
+					);
+					x
+				},
+				id: game.unlockables_id()
+			})
+		)?;
+
+		fs::remove_file(&path)?;
+
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Success,
+				title: "File converted to JSON.patch.json".into(),
+				subtitle: "The patch file has been converted into a JSON.patch.json file.".into()
+			}
+		)?;
+	} else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "No game selected".into(),
+				subtitle: "You can't convert between patch formats without a copy of the game selected.".into()
+			}
+		)?;
+	}
+}
+
+#[try_fn]
+pub fn create_material_entity(app: &AppHandle, path: &Path) -> Result<()> {
+	let material = from_slice::<MaterialInstance>(&fs::read(&path).context("Couldn't read file")?)
+		.context("Invalid material instance")?;
+
+	let Some(material_path) = material.id.get_path() else {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "Material has no path".into(),
+				subtitle: "The material instance must have a known path to automatically create an associated \
+				           material entity."
+					.into()
+			}
+		)?;
+		return Ok(());
+	};
+
+	let factory = regex_replace!(r"mi$", &material_path, "entitytype");
+	let blueprint = regex_replace!(r"mi$", &material_path, "entityblueprint");
+
+	if *factory == *material_path || *blueprint == *material_path {
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "Material path invalid".into(),
+				subtitle: "The material instance's path cannot be automatically converted into a material entity."
+					.into()
+			}
+		)?;
+		return Ok(());
+	}
+
+	fs::write(
+		path.with_extension("entity.json"),
+		format_json(to_string(&MaterialEntity {
+			factory: RuntimeID::from_path(&factory),
+			blueprint: RuntimeID::from_path(&blueprint),
+			material: material.id,
+			overrides: material
+				.binder
+				.properties
+				.into_iter()
+				.filter_map(|(prop, val)| match val {
+					MaterialPropertyValue::Float { enabled, value } if enabled => {
+						Some((prop, MaterialOverride::Float(value)))
+					}
+					MaterialPropertyValue::Vector { enabled, value } if enabled => {
+						Some((prop, MaterialOverride::Vector(value)))
+					}
+					MaterialPropertyValue::Texture { enabled, value, .. } if enabled => {
+						Some((prop.trim_prefix("map").into(), MaterialOverride::Texture(value)))
+					}
+					MaterialPropertyValue::Colour { enabled, value } if enabled => {
+						Some((prop, MaterialOverride::Color(value)))
+					}
+					_ => None
+				})
+				.collect()
+		})?)?
+	)?;
+}
 
 #[try_fn]
 #[context("Couldn't handle tool event")]
@@ -167,658 +958,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				finish_task(app, task)?;
 			}
 
-			FileBrowserEvent::NormaliseQNFile { path } => {
-				let task = start_task(
-					app,
-					format!("Normalising {}", path.file_name().unwrap().to_string_lossy())
-				)?;
-
-				let extension = path
-					.file_name()
-					.context("No file name")?
-					.to_string_lossy()
-					.split('.')
-					.skip(1)
-					.collect_vec()
-					.join(".");
-
-				if let Some(game) = app_state.game.load().as_ref() {
-					match extension.as_ref() {
-						"entity.json" => {
-							let mut entity: Entity = from_slice(&fs::read(&path).context("Couldn't read file")?)
-								.context("Invalid entity")?;
-
-							// Normalise comments to form used by GlacierKit (single comment for each entity)
-							let mut comments: Vec<CommentEntity> = vec![];
-							for comment in entity.comments {
-								if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-									x.text = eco_format!("{}\n\n{}", x.text, comment.text);
-								} else {
-									comments.push(CommentEntity {
-										parent: comment.parent,
-										name: "Notes".into(),
-										text: comment.text
-									});
-								}
-							}
-							entity.comments = vec![]; // we don't need them here, since they get erased by the conversion to RT anyway
-
-							let mut reconverted = match game.version() {
-								GlacierGame::H1 => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::h1::STemplateEntity,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-
-								GlacierGame::H2 => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::h2::STemplateEntityFactory,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-
-								GlacierGame::H3 => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::h3::STemplateEntityFactory,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-
-								GlacierGame::FL => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::fl::STemplateEntityFactory,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-							};
-
-							reconverted.comments = comments;
-
-							fs::write(path, to_vec(&reconverted)?)?;
-
-							send_notification(
-								app,
-								Notification {
-									kind: NotificationKind::Success,
-									title: "File normalised".into(),
-									subtitle: "The entity file has been re-saved in canonical format.".into()
-								}
-							)?;
-						}
-
-						"entity.patch.json" => {
-							let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?)
-								.context("Invalid entity")?;
-
-							let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
-
-							let base = entity.to_owned();
-
-							apply_patch(&mut entity, patch, |_| {})
-								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-
-							// Normalise comments to form used by GlacierKit (single comment for each entity)
-							let mut comments: Vec<CommentEntity> = vec![];
-							for comment in entity.comments {
-								if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-									x.text = eco_format!("{}\n\n{}", x.text, comment.text);
-								} else {
-									comments.push(CommentEntity {
-										parent: comment.parent,
-										name: "Notes".into(),
-										text: comment.text
-									});
-								}
-							}
-							entity.comments = vec![];
-
-							let mut reconverted = match game.version() {
-								GlacierGame::H1 => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::h1::STemplateEntity,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-
-								GlacierGame::H2 => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::h2::STemplateEntityFactory,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-
-								GlacierGame::H3 => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::h3::STemplateEntityFactory,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-
-								GlacierGame::FL => {
-									let (fac, fac_meta, blu, blu_meta): (
-										glacier_bin1::game::fl::STemplateEntityFactory,
-										_,
-										_,
-										_
-									) = entity.to_game().map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-									Entity::from_game(&fac, &fac_meta, &blu, &blu_meta, false)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								}
-							};
-
-							reconverted.comments = comments;
-
-							fs::write(
-								path,
-								to_vec(
-									&generate_patch(&base, &reconverted)
-										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
-								)?
-							)?;
-
-							send_notification(
-								app,
-								Notification {
-									kind: NotificationKind::Success,
-									title: "File normalised".into(),
-									subtitle: "The patch file has been re-saved in canonical format.".into()
-								}
-							)?;
-						}
-
-						_ => {
-							Err(anyhow!("Can't normalise non-QN files"))?;
-							panic!();
-						}
-					}
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't normalise QuickEntity files without a copy of the game selected."
-								.into()
-						}
-					)?;
-				}
-
-				finish_task(app, task)?;
-			}
-
-			FileBrowserEvent::ConvertEntityToPatch { path } => {
-				if let Some(game) = app_state.game.load().as_ref() {
-					let mut entity: Entity =
-						from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
-
-					// Normalise comments to form used by GlacierKit (single comment for each entity)
-					let mut comments: Vec<CommentEntity> = vec![];
-					for comment in entity.comments {
-						if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-							x.text = eco_format!("{}\n\n{}", x.text, comment.text);
-						} else {
-							comments.push(CommentEntity {
-								parent: comment.parent,
-								name: "Notes".into(),
-								text: comment.text
-							});
-						}
-					}
-					entity.comments = comments;
-
-					let base = game.extract_entity(entity.factory)?;
-
-					fs::write(
-						{
-							let mut x = path.to_owned();
-							x.pop();
-							x.push(
-								path.file_name()
-									.context("No file name")?
-									.to_string_lossy()
-									.replace(".entity.json", ".entity.patch.json")
-							);
-							x
-						},
-						to_vec(&generate_patch(&base, &entity).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?)?
-					)?;
-
-					fs::remove_file(&path)?;
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Success,
-							title: "File converted to patch".into(),
-							subtitle: "The entity.json file has been converted into a patch file.".into()
-						}
-					)?;
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't convert between entity and patch without a copy of the game selected."
-								.into()
-						}
-					)?;
-				}
-			}
-
-			FileBrowserEvent::ConvertPatchToEntity { path } => {
-				let patch: Patch =
-					from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
-
-				if let Some(game) = app_state.game.load().as_ref() {
-					let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
-
-					apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
-
-					// Normalise comments to form used by GlacierKit (single comment for each entity)
-					let mut comments: Vec<CommentEntity> = vec![];
-					for comment in entity.comments {
-						if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-							x.text = eco_format!("{}\n\n{}", x.text, comment.text);
-						} else {
-							comments.push(CommentEntity {
-								parent: comment.parent,
-								name: "Notes".into(),
-								text: comment.text
-							});
-						}
-					}
-					entity.comments = comments;
-
-					fs::write(
-						{
-							let mut x = path.to_owned();
-							x.pop();
-							x.push(
-								path.file_name()
-									.context("No file name")?
-									.to_string_lossy()
-									.replace(".entity.patch.json", ".entity.json")
-							);
-							x
-						},
-						to_vec(&entity)?
-					)?;
-
-					fs::remove_file(&path)?;
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Success,
-							title: "File converted to entity.json".into(),
-							subtitle: "The patch file has been converted into an entity.json file.".into()
-						}
-					)?;
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't convert between entity and patch without a copy of the game selected."
-								.into()
-						}
-					)?;
-				}
-			}
-
-			FileBrowserEvent::ConvertRepoPatchToMergePatch { path } => {
-				if let Some(game) = app_state.game.load().as_ref()
-					&& let Some(repo) = game.repository()
-				{
-					if game.resource_type(
-						from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
-							.context("Invalid JSON")?
-							.get("id")
-							.context("Patch had no id key")?
-							.as_str()
-							.context("id key was not string")?
-							.parse::<RuntimeID>()
-							.context("id key was invalid")?
-					) == Some(resource_type!("REPO"))
-					{
-						let mut current = to_value(repo.iter().cloned().map(|x| (x.id, x.data)).collect::<IndexMap<
-							Uuid,
-							IndexMap<String, Value>
-						>>(
-						))?;
-
-						let base = current.to_owned();
-
-						let patch: Vec<json_patch::PatchOperation> = from_value(
-							from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
-								.context("Invalid JSON")?
-								.get("patch")
-								.context("No patch key")?
-								.to_owned()
-						)
-						.context("Invalid JSON patch")?;
-
-						json_patch::patch(&mut current, &patch)?;
-
-						let patch = json_patch::diff(&base, &current);
-
-						fs::write(
-							{
-								let mut x = path.to_owned();
-								x.pop();
-								x.push(
-									path.file_name()
-										.context("No file name")?
-										.to_string_lossy()
-										.replace(".JSON.patch.json", ".repository.json")
-								);
-								x
-							},
-							to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
-						)?;
-
-						fs::remove_file(&path)?;
-
-						send_notification(
-							app,
-							Notification {
-								kind: NotificationKind::Success,
-								title: "File converted to repository.json".into(),
-								subtitle: "The patch file has been converted into a repository.json file.".into()
-							}
-						)?;
-					} else {
-						send_notification(
-							app,
-							Notification {
-								kind: NotificationKind::Error,
-								title: "Not a repository patch".into(),
-								subtitle: "This patch is for a different type of file, so it can't be converted to a \
-								           repository.json file."
-									.into()
-							}
-						)?;
-					}
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't convert between patch formats without a copy of the game selected."
-								.into()
-						}
-					)?;
-				}
-			}
-
-			FileBrowserEvent::ConvertRepoPatchToJsonPatch { path } => {
-				if let Some(game) = app_state.game.load().as_ref()
-					&& let Some(repo) = game.repository()
-				{
-					let mut current = to_value(
-						repo.iter()
-							.cloned()
-							.map(|x| (x.id, x.data))
-							.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
-					)?;
-
-					let base = current.to_owned();
-
-					let patch: Value =
-						from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid JSON")?;
-
-					json_patch::merge(&mut current, &patch);
-
-					send_request(
-						app,
-						Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-							base,
-							current,
-							save_path: {
-								let mut x = path.to_owned();
-								x.pop();
-								x.push(
-									path.file_name()
-										.context("No file name")?
-										.to_string_lossy()
-										.replace(".repository.json", ".JSON.patch.json")
-								);
-								x
-							},
-							id: REPO_ID
-						})
-					)?;
-
-					fs::remove_file(&path)?;
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Success,
-							title: "File converted to JSON.patch.json".into(),
-							subtitle: "The patch file has been converted into a JSON.patch.json file.".into()
-						}
-					)?;
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't convert between patch formats without a copy of the game selected."
-								.into()
-						}
-					)?;
-				}
-			}
-
-			FileBrowserEvent::ConvertUnlockablesPatchToMergePatch { path } => {
-				if let Some(game) = app_state.game.load().as_ref() {
-					if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
-						.context("Invalid JSON")?
-						.get("file")
-						.context("Patch had no file key")?
-						.as_str()
-						.context("File key was not string")?
-						.parse::<RuntimeID>()
-						.context("File key was invalid")?
-						== game.unlockables_id()
-					{
-						let mut current = to_value(
-							from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
-								&game.extract_latest_resource(game.unlockables_id())?.1
-							)?)?
-							.into_iter()
-							.map(|x| {
-								(
-									x.data
-										.get("Id")
-										.expect("Unlockable did not have Id")
-										.as_str()
-										.expect("Id was not string")
-										.to_owned(),
-									{
-										let mut y = IndexMap::new();
-										y.insert("Guid".into(), to_value(x.id).unwrap());
-										y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
-										y
-									}
-								)
-							})
-							.collect::<IndexMap<String, IndexMap<String, Value>>>()
-						)?;
-
-						let base = current.to_owned();
-
-						let patch: Vec<json_patch::PatchOperation> = from_value(
-							from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
-								.context("Invalid JSON")?
-								.get("patch")
-								.context("No patch key")?
-								.to_owned()
-						)
-						.context("Invalid JSON patch")?;
-
-						json_patch::patch(&mut current, &patch)?;
-
-						let patch = json_patch::diff(&base, &current);
-
-						fs::write(
-							{
-								let mut x = path.to_owned();
-								x.pop();
-								x.push(
-									path.file_name()
-										.context("No file name")?
-										.to_string_lossy()
-										.replace(".JSON.patch.json", ".unlockables.json")
-								);
-								x
-							},
-							to_vec(&convert_json_patch_to_merge_patch(&current, &patch)?)?
-						)?;
-
-						fs::remove_file(&path)?;
-
-						send_notification(
-							app,
-							Notification {
-								kind: NotificationKind::Success,
-								title: "File converted to unlockables.json".into(),
-								subtitle: "The patch file has been converted into a unlockables.json file.".into()
-							}
-						)?;
-					} else {
-						send_notification(
-							app,
-							Notification {
-								kind: NotificationKind::Error,
-								title: "Not an unlockables patch".into(),
-								subtitle: "This patch is for a different type of file, so it can't be converted to a \
-								           unlockables.json file."
-									.into()
-							}
-						)?;
-					}
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't convert between patch formats without a copy of the game selected."
-								.into()
-						}
-					)?;
-				}
-			}
-
-			FileBrowserEvent::ConvertUnlockablesPatchToJsonPatch { path } => {
-				if let Some(game) = app_state.game.load().as_ref() {
-					let mut current = to_value(
-						from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
-							&game.extract_latest_resource(game.unlockables_id())?.1
-						)?)?
-						.into_iter()
-						.map(|x| {
-							(
-								x.data
-									.get("Id")
-									.expect("Unlockable did not have Id")
-									.as_str()
-									.expect("Id was not string")
-									.to_owned(),
-								{
-									let mut y = IndexMap::new();
-									y.insert("Guid".into(), to_value(x.id).unwrap());
-									y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
-									y
-								}
-							)
-						})
-						.collect::<IndexMap<String, IndexMap<String, Value>>>()
-					)?;
-
-					let base = current.to_owned();
-
-					let patch: Value =
-						from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid JSON")?;
-
-					json_patch::merge(&mut current, &patch);
-
-					send_request(
-						app,
-						Request::Global(GlobalRequest::ComputeJSONPatchAndSave {
-							base,
-							current,
-							save_path: {
-								let mut x = path.to_owned();
-								x.pop();
-								x.push(
-									path.file_name()
-										.context("No file name")?
-										.to_string_lossy()
-										.replace(".unlockables.json", ".JSON.patch.json")
-								);
-								x
-							},
-							id: game.unlockables_id()
-						})
-					)?;
-
-					fs::remove_file(&path)?;
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Success,
-							title: "File converted to JSON.patch.json".into(),
-							subtitle: "The patch file has been converted into a JSON.patch.json file.".into()
-						}
-					)?;
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't convert between patch formats without a copy of the game selected."
-								.into()
-						}
-					)?;
-				}
+			FileBrowserEvent::PerformFileAction { path, action } => {
+				action.perform(app, &path)?;
 			}
 		},
 

@@ -562,7 +562,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				)?;
 			}
 
-			"xml" => {
+			"xml" | "XMLB.patch.xml" => {
 				let id = Uuid::new_v4();
 
 				app_state
@@ -596,7 +596,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				)?;
 			}
 
-			"txt" => {
+			"behavior.txt" | "txt" => {
 				let id = Uuid::new_v4();
 
 				app_state
@@ -1065,7 +1065,7 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 				}
 			}
 
-			"dlge.json" | "locr.json" | "rtlv.json" | "clng.json" | "ditl.json" | "material.json" | "contract.json" => {
+			extension if extension.ends_with(".json") => {
 				let id = Uuid::new_v4();
 
 				app_state
@@ -1236,7 +1236,7 @@ pub async fn initialise_app(app: &AppHandle) -> Result<()> {
 		.join("last_panic.txt")
 		.exists()
 	{
-		send_request(app, Request::Global(GlobalRequest::RequestLastPanicUpload))?;
+		send_request(app, Request::Global(GlobalRequest::NotifyLastPanic))?;
 	}
 
 	if let Ok(req) = reqwest::get("https://hitman-resources.netlify.app/glacierkit/dynamics.json").await {

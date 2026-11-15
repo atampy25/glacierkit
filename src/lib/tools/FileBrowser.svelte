@@ -1,7 +1,7 @@
 <script lang="ts">
 	import jQuery from "jquery"
 	import "jstree"
-	import { createEventDispatcher, onDestroy, onMount } from "svelte"
+	import { onMount } from "svelte"
 	import { join, sep as getSep } from "@tauri-apps/api/path"
 	import type { FileBrowserRequest } from "$lib/bindings"
 	import { Button, Search } from "carbon-components-svelte"
@@ -11,7 +11,6 @@
 	import { v4 } from "uuid"
 	import Filter from "carbon-icons-svelte/lib/Filter.svelte"
 	import { trackEvent } from "$lib/utils"
-	import { readTextFile } from "@tauri-apps/plugin-fs"
 	import { help } from "$lib/helpray"
 
 	const sep = getSep()
@@ -112,12 +111,7 @@
 
 														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
 
-														tree.set_icon(
-															id,
-															icons.find((a) => path.split(".").at(-1)?.includes(a[0]))
-																? icons.find((a) => path.split(".").at(-1)?.includes(a[0]))![1]
-																: "fa-regular fa-file"
-														)
+														tree.set_icon(id, icons.find((a) => path.endsWith(a[0])) ? icons.find((a) => path.endsWith(a[0]))![1] : "fa-regular fa-file")
 
 														pathToID[path] = id
 
@@ -228,10 +222,7 @@
 										delete pathToID[oldPath]
 										pathToID[newPath] = node.id
 
-										tree.set_icon(
-											node.id,
-											icons.find((a) => newPath.split(".").at(-1)?.includes(a[0])) ? icons.find((a) => newPath.split(".").at(-1)?.includes(a[0]))![1] : "fa-regular fa-file"
-										)
+										tree.set_icon(node.id, icons.find((a) => newPath.endsWith(a[0])) ? icons.find((a) => newPath.endsWith(a[0]))![1] : "fa-regular fa-file")
 
 										await event({
 											type: "tool",
@@ -276,17 +267,18 @@
 								})
 							}
 						},
-						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".entity.json")
-							? {}
-							: {
-									normaliseEntity: {
+						...Object.fromEntries(
+							(fileActions[Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id]] || []).map(([label, icon, action]) => {
+								return [
+									action,
+									{
 										separator_before: false,
 										separator_after: false,
 										_disabled: false,
-										label: "Normalise",
-										icon: "fa-solid fa-rotate",
+										label,
+										icon,
 										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Normalise entity")
+											trackEvent(`Perform ${action} action`)
 
 											const tree = jQuery.jstree!.reference(b.reference)
 											const selected_node = tree.get_node(b.reference)
@@ -298,228 +290,19 @@
 												data: {
 													type: "fileBrowser",
 													data: {
-														type: "normaliseQNFile",
+														type: "performFileAction",
 														data: {
-															path
-														}
-													}
-												}
-											})
-										}
-									},
-									convertEntityToPatch: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Convert to Patch",
-										icon: "fa-solid fa-right-left",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Convert entity to patch")
-
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "convertEntityToPatch",
-														data: {
-															path
+															path,
+															action
 														}
 													}
 												}
 											})
 										}
 									}
-								}),
-						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".entity.patch.json")
-							? {}
-							: {
-									normalisePatch: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Normalise",
-										icon: "fa-solid fa-rotate",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Normalise patch")
-
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "normaliseQNFile",
-														data: {
-															path
-														}
-													}
-												}
-											})
-										}
-									},
-									convertPatchToEntity: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Convert to Entity",
-										icon: "fa-solid fa-right-left",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Convert patch to entity")
-
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "convertPatchToEntity",
-														data: {
-															path
-														}
-													}
-												}
-											})
-										}
-									}
-								}),
-						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".repository.json")
-							? {}
-							: {
-									convertRepoPatchToJsonPatch: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Convert to JSON.patch.json",
-										icon: "fa-solid fa-right-left",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Convert repository merge patch to JSON patch")
-
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "convertRepoPatchToJsonPatch",
-														data: {
-															path
-														}
-													}
-												}
-											})
-										}
-									}
-								}),
-						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".unlockables.json")
-							? {}
-							: {
-									convertUnlockablesPatchToJsonPatch: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Convert to JSON.patch.json",
-										icon: "fa-solid fa-right-left",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Convert unlockables merge patch to JSON patch")
-
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "convertUnlockablesPatchToJsonPatch",
-														data: {
-															path
-														}
-													}
-												}
-											})
-										}
-									}
-								}),
-						...(!Object.fromEntries(Object.entries(pathToID).map(([a, b]) => [b, a]))[rightClickedNode.id].endsWith(".JSON.patch.json")
-							? {}
-							: {
-									convertRepoPatchToMergePatch: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Convert to repository.json",
-										icon: "fa-solid fa-right-left",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Convert repository JSON patch to merge patch")
-
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "convertRepoPatchToMergePatch",
-														data: {
-															path
-														}
-													}
-												}
-											})
-										}
-									},
-									convertUnlockablesPatchToMergePatch: {
-										separator_before: false,
-										separator_after: false,
-										_disabled: false,
-										label: "Convert to unlockables.json",
-										icon: "fa-solid fa-right-left",
-										action: async function (b: { reference: string | HTMLElement | JQuery<HTMLElement> }) {
-											trackEvent("Convert unlockables JSON patch to merge patch")
-
-											const tree = jQuery.jstree!.reference(b.reference)
-											const selected_node = tree.get_node(b.reference)
-
-											const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.parent], selected_node.text)
-
-											await event({
-												type: "tool",
-												data: {
-													type: "fileBrowser",
-													data: {
-														type: "convertUnlockablesPatchToMergePatch",
-														data: {
-															path
-														}
-													}
-												}
-											})
-										}
-									}
-								})
+								]
+							})
+						)
 					}
 				}
 			},
@@ -598,7 +381,11 @@
 						{
 							id: pathToID[request.data.path],
 							parent: pathToID[request.data.path.split(sep).slice(0, -1).join(sep)],
-							icon: `fa-regular fa-${request.data.isFolder ? "folder" : request.data.path.endsWith(".json") ? "pen-to-square" : "file"}`,
+							icon: request.data.isFolder
+								? "fa-regular fa-folder"
+								: icons.find((a) => request.data.path.endsWith(a[0]))
+									? icons.find((a) => request.data.path.endsWith(a[0]))![1]
+									: "fa-regular fa-file",
 							text: request.data.path.split(sep).at(-1)!,
 							folder: request.data.isFolder
 						},
@@ -694,6 +481,10 @@
 				await replaceTree(request.data.files)
 				break
 
+			case "fileActions":
+				Object.assign(fileActions, Object.fromEntries(request.data.files))
+				break
+
 			default:
 				request satisfies never
 				break
@@ -701,6 +492,7 @@
 	}
 
 	const pathToID: Record<string, string> = {}
+	const fileActions: Record<string, [string, string, FileAction][]> = {}
 
 	async function replaceTree(files: [string, boolean][]) {
 		tree.settings!.core.data = []
@@ -726,11 +518,7 @@
 				tree.settings!.core.data.push({
 					id,
 					parent: pathToID[path.split(sep).slice(0, -1).join(sep)],
-					icon: isFolder
-						? "fa-regular fa-folder"
-						: icons.find((a) => path.split(".").at(-1)?.includes(a[0]))
-							? icons.find((a) => path.split(".").at(-1)?.includes(a[0]))![1]
-							: "fa-regular fa-file",
+					icon: isFolder ? "fa-regular fa-folder" : icons.find((a) => path.endsWith(a[0])) ? icons.find((a) => path.endsWith(a[0]))![1] : "fa-regular fa-file",
 					text: path.split(sep).at(-1),
 					folder: isFolder
 				})

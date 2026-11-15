@@ -154,16 +154,10 @@
 							)
 						}
 
-						if (request.data.type === "requestLastPanicUpload") {
+						if (request.data.type === "notifyLastPanic") {
 							console.log("Layout handling request", request)
 
 							lastPanicModalOpen = true
-						}
-
-						if (request.data.type === "logUploadRejected") {
-							console.log("Layout handling request", request)
-
-							logUploadRejectedModalOpen = true
 						}
 
 						if (request.data.type === "setGameVersion") {
@@ -519,37 +513,21 @@
 	let commitsSinceLastVersion: string[] = $state([])
 
 	let lastPanicModalOpen = $state(false)
-
-	let logUploadRejectedModalOpen = $state(false)
 </script>
 
 <ComposedModal
 	open={errorModalOpen}
-	on:click:button--primary={async () => {
+	on:click:button--primary={() => {
 		errorModalOpen = false
-
-		await event({
-			type: "global",
-			data: {
-				type: "uploadLogAndReport",
-				data: errorModalError
-			}
-		})
 	}}
 >
 	<ModalHeader title="Error" />
 	<ModalBody>
-		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability. You can send your log file to Atampy26
-		automatically to help fix this issue. If you choose not to, you can find it in <code>%appdata%\app.glacierkit\logs</code>.
+		An error has occurred. Make a backup of your mod folder, then save any work inside this app and close the app to prevent further instability. A log file may be useful in reporting this issue -
+		you can find it in <code>%appdata%\app.glacierkit\logs</code>.
 		<pre class="mt-2 p-4 bg-neutral-800 overflow-x-auto"><code>{errorModalError}</code></pre>
 	</ModalBody>
-	<ModalFooter
-		primaryButtonText="Upload log and continue"
-		secondaryButtonText="Continue without uploading log"
-		on:click:button--secondary={() => {
-			errorModalOpen = false
-		}}
-	/>
+	<ModalFooter primaryButtonText="Continue" />
 </ComposedModal>
 
 <ComposedModal
@@ -560,43 +538,18 @@
 		await event({
 			type: "global",
 			data: {
-				type: "uploadLastPanic"
+				type: "clearLastPanic"
 			}
 		})
 	}}
 >
 	<ModalHeader title="Crash report" />
 	<ModalBody>
-		It seems GlacierKit crashed the last time it was used. You can send a crash report, including your log and the error message, to Atampy26 automatically to help fix this issue. If you choose
-		not to, you can find it in <code>%appdata%\app.glacierkit</code>.
+		It seems GlacierKit crashed the last time it was used. You should send the crash report, which includes your log and the error message, to Atampy26 to help fix this issue - you can find it in <code
+			>%appdata%\app.glacierkit</code
+		>.
 	</ModalBody>
-	<ModalFooter
-		primaryButtonText="Send crash report"
-		secondaryButtonText="Continue without sending report"
-		on:click:button--secondary={async () => {
-			lastPanicModalOpen = false
-
-			await event({
-				type: "global",
-				data: {
-					type: "clearLastPanic"
-				}
-			})
-		}}
-	/>
-</ComposedModal>
-
-<ComposedModal
-	open={logUploadRejectedModalOpen}
-	on:submit={() => {
-		logUploadRejectedModalOpen = false
-	}}
->
-	<ModalHeader title="Upload failed" />
-	<ModalBody>
-		The file is likely too large to be uploaded automatically. You can find it in <code>%appdata%\app.glacierkit</code>; please send it to Atampy26 via Discord.
-	</ModalBody>
-	<ModalFooter primaryButtonText="OK" />
+	<ModalFooter primaryButtonText="Continue" />
 </ComposedModal>
 
 <ComposedModal

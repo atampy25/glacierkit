@@ -30,6 +30,7 @@ use crate::{
 	HashMap, ShardMap,
 	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
+	event_handling::tools::FileAction,
 	game::{Game, valid_game_path},
 	geometry::SceneGeometry,
 	ores_repo::{
@@ -517,6 +518,10 @@ nesting::nest! {
 
 		MultiOgg,
 
+		Wav,
+
+		MultiWav,
+
 		HMLanguages,
 
 		MaterialInstance,
@@ -536,8 +541,7 @@ nesting::nest! {
 		#[derive(PartialEq, Eq, Hash)]
 		pub enum TextureExtractFormat {
 			Dds,
-			Png,
-			Tga
+			Png
 		}
 
 		Pseudocode
@@ -560,6 +564,8 @@ impl Display for ExtractKind {
 			},
 			ExtractKind::Ogg => write!(f, "as OGG"),
 			ExtractKind::MultiOgg => write!(f, "all as OGGs"),
+			ExtractKind::Wav => write!(f, "as WAV"),
+			ExtractKind::MultiWav => write!(f, "all as WAVs"),
 			ExtractKind::HMLanguages => write!(f, "as JSON"),
 			ExtractKind::MaterialInstance => write!(f, "as JSON"),
 			ExtractKind::MaterialEntity => write!(f, "as JSON"),
@@ -568,7 +574,6 @@ impl Display for ExtractKind {
 			ExtractKind::Glb => write!(f, "as GLB"),
 			ExtractKind::Texture { format } => match format {
 				TextureExtractFormat::Png => write!(f, "as PNG"),
-				TextureExtractFormat::Tga => write!(f, "as TGA"),
 				TextureExtractFormat::Dds => write!(f, "as DDS")
 			},
 			ExtractKind::Pseudocode => write!(f, "as TXT")
@@ -620,32 +625,9 @@ nesting::nest! {
 					new_path: PathBuf
 				},
 
-				NormaliseQNFile {
-					path: PathBuf
-				},
-
-				ConvertEntityToPatch {
-					path: PathBuf
-				},
-
-				ConvertPatchToEntity {
-					path: PathBuf
-				},
-
-				ConvertRepoPatchToMergePatch {
-					path: PathBuf
-				},
-
-				ConvertRepoPatchToJsonPatch {
-					path: PathBuf
-				},
-
-				ConvertUnlockablesPatchToMergePatch {
-					path: PathBuf
-				},
-
-				ConvertUnlockablesPatchToJsonPatch {
-					path: PathBuf
+				PerformFileAction {
+					path: PathBuf,
+					action: FileAction
 				}
 			}
 
@@ -997,8 +979,6 @@ nesting::nest! {
 			SelectTab(Option<Uuid>),
 			RemoveTab(Uuid),
 			SaveTab(Uuid),
-			UploadLogAndReport(String),
-			UploadLastPanic,
 			ClearLastPanic
 		}
 
@@ -1079,6 +1059,10 @@ nesting::nest! {
 					/// Relative path, is folder
 					#[debug(skip)]
 					files: Vec<(PathBuf, bool)>
+				},
+
+				FileActions {
+					files: Vec<(PathBuf, Vec<(String, String, FileAction)>)>
 				}
 			}
 
@@ -1305,6 +1289,11 @@ nesting::nest! {
 
 						SetBlueprint {
 							blueprint: RuntimeID
+						},
+
+						SetExternalScenes {
+							#[debug(skip)]
+							external_scenes: Vec<RuntimeID>
 						}
 					}
 
@@ -1489,8 +1478,7 @@ nesting::nest! {
 				save_path: PathBuf,
 				id: RuntimeID
 			},
-			RequestLastPanicUpload,
-			LogUploadRejected,
+			NotifyLastPanic,
 			SetGameVersion {
 				version: Option<GlacierGame>,
 

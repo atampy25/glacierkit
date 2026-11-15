@@ -57,7 +57,7 @@ use crate::{
 	event_handling::{
 		repository_patch::handle_repository_patch_event,
 		resource_overview::{handle_resource_overview_event, open_resource_overview},
-		tools::handle_tool_event,
+		tools::{FileAction, handle_tool_event},
 		unlockables_patch::handle_unlockables_patch_event
 	},
 	game::GameFiles,
@@ -71,6 +71,9 @@ use crate::{
 	}
 };
 
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub type HashMap<K, V, S = rapidhash::fast::RandomState> = std::collections::HashMap<K, V, S>;
 pub type HashSet<K, S = rapidhash::fast::RandomState> = std::collections::HashSet<K, S>;
 pub type PapayaMap<K, V, S = rapidhash::fast::RandomState> = papaya::HashMap<K, V, S>;
@@ -83,8 +86,6 @@ pub const TONYTOOLS_HASH_LIST_VERSION_ENDPOINT: &str =
 
 pub const TONYTOOLS_HASH_LIST_ENDPOINT: &str =
 	"https://github.com/glacier-modding/Hitman-l10n-Hashes/releases/latest/download/hash_list.hmla";
-
-pub const UPLOAD_LOG_ENDPOINT: &str = "https://hitman-resources.netlify.app/.netlify/functions/upload-gk-log";
 
 thread_local!(static IS_MAIN_THREAD: Cell<bool> = const { Cell::new(false) });
 thread_local!(static LOG_DIR: Cell<PathBuf> = Cell::new(Default::default()));
@@ -569,9 +570,22 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				}
 			}
 
-			GlobalEvent::LoadWorkspace(path) => {
+			GlobalEvent::LoadWorkspace(mut path) => {
 				app.track_event("Workspace loaded", None).unwrap();
 				let task = start_task(&app, format!("Loading project {}", path.display()))?;
+
+				// Open any parent with a project.json instead
+				if !path.join("project.json").exists() {
+					let mut check = path.to_owned();
+					while !check.join("project.json").exists() {
+						if !check.pop() {
+							break;
+						}
+					}
+					if check.join("project.json").exists() {
+						path = check;
+					}
+				}
 
 				let mut files = vec![];
 
@@ -625,7 +639,26 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					&app,
 					Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::NewTree {
 						base_path: path.to_owned(),
-						files
+						files: files.to_owned()
+					}))
+				)?;
+
+				send_request(
+					&app,
+					Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::FileActions {
+						files: files
+							.iter()
+							.filter(|(_, is_folder)| !is_folder)
+							.map(|(path, _)| {
+								Ok((
+									path.to_owned(),
+									FileAction::all_available(&path)?
+										.into_iter()
+										.map(|x| (x.to_string(), x.icon(), x))
+										.collect()
+								))
+							})
+							.collect::<Result<Vec<_>>>()?
 					}))
 				)?;
 
@@ -660,8 +693,29 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												&notify_app,
 												Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::NewTree {
 													base_path: notify_path.to_owned(),
-													files
+													files: files.to_owned()
 												}))
+											)?;
+
+											send_request(
+												&notify_app,
+												Request::Tool(ToolRequest::FileBrowser(
+													FileBrowserRequest::FileActions {
+														files: files
+															.iter()
+															.filter(|(_, is_folder)| !is_folder)
+															.map(|(path, _)| {
+																Ok((
+																	path.to_owned(),
+																	FileAction::all_available(&path)?
+																		.into_iter()
+																		.map(|x| (x.to_string(), x.icon(), x))
+																		.collect()
+																))
+															})
+															.collect::<Result<Vec<_>>>()?
+													}
+												))
 											)?;
 
 											return;
@@ -670,16 +724,30 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 										match evt.kind {
 											notify::EventKind::Create(kind) => match kind {
 												notify::event::CreateKind::File => {
+													let path =
+														evt.paths.first().context("Create event had no paths")?;
+
 													send_request(
 														&notify_app,
 														Request::Tool(ToolRequest::FileBrowser(
 															FileBrowserRequest::Create {
-																path: evt
-																	.paths
-																	.first()
-																	.context("Create event had no paths")?
-																	.to_owned(),
+																path: path.to_owned(),
 																is_folder: false
+															}
+														))
+													)?;
+
+													send_request(
+														&notify_app,
+														Request::Tool(ToolRequest::FileBrowser(
+															FileBrowserRequest::FileActions {
+																files: vec![(
+																	path.to_owned(),
+																	FileAction::all_available(&path)?
+																		.into_iter()
+																		.map(|x| (x.to_string(), x.icon(), x))
+																		.collect()
+																)]
 															}
 														))
 													)?;
@@ -702,19 +770,31 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												}
 
 												notify::event::CreateKind::Any | notify::event::CreateKind::Other => {
-													if let Ok(metadata) = fs::metadata(
-														evt.paths.first().context("Create event had no paths")?
-													) {
+													let path =
+														evt.paths.first().context("Create event had no paths")?;
+
+													if let Ok(metadata) = fs::metadata(path) {
 														send_request(
 															&notify_app,
 															Request::Tool(ToolRequest::FileBrowser(
 																FileBrowserRequest::Create {
-																	path: evt
-																		.paths
-																		.first()
-																		.context("Create event had no paths")?
-																		.to_owned(),
+																	path: path.to_owned(),
 																	is_folder: metadata.is_dir()
+																}
+															))
+														)?;
+
+														send_request(
+															&notify_app,
+															Request::Tool(ToolRequest::FileBrowser(
+																FileBrowserRequest::FileActions {
+																	files: vec![(
+																		path.to_owned(),
+																		FileAction::all_available(&path)?
+																			.into_iter()
+																			.map(|x| (x.to_string(), x.icon(), x))
+																			.collect()
+																	)]
 																}
 															))
 														)?;
@@ -725,20 +805,42 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											notify::EventKind::Modify(notify::event::ModifyKind::Name(
 												notify::event::RenameMode::Both
 											)) => {
+												let old_path =
+													evt.paths.first().context("Rename-both event had no first path")?;
+
+												let new_path =
+													evt.paths.get(1).context("Rename-both event had no second path")?;
+
 												send_request(
 													&notify_app,
 													Request::Tool(ToolRequest::FileBrowser(
 														FileBrowserRequest::Rename {
-															old_path: evt
-																.paths
-																.first()
-																.context("Rename-both event had no first path")?
-																.to_owned(),
-															new_path: evt
-																.paths
-																.get(1)
-																.context("Rename-both event had no second path")?
-																.to_owned()
+															old_path: old_path.to_owned(),
+															new_path: new_path.to_owned()
+														}
+													))
+												)?;
+
+												send_request(
+													&notify_app,
+													Request::Tool(ToolRequest::FileBrowser(
+														FileBrowserRequest::FileActions {
+															files: vec![
+																(
+																	old_path.to_owned(),
+																	FileAction::all_available(&old_path)?
+																		.into_iter()
+																		.map(|x| (x.to_string(), x.icon(), x))
+																		.collect()
+																),
+																(
+																	new_path.to_owned(),
+																	FileAction::all_available(&new_path)?
+																		.into_iter()
+																		.map(|x| (x.to_string(), x.icon(), x))
+																		.collect()
+																),
+															]
 														}
 													))
 												)?;
@@ -764,15 +866,28 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											notify::EventKind::Modify(notify::event::ModifyKind::Name(
 												notify::event::RenameMode::To
 											)) => {
+												let path = evt.paths.first().context("Rename-to event had no path")?;
+
 												send_request(
 													&notify_app,
 													Request::Tool(ToolRequest::FileBrowser(
 														FileBrowserRequest::FinishRename {
-															new_path: evt
-																.paths
-																.first()
-																.context("Rename-to event had no path")?
-																.to_owned()
+															new_path: path.to_owned()
+														}
+													))
+												)?;
+
+												send_request(
+													&notify_app,
+													Request::Tool(ToolRequest::FileBrowser(
+														FileBrowserRequest::FileActions {
+															files: vec![(
+																path.to_owned(),
+																FileAction::all_available(&path)?
+																	.into_iter()
+																	.map(|x| (x.to_string(), x.icon(), x))
+																	.collect()
+															)]
 														}
 													))
 												)?;
@@ -1415,72 +1530,6 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				}
 
 				finish_task(&app, task)?;
-			}
-
-			GlobalEvent::UploadLogAndReport(error) => {
-				let log_contents = fs::read_to_string(
-					app.path()
-						.app_log_dir()
-						.context("Couldn't get log dir")?
-						.join("GlacierKit.log")
-				)
-				.context("Couldn't read log file")?;
-
-				if let Ok(res) = reqwest::Client::new()
-					.post(UPLOAD_LOG_ENDPOINT)
-					.json(&json!({
-						"content": log_contents
-					}))
-					.send()
-					.await
-					.and_then(|x| x.error_for_status())
-				{
-					let log_url = res.text().await.context("Couldn't decode log upload response")?;
-					app.track_event("Error with log", Some(json!({ "error": error, "log": log_url })))
-						.unwrap();
-				} else {
-					send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
-				}
-			}
-
-			GlobalEvent::UploadLastPanic => {
-				let last_panic = fs::read_to_string(
-					app.path()
-						.app_log_dir()
-						.context("Couldn't get log dir")?
-						.join("..")
-						.join("last_panic.txt")
-				)
-				.context("Couldn't read panic report")?;
-
-				if let Ok(res) = reqwest::Client::new()
-					.post(UPLOAD_LOG_ENDPOINT)
-					.json(&json!({
-						"content": last_panic
-					}))
-					.send()
-					.await
-					.and_then(|x| x.error_for_status())
-				{
-					let report_url = res.text().await.context("Couldn't decode report upload response")?;
-					app.track_event("Panic report", Some(json!({ "report": report_url })))
-						.unwrap();
-				} else {
-					send_request(&app, Request::Global(GlobalRequest::LogUploadRejected))?;
-				}
-
-				fs::rename(
-					app.path()
-						.app_log_dir()
-						.context("Couldn't get log dir")?
-						.join("..")
-						.join("last_panic.txt"),
-					app.path()
-						.app_log_dir()
-						.context("Couldn't get log dir")?
-						.join("..")
-						.join(format!("panic_{}.txt", rand::random::<u32>()))
-				)?;
 			}
 
 			GlobalEvent::ClearLastPanic => {

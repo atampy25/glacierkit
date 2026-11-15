@@ -181,12 +181,18 @@
 		},
 		"ExposedEntity": {
 			"description": "An exposed entity.\n\nExposed entities are accessible when referencing this entity through a property on long-form references.",
-			"type": "object",
-			"properties": {
-				"isArray": { "description": "Whether there are multiple target entities.", "type": "boolean" },
-				"refersTo": { "description": "The target entity (or entities) that will be accessed.", "type": "array", "items": { "$ref": "#/$defs/Ref" } }
-			},
-			"required": ["isArray", "refersTo"]
+			"anyOf": [
+				{ "anyOf": [{ "$ref": "#/$defs/Ref" }, { "type": "null" }] },
+				{ "type": "array", "items": { "$ref": "#/$defs/Ref" } },
+				{
+					"type": "object",
+					"properties": {
+						"isArray": { "description": "Whether there are multiple target entities.", "type": "boolean" },
+						"refersTo": { "description": "The target entity (or entities) that will be accessed.", "type": "array", "items": { "$ref": "#/$defs/Ref" } }
+					},
+					"required": ["isArray", "refersTo"]
+				}
+			]
 		},
 		"PropertyOverride": {
 			"description": "A set of overrides for entity properties.",

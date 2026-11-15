@@ -373,6 +373,12 @@ export type EntityMetadataRequest =
 				blueprint: string
 			}
 	  }
+	| {
+			type: "setExternalScenes"
+			data: {
+				externalScenes: string[]
+			}
+	  }
 
 export type EntityMonacoEvent =
 	| {
@@ -892,29 +898,47 @@ export type Event_Serialize =
  */
 export type ExposedEntity = ExposedEntity_Serialize | ExposedEntity_Deserialize
 
-/**
- *  An exposed entity.
- *
- *  Exposed entities are accessible when referencing this entity through a property on long-form references.
- */
-export type ExposedEntity_Deserialize = {
-	// Whether there are multiple target entities.
-	isArray: boolean
-	// The target entity (or entities) that will be accessed.
-	refersTo: RefProxy_Deserialize[]
-}
+export type ExposedEntityProxy = ExposedEntityProxy_Serialize | ExposedEntityProxy_Deserialize
+
+export type ExposedEntityProxy_Deserialize =
+	| RefProxy_Deserialize
+	| null
+	| RefProxy_Deserialize[]
+	| {
+			// Whether there are multiple target entities.
+			isArray: boolean
+			// The target entity (or entities) that will be accessed.
+			refersTo: RefProxy_Deserialize[]
+	  }
+
+export type ExposedEntityProxy_Serialize =
+	| RefProxy_Serialize
+	| null
+	| RefProxy_Serialize[]
+	| {
+			// Whether there are multiple target entities.
+			isArray: boolean
+			// The target entity (or entities) that will be accessed.
+			refersTo: RefProxy_Serialize[]
+	  }
 
 /**
  *  An exposed entity.
  *
  *  Exposed entities are accessible when referencing this entity through a property on long-form references.
  */
-export type ExposedEntity_Serialize = {
-	// Whether there are multiple target entities.
-	isArray: boolean
-	// The target entity (or entities) that will be accessed.
-	refersTo: RefProxy_Serialize[]
-}
+export type ExposedEntity_Deserialize = ExposedEntityProxy_Deserialize
+
+/**
+ *  An exposed entity.
+ *
+ *  Exposed entities are accessible when referencing this entity through a property on long-form references.
+ */
+export type ExposedEntity_Serialize =
+	// A single target entity that will be accessed.
+	| ({ Single: RefProxy_Serialize | null } & { Array?: never })
+	// An array of target entities that will be accessed.
+	| ({ Array: RefProxy_Serialize[] } & { Single?: never })
 
 export type ExtractKind =
 	| { type: "raw" }
@@ -930,6 +954,8 @@ export type ExtractKind =
 	  }
 	| { type: "ogg" }
 	| { type: "multiOgg" }
+	| { type: "wav" }
+	| { type: "multiWav" }
 	| { type: "hMLanguages" }
 	| { type: "materialInstance" }
 	| { type: "materialEntity" }
@@ -943,6 +969,16 @@ export type ExtractKind =
 			}
 	  }
 	| { type: "pseudocode" }
+
+export type FileAction =
+	| { type: "normaliseQN" }
+	| { type: "convertEntityToPatch" }
+	| { type: "convertPatchToEntity" }
+	| { type: "convertRepoPatchToMergePatch" }
+	| { type: "convertRepoPatchToJsonPatch" }
+	| { type: "convertUnlockablesPatchToMergePatch" }
+	| { type: "convertUnlockablesPatchToJsonPatch" }
+	| { type: "createMaterialEntity" }
 
 export type FileBrowserEvent =
 	| {
@@ -972,45 +1008,10 @@ export type FileBrowserEvent =
 			}
 	  }
 	| {
-			type: "normaliseQNFile"
+			type: "performFileAction"
 			data: {
 				path: string
-			}
-	  }
-	| {
-			type: "convertEntityToPatch"
-			data: {
-				path: string
-			}
-	  }
-	| {
-			type: "convertPatchToEntity"
-			data: {
-				path: string
-			}
-	  }
-	| {
-			type: "convertRepoPatchToMergePatch"
-			data: {
-				path: string
-			}
-	  }
-	| {
-			type: "convertRepoPatchToJsonPatch"
-			data: {
-				path: string
-			}
-	  }
-	| {
-			type: "convertUnlockablesPatchToMergePatch"
-			data: {
-				path: string
-			}
-	  }
-	| {
-			type: "convertUnlockablesPatchToJsonPatch"
-			data: {
-				path: string
+				action: FileAction
 			}
 	  }
 
@@ -1059,6 +1060,12 @@ export type FileBrowserRequest =
 				basePath: string
 				// Relative path, is folder
 				files: [string, boolean][]
+			}
+	  }
+	| {
+			type: "fileActions"
+			data: {
+				files: [string, [string, string, FileAction][]][]
 			}
 	  }
 
@@ -1139,8 +1146,6 @@ export type GlobalEvent =
 	| { type: "selectTab"; data: string | null }
 	| { type: "removeTab"; data: string }
 	| { type: "saveTab"; data: string }
-	| { type: "uploadLogAndReport"; data: string }
-	| { type: "uploadLastPanic" }
 	| { type: "clearLastPanic" }
 
 export type GlobalRequest =
@@ -1194,8 +1199,7 @@ export type GlobalRequest =
 				id: string
 			}
 	  }
-	| { type: "requestLastPanicUpload" }
-	| { type: "logUploadRejected" }
+	| { type: "notifyLastPanic" }
 	| {
 			type: "setGameVersion"
 			data: {
@@ -2009,7 +2013,7 @@ export type TextEditorRequest =
 
 export type TextFileType = "Json" | "ManifestJson" | "Xml" | "PlainText" | "Markdown"
 
-export type TextureExtractFormat = { type: "dds" } | { type: "png" } | { type: "tga" }
+export type TextureExtractFormat = { type: "dds" } | { type: "png" }
 
 export type ToolEvent =
 	| { type: "fileBrowser"; data: FileBrowserEvent }

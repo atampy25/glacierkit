@@ -39,6 +39,10 @@
 				hashModificationAllowed = request.data.hashModificationAllowed
 				break
 
+			case "setExternalScenes":
+				externalScenes = request.data.externalScenes
+				break
+
 			default:
 				request satisfies never
 				break

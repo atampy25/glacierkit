@@ -22,6 +22,7 @@ use glacier_texture::{
 use image::{ImageFormat, ImageReader};
 use itertools::Itertools;
 use lazy_regex::regex_captures;
+use lewton::inside_ogg::OggStreamReader;
 use optivorbis::{OggToOgg, Remuxer};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::Serialize;
@@ -977,20 +978,17 @@ pub fn get_extract_kinds(game: &Game, id: RuntimeID) -> Result<Vec<ExtractKind>>
 					format: TextureExtractFormat::Png
 				},
 				ExtractKind::Texture {
-					format: TextureExtractFormat::Tga
-				},
-				ExtractKind::Texture {
 					format: TextureExtractFormat::Dds
 				}
 			]);
 		}
 
 		"WWEM" | "WWES" => {
-			kinds.push(ExtractKind::Ogg);
+			kinds.extend([ExtractKind::Ogg, ExtractKind::Wav]);
 		}
 
 		"WWEV" => {
-			kinds.push(ExtractKind::MultiOgg);
+			kinds.extend([ExtractKind::MultiOgg, ExtractKind::MultiWav]);
 		}
 
 		"CLNG" | "DITL" | "DLGE" | "LOCR" | "RTLV" => {
@@ -1315,6 +1313,133 @@ pub fn extract_file(
 				.collect::<Result<_>>()?
 		}
 
+		ExtractKind::Wav => {
+			let (_, res_data) = game.extract_latest_resource(id)?;
+
+			let mut ogg = vec![];
+
+			WwiseRiffVorbis::new(Cursor::new(res_data), CodebookLibrary::aotuv_codebooks()?)?.generate_ogg(&mut ogg)?;
+
+			let mut ogg_reader = OggStreamReader::new(Cursor::new(ogg))?;
+
+			let mut data = vec![];
+			let mut wav_writer = hound::WavWriter::new(
+				Cursor::new(&mut data),
+				hound::WavSpec {
+					channels: ogg_reader.ident_hdr.audio_channels as u16,
+					sample_rate: ogg_reader.ident_hdr.audio_sample_rate,
+					bits_per_sample: 16,
+					sample_format: hound::SampleFormat::Int
+				}
+			)?;
+
+			while let Some(decoded) = ogg_reader.read_dec_packet_itl()? {
+				let mut wav_writer = wav_writer.get_i16_writer(decoded.len() as u32);
+				for sample in decoded {
+					wav_writer.write_sample(sample);
+				}
+			}
+
+			wav_writer.finalize()?;
+
+			vec![ExtractedFile {
+				suffix: ".wav".into(),
+				data
+			}]
+		}
+
+		ExtractKind::MultiWav => {
+			let (res_meta, res_data) = game.extract_latest_resource(id)?;
+
+			let wwev = WwiseEvent::parse(game.version(), &res_data, &res_meta.core_info)?;
+
+			wwev.non_streamed
+				.into_par_iter()
+				.map(|object| {
+					anyhow::Ok(if object.data.starts_with(b"RIFF") {
+						let mut ogg = vec![];
+
+						WwiseRiffVorbis::new(Cursor::new(object.data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(&mut ogg)?;
+
+						let mut ogg_reader = OggStreamReader::new(Cursor::new(ogg))?;
+
+						let mut data = vec![];
+						let mut wav_writer = hound::WavWriter::new(
+							Cursor::new(&mut data),
+							hound::WavSpec {
+								channels: ogg_reader.ident_hdr.audio_channels as u16,
+								sample_rate: ogg_reader.ident_hdr.audio_sample_rate,
+								bits_per_sample: 16,
+								sample_format: hound::SampleFormat::Int
+							}
+						)?;
+
+						while let Some(decoded) = ogg_reader.read_dec_packet_itl()? {
+							let mut wav_writer = wav_writer.get_i16_writer(decoded.len() as u32);
+							for sample in decoded {
+								wav_writer.write_sample(sample);
+							}
+						}
+
+						wav_writer.finalize()?;
+
+						ExtractedFile {
+							suffix: eco_format!("~{}.wav", object.wem_id),
+							data
+						}
+					} else {
+						ExtractedFile {
+							suffix: eco_format!("~{}.wem", object.wem_id),
+							data: object.data
+						}
+					})
+				})
+				.chain(wwev.streamed.into_par_iter().map(|object| {
+					let (_, wem_data) = game.extract_latest_resource(object.source)?;
+
+					anyhow::Ok(if wem_data.starts_with(b"RIFF") {
+						let mut ogg = vec![];
+
+						WwiseRiffVorbis::new(Cursor::new(wem_data), CodebookLibrary::aotuv_codebooks()?)?
+							.generate_ogg(&mut ogg)?;
+
+						let mut ogg_reader = OggStreamReader::new(Cursor::new(ogg))?;
+
+						let mut data = vec![];
+						let mut wav_writer = hound::WavWriter::new(
+							Cursor::new(&mut data),
+							hound::WavSpec {
+								channels: ogg_reader.ident_hdr.audio_channels as u16,
+								sample_rate: ogg_reader.ident_hdr.audio_sample_rate,
+								bits_per_sample: 16,
+								sample_format: hound::SampleFormat::Int
+							}
+						)?;
+
+						while let Some(decoded) = ogg_reader.read_dec_packet_itl()? {
+							let mut wav_writer = wav_writer.get_i16_writer(decoded.len() as u32);
+							for sample in decoded {
+								wav_writer.write_sample(sample);
+							}
+						}
+
+						wav_writer.finalize()?;
+
+						ExtractedFile {
+							suffix: eco_format!("~{}.wav", object.wem_id),
+							data
+						}
+					} else {
+						ExtractedFile {
+							suffix: eco_format!("~{}.wem", object.wem_id),
+							data: wem_data
+						}
+					})
+				}))
+				.collect::<Result<_>>()?
+		}
+
 		ExtractKind::HMLanguages => {
 			let (res_meta, res_data) = game.extract_latest_resource(id)?;
 			let resource_type = res_meta.core_info.resource_type;
@@ -1591,16 +1716,6 @@ pub fn extract_file(
 
 						ExtractedFile {
 							suffix: ".texture.dds".into(),
-							data
-						}
-					}
-
-					TextureExtractFormat::Tga => {
-						let data = glacier_texture::convert::create_tga(&texture)
-							.context("Couldn't convert texture to TGA")?;
-
-						ExtractedFile {
-							suffix: ".texture.tga".into(),
 							data
 						}
 					}

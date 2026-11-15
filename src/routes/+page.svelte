@@ -185,8 +185,7 @@
 								case "errorReport":
 								case "setWindowTitle":
 								case "computeJSONPatchAndSave":
-								case "requestLastPanicUpload":
-								case "logUploadRejected":
+								case "notifyLastPanic":
 								case "setGameVersion":
 									// Handled by +layout.svelte
 									break

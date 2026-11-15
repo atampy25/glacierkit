@@ -313,6 +313,7 @@ dependencies = [
  "glacier-texture",
  "glam 0.32.1",
  "hitman-behavior",
+ "hound",
  "identity-hash",
  "image 0.24.9",
  "image 0.25.10",
@@ -321,10 +322,12 @@ dependencies = [
  "itertools 0.14.0",
  "json-patch",
  "lazy-regex",
+ "lewton",
  "log",
  "matchers",
  "memchr",
  "mesh-tools",
+ "mimalloc",
  "nesting",
  "notify",
  "notify-debouncer-full",
@@ -2893,9 +2896,9 @@ dependencies = [
 
 [[package]]
 name = "bpaf"
-version = "0.9.28"
+version = "0.9.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "597e81e56404b7a3e26ef7b449f82a4b7a661ae76c3cac692b42d6bad06a0fbe"
+checksum = "6ec87bdee42abd2534b8afb7b92086347dfff18e9c87751a7d25b062b33e87b4"
 dependencies = [
  "bpaf_derive",
 ]
@@ -3147,9 +3150,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.11.1"
+version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ff2a8126fff0f8c839080d619675a585e61720bb12d2baceae45769fd66f155"
+checksum = "33ef9e3e8154a45c7a95cff4c1299702106ad94062d7bb85fdc5d3a5afd91d45"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -4358,9 +4361,9 @@ dependencies = [
 
 [[package]]
 name = "errno"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
+checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
@@ -5328,7 +5331,7 @@ dependencies = [
 [[package]]
 name = "glacier-formats"
 version = "0.1.0"
-source = "git+https://github.com/atampy25/glacier-formats#f84d10f71fff27e0394592b12beee79b28fcfe55"
+source = "git+https://github.com/atampy25/glacier-formats#42aad054d9c4fb1f3a25707567688bc087efdb36"
 dependencies = [
  "discrim",
  "glacier-commons",
@@ -5864,6 +5867,12 @@ name = "hotpath-macros"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ff68b15fdbcddfbad685f445597580d6fcbf28b49f01ff975e934351079e13b"
+
+[[package]]
+name = "hound"
+version = "3.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62adaabb884c94955b19907d60019f4e145d091c75345379e70d1ee696f7854f"
 
 [[package]]
 name = "html5ever"
@@ -6829,6 +6838,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
+name = "libmimalloc-sys"
+version = "0.1.49"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a45a52f43e1c16f667ccfe4dd8c85b7f7c204fd5e3bf46c5b0db9a5c3c0b8e9"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "libredox"
 version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7130,6 +7148,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0768bce87944c9f5baac5c033a26d3f5a3bcc64248160c393a18356fa15f822e"
 dependencies = [
  "uuid",
+]
+
+[[package]]
+name = "mimalloc"
+version = "0.1.52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d4139bb28d14ad1facf21d5eb8825051b326e172d216b39f6d31df53cc97862"
+dependencies = [
+ "libmimalloc-sys",
 ]
 
 [[package]]
@@ -9809,9 +9836,9 @@ checksum = "eec689c0bc40ff2458a5977b6619cb718087084a18e02a131c599b62d05e1a5f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.16"
+version = "0.103.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
+checksum = "e3a0760a887c14823fca5a1c970b01d47c328c696c0c64829d1df50e8f853fd5"
 dependencies = [
  "aws-lc-rs",
  "ring",

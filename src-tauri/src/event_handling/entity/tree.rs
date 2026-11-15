@@ -40,8 +40,8 @@ use crate::{
 	general::EMPTY_ID,
 	model::{
 		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
-		EntityGeneralRequest, EntityMetaPaneRequest, EntityMonacoRequest, EntityTreeEvent, EntityTreeRequest, Request,
-		SearchQuery, TabRequest, TabRequestData
+		EntityGeneralRequest, EntityMetaPaneRequest, EntityMetadataRequest, EntityMonacoRequest, EntityTreeEvent,
+		EntityTreeRequest, Request, SearchQuery, TabRequest, TabRequestData
 	},
 	send_notification, send_request, start_task
 };
@@ -1269,6 +1269,18 @@ pub async fn paste(
 					if added_external_scenes > 1 { "s have" } else { " has" }
 				)
 			}
+		)?;
+
+		send_request(
+			app,
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Metadata(
+					EntityMetadataRequest::SetExternalScenes {
+						external_scenes: entity.external_scenes.to_owned()
+					}
+				))
+			})
 		)?;
 	}
 

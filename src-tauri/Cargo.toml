@@ -102,6 +102,9 @@ serde-brief = { version = "0.2.0", features = ["std"] }
 bevy_tasks = { version = "0.19.0", features = ["multi_threaded"] }
 memchr = "2.8.3"
 aho-corasick = "1.1.4"
+lewton = "0.10.2"
+hound = "3.5.1"
+mimalloc = "0.1.52"
 
 [dependencies.tokio]
 version = "1.43.0"
