@@ -122,10 +122,6 @@ features = ["debug"]
 git = "https://github.com/dafitius/rpkg-rs"
 branch = "v2"
 
-[dependencies.rpkg-rs-1]
-package = "rpkg-rs"
-version = "1.4.0"
-
 [dependencies.glacier-bin1]
 git = "https://github.com/atampy25/glacier-bin1"
 features = ["all-games", "all-types"]
@@ -135,7 +131,7 @@ git = "https://github.com/atampy25/hitman-behavior"
 
 [dependencies.glacier-commons]
 git = "https://github.com/atampy25/glacier-commons"
-features = ["serde", "specta", "rpkg-rs-1", "rpkg-rs-2", "glacier-texture", "tonytools", "hash-list", "hash-list-download", "game-detection", "macros"]
+features = ["serde", "specta", "rpkg-rs-2", "glacier-texture", "tonytools", "hash-list", "hash-list-download", "game-detection", "macros"]
 
 [dependencies.glacier-formats]
 git = "https://github.com/atampy25/glacier-formats"
