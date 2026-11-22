@@ -1,8 +1,4 @@
-use std::{
-	fs,
-	path::Path,
-	sync::{Arc, RwLock}
-};
+use std::{fs, path::Path, sync::Arc};
 
 use anyhow::{Context, Result, anyhow, bail};
 use dashmap::{DashMap, DashSet};
@@ -12,31 +8,25 @@ use glacier_commons::{
 	metadata::{ExtendedResourceMetadata, ResourceReference, ResourceType, RuntimeID},
 	rid
 };
-use glacier_ini::IniFileSystem;
 use identity_hash::BuildIdentityHasher;
 use itertools::Itertools;
 use quickentity_rs::entity::Entity;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rpkg_rs::resource::{
-	partition_manager::PartitionManager,
-	pdefs::{PackageDefinitionParser, PackageDefinitionSource, bond_parser::BondParser},
-	resource_info::ResourceInfo,
-	resource_partition::PatchId,
+	partition_manager::PartitionManager, resource_info::ResourceInfo, resource_partition::PatchId,
 	runtime_resource_id::RuntimeResourceID
 };
+use simple_mod_framework_core::game::GameContext;
 use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 
 use crate::{
-	HashMap, PapayaMap, finish_task,
+	HashMap, Notification, NotificationKind, PapayaMap, finish_task,
 	general::REPO_ID,
 	intellisense::Intellisense,
-	model::{
-		AppSettings, AppState, ContentSearchRequest, Request, ResourceChangelogEntry, ResourceChangelogOperation,
-		ToolRequest
-	},
+	model::{AppState, ContentSearchRequest, Request, ResourceChangelogEntry, ResourceChangelogOperation, ToolRequest},
 	ores_repo::RepositoryItem,
-	send_request, start_progress, start_task, task_progress
+	send_notification, send_request, start_task
 };
 
 pub fn valid_game_path(path: impl AsRef<Path>) -> bool {
@@ -97,6 +87,8 @@ pub trait GameFiles: Send + Sync {
 
 	fn partition_manager(&self) -> &PartitionManager;
 
+	fn smf_context(&self) -> Arc<GameContext>;
+
 	fn all_resources(&self) -> impl Iterator<Item = RuntimeID> + Send + Sync;
 
 	fn repository(&self) -> &Option<Vec<RepositoryItem>>;
@@ -153,6 +145,8 @@ impl GameFiles for Arc<Arc<DynGameFiles<'static>>> {
 
 			fn partition_manager(&self) -> &PartitionManager;
 
+			fn smf_context(&self) -> Arc<GameContext>;
+
 			fn all_resources(&self) -> impl Iterator<Item = RuntimeID>;
 
 			fn repository(&self) -> &Option<Vec<RepositoryItem>>;
@@ -180,9 +174,45 @@ impl GameFiles for Arc<Arc<DynGameFiles<'static>>> {
 	}
 }
 
+pub struct NotificationDiagnostics {
+	app: AppHandle
+}
+
+impl NotificationDiagnostics {
+	pub fn new(app: &AppHandle) -> Self {
+		Self { app: app.clone() }
+	}
+}
+
+impl simple_mod_framework_core::world::Diagnostics for NotificationDiagnostics {
+	#[try_fn]
+	fn emit_diagnostic(&self, diagnostic: simple_mod_framework::diagnostics::Diagnostic) -> Result<(), eyre::Report> {
+		send_notification(
+			&self.app,
+			Notification {
+				kind: NotificationKind::Warning,
+				title: match diagnostic.target {
+					simple_mod_framework::diagnostics::DiagnosticTarget::Operation {
+						mod_id,
+						source,
+						script_identifier
+					} => format!(
+						"{mod_id} - {source}{}",
+						script_identifier.map_or_else(|| "".into(), |x| format!(" ({x})"))
+					),
+					simple_mod_framework::diagnostics::DiagnosticTarget::Mod { mod_id } => format!("{mod_id}"),
+					simple_mod_framework::diagnostics::DiagnosticTarget::None => "Warning".into()
+				},
+				subtitle: diagnostic.kind.to_string()
+			}
+		)
+		.map_err(|e| eyre::eyre!("{e:?}"))?;
+	}
+}
+
 pub struct VanillaGame {
 	install: GameInstall,
-	game_files: PartitionManager,
+	game_files: Arc<GameContext>,
 	intellisense: Intellisense,
 
 	resource_reverse_references: HashMap<RuntimeID, Vec<RuntimeID>, BuildIdentityHasher<u64>>,
@@ -203,93 +233,39 @@ impl VanillaGame {
 			.cloned()
 			.map_or_else(|| custom_game_install(path), Ok)?;
 
-		let (proj_path, relative_runtime_path) = if install.version == GlacierGame::FL {
-			(r"..\".into(), "runtime".into())
-		} else {
-			let thumbs = IniFileSystem::from_path(path.join("thumbs.dat")).context("Couldn't load thumbs.dat")?;
-
-			let thumbs = thumbs
-				.root()
-				.sections()
-				.get("application")
-				.context("Couldn't get application section")?;
-
-			let (Some(proj_path), Some(relative_runtime_path)) = (
-				thumbs.options().get("PROJECT_PATH"),
-				thumbs.options().get("RUNTIME_PATH")
-			) else {
-				bail!("thumbs.dat was missing required properties");
-			};
-
-			(proj_path.to_owned(), relative_runtime_path.to_owned())
-		};
-
-		// Workaround for the Linux filesystem.
-		// The relative_runtime_path will in most cases be "runtime", while the folder is actually called "Runtime"
-		// Windows doesn't care about the mismatched casing, UNIX does :(
-		let relative_runtime_path_uppercased = relative_runtime_path
-			.char_indices()
-			.map(|(idx, ch)| if idx == 0 { ch.to_ascii_uppercase() } else { ch })
-			.collect::<String>();
-
-		let runtime_path = [relative_runtime_path, relative_runtime_path_uppercased]
-			.iter()
-			.flat_map(|folder| path.join(proj_path.replace('\\', "/")).join(folder).canonicalize())
-			.find(|joined_path| joined_path.exists())
-			.context("Couldn't find valid runtime folder")?;
-
-		let mut partitions = match install.version {
-			GlacierGame::H1 => PackageDefinitionSource::HM2016(fs::read(runtime_path.join("packagedefinition.txt"))?)
-				.read()
-				.context("Couldn't read packagedefinition")?,
-
-			GlacierGame::H2 => PackageDefinitionSource::HM2(fs::read(runtime_path.join("packagedefinition.txt"))?)
-				.read()
-				.context("Couldn't read packagedefinition")?,
-
-			GlacierGame::H3 => PackageDefinitionSource::HM3(fs::read(runtime_path.join("packagedefinition.txt"))?)
-				.read()
-				.context("Couldn't read packagedefinition")?,
-
-			GlacierGame::FL => BondParser::parse(&fs::read(runtime_path.join("packagedefinition.txt"))?)
-				.context("Couldn't read packagedefinition")?
-		};
-
-		if !app.state::<AppSettings>().settings().extract_modded_files {
-			for partition in &mut partitions {
-				partition.set_max_patch_level(9);
-			}
-		}
-
-		let partition_names = partitions.iter().map(|x| x.id.to_string()).collect_vec();
-
-		let last_index = RwLock::new(0);
-		let task = RwLock::new(start_progress(app, format!("Loading {}", partition_names[0]))?);
-
-		let mut partition_manager = PartitionManager::new(
-			runtime_path.clone(),
-			install.version.into(),
-			&PackageDefinitionSource::Custom(partitions)
+		let task = start_task(app, "Loading game files")?;
+		let game_files = GameContext::from_game(
+			simple_mod_framework_types::Game {
+				path: install.path.to_owned(),
+				version: install.version,
+				platform: match install.platform {
+					StorePlatform::Epic => simple_mod_framework_types::Platform::Epic,
+					StorePlatform::Steam => simple_mod_framework_types::Platform::Steam,
+					StorePlatform::Microsoft => simple_mod_framework_types::Platform::Microsoft,
+					StorePlatform::GOG => simple_mod_framework_types::Platform::GOG
+				},
+				hash: format!(
+					"{:x}",
+					md5::compute(if path.join("Runtime").join("chunk0.rpkg").exists() {
+						fs::read(path.join("..").join("MicrosoftGame.Config")).context("Couldn't read game config")?
+					} else {
+						fs::read(path.join(match install.version {
+							GlacierGame::H1 => "HITMAN.exe",
+							GlacierGame::H2 => "HITMAN2.exe",
+							GlacierGame::H3 => "HITMAN3.exe",
+							GlacierGame::FL => "007FirstLight.exe"
+						}))
+						.context("Couldn't read game EXE")?
+					})
+				)
+			},
+			&NotificationDiagnostics::new(app),
+			false
 		)
-		.context("Couldn't create partition manager")?;
+		.map_err(|e| anyhow!("{e:?}"))?;
+		finish_task(app, task)?;
 
-		partition_manager
-			.mount_partitions(|cur_partition, state| {
-				if cur_partition < partition_names.len() {
-					if cur_partition != *last_index.read().unwrap() {
-						*last_index.write().unwrap() = cur_partition;
-
-						finish_task(app, *task.read().unwrap()).expect("Couldn't send data to frontend");
-						*task.write().unwrap() =
-							start_progress(app, format!("Loading {}", partition_names[cur_partition]))
-								.expect("Couldn't send data to frontend");
-					}
-
-					task_progress(app, *task.read().unwrap(), state.install_progress)
-						.expect("Couldn't send data to frontend");
-				}
-			})
-			.context("Couldn't mount partitions")?;
+		let partition_manager = &game_files.game_files;
 
 		send_request(
 			app,
@@ -307,7 +283,6 @@ impl VanillaGame {
 			}))
 		)?;
 
-		finish_task(app, *task.read().unwrap())?;
 		let task = start_task(app, "Caching reverse references")?;
 
 		let resource_types: HashMap<RuntimeID, ResourceType, BuildIdentityHasher<u64>> = partition_manager
@@ -372,7 +347,7 @@ impl VanillaGame {
 
 		Self {
 			install,
-			game_files: partition_manager,
+			game_files: game_files.into(),
 			intellisense: Intellisense::new(
 				fs::read(
 					dirs::data_local_dir()
@@ -417,7 +392,11 @@ impl GameFiles for VanillaGame {
 	}
 
 	fn partition_manager(&self) -> &PartitionManager {
-		&self.game_files
+		&self.game_files.game_files
+	}
+
+	fn smf_context(&self) -> Arc<GameContext> {
+		self.game_files.clone()
 	}
 
 	fn all_resources(&self) -> impl Iterator<Item = RuntimeID> {
@@ -445,7 +424,7 @@ impl GameFiles for VanillaGame {
 	/// Extract the latest copy of a resource.
 	fn extract_latest_resource(&self, resource: RuntimeID) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
 		let rrid = self.to_rrid(resource);
-		for partition in &self.game_files.partitions {
+		for partition in &self.partition_manager().partitions {
 			if partition.contains(&rrid) {
 				return Ok((
 					partition
@@ -466,7 +445,7 @@ impl GameFiles for VanillaGame {
 	/// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
 	fn extract_latest_metadata(&self, resource: RuntimeID) -> Result<ExtendedResourceMetadata> {
 		let rrid = self.to_rrid(resource);
-		for partition in &self.game_files.partitions {
+		for partition in &self.partition_manager().partitions {
 			if partition.contains(&rrid) {
 				return partition
 					.get_resource_info(&rrid)
@@ -486,7 +465,7 @@ impl GameFiles for VanillaGame {
 	) -> Result<(ResourceType, u32, String, Vec<ResourceReference>)> {
 		let resource_id = self.to_rrid(resource);
 
-		for partition in &self.game_files.partitions {
+		for partition in &self.partition_manager().partitions {
 			if partition.contains(&resource_id)
 				&& let Some((info, patchlevel)) = partition
 					.latest_resources()
@@ -587,7 +566,7 @@ impl GameFiles for VanillaGame {
 
 		let mut events = vec![];
 
-		for partition in &self.game_files.partitions {
+		for partition in &self.partition_manager().partitions {
 			let mut last_occurence: Option<&ResourceInfo> = None;
 
 			let changes = partition.resource_patch_indices(&resource_id);
@@ -680,6 +659,8 @@ impl GameFiles for EntitiesOverlay {
 			fn resource_reverse_references(&self, resource: RuntimeID) -> Option<&Vec<RuntimeID>>;
 
 			fn partition_manager(&self) -> &PartitionManager;
+
+			fn smf_context(&self) -> Arc<GameContext>;
 
 			fn all_resources(&self) -> impl Iterator<Item = RuntimeID>;
 

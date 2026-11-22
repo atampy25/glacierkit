@@ -33,7 +33,6 @@ walkdir = "2.4.0"
 itertools = "0.14.0"
 trash = "5.2.1"
 velcro = "0.5.4"
-indexmap = "2.14.0"
 arboard = "3.3.0"
 rand = "0.10.1"
 glacier-ini = "0.1.0"
@@ -106,6 +105,14 @@ lewton = "0.10.2"
 hound = "3.5.1"
 mimalloc = "0.1.52"
 dynosaur = "0.3.1"
+simple-mod-framework = { git = "https://github.com/hitman-rs/simple-mod-framework" }
+simple-mod-framework-core = { git = "https://github.com/hitman-rs/simple-mod-framework", version = "0.0.0" }
+simple-mod-framework-types = { git = "https://github.com/hitman-rs/simple-mod-framework", version = "0.0.0" }
+md5 = "0.8.1"
+eyre = "0.6.14"
+relative-path = "2.0.3"
+futures = "0.3.34"
+indexmap = "2.14.2"
 
 [dependencies.tokio]
 version = "1.43.0"

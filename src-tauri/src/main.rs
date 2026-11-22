@@ -17,6 +17,7 @@ pub mod intellisense;
 pub mod languages;
 pub mod model;
 pub mod ores_repo;
+pub mod project;
 pub mod render;
 
 use std::{
@@ -66,9 +67,10 @@ use crate::{
 		AppSettings, AppState, ContentSearchResultsEvent, ContentSearchResultsRequest, EditorConnectionEvent,
 		EditorData, EditorEventData, EditorRequest, EditorRequestData, EntityEditorRequest, EntityMetadataRequest,
 		EntityMonacoRequest, EntityTreeRequest, Event, FileBrowserRequest, GlobalEvent, GlobalRequest, JsonPatchType,
-		Project, ProjectSettings, Request, SceneRendererEvent, SettingsRequest, TabRequest, TabRequestData,
-		TextEditorEvent, TextEditorRequest, TextFileType, ToolRequest
-	}
+		Request, SceneRendererEvent, SettingsRequest, TabRequest, TabRequestData, TextEditorEvent, TextEditorRequest,
+		TextFileType, ToolRequest
+	},
+	project::{Project, ProjectSettings}
 };
 
 #[global_allocator]
@@ -613,13 +615,15 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					fs::write(path.join("project.json"), to_vec(&settings)?)?;
 				}
 
-				app_state.project.store(Some(
-					Project {
-						path: path.to_owned(),
-						settings: Arc::new(settings.to_owned()).into()
-					}
-					.into()
-				));
+				let project = Arc::new(Project {
+					path: path.to_owned(),
+					settings: Arc::new(settings.to_owned()).into(),
+					deploy: Default::default()
+				});
+
+				project.background_deploy(&app);
+
+				app_state.project.store(Some(project));
 
 				send_request(
 					&app,
@@ -1395,6 +1399,12 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				if let Some(file) = editor.file.as_ref() {
 					fs::write(file, data_to_save).context("Couldn't write file")?;
 
+					if let Some(project) = app_state.project.load().as_ref()
+						&& file.starts_with(&project.path)
+					{
+						project.background_deploy(&app);
+					}
+
 					send_request(
 						&app,
 						Request::Tab(TabRequest {
@@ -1514,10 +1524,16 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						)
 						.blocking_save_file()
 					{
-						editor.file = Some(path.as_path().context("Invalid path")?.to_owned());
+						let file = path.as_path().context("Invalid path")?;
 
-						fs::write(path.as_path().context("Invalid path")?, data_to_save)
-							.context("Couldn't write file")?;
+						editor.file = Some(file.to_owned());
+						fs::write(file, data_to_save).context("Couldn't write file")?;
+
+						if let Some(project) = app_state.project.load().as_ref()
+							&& file.starts_with(&project.path)
+						{
+							project.background_deploy(&app);
+						}
 
 						send_request(
 							&app,

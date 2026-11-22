@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { event } from "$lib/utils"
-	import type { GameInstall, SettingsRequest } from "$lib/bindings"
-	import { Checkbox, TooltipIcon, TileGroup, RadioTile, Button } from "carbon-components-svelte"
+	import type { GameInstall, ProjectSettings, SettingsRequest } from "$lib/bindings"
+	import { Checkbox, TooltipIcon, TileGroup, RadioTile, Button, TextInput } from "carbon-components-svelte"
 	import { onMount } from "svelte"
 	import Information from "carbon-icons-svelte/lib/Information.svelte"
 	import Close from "carbon-icons-svelte/lib/Close.svelte"
@@ -18,13 +18,14 @@
 				extractModdedFiles = request.data.settings.extractModdedFiles
 				colourblind = request.data.settings.colourblindMode
 				editorConnectionEnabled = request.data.settings.editorConnection
+				smfIntegration = request.data.settings.smfIntegration
 				selectedGameInstall = request.data.settings.gamePath
 				customGamePaths = request.data.settings.customGamePaths
 				break
 
 			case "changeProjectSettings":
 				projectLoaded = true
-				customPaths = request.data.settings.customPaths
+				projectSettings = request.data.settings
 				break
 
 			default:
@@ -99,11 +100,31 @@
 		}
 	}
 
+	async function changeSMFIntegration({ target }: { target: EventTarget | null }) {
+		if (target) {
+			const _target = target as HTMLInputElement
+
+			smfIntegration = _target.checked
+			await event({
+				type: "tool",
+				data: {
+					type: "settings",
+					data: {
+						type: "changeSMFIntegration",
+						data: { value: _target.checked }
+					}
+				}
+			})
+		}
+	}
+
 	let extractModdedFiles = false
 	let colourblind = false
 	let editorConnectionEnabled = true
+	let smfIntegration = true
 
 	let projectLoaded = false
+	let projectSettings: ProjectSettings = { modOptions: {} }
 
 	let gameInstalls: GameInstall[] = []
 	let selectedGameInstall: string | null = null
@@ -114,8 +135,6 @@
 	} else {
 		document.body.classList.remove("colourblind-mode")
 	}
-
-	let customPaths: string[] = []
 </script>
 
 <div
@@ -150,6 +169,16 @@
 		<TooltipIcon icon={Information}>
 			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
 				By default, GlacierKit connects automatically to the SDK editor and syncs any changes you make. If you don't want this, you can disable the editor connection.
+			</span>
+		</TooltipIcon>
+	</div>
+	<div class="flex items-center gap-2">
+		<div class="flex-shrink">
+			<Checkbox checked={smfIntegration} on:change={changeSMFIntegration} labelText="Enable SMF integration" />
+		</div>
+		<TooltipIcon icon={Information}>
+			<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
+				Deploys your mod internally to allow GlacierKit to read and understand your mod's files, enabling features like intellisense to work with custom resources.
 			</span>
 		</TooltipIcon>
 	</div>
@@ -246,22 +275,102 @@
 
 	<h4 class="mt-4">Project settings</h4>
 	{#if projectLoaded}
-		<p class="mt-1 mb-1">Custom paths</p>
-		<ListEditor
-			bind:data={customPaths}
-			on:updated={async ({ detail }) => {
-				await event({
-					type: "tool",
-					data: {
-						type: "settings",
-						data: {
-							type: "changeCustomPaths",
-							data: { value: detail }
-						}
-					}
-				})
-			}}
-		/>
+		<h5 class="mt-2 mb-2">Mod options</h5>
+		{#each Object.entries(projectSettings.modOptions).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })) as [id, val] (id)}
+			{#if val.type === "boolean"}
+				<Checkbox
+					checked={val.value}
+					on:check={async ({ detail }) => {
+						projectSettings.modOptions[id].value = detail
+						await event({
+							type: "tool",
+							data: {
+								type: "settings",
+								data: {
+									type: "changeProjectSettings",
+									data: { settings: projectSettings }
+								}
+							}
+						})
+					}}
+					labelText={id}
+				/>
+			{:else if val.type === "string"}
+				<TextInput
+					value={val.value}
+					on:change={async ({ detail }) => {
+						projectSettings.modOptions[id].value = String(detail)
+						await event({
+							type: "tool",
+							data: {
+								type: "settings",
+								data: {
+									type: "changeProjectSettings",
+									data: { settings: projectSettings }
+								}
+							}
+						})
+					}}
+					labelText={id}
+				/>
+			{:else if val.type === "selection"}
+				<TextInput
+					value={val.value}
+					on:change={async ({ detail }) => {
+						projectSettings.modOptions[id].value = String(detail)
+						await event({
+							type: "tool",
+							data: {
+								type: "settings",
+								data: {
+									type: "changeProjectSettings",
+									data: { settings: projectSettings }
+								}
+							}
+						})
+					}}
+					labelText={id}
+				/>
+			{:else if val.type === "number"}
+				<TextInput
+					type="number"
+					value={val.value}
+					on:change={async ({ detail }) => {
+						projectSettings.modOptions[id].value = Number(detail)
+						await event({
+							type: "tool",
+							data: {
+								type: "settings",
+								data: {
+									type: "changeProjectSettings",
+									data: { settings: projectSettings }
+								}
+							}
+						})
+					}}
+					labelText={id}
+				/>
+			{:else if val.type === "color"}
+				<TextInput
+					value={val.value}
+					on:change={async ({ detail }) => {
+						projectSettings.modOptions[id].value = String(detail)
+						await event({
+							type: "tool",
+							data: {
+								type: "settings",
+								data: {
+									type: "changeProjectSettings",
+									data: { settings: projectSettings }
+								}
+							}
+						})
+					}}
+					labelText={id}
+				/>
+			{/if}
+			<br />
+		{/each}
 	{:else}
 		<p>No project loaded</p>
 	{/if}

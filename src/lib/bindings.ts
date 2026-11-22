@@ -934,11 +934,7 @@ export type ExposedEntity_Deserialize = ExposedEntityProxy_Deserialize
  *
  *  Exposed entities are accessible when referencing this entity through a property on long-form references.
  */
-export type ExposedEntity_Serialize =
-	// A single target entity that will be accessed.
-	| ({ Single: RefProxy_Serialize | null } & { Array?: never })
-	// An array of target entities that will be accessed.
-	| ({ Array: RefProxy_Serialize[] } & { Single?: never })
+export type ExposedEntity_Serialize = ExposedEntityProxy_Serialize
 
 export type ExtractKind =
 	| { type: "raw" }
@@ -1216,6 +1212,13 @@ export type JsonPatchType = "MergePatch" | "JsonPatch"
 
 export type LocalPinConnectionProxy = { ref: string; value: VariantProxy } | string
 
+export type ModOptionValue =
+	| { type: "boolean"; value: boolean }
+	| { type: "number"; value: number }
+	| { type: "selection"; value: string }
+	| { type: "color"; value: string }
+	| { type: "string"; value: string }
+
 export type PastableTemplate = PastableTemplate_Serialize | PastableTemplate_Deserialize
 
 export type PastableTemplateCategory = PastableTemplateCategory_Serialize | PastableTemplateCategory_Deserialize
@@ -1251,7 +1254,7 @@ export type PinConnectionProxy_Deserialize = { ref: RefProxy_Deserialize; value:
 export type PinConnectionProxy_Serialize = { ref: RefProxy_Serialize; value: VariantProxy } | RefProxy_Serialize
 
 export type ProjectSettings = {
-	customPaths: string[]
+	modOptions: { [key in string]: ModOptionValue }
 }
 
 // A property with a type and a value. Can be marked as post-init.
@@ -1842,9 +1845,15 @@ export type SettingsEvent =
 			}
 	  }
 	| {
-			type: "changeCustomPaths"
+			type: "changeSMFIntegration"
 			data: {
-				value: string[]
+				value: boolean
+			}
+	  }
+	| {
+			type: "changeProjectSettings"
+			data: {
+				settings: ProjectSettings
 			}
 	  }
 
@@ -1854,6 +1863,7 @@ export type SettingsInner = {
 	extractModdedFiles: boolean
 	colourblindMode: boolean
 	editorConnection: boolean
+	smfIntegration: boolean
 	seenAnnouncements: string[]
 }
 

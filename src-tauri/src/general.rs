@@ -15,6 +15,7 @@ use quickentity_rs::{
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::Regex;
 use regex_automata::dfa::Automaton;
+use relative_path::PathExt;
 use serde_json::{Value, from_slice, from_str, from_value, to_value};
 use tauri::{AppHandle, Manager, async_runtime};
 use tauri_plugin_aptabase::EventTracker;
@@ -361,10 +362,7 @@ impl<'a> std::io::Write for SearchQueryMatcherInner<'a> {
 }
 
 #[try_fn]
-#[context("Couldn't open file")]
 pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
-	let app_state = app.state::<AppState>();
-
 	let path = path.as_ref();
 
 	let task = start_task(
@@ -375,94 +373,44 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 		)
 	)?;
 
-	let mut existing = None;
-	for id in app_state.editor_states.keys().await {
-		if let Some(editor) = app_state.editor_states.get(&id).await
-			&& let Some(file) = editor.file.as_ref()
-			&& file == path
-		{
-			existing = Some(id);
-		}
-	}
+	#[try_fn]
+	async fn open_file_inner(app: &AppHandle, path: &Path) -> Result<()> {
+		let app_state = app.state::<AppState>();
 
-	if let Some(existing) = existing {
-		send_request(
-			app,
-			Request::Tab(TabRequest {
-				tab: existing,
-				data: TabRequestData::Select
-			})
-		)?;
-	} else {
-		let extension = path
-			.file_name()
-			.context("No file name")?
-			.to_string_lossy()
-			.split('.')
-			.skip(1)
-			.collect_vec()
-			.join(".");
-
-		match extension.as_ref() {
-			"entity.json" => {
-				let id = Uuid::new_v4();
-
-				let mut entity: Entity =
-					from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
-
-				// Normalise comments to form used by GlacierKit (single comment for each entity)
-				let mut comments: Vec<CommentEntity> = vec![];
-				for comment in entity.comments {
-					if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
-						x.text = eco_format!("{}\n\n{}", x.text, comment.text);
-					} else {
-						comments.push(CommentEntity {
-							parent: comment.parent,
-							name: "Notes".into(),
-							text: comment.text
-						});
-					}
-				}
-				entity.comments = comments;
-
-				app_state
-					.editor_states
-					.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::QNEntity {
-								entity: entity.into(),
-								settings: Default::default()
-							},
-							..Default::default()
-						}
-					)
-					.await;
-
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::QNEntity
-						}
-					})
-				)?;
+		let mut existing = None;
+		for id in app_state.editor_states.keys().await {
+			if let Some(editor) = app_state.editor_states.get(&id).await
+				&& let Some(file) = editor.file.as_ref()
+				&& file == path
+			{
+				existing = Some(id);
 			}
+		}
 
-			"entity.patch.json" => {
-				let id = Uuid::new_v4();
+		if let Some(existing) = existing {
+			send_request(
+				app,
+				Request::Tab(TabRequest {
+					tab: existing,
+					data: TabRequestData::Select
+				})
+			)?;
+		} else {
+			let extension = path
+				.file_name()
+				.context("No file name")?
+				.to_string_lossy()
+				.split('.')
+				.skip(1)
+				.collect_vec()
+				.join(".");
 
-				if let Some(game) = app_state.game.load().as_ref() {
-					let patch: Patch =
+			match extension.as_ref() {
+				"entity.json" => {
+					let id = Uuid::new_v4();
+
+					let mut entity: Entity =
 						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
-
-					let base = game.extract_entity(patch.factory)?;
-					let mut entity = (*base).to_owned();
-
-					apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
 
 					// Normalise comments to form used by GlacierKit (single comment for each entity)
 					let mut comments: Vec<CommentEntity> = vec![];
@@ -485,9 +433,8 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							id.to_owned(),
 							EditorState {
 								file: Some(path.to_owned()),
-								data: EditorData::QNPatch {
-									base,
-									current: entity.into(),
+								data: EditorData::QNEntity {
+									entity: entity.into(),
 									settings: Default::default()
 								},
 								..Default::default()
@@ -501,293 +448,213 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							tab: id,
 							data: TabRequestData::Create {
 								name: path.file_name().context("No file name")?.to_string_lossy().into(),
-								editor_type: EditorType::QNPatch
+								editor_type: EditorType::QNEntity
 							}
 						})
 					)?;
-				} else {
-					send_request(
-						app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
-					)?;
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't open patch files without a copy of the game selected.".into()
-						}
-					)?;
 				}
-			}
 
-			"json" | "JSON" => {
-				let id = Uuid::new_v4();
+				"entity.patch.json" => {
+					let id = Uuid::new_v4();
 
-				let file_type = if path.file_name().context("No file name")?.to_string_lossy() == "manifest.json" {
-					TextFileType::ManifestJson
-				} else {
-					TextFileType::Json
-				};
+					if let Some(game) = app_state.game.load().as_ref() {
+						let patch: Patch =
+							from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
 
-				app_state
-					.editor_states
-					.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::Text {
-								content: fs::read_to_string(path)
-									.context("Couldn't read file")?
-									.replace("\r\n", "\n"),
-								file_type: file_type.to_owned()
-							},
-							..Default::default()
-						}
-					)
-					.await;
+						let base = if let Some(project) = app_state.project.load().as_ref()
+							&& let Ok(relative_file) = path.relative_to(&project.path)
+							&& let Some(deploy_result) = project.deploy.result.read().as_ref()
+						{
+							if let Some(temp_states) = deploy_result
+								.resource_states
+								.iter()
+								.filter(|(r, _)| r.id == patch.factory)
+								.map(|(_, states)| states)
+								.find(|states| {
+									states.iter().any(|(attribution, _)| {
+										attribution.as_ref().is_some_and(|attribution| {
+											attribution.source == relative_file
+												&& attribution.script_identifier.is_none()
+										})
+									})
+								})
+								&& let Some(tblu_states) = deploy_result
+									.resource_states
+									.iter()
+									.filter(|(r, _)| r.id == patch.blueprint)
+									.map(|(_, states)| states)
+									.find(|states| {
+										states.iter().any(|(attribution, _)| {
+											attribution.as_ref().is_some_and(|attribution| {
+												attribution.source == relative_file
+													&& attribution.script_identifier.is_none()
+											})
+										})
+									})
+								&& let temp_pos = temp_states
+									.iter()
+									.find_position(|(attribution, _)| {
+										attribution.as_ref().is_some_and(|attribution| {
+											attribution.source == relative_file
+												&& attribution.script_identifier.is_none()
+										})
+									})
+									.unwrap()
+									.0
+								&& let tblu_pos = tblu_states
+									.iter()
+									.find_position(|(attribution, _)| {
+										attribution.as_ref().is_some_and(|attribution| {
+											attribution.source == relative_file
+												&& attribution.script_identifier.is_none()
+										})
+									})
+									.unwrap()
+									.0
+								&& temp_pos > 0
+								&& let Some((Some(_), temp_prev)) = temp_states.get(temp_pos - 1)
+								&& tblu_pos > 0
+								&& let Some((Some(_), tblu_prev)) = tblu_states.get(tblu_pos - 1)
+							{
+								macro_rules! impl_game {
+									($ty:ty) => {{
+										let factory = glacier_bin1::deserialize::<$ty>(&temp_prev.data)?;
+										let blueprint = glacier_bin1::deserialize(&tblu_prev.data)?;
 
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::Text { file_type }
-						}
-					})
-				)?;
-			}
-
-			"xml" | "XMLB.patch.xml" => {
-				let id = Uuid::new_v4();
-
-				app_state
-					.editor_states
-					.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::Text {
-								content: fs::read_to_string(path)
-									.context("Couldn't read file")?
-									.replace("\r\n", "\n"),
-								file_type: TextFileType::Xml
-							},
-							..Default::default()
-						}
-					)
-					.await;
-
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::Text {
-								file_type: TextFileType::Xml
-							}
-						}
-					})
-				)?;
-			}
-
-			"behavior.txt" | "txt" => {
-				let id = Uuid::new_v4();
-
-				app_state
-					.editor_states
-					.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::Text {
-								content: fs::read_to_string(path)
-									.context("Couldn't read file")?
-									.replace("\r\n", "\n"),
-								file_type: TextFileType::PlainText
-							},
-							..Default::default()
-						}
-					)
-					.await;
-
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::Text {
-								file_type: TextFileType::PlainText
-							}
-						}
-					})
-				)?;
-			}
-
-			"md" => {
-				let id = Uuid::new_v4();
-
-				app_state
-					.editor_states
-					.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::Text {
-								content: fs::read_to_string(path)
-									.context("Couldn't read file")?
-									.replace("\r\n", "\n"),
-								file_type: TextFileType::Markdown
-							},
-							..Default::default()
-						}
-					)
-					.await;
-
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::Text {
-								file_type: TextFileType::Markdown
-							}
-						}
-					})
-				)?;
-			}
-
-			"repository.json" => {
-				let id = Uuid::new_v4();
-
-				if let Some(game) = app_state.game.load().as_ref()
-					&& let Some(repo) = game.repository()
-				{
-					let mut repository = to_value(repo.iter().cloned().map(|x| (x.id, x.data)).collect::<IndexMap<
-						Uuid,
-						IndexMap<String, Value>
-					>>(
-					))?;
-
-					let base = to_value(game.repository())?;
-
-					let patch: Value =
-						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
-
-					json_patch::merge(&mut repository, &patch);
-
-					let repository = from_value::<IndexMap<Uuid, IndexMap<String, Value>>>(repository)?
-						.into_iter()
-						.map(|(id, data)| RepositoryItem { id, data })
-						.collect();
-
-					app_state
-						.editor_states
-						.insert(
-							id.to_owned(),
-							EditorState {
-								file: Some(path.to_owned()),
-								data: EditorData::RepositoryPatch {
-									base: from_value(base)?,
-									current: repository,
-									patch_type: JsonPatchType::MergePatch
-								},
-								..Default::default()
-							}
-						)
-						.await;
-
-					send_request(
-						app,
-						Request::Tab(TabRequest {
-							tab: id,
-							data: TabRequestData::Create {
-								name: path.file_name().context("No file name")?.to_string_lossy().into(),
-								editor_type: EditorType::RepositoryPatch {
-									patch_type: JsonPatchType::MergePatch
+										Entity::from_game(
+											&factory,
+											&temp_prev.metadata,
+											&blueprint,
+											&tblu_prev.metadata,
+											false
+										)
+										.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+									}};
 								}
+
+								let entity = match game.version() {
+									GlacierGame::H1 => impl_game!(glacier_bin1::game::h1::STemplateEntity),
+									GlacierGame::H2 => impl_game!(glacier_bin1::game::h2::STemplateEntityFactory),
+									GlacierGame::H3 => impl_game!(glacier_bin1::game::h3::STemplateEntityFactory),
+									GlacierGame::FL => impl_game!(glacier_bin1::game::fl::STemplateEntityFactory)
+								};
+
+								entity.into()
+							} else if game.resource_exists(patch.factory) {
+								game.extract_entity(patch.factory)?
+							} else {
+								send_request(
+									app,
+									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+								)?;
+
+								send_notification(
+									app,
+									Notification {
+										kind: NotificationKind::Error,
+										title: "Unknown resource".into(),
+										subtitle: "The patch is for a custom entity but is not included in the \
+										           current deploy configuration."
+											.into()
+									}
+								)?;
+
+								return Ok(());
 							}
-						})
-					)?;
-				} else {
-					send_request(
-						app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
-					)?;
+						} else {
+							if game.resource_exists(patch.factory) {
+								game.extract_entity(patch.factory)?
+							} else {
+								send_request(
+									app,
+									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+								)?;
 
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't open repository patch files without a copy of a supported game \
-							           selected."
-								.into()
+								send_notification(
+									app,
+									Notification {
+										kind: NotificationKind::Error,
+										title: "Unknown resource".into(),
+										subtitle: "SMF integration is disabled and the entity to patch can't be found \
+										           in the game files."
+											.into()
+									}
+								)?;
+
+								return Ok(());
+							}
+						};
+
+						let mut entity = (*base).to_owned();
+
+						apply_patch(&mut entity, patch, |_| {}).map_err(|x| anyhow!("QuickEntity error: {:?}", x))?;
+
+						// Normalise comments to form used by GlacierKit (single comment for each entity)
+						let mut comments: Vec<CommentEntity> = vec![];
+						for comment in entity.comments {
+							if let Some(x) = comments.iter_mut().find(|x| x.parent == comment.parent) {
+								x.text = eco_format!("{}\n\n{}", x.text, comment.text);
+							} else {
+								comments.push(CommentEntity {
+									parent: comment.parent,
+									name: "Notes".into(),
+									text: comment.text
+								});
+							}
 						}
-					)?;
-				}
-			}
+						entity.comments = comments;
 
-			"unlockables.json" => {
-				let id = Uuid::new_v4();
-
-				if let Some(game) = app_state.game.load().as_ref() {
-					let mut unlockables = to_value(
-						from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
-							&game.extract_latest_resource(game.unlockables_id())?.1
-						)?)?
-						.into_iter()
-						.map(|x| {
-							(
-								x.data
-									.get("Id")
-									.expect("Unlockable did not have Id")
-									.as_str()
-									.expect("Id was not string")
-									.to_owned(),
-								{
-									let mut y = IndexMap::new();
-									y.insert("Guid".into(), to_value(x.id).unwrap());
-									y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
-									y
+						app_state
+							.editor_states
+							.insert(
+								id.to_owned(),
+								EditorState {
+									file: Some(path.to_owned()),
+									data: EditorData::QNPatch {
+										base,
+										current: entity.into(),
+										settings: Default::default()
+									},
+									..Default::default()
 								}
 							)
-						})
-						.collect::<IndexMap<String, IndexMap<String, Value>>>()
-					)?;
+							.await;
 
-					let base = from_str::<Value>(&glacier_bin1::deserialize::<EcoString>(
-						&game.extract_latest_resource(game.unlockables_id())?.1
-					)?)?;
+						send_request(
+							app,
+							Request::Tab(TabRequest {
+								tab: id,
+								data: TabRequestData::Create {
+									name: path.file_name().context("No file name")?.to_string_lossy().into(),
+									editor_type: EditorType::QNPatch
+								}
+							})
+						)?;
+					} else {
+						send_request(
+							app,
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+						)?;
 
-					let patch: Value =
-						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
-
-					json_patch::merge(&mut unlockables, &patch);
-
-					let unlockables = from_value::<IndexMap<String, IndexMap<String, Value>>>(unlockables)?
-						.into_iter()
-						.map(|(id, data)| UnlockableItem {
-							id: data
-								.get("Guid")
-								.expect("No Guid on unlockable item")
-								.as_str()
-								.expect("Guid was not string")
-								.try_into()
-								.expect("Guid was not valid UUID"),
-							data: {
-								let mut y = IndexMap::new();
-								y.insert("Id".into(), Value::String(id));
-								y.extend(data.into_iter().filter(|(key, _)| key != "Guid"));
-								y
+						send_notification(
+							app,
+							Notification {
+								kind: NotificationKind::Error,
+								title: "No game selected".into(),
+								subtitle: "You can't open patch files without a copy of the game selected.".into()
 							}
-						})
-						.collect();
+						)?;
+					}
+				}
+
+				"json" | "JSON" => {
+					let id = Uuid::new_v4();
+
+					let file_type = if path.file_name().context("No file name")?.to_string_lossy() == "manifest.json" {
+						TextFileType::ManifestJson
+					} else {
+						TextFileType::Json
+					};
 
 					app_state
 						.editor_states
@@ -795,10 +662,11 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							id.to_owned(),
 							EditorState {
 								file: Some(path.to_owned()),
-								data: EditorData::UnlockablesPatch {
-									base: from_value(base)?,
-									current: unlockables,
-									patch_type: JsonPatchType::MergePatch
+								data: EditorData::Text {
+									content: fs::read_to_string(path)
+										.context("Couldn't read file")?
+										.replace("\r\n", "\n"),
+									file_type: file_type.to_owned()
 								},
 								..Default::default()
 							}
@@ -811,54 +679,412 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 							tab: id,
 							data: TabRequestData::Create {
 								name: path.file_name().context("No file name")?.to_string_lossy().into(),
-								editor_type: EditorType::UnlockablesPatch {
-									patch_type: JsonPatchType::MergePatch
+								editor_type: EditorType::Text { file_type }
+							}
+						})
+					)?;
+				}
+
+				"xml" | "XMLB.patch.xml" => {
+					let id = Uuid::new_v4();
+
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::Text {
+									content: fs::read_to_string(path)
+										.context("Couldn't read file")?
+										.replace("\r\n", "\n"),
+									file_type: TextFileType::Xml
+								},
+								..Default::default()
+							}
+						)
+						.await;
+
+					send_request(
+						app,
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::Text {
+									file_type: TextFileType::Xml
 								}
 							}
 						})
 					)?;
-				} else {
+				}
+
+				"behavior.txt" | "txt" => {
+					let id = Uuid::new_v4();
+
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::Text {
+									content: fs::read_to_string(path)
+										.context("Couldn't read file")?
+										.replace("\r\n", "\n"),
+									file_type: TextFileType::PlainText
+								},
+								..Default::default()
+							}
+						)
+						.await;
+
 					send_request(
 						app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
-					)?;
-
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't open patch files without a copy of the game selected.".into()
-						}
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::Text {
+									file_type: TextFileType::PlainText
+								}
+							}
+						})
 					)?;
 				}
-			}
 
-			"JSON.patch.json" => {
-				let id = Uuid::new_v4();
+				"md" => {
+					let id = Uuid::new_v4();
 
-				let file: Value =
-					from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid patch")?;
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::Text {
+									content: fs::read_to_string(path)
+										.context("Couldn't read file")?
+										.replace("\r\n", "\n"),
+									file_type: TextFileType::Markdown
+								},
+								..Default::default()
+							}
+						)
+						.await;
 
-				if let Some(game) = app_state.game.load().as_ref() {
-					match game.resource_type(
-						file.get("id")
-							.context("Patch had no id key")?
-							.as_str()
-							.context("id key was not string")?
-							.parse::<RuntimeID>()
-							.context("id key was invalid")?
-					) {
-						Some(ty) if ty == resource_type!("REPO") => {
-							if let Some(repo) = game.repository() {
-								let mut repository =
-									to_value(repo.iter().cloned().map(|x| (x.id, x.data)).collect::<IndexMap<
-										Uuid,
-										IndexMap<String, Value>
-									>>(
-									))?;
+					send_request(
+						app,
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::Text {
+									file_type: TextFileType::Markdown
+								}
+							}
+						})
+					)?;
+				}
 
-								let base = to_value(repo)?;
+				"repository.json" => {
+					let id = Uuid::new_v4();
+
+					if let Some(game) = app_state.game.load().as_ref()
+						&& let Some(repo) = game.repository()
+					{
+						let mut repository = to_value(
+							repo.iter()
+								.cloned()
+								.map(|x| (x.id, x.data))
+								.collect::<IndexMap<Uuid, IndexMap<String, Value>>>()
+						)?;
+
+						let base = to_value(game.repository())?;
+
+						let patch: Value =
+							from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
+
+						json_patch::merge(&mut repository, &patch);
+
+						let repository = from_value::<IndexMap<Uuid, IndexMap<String, Value>>>(repository)?
+							.into_iter()
+							.map(|(id, data)| RepositoryItem { id, data })
+							.collect();
+
+						app_state
+							.editor_states
+							.insert(
+								id.to_owned(),
+								EditorState {
+									file: Some(path.to_owned()),
+									data: EditorData::RepositoryPatch {
+										base: from_value(base)?,
+										current: repository,
+										patch_type: JsonPatchType::MergePatch
+									},
+									..Default::default()
+								}
+							)
+							.await;
+
+						send_request(
+							app,
+							Request::Tab(TabRequest {
+								tab: id,
+								data: TabRequestData::Create {
+									name: path.file_name().context("No file name")?.to_string_lossy().into(),
+									editor_type: EditorType::RepositoryPatch {
+										patch_type: JsonPatchType::MergePatch
+									}
+								}
+							})
+						)?;
+					} else {
+						send_request(
+							app,
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+						)?;
+
+						send_notification(
+							app,
+							Notification {
+								kind: NotificationKind::Error,
+								title: "No game selected".into(),
+								subtitle: "You can't open repository patch files without a copy of a supported game \
+								           selected."
+									.into()
+							}
+						)?;
+					}
+				}
+
+				"unlockables.json" => {
+					let id = Uuid::new_v4();
+
+					if let Some(game) = app_state.game.load().as_ref() {
+						let mut unlockables = to_value(
+							from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
+								&game.extract_latest_resource(game.unlockables_id())?.1
+							)?)?
+							.into_iter()
+							.map(|x| {
+								(
+									x.data
+										.get("Id")
+										.expect("Unlockable did not have Id")
+										.as_str()
+										.expect("Id was not string")
+										.to_owned(),
+									{
+										let mut y = IndexMap::new();
+										y.insert("Guid".into(), to_value(x.id).unwrap());
+										y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
+										y
+									}
+								)
+							})
+							.collect::<IndexMap<String, IndexMap<String, Value>>>()
+						)?;
+
+						let base = from_str::<Value>(&glacier_bin1::deserialize::<EcoString>(
+							&game.extract_latest_resource(game.unlockables_id())?.1
+						)?)?;
+
+						let patch: Value =
+							from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
+
+						json_patch::merge(&mut unlockables, &patch);
+
+						let unlockables = from_value::<IndexMap<String, IndexMap<String, Value>>>(unlockables)?
+							.into_iter()
+							.map(|(id, data)| UnlockableItem {
+								id: data
+									.get("Guid")
+									.expect("No Guid on unlockable item")
+									.as_str()
+									.expect("Guid was not string")
+									.try_into()
+									.expect("Guid was not valid UUID"),
+								data: {
+									let mut y = IndexMap::new();
+									y.insert("Id".into(), Value::String(id));
+									y.extend(data.into_iter().filter(|(key, _)| key != "Guid"));
+									y
+								}
+							})
+							.collect();
+
+						app_state
+							.editor_states
+							.insert(
+								id.to_owned(),
+								EditorState {
+									file: Some(path.to_owned()),
+									data: EditorData::UnlockablesPatch {
+										base: from_value(base)?,
+										current: unlockables,
+										patch_type: JsonPatchType::MergePatch
+									},
+									..Default::default()
+								}
+							)
+							.await;
+
+						send_request(
+							app,
+							Request::Tab(TabRequest {
+								tab: id,
+								data: TabRequestData::Create {
+									name: path.file_name().context("No file name")?.to_string_lossy().into(),
+									editor_type: EditorType::UnlockablesPatch {
+										patch_type: JsonPatchType::MergePatch
+									}
+								}
+							})
+						)?;
+					} else {
+						send_request(
+							app,
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+						)?;
+
+						send_notification(
+							app,
+							Notification {
+								kind: NotificationKind::Error,
+								title: "No game selected".into(),
+								subtitle: "You can't open patch files without a copy of the game selected.".into()
+							}
+						)?;
+					}
+				}
+
+				"JSON.patch.json" => {
+					let id = Uuid::new_v4();
+
+					let file: Value =
+						from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid patch")?;
+
+					if let Some(game) = app_state.game.load().as_ref() {
+						match game.resource_type(
+							file.get("id")
+								.context("Patch had no id key")?
+								.as_str()
+								.context("id key was not string")?
+								.parse::<RuntimeID>()
+								.context("id key was invalid")?
+						) {
+							Some(ty) if ty == resource_type!("REPO") => {
+								if let Some(repo) = game.repository() {
+									let mut repository =
+										to_value(repo.iter().cloned().map(|x| (x.id, x.data)).collect::<IndexMap<
+											Uuid,
+											IndexMap<String, Value>
+										>>(
+										))?;
+
+									let base = to_value(repo)?;
+
+									let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
+										.context("Invalid JSON")?;
+
+									let patch = patch.get("patch").context("Patch had no patch key")?;
+
+									json_patch::patch(
+										&mut repository,
+										&from_value::<Vec<json_patch::PatchOperation>>(patch.to_owned())
+											.context("Invalid JSON patch")?
+									)?;
+
+									let repository = from_value::<IndexMap<Uuid, IndexMap<String, Value>>>(repository)?
+										.into_iter()
+										.map(|(id, data)| RepositoryItem { id, data })
+										.collect();
+
+									app_state
+										.editor_states
+										.insert(
+											id.to_owned(),
+											EditorState {
+												file: Some(path.to_owned()),
+												data: EditorData::RepositoryPatch {
+													base: from_value(base)?,
+													current: repository,
+													patch_type: JsonPatchType::JsonPatch
+												},
+												..Default::default()
+											}
+										)
+										.await;
+
+									send_request(
+										app,
+										Request::Tab(TabRequest {
+											tab: id,
+											data: TabRequestData::Create {
+												name: path
+													.file_name()
+													.context("No file name")?
+													.to_string_lossy()
+													.into(),
+												editor_type: EditorType::RepositoryPatch {
+													patch_type: JsonPatchType::JsonPatch
+												}
+											}
+										})
+									)?;
+								} else {
+									send_request(
+										app,
+										Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select {
+											path: None
+										}))
+									)?;
+
+									send_notification(
+										app,
+										Notification {
+											kind: NotificationKind::Error,
+											title: "No game selected".into(),
+											subtitle: "You can't open repository patch files without a copy of a \
+											           supported game selected."
+												.into()
+										}
+									)?;
+								}
+							}
+
+							Some(ty) if ty == resource_type!("ORES") => {
+								let id = Uuid::new_v4();
+
+								let mut unlockables = to_value(
+									from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
+										&game.extract_latest_resource(game.unlockables_id())?.1
+									)?)?
+									.into_iter()
+									.map(|x| {
+										(
+											x.data
+												.get("Id")
+												.expect("Unlockable did not have Id")
+												.as_str()
+												.expect("Id was not string")
+												.to_owned(),
+											{
+												let mut y = IndexMap::new();
+												y.insert("Guid".into(), to_value(x.id).unwrap());
+												y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
+												y
+											}
+										)
+									})
+									.collect::<IndexMap<String, IndexMap<String, Value>>>()
+								)?;
+
+								let base = from_str::<Value>(&glacier_bin1::deserialize::<EcoString>(
+									&game.extract_latest_resource(game.unlockables_id())?.1
+								)?)?;
 
 								let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 									.context("Invalid JSON")?;
@@ -866,14 +1092,28 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 								let patch = patch.get("patch").context("Patch had no patch key")?;
 
 								json_patch::patch(
-									&mut repository,
+									&mut unlockables,
 									&from_value::<Vec<json_patch::PatchOperation>>(patch.to_owned())
 										.context("Invalid JSON patch")?
 								)?;
 
-								let repository = from_value::<IndexMap<Uuid, IndexMap<String, Value>>>(repository)?
+								let unlockables = from_value::<IndexMap<String, IndexMap<String, Value>>>(unlockables)?
 									.into_iter()
-									.map(|(id, data)| RepositoryItem { id, data })
+									.map(|(id, data)| UnlockableItem {
+										id: data
+											.get("Guid")
+											.expect("No Guid on unlockable item")
+											.as_str()
+											.expect("Guid was not string")
+											.try_into()
+											.expect("Guid was not valid UUID"),
+										data: {
+											let mut y = IndexMap::new();
+											y.insert("Id".into(), Value::String(id));
+											y.extend(data.into_iter().filter(|(key, _)| key != "Guid"));
+											y
+										}
+									})
 									.collect();
 
 								app_state
@@ -882,9 +1122,9 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 										id.to_owned(),
 										EditorState {
 											file: Some(path.to_owned()),
-											data: EditorData::RepositoryPatch {
+											data: EditorData::UnlockablesPatch {
 												base: from_value(base)?,
-												current: repository,
+												current: unlockables,
 												patch_type: JsonPatchType::JsonPatch
 											},
 											..Default::default()
@@ -898,234 +1138,143 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 										tab: id,
 										data: TabRequestData::Create {
 											name: path.file_name().context("No file name")?.to_string_lossy().into(),
-											editor_type: EditorType::RepositoryPatch {
+											editor_type: EditorType::UnlockablesPatch {
 												patch_type: JsonPatchType::JsonPatch
 											}
 										}
 									})
 								)?;
-							} else {
+							}
+
+							_ => {
+								app_state
+									.editor_states
+									.insert(
+										id.to_owned(),
+										EditorState {
+											file: Some(path.to_owned()),
+											data: EditorData::Text {
+												content: fs::read_to_string(path)
+													.context("Couldn't read file")?
+													.replace("\r\n", "\n"),
+												file_type: TextFileType::Json
+											},
+											..Default::default()
+										}
+									)
+									.await;
+
 								send_request(
 									app,
-									Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
-								)?;
-
-								send_notification(
-									app,
-									Notification {
-										kind: NotificationKind::Error,
-										title: "No game selected".into(),
-										subtitle: "You can't open repository patch files without a copy of a \
-										           supported game selected."
-											.into()
-									}
+									Request::Tab(TabRequest {
+										tab: id,
+										data: TabRequestData::Create {
+											name: path.file_name().context("No file name")?.to_string_lossy().into(),
+											editor_type: EditorType::Text {
+												file_type: TextFileType::Json
+											}
+										}
+									})
 								)?;
 							}
 						}
+					} else {
+						send_request(
+							app,
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+						)?;
 
-						Some(ty) if ty == resource_type!("ORES") => {
-							let id = Uuid::new_v4();
-
-							let mut unlockables = to_value(
-								from_str::<Vec<UnlockableItem>>(&glacier_bin1::deserialize::<EcoString>(
-									&game.extract_latest_resource(game.unlockables_id())?.1
-								)?)?
-								.into_iter()
-								.map(|x| {
-									(
-										x.data
-											.get("Id")
-											.expect("Unlockable did not have Id")
-											.as_str()
-											.expect("Id was not string")
-											.to_owned(),
-										{
-											let mut y = IndexMap::new();
-											y.insert("Guid".into(), to_value(x.id).unwrap());
-											y.extend(x.data.into_iter().filter(|(key, _)| key != "Id"));
-											y
-										}
-									)
-								})
-								.collect::<IndexMap<String, IndexMap<String, Value>>>()
-							)?;
-
-							let base = from_str::<Value>(&glacier_bin1::deserialize::<EcoString>(
-								&game.extract_latest_resource(game.unlockables_id())?.1
-							)?)?;
-
-							let patch = from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
-								.context("Invalid JSON")?;
-
-							let patch = patch.get("patch").context("Patch had no patch key")?;
-
-							json_patch::patch(
-								&mut unlockables,
-								&from_value::<Vec<json_patch::PatchOperation>>(patch.to_owned())
-									.context("Invalid JSON patch")?
-							)?;
-
-							let unlockables = from_value::<IndexMap<String, IndexMap<String, Value>>>(unlockables)?
-								.into_iter()
-								.map(|(id, data)| UnlockableItem {
-									id: data
-										.get("Guid")
-										.expect("No Guid on unlockable item")
-										.as_str()
-										.expect("Guid was not string")
-										.try_into()
-										.expect("Guid was not valid UUID"),
-									data: {
-										let mut y = IndexMap::new();
-										y.insert("Id".into(), Value::String(id));
-										y.extend(data.into_iter().filter(|(key, _)| key != "Guid"));
-										y
-									}
-								})
-								.collect();
-
-							app_state
-								.editor_states
-								.insert(
-									id.to_owned(),
-									EditorState {
-										file: Some(path.to_owned()),
-										data: EditorData::UnlockablesPatch {
-											base: from_value(base)?,
-											current: unlockables,
-											patch_type: JsonPatchType::JsonPatch
-										},
-										..Default::default()
-									}
-								)
-								.await;
-
-							send_request(
-								app,
-								Request::Tab(TabRequest {
-									tab: id,
-									data: TabRequestData::Create {
-										name: path.file_name().context("No file name")?.to_string_lossy().into(),
-										editor_type: EditorType::UnlockablesPatch {
-											patch_type: JsonPatchType::JsonPatch
-										}
-									}
-								})
-							)?;
-						}
-
-						_ => {
-							app_state
-								.editor_states
-								.insert(
-									id.to_owned(),
-									EditorState {
-										file: Some(path.to_owned()),
-										data: EditorData::Text {
-											content: fs::read_to_string(path)
-												.context("Couldn't read file")?
-												.replace("\r\n", "\n"),
-											file_type: TextFileType::Json
-										},
-										..Default::default()
-									}
-								)
-								.await;
-
-							send_request(
-								app,
-								Request::Tab(TabRequest {
-									tab: id,
-									data: TabRequestData::Create {
-										name: path.file_name().context("No file name")?.to_string_lossy().into(),
-										editor_type: EditorType::Text {
-											file_type: TextFileType::Json
-										}
-									}
-								})
-							)?;
-						}
+						send_notification(
+							app,
+							Notification {
+								kind: NotificationKind::Error,
+								title: "No game selected".into(),
+								subtitle: "You can't open patch files without a copy of the game selected.".into()
+							}
+						)?;
 					}
-				} else {
+				}
+
+				extension if extension.ends_with(".json") => {
+					let id = Uuid::new_v4();
+
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::Text {
+									content: fs::read_to_string(path)
+										.context("Couldn't read file")?
+										.replace("\r\n", "\n"),
+									file_type: TextFileType::Json
+								},
+								..Default::default()
+							}
+						)
+						.await;
+
 					send_request(
 						app,
-						Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::Text {
+									file_type: TextFileType::Json
+								}
+							}
+						})
 					)?;
+				}
 
-					send_notification(
+				_ => {
+					// Unsupported extension
+
+					let id = Uuid::new_v4();
+
+					app_state
+						.editor_states
+						.insert(
+							id.to_owned(),
+							EditorState {
+								file: Some(path.to_owned()),
+								data: EditorData::Nil,
+								..Default::default()
+							}
+						)
+						.await;
+
+					send_request(
 						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "No game selected".into(),
-							subtitle: "You can't open patch files without a copy of the game selected.".into()
-						}
+						Request::Tab(TabRequest {
+							tab: id,
+							data: TabRequestData::Create {
+								name: path.file_name().context("No file name")?.to_string_lossy().into(),
+								editor_type: EditorType::Nil
+							}
+						})
 					)?;
 				}
 			}
-
-			extension if extension.ends_with(".json") => {
-				let id = Uuid::new_v4();
-
-				app_state
-					.editor_states
-					.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::Text {
-								content: fs::read_to_string(path)
-									.context("Couldn't read file")?
-									.replace("\r\n", "\n"),
-								file_type: TextFileType::Json
-							},
-							..Default::default()
-						}
-					)
-					.await;
-
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::Text {
-								file_type: TextFileType::Json
-							}
-						}
-					})
-				)?;
-			}
-
-			_ => {
-				// Unsupported extension
-
-				let id = Uuid::new_v4();
-
-				app_state
-					.editor_states
-					.insert(
-						id.to_owned(),
-						EditorState {
-							file: Some(path.to_owned()),
-							data: EditorData::Nil,
-							..Default::default()
-						}
-					)
-					.await;
-
-				send_request(
-					app,
-					Request::Tab(TabRequest {
-						tab: id,
-						data: TabRequestData::Create {
-							name: path.file_name().context("No file name")?.to_string_lossy().into(),
-							editor_type: EditorType::Nil
-						}
-					})
-				)?;
-			}
 		}
+	}
+
+	if let Err(e) = open_file_inner(app, path).await {
+		send_request(
+			app,
+			Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::Select { path: None }))
+		)?;
+
+		send_notification(
+			app,
+			Notification {
+				kind: NotificationKind::Error,
+				title: "Couldn't open file".into(),
+				subtitle: format!("{e:#}")
+			}
+		)?;
 	}
 
 	finish_task(app, task)?;

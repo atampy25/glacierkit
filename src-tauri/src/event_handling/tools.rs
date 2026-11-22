@@ -22,10 +22,9 @@ use rayon::iter::{
 	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelBridge, ParallelIterator
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value, to_vec};
+use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value};
 use specta::Type;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_aptabase::EventTracker;
 use tauri_plugin_dialog::DialogExt;
 use tryvial::try_fn;
 use uuid::Uuid;
@@ -1470,14 +1469,14 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				}
 			}
 
-			SettingsEvent::ChangeCustomPaths { value } => {
-				if let Some(project) = app_state.project.load().as_ref() {
-					app.track_event("Edit custom paths list manually", None).unwrap();
+			SettingsEvent::ChangeSMFIntegration { value } => {
+				app_settings.set_smf_integration(value)?;
+			}
 
-					let mut settings = (*project.settings.load_full()).to_owned();
-					settings.custom_paths = value;
-					fs::write(project.path.join("project.json"), to_vec(&settings)?)?;
+			SettingsEvent::ChangeProjectSettings { settings } => {
+				if let Some(project) = app_state.project.load().as_ref() {
 					project.settings.store(settings.into());
+					project.background_deploy(&app);
 				}
 			}
 		},

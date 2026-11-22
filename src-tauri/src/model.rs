@@ -37,6 +37,7 @@ use crate::{
 		RepositoryItem, RepositoryItemInformation, RepositoryItemKind, UnlockableInformation, UnlockableItem,
 		UnlockableKind
 	},
+	project::{Project, ProjectSettings},
 	render::SceneRenderer
 };
 
@@ -53,6 +54,7 @@ pub struct SettingsInner {
 	pub extract_modded_files: bool,
 	pub colourblind_mode: bool,
 	pub editor_connection: bool,
+	pub smf_integration: bool,
 	pub seen_announcements: Vec<String>
 }
 
@@ -64,6 +66,7 @@ impl Default for SettingsInner {
 			extract_modded_files: false,
 			colourblind_mode: false,
 			editor_connection: true,
+			smf_integration: true,
 			seen_announcements: vec![]
 		}
 	}
@@ -119,6 +122,10 @@ impl AppSettings {
 		self.settings.load()
 	}
 
+	pub fn data_dir(&self) -> &Path {
+		&self.data_dir
+	}
+
 	#[try_fn]
 	fn persist(&self) -> Result<()> {
 		fs::write(
@@ -144,6 +151,7 @@ impl AppSettings {
 	impl_set!(set_extract_modded_files, extract_modded_files, bool);
 	impl_set!(set_colourblind_mode, colourblind_mode, bool);
 	impl_set!(set_editor_connection, editor_connection, bool);
+	impl_set!(set_smf_integration, smf_integration, bool);
 	impl_set!(set_seen_announcements, seen_announcements, Vec<String>);
 }
 
@@ -221,19 +229,6 @@ pub enum EditorData {
 pub struct QNEditorSettings {
 	pub show_reverse_parent_refs: bool,
 	pub show_changes_from_original: bool
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Project {
-	pub path: PathBuf,
-	pub settings: ArcSwap<ProjectSettings>
-}
-
-#[derive(Type, Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectSettings {
-	pub custom_paths: Vec<String>
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
@@ -664,11 +659,9 @@ nesting::nest! {
 				ChangeExtractModdedFiles { value: bool },
 				ChangeColourblindMode { value: bool },
 				ChangeEditorConnection { value: bool },
+				ChangeSMFIntegration { value: bool },
 
-				ChangeCustomPaths {
-					#[debug(skip)]
-					value: Vec<String>
-				}
+				ChangeProjectSettings { settings: ProjectSettings }
 			}
 
 			ContentSearch(ContentSearchEvent)
@@ -1062,6 +1055,7 @@ nesting::nest! {
 				},
 
 				FileActions {
+					#[debug(skip)]
 					files: Vec<(PathBuf, Vec<(String, String, FileAction)>)>
 				}
 			}

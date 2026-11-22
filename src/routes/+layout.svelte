@@ -660,7 +660,9 @@
 	<div class="h-screen flex flex-col-reverse content-end pb-4">
 		{#each notifications as [id, { kind, title, subtitle }] (id)}
 			<div in:fly={{ x: 100 }} out:fade animate:flip>
-				<ToastNotification hideCloseButton {kind} {title} {subtitle} />
+				<ToastNotification hideCloseButton {kind} {title}>
+					<div slot="subtitleChildren"><pre>{subtitle}</pre></div>
+				</ToastNotification>
 			</div>
 		{/each}
 	</div>
