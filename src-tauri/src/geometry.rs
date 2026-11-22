@@ -924,7 +924,7 @@ pub fn resolve_instantiated_ref(
 					.instantiations
 					.get(entity_id)
 					.unwrap_or(&vec![])
-					.into_iter()
+					.iter()
 					.flat_map(|&entity| {
 						resolve_instantiated_ref(
 							scenes,
@@ -1009,15 +1009,11 @@ pub fn instantiate_scenes(game: &impl GameFiles, scenes: &[RuntimeID]) -> Result
 					.entities
 					.iter()
 					.filter_map(|(id, entity)| {
-						if let Some(reference) = &entity.parent {
-							Some(
-								resolve_instantiated_ref(&scenes, *scene_id, reference)
-									.into_iter()
-									.map(move |reference| (reference, (*scene_id, id)))
-							)
-						} else {
-							None
-						}
+						entity.parent.as_ref().map(|reference| {
+							resolve_instantiated_ref(&scenes, *scene_id, reference)
+								.into_iter()
+								.map(move |reference| (reference, (*scene_id, id)))
+						})
 					})
 					.flatten()
 					.collect_vec()
@@ -1239,7 +1235,7 @@ pub fn get_property_source(
 	{
 		for child in children {
 			if value.is_none() && !no_traverse.is_some_and(|x| x == *child) {
-				value = get_property_source(game, scenes, scene_id, scene, Some(entity), *child, &property)?;
+				value = get_property_source(game, scenes, scene_id, scene, Some(entity), *child, property)?;
 			}
 		}
 	}
@@ -1318,7 +1314,7 @@ pub fn get_scene_geometry(
 		{
 			for child in children {
 				if value.is_none() && !no_traverse.is_some_and(|x| x == *child) {
-					value = get_property_value(game, scenes, scene_id, scene, Some(entity), *child, &property)?;
+					value = get_property_value(game, scenes, scene_id, scene, Some(entity), *child, property)?;
 				}
 			}
 		}
@@ -1395,7 +1391,7 @@ pub fn get_scene_geometry(
 		{
 			for child in children {
 				if value.is_none() && !no_traverse.is_some_and(|x| x == *child) {
-					value = get_ref_property_value(scenes, scene_id, scene, Some(entity), *child, &property)?;
+					value = get_ref_property_value(scenes, scene_id, scene, Some(entity), *child, property)?;
 				}
 			}
 		}
@@ -1485,7 +1481,7 @@ pub fn get_scene_geometry(
 		{
 			for child in children {
 				if value.is_none() && !no_traverse.is_some_and(|x| x == *child) {
-					value = get_ref_array_property_value(scenes, scene_id, scene, Some(entity), *child, &property)?;
+					value = get_ref_array_property_value(scenes, scene_id, scene, Some(entity), *child, property)?;
 				}
 			}
 		}
@@ -1502,8 +1498,7 @@ pub fn get_scene_geometry(
 	let matt_props = game
 		.intellisense()
 		.get_cppt_properties(game, crate::class_for_game!(game, "zrendermaterialentity"))?
-		.into_iter()
-		.map(|(x, _)| x)
+		.into_keys()
 		.collect::<HashSet<_>>();
 
 	for (scene_id, (_, scene)) in &scenes.scenes {
@@ -1642,10 +1637,8 @@ pub fn get_scene_geometry(
 					children
 						.iter()
 						.find_map(|&child| find_existing(ids, scene_id, scene, child))
-				} else if let Some(existing) = ids.get(&(scene_id, id)) {
-					Some(*existing)
 				} else {
-					None
+					ids.get(&(scene_id, id)).copied()
 				}
 			}
 
@@ -1898,7 +1891,7 @@ pub fn get_scene_geometry(
 										as f32
 								)
 							} else {
-								(0.6981316804885864, std::f32::consts::FRAC_PI_4)
+								(0.6981317, std::f32::consts::FRAC_PI_4)
 							};
 
 							LightKind::Spot {
@@ -2037,91 +2030,89 @@ pub fn get_scene_geometry(
 
 	for (scene_id, (_, scene)) in &scenes.scenes {
 		for (id, instance) in &scene.entities {
-			if let InstantiatedEntityFactory::Factory(factory) = instance.factory {
-				if game.resource_type(factory).is_some_and(|ty| ty == "MATT")
-					&& get_property_value(game, scenes, *scene_id, scene, None, id, &"Active".into())?
+			if let InstantiatedEntityFactory::Factory(factory) = instance.factory
+				&& game.resource_type(factory).is_some_and(|ty| ty == "MATT")
+				&& get_property_value(game, scenes, *scene_id, scene, None, id, &"Active".into())?
+					.map(|val| {
+						if let Variant::Raw(val) = val
+							&& val.variant_type() == "bool"
+						{
+							val.to_serde().unwrap().as_bool().unwrap()
+						} else {
+							true
+						}
+					})
+					.unwrap_or(true)
+				&& let Some(clients) =
+					get_ref_array_property_value(scenes, *scene_id, scene, None, id, &"Clients".into())?
+				&& !clients.is_empty()
+			{
+				let this_material = game
+					.extract_latest_metadata(factory)?
+					.core_info
+					.references
+					.iter()
+					.find_map(|x| {
+						game.resource_type(x.resource)
+							.is_some_and(|ty| ty == "MATI")
+							.then_some(x.resource)
+					})
+					.context("No MATI present on MATT")?;
+
+				let overridden_material =
+					if get_property_value(game, scenes, *scene_id, scene, None, id, &"Override".into())?
 						.map(|val| {
 							if let Variant::Raw(val) = val
 								&& val.variant_type() == "bool"
 							{
 								val.to_serde().unwrap().as_bool().unwrap()
 							} else {
-								true
+								false
 							}
 						})
-						.unwrap_or(true)
-					&& let Some(clients) =
-						get_ref_array_property_value(scenes, *scene_id, scene, None, id, &"Clients".into())?
-					&& !clients.is_empty()
-				{
-					let this_material = game
-						.extract_latest_metadata(factory)?
-						.core_info
-						.references
-						.iter()
-						.find_map(|x| {
-							game.resource_type(x.resource)
-								.is_some_and(|ty| ty == "MATI")
-								.then_some(x.resource)
-						})
-						.context("No MATI present on MATT")?;
+						.unwrap_or(false)
+						&& let Some(dest) = get_property_value(
+							game,
+							scenes,
+							*scene_id,
+							scene,
+							None,
+							id,
+							&"MaterialInstanceOverrideDest".into()
+						)?
+						.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
+					{
+						dest.resource
+					} else {
+						this_material
+					};
 
-					let overridden_material =
-						if get_property_value(game, scenes, *scene_id, scene, None, id, &"Override".into())?
-							.map(|val| {
-								if let Variant::Raw(val) = val
-									&& val.variant_type() == "bool"
-								{
-									val.to_serde().unwrap().as_bool().unwrap()
-								} else {
-									false
-								}
-							})
-							.unwrap_or(false)
-							&& let Some(dest) = get_property_value(
-								game,
-								scenes,
-								*scene_id,
-								scene,
-								None,
-								id,
-								&"MaterialInstanceOverrideDest".into()
-							)?
-							.and_then(|val| if let Variant::Resource(_, val) = val { val } else { None })
-						{
-							dest.resource
-						} else {
-							this_material
-						};
+				for (client_scene_id, client_id) in clients {
+					let client = {
+						let client_scene = &scenes.scenes[&client_scene_id].1;
+						process_entity(
+							game,
+							scenes,
+							&settings,
+							client_scene_id,
+							client_scene,
+							client_id,
+							&client_scene.entities[client_id],
+							&mut ids,
+							&mut geometry
+						)?
+					};
 
-					for (client_scene_id, client_id) in clients {
-						let client = {
-							let client_scene = &scenes.scenes[&client_scene_id].1;
-							process_entity(
-								game,
-								scenes,
-								&settings,
-								client_scene_id,
-								client_scene,
-								client_id,
-								&client_scene.entities[client_id],
-								&mut ids,
-								&mut geometry
-							)?
-						};
+					if let GeomEntityData::Geometry { material_overrides, .. } = &mut geometry[client].data {
+						let overrides = &mut material_overrides
+							.entry(overridden_material)
+							.or_insert_with(|| (this_material, Default::default()))
+							.1;
 
-						if let GeomEntityData::Geometry { material_overrides, .. } = &mut geometry[client].data {
-							let overrides = &mut material_overrides
-								.entry(overridden_material)
-								.or_insert_with(|| (this_material, Default::default()))
-								.1;
-
-							for property in instance.properties.keys().filter(|x| !matt_props.contains(*x)) {
-								if let Some(value) =
-									get_property_value(game, scenes, *scene_id, scene, None, id, property)?
-								{
-									overrides.insert(property.to_owned(), value);
-								}
+						for property in instance.properties.keys().filter(|x| !matt_props.contains(*x)) {
+							if let Some(value) = get_property_value(game, scenes, *scene_id, scene, None, id, property)?
+							{
+								overrides.insert(property.to_owned(), value);
 							}
 						}
 					}

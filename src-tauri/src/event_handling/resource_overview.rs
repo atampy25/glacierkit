@@ -220,7 +220,7 @@ pub async fn initialise_resource_overview(
 							.await
 							.context("No such editor")?
 							.assets
-							.insert(asset_id, ("image/webp".into(), image_data.into()))
+							.insert(asset_id, ("image/webp".into(), image_data))
 							.await;
 
 						ResourceOverviewData::Image {
@@ -242,7 +242,7 @@ pub async fn initialise_resource_overview(
 							.await
 							.context("No such editor")?
 							.assets
-							.insert(asset_id, ("model/gltf-binary".into(), glb.into()))
+							.insert(asset_id, ("model/gltf-binary".into(), glb))
 							.await;
 
 						ResourceOverviewData::Mesh { asset_id, bounding_box }
@@ -278,7 +278,7 @@ pub async fn initialise_resource_overview(
 								.await
 								.context("No such editor")?
 								.assets
-								.insert(asset_id, ("image/x-targa".into(), image_data.into()))
+								.insert(asset_id, ("image/x-targa".into(), image_data))
 								.await;
 						} else {
 							let image = glacier_texture::convert::create_dynamic_image(&texture)
@@ -294,7 +294,7 @@ pub async fn initialise_resource_overview(
 								.await
 								.context("No such editor")?
 								.assets
-								.insert(asset_id, ("image/webp".into(), image_data.into()))
+								.insert(asset_id, ("image/webp".into(), image_data))
 								.await;
 						}
 
@@ -916,7 +916,7 @@ pub async fn initialise_resource_overview(
 								.await
 								.context("No such editor")?
 								.assets
-								.insert(asset_id, ("application/octet-stream".into(), res_data.into()))
+								.insert(asset_id, ("application/octet-stream".into(), res_data))
 								.await;
 
 							ResourceOverviewData::GenericData { asset_id }
@@ -2055,7 +2055,7 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 												.await
 												.context("No such editor")?
 												.assets
-												.insert(asset_id, ("model/gltf-binary".into(), v.into()))
+												.insert(asset_id, ("model/gltf-binary".into(), v))
 												.await;
 
 											asset_ids.insert(k, asset_id);

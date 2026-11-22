@@ -297,18 +297,16 @@ pub async fn handle_unlockables_patch_event(
 				.find(|x| x.id == unlockable)
 				.context("No such unlockable")?;
 
-			let modified;
-
 			// All items must have an Id to be saved in SMF unlockables format
-			if itm.data != from_str::<IndexMap<String, Value>>(&data)?
+			let modified = if itm.data != from_str::<IndexMap<String, Value>>(&data)?
 				&& from_str::<IndexMap<String, Value>>(&data)?.contains_key("Id")
 			{
 				itm.data = from_str(&data)?;
 
-				modified = true;
+				true
 			} else {
-				modified = false;
-			}
+				false
+			};
 
 			if modified {
 				send_request(

@@ -188,7 +188,7 @@ impl SearchQuery {
 			Self::Simple(query) => SearchQueryPattern(SearchQueryPatternInner::MultiRegex(
 				Self::parse_simple(query)?
 					.into_iter()
-					.map(|needle| regex_automata::dfa::dense::DFA::new(&regex::escape(&needle)))
+					.map(|needle| regex_automata::dfa::dense::DFA::new(&regex::escape(&needle)).map_err(Box::new))
 					.collect::<Result<_, _>>()?
 			)),
 
@@ -334,10 +334,8 @@ impl<'a> std::io::Write for SearchQueryMatcherInner<'a> {
 
 			Self::And { matchers } => {
 				for (matcher, finished) in matchers.iter_mut() {
-					if !*finished {
-						if matcher.write(buf).is_err() {
-							*finished = true;
-						}
+					if !*finished && matcher.write(buf).is_err() {
+						*finished = true;
 					}
 				}
 

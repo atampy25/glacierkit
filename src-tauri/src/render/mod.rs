@@ -37,10 +37,10 @@ macro_rules! __to_bevy {
 		$(#[$meta])*
 		pub struct $name $($rest)*
 
-		inventory::submit!(crate::render::MessageInitialiser(|channels, app| {
+		inventory::submit!($crate::render::MessageInitialiser(|channels, app| {
 			let (sender, receiver) = flume::unbounded::<$name>();
 			channels.insert(sender);
-			app.insert_resource(crate::render::BevyReceiver(receiver));
+			app.insert_resource($crate::render::BevyReceiver(receiver));
 		}));
 	};
 
@@ -51,10 +51,10 @@ macro_rules! __to_bevy {
 		$(#[$meta])*
 		pub enum $name $($rest)*
 
-		inventory::submit!(crate::render::MessageInitialiser(|channels, app| {
+		inventory::submit!($crate::render::MessageInitialiser(|channels, app| {
 			let (sender, receiver) = flume::unbounded::<$name>();
 			channels.insert(sender);
-			app.insert_resource(crate::render::BevyReceiver(receiver));
+			app.insert_resource($crate::render::BevyReceiver(receiver));
 		}));
 	};
 }
@@ -71,10 +71,10 @@ macro_rules! __from_bevy {
 		$(#[$meta])*
 		pub struct $name $($rest)*
 
-		inventory::submit!(crate::render::MessageInitialiser(|channels, app| {
+		inventory::submit!($crate::render::MessageInitialiser(|channels, app| {
 			let (sender, receiver) = flume::unbounded::<$name>();
 			channels.insert(receiver);
-			app.insert_resource(crate::render::BevySender(sender));
+			app.insert_resource($crate::render::BevySender(sender));
 		}));
 	};
 
@@ -85,10 +85,10 @@ macro_rules! __from_bevy {
 		$(#[$meta])*
 		pub enum $name $($rest)*
 
-		inventory::submit!(crate::render::MessageInitialiser(|channels, app| {
+		inventory::submit!($crate::render::MessageInitialiser(|channels, app| {
 			let (sender, receiver) = flume::unbounded::<$name>();
 			channels.insert(receiver);
-			app.insert_resource(crate::render::BevySender(sender));
+			app.insert_resource($crate::render::BevySender(sender));
 		}));
 	};
 }
@@ -149,8 +149,7 @@ impl Default for SceneRenderer {
 							..default()
 						})
 						.set(WinitPlugin {
-							run_on_any_thread: true,
-							..default()
+							run_on_any_thread: true
 						})
 						.build()
 						.disable::<LogPlugin>()

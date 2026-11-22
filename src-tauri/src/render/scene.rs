@@ -407,7 +407,7 @@ fn process_material(
 			mati,
 			(!overrides.is_empty()).then(|| {
 				let mut to_ser = overrides.iter().collect_vec();
-				to_ser.sort_unstable_by(|&(a, _), &(b, _)| a.cmp(b));
+				to_ser.sort_unstable_by_key(|&(x, _)| x);
 				serde_brief::to_vec(&to_ser).unwrap()
 			})
 		))
@@ -827,7 +827,7 @@ fn process_prim(
 			prim,
 			(!material_overrides.is_empty()).then(|| {
 				let mut to_ser = material_overrides.iter().collect_vec();
-				to_ser.sort_unstable_by(|&(a, _), &(b, _)| a.cmp(b));
+				to_ser.sort_unstable_by_key(|&(x, _)| x);
 				serde_brief::to_vec(&to_ser).unwrap()
 			})
 		))
@@ -901,14 +901,14 @@ fn process_prim(
 						if let Some(uvs) = obj.get_tex_coords().first() {
 							mesh = mesh.with_inserted_attribute(
 								Mesh::ATTRIBUTE_UV_0,
-								uvs.into_iter().map(|norm| [norm.x, norm.y]).collect_vec()
+								uvs.iter().map(|norm| [norm.x, norm.y]).collect_vec()
 							);
 						}
 
 						if let Some(uvs) = obj.get_tex_coords().get(1) {
 							mesh = mesh.with_inserted_attribute(
 								Mesh::ATTRIBUTE_UV_1,
-								uvs.into_iter().map(|norm| [norm.x, norm.y]).collect_vec()
+								uvs.iter().map(|norm| [norm.x, norm.y]).collect_vec()
 							);
 						}
 
@@ -925,7 +925,7 @@ fn process_prim(
 							process_material(
 								world,
 								*override_id,
-								global_material_overrides.get(&override_id).as_ref().map(|(_, x)| x),
+								global_material_overrides.get(override_id).as_ref().map(|(_, x)| x),
 								override_props
 							)
 						} else if let Some((override_id, override_props)) = global_material_overrides.get(&material_id)
@@ -934,7 +934,7 @@ fn process_prim(
 								world,
 								*override_id,
 								Some(override_props),
-								&material_overrides
+								material_overrides
 									.get(&material_id)
 									.as_ref()
 									.map(|(_, x)| x)
@@ -1296,12 +1296,12 @@ fn process_geom(
 		}
 	}
 
-	for (child_id, child_geom_entity) in geometry.geometry.iter().filter_map(|(id, geom_entity)| {
-		geom_entity
-			.parent
-			.is_some_and(|id| id == geom_entity_id)
-			.then(|| (id, geom_entity.to_owned()))
-	}) {
+	for (child_id, child_geom_entity) in geometry
+		.geometry
+		.iter()
+		.filter(|(_, geom_entity)| geom_entity.parent.is_some_and(|id| id == geom_entity_id))
+		.map(|(id, geom_entity)| (id, geom_entity.to_owned()))
+	{
 		let scenes = scenes.clone();
 		let geometry = geometry.clone();
 		let settings = settings.clone();
@@ -1604,7 +1604,8 @@ fn start_render_system(
 					.geometry
 					.geometry
 					.iter()
-					.filter_map(|(id, geom)| geom.parent.is_none().then(|| (None, id)))
+					.filter(|(_, geom)| geom.parent.is_none())
+					.map(|(id, _)| (None, id))
 			);
 		}
 
@@ -1670,7 +1671,7 @@ fn handle_select_system(
 			.filter_map(|(entity, source)| source.0.contains(&(event.factory, event.id)).then_some(entity))
 			.collect_vec();
 
-		for entity in to_select.to_owned() {
+		for entity in to_select.clone() {
 			let descendants = descendants.iter_descendants(entity).collect_vec();
 			to_select.retain(|x| !descendants.contains(x));
 		}
@@ -1707,67 +1708,66 @@ fn keybind_center_system(
 	descendants: Query<&Children>,
 	aabb: Query<&Aabb>
 ) {
-	if keyboard_input.just_pressed(KeyCode::KeyZ) {
-		if let Some(selected) = selected.iter().next() {
-			if let Ok((camera_entity, orbit_camera)) = camera.single_mut() {
-				let mut min = Vec3::splat(f32::MAX);
-				let mut max = Vec3::splat(f32::MIN);
-				for child in descendants.iter_descendants(selected) {
-					if let Ok(aabb) = aabb.get(child) {
-						if let Ok(global_transform) = transform.get(child) {
-							let child_min = aabb.min();
-							let child_max = aabb.max();
+	if keyboard_input.just_pressed(KeyCode::KeyZ)
+		&& let Some(selected) = selected.iter().next()
+		&& let Ok((camera_entity, orbit_camera)) = camera.single_mut()
+	{
+		let mut min = Vec3::splat(f32::MAX);
+		let mut max = Vec3::splat(f32::MIN);
+		for child in descendants.iter_descendants(selected) {
+			if let Ok(aabb) = aabb.get(child)
+				&& let Ok(global_transform) = transform.get(child)
+			{
+				let child_min = aabb.min();
+				let child_max = aabb.max();
 
-							fn get_box_corners(min: Vec3A, max: Vec3A) -> [Vec3; 8] {
-								[
-									Vec3::new(min.x, min.y, min.z),
-									Vec3::new(max.x, min.y, min.z),
-									Vec3::new(min.x, max.y, min.z),
-									Vec3::new(min.x, min.y, max.z),
-									Vec3::new(max.x, max.y, min.z),
-									Vec3::new(min.x, max.y, max.z),
-									Vec3::new(max.x, min.y, max.z),
-									Vec3::new(max.x, max.y, max.z)
-								]
-							}
+				fn get_box_corners(min: Vec3A, max: Vec3A) -> [Vec3; 8] {
+					[
+						Vec3::new(min.x, min.y, min.z),
+						Vec3::new(max.x, min.y, min.z),
+						Vec3::new(min.x, max.y, min.z),
+						Vec3::new(min.x, min.y, max.z),
+						Vec3::new(max.x, max.y, min.z),
+						Vec3::new(min.x, max.y, max.z),
+						Vec3::new(max.x, min.y, max.z),
+						Vec3::new(max.x, max.y, max.z)
+					]
+				}
 
-							for corner in get_box_corners(child_min, child_max) {
-								let world_pos = global_transform.transform_point(corner);
-								min = min.min(world_pos);
-								max = max.max(world_pos);
-							}
+				for corner in get_box_corners(child_min, child_max) {
+					let world_pos = global_transform.transform_point(corner);
+					min = min.min(world_pos);
+					max = max.max(world_pos);
+				}
+			}
+		}
+
+		if min != Vec3::splat(f32::MAX) && max != Vec3::splat(f32::MIN) {
+			if let Some(mut camera) = orbit_camera {
+				camera.target_focus = (min + max) / 2.0;
+				camera.target_radius = (max - min).max_element() + 1.0;
+			} else if let Ok((transform, preferred_radius)) = free_camera.single() {
+				commands
+					.entity(camera_entity)
+					.remove::<FreeCamera>()
+					.insert(PanOrbitCamera {
+						focus: transform.translation + (transform.forward() * preferred_radius.0),
+						button_orbit: MouseButton::Right,
+						modifier_pan: Some(KeyCode::ShiftLeft),
+						..default()
+					})
+					.remove::<PreferredRadius>();
+
+				commands
+					.delayed()
+					.secs(0.2)
+					.entity(camera_entity)
+					.queue(move |mut entity: EntityWorldMut| {
+						if let Some(mut camera) = entity.get_mut::<PanOrbitCamera>() {
+							camera.target_focus = (min + max) / 2.0;
+							camera.target_radius = (max - min).max_element() + 1.0;
 						}
-					}
-				}
-
-				if min != Vec3::splat(f32::MAX) && max != Vec3::splat(f32::MIN) {
-					if let Some(mut camera) = orbit_camera {
-						camera.target_focus = (min + max) / 2.0;
-						camera.target_radius = (max - min).max_element() + 1.0;
-					} else if let Ok((transform, preferred_radius)) = free_camera.single() {
-						commands
-							.entity(camera_entity)
-							.remove::<FreeCamera>()
-							.insert(PanOrbitCamera {
-								focus: transform.translation + (transform.forward() * preferred_radius.0),
-								button_orbit: MouseButton::Right,
-								modifier_pan: Some(KeyCode::ShiftLeft),
-								..default()
-							})
-							.remove::<PreferredRadius>();
-
-						commands
-							.delayed()
-							.secs(0.2)
-							.entity(camera_entity)
-							.queue(move |mut entity: EntityWorldMut| {
-								if let Some(mut camera) = entity.get_mut::<PanOrbitCamera>() {
-									camera.target_focus = (min + max) / 2.0;
-									camera.target_radius = (max - min).max_element() + 1.0;
-								}
-							});
-					}
-				}
+					});
 			}
 		}
 	}
@@ -1966,11 +1966,11 @@ fn transform_debounce_system(
 	if debounce.1.is_some() {
 		debounce.0.tick(time.delta());
 
-		if debounce.0.just_finished() {
-			if let Some(events) = debounce.1.take() {
-				for event in events {
-					let _ = sender.0.send(event);
-				}
+		if debounce.0.just_finished()
+			&& let Some(events) = debounce.1.take()
+		{
+			for event in events {
+				let _ = sender.0.send(event);
 			}
 		}
 	}

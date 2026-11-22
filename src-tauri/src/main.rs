@@ -652,7 +652,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 							.map(|(path, _)| {
 								Ok((
 									path.to_owned(),
-									FileAction::all_available(&path)?
+									FileAction::all_available(path)?
 										.into_iter()
 										.map(|x| (x.to_string(), x.icon(), x))
 										.collect()
@@ -707,7 +707,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 															.map(|(path, _)| {
 																Ok((
 																	path.to_owned(),
-																	FileAction::all_available(&path)?
+																	FileAction::all_available(path)?
 																		.into_iter()
 																		.map(|x| (x.to_string(), x.icon(), x))
 																		.collect()
@@ -743,7 +743,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 															FileBrowserRequest::FileActions {
 																files: vec![(
 																	path.to_owned(),
-																	FileAction::all_available(&path)?
+																	FileAction::all_available(path)?
 																		.into_iter()
 																		.map(|x| (x.to_string(), x.icon(), x))
 																		.collect()
@@ -790,7 +790,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 																FileBrowserRequest::FileActions {
 																	files: vec![(
 																		path.to_owned(),
-																		FileAction::all_available(&path)?
+																		FileAction::all_available(path)?
 																			.into_iter()
 																			.map(|x| (x.to_string(), x.icon(), x))
 																			.collect()
@@ -828,14 +828,14 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 															files: vec![
 																(
 																	old_path.to_owned(),
-																	FileAction::all_available(&old_path)?
+																	FileAction::all_available(old_path)?
 																		.into_iter()
 																		.map(|x| (x.to_string(), x.icon(), x))
 																		.collect()
 																),
 																(
 																	new_path.to_owned(),
-																	FileAction::all_available(&new_path)?
+																	FileAction::all_available(new_path)?
 																		.into_iter()
 																		.map(|x| (x.to_string(), x.icon(), x))
 																		.collect()
@@ -883,7 +883,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 														FileBrowserRequest::FileActions {
 															files: vec![(
 																path.to_owned(),
-																FileAction::all_available(&path)?
+																FileAction::all_available(path)?
 																	.into_iter()
 																	.map(|x| (x.to_string(), x.icon(), x))
 																	.collect()
@@ -1826,7 +1826,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						};
 
 						sub_entity.properties.insert(
-							property.to_owned().into(),
+							property.to_owned(),
 							Property {
 								value: value.to_owned(),
 								post_init

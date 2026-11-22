@@ -388,15 +388,13 @@ pub async fn handle_repository_patch_event(app: &AppHandle, id: Uuid, event: Rep
 				.find(|x| x.id == item)
 				.context("No such repository item")?;
 
-			let modified;
-
-			if itm.data != from_str::<IndexMap<String, Value>>(&data)? {
+			let modified = if itm.data != from_str::<IndexMap<String, Value>>(&data)? {
 				itm.data = from_str(&data)?;
 
-				modified = true;
+				true
 			} else {
-				modified = false;
-			}
+				false
+			};
 
 			if modified {
 				send_request(

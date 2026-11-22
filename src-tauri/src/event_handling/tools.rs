@@ -160,7 +160,7 @@ pub fn normalise_qn_file(app: &AppHandle, path: &Path) -> Result<()> {
 		match extension.as_ref() {
 			"entity.json" => {
 				let mut entity: Entity =
-					from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+					from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
 
 				// Normalise comments to form used by GlacierKit (single comment for each entity)
 				let mut comments: Vec<CommentEntity> = vec![];
@@ -223,7 +223,7 @@ pub fn normalise_qn_file(app: &AppHandle, path: &Path) -> Result<()> {
 
 			"entity.patch.json" => {
 				let patch: Patch =
-					from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+					from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
 
 				let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
 
@@ -320,7 +320,7 @@ pub fn convert_entity_to_patch(app: &AppHandle, path: &Path) -> Result<()> {
 
 	if let Some(game) = app_state.game.load().as_ref() {
 		let mut entity: Entity =
-			from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+			from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
 
 		// Normalise comments to form used by GlacierKit (single comment for each entity)
 		let mut comments: Vec<CommentEntity> = vec![];
@@ -356,7 +356,7 @@ pub fn convert_entity_to_patch(app: &AppHandle, path: &Path) -> Result<()> {
 			)?)?
 		)?;
 
-		fs::remove_file(&path)?;
+		fs::remove_file(path)?;
 
 		send_notification(
 			app,
@@ -382,7 +382,7 @@ pub fn convert_entity_to_patch(app: &AppHandle, path: &Path) -> Result<()> {
 pub fn convert_patch_to_entity(app: &AppHandle, path: &Path) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	let patch: Patch = from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid entity")?;
+	let patch: Patch = from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?;
 
 	if let Some(game) = app_state.game.load().as_ref() {
 		let mut entity = (*game.extract_entity(patch.factory)?).to_owned();
@@ -419,7 +419,7 @@ pub fn convert_patch_to_entity(app: &AppHandle, path: &Path) -> Result<()> {
 			format_json(to_string(&entity)?)?
 		)?;
 
-		fs::remove_file(&path)?;
+		fs::remove_file(path)?;
 
 		send_notification(
 			app,
@@ -449,7 +449,7 @@ pub fn convert_repo_to_merge_patch(app: &AppHandle, path: &Path) -> Result<()> {
 		&& let Some(repo) = game.repository()
 	{
 		if game.resource_type(
-			from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+			from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 				.context("Invalid JSON")?
 				.get("id")
 				.context("Patch had no id key")?
@@ -469,7 +469,7 @@ pub fn convert_repo_to_merge_patch(app: &AppHandle, path: &Path) -> Result<()> {
 			let base = current.to_owned();
 
 			let patch: Vec<json_patch::PatchOperation> = from_value(
-				from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+				from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 					.context("Invalid JSON")?
 					.get("patch")
 					.context("No patch key")?
@@ -496,7 +496,7 @@ pub fn convert_repo_to_merge_patch(app: &AppHandle, path: &Path) -> Result<()> {
 				format_json(to_string(&convert_json_patch_to_merge_patch(&current, &patch)?)?)?
 			)?;
 
-			fs::remove_file(&path)?;
+			fs::remove_file(path)?;
 
 			send_notification(
 				app,
@@ -546,7 +546,7 @@ pub fn convert_repo_to_json_patch(app: &AppHandle, path: &Path) -> Result<()> {
 
 		let base = current.to_owned();
 
-		let patch: Value = from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid JSON")?;
+		let patch: Value = from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
 
 		json_patch::merge(&mut current, &patch);
 
@@ -570,7 +570,7 @@ pub fn convert_repo_to_json_patch(app: &AppHandle, path: &Path) -> Result<()> {
 			})
 		)?;
 
-		fs::remove_file(&path)?;
+		fs::remove_file(path)?;
 
 		send_notification(
 			app,
@@ -597,7 +597,7 @@ pub fn convert_unlockables_to_merge_patch(app: &AppHandle, path: &Path) -> Resul
 	let app_state = app.state::<AppState>();
 
 	if let Some(game) = app_state.game.load().as_ref() {
-		if from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+		if from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 			.context("Invalid JSON")?
 			.get("file")
 			.context("Patch had no file key")?
@@ -634,7 +634,7 @@ pub fn convert_unlockables_to_merge_patch(app: &AppHandle, path: &Path) -> Resul
 			let base = current.to_owned();
 
 			let patch: Vec<json_patch::PatchOperation> = from_value(
-				from_slice::<Value>(&fs::read(&path).context("Couldn't read file")?)
+				from_slice::<Value>(&fs::read(path).context("Couldn't read file")?)
 					.context("Invalid JSON")?
 					.get("patch")
 					.context("No patch key")?
@@ -661,7 +661,7 @@ pub fn convert_unlockables_to_merge_patch(app: &AppHandle, path: &Path) -> Resul
 				format_json(to_string(&convert_json_patch_to_merge_patch(&current, &patch)?)?)?
 			)?;
 
-			fs::remove_file(&path)?;
+			fs::remove_file(path)?;
 
 			send_notification(
 				app,
@@ -726,7 +726,7 @@ pub fn convert_unlockables_to_json_patch(app: &AppHandle, path: &Path) -> Result
 
 		let base = current.to_owned();
 
-		let patch: Value = from_slice(&fs::read(&path).context("Couldn't read file")?).context("Invalid JSON")?;
+		let patch: Value = from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid JSON")?;
 
 		json_patch::merge(&mut current, &patch);
 
@@ -750,7 +750,7 @@ pub fn convert_unlockables_to_json_patch(app: &AppHandle, path: &Path) -> Result
 			})
 		)?;
 
-		fs::remove_file(&path)?;
+		fs::remove_file(path)?;
 
 		send_notification(
 			app,
@@ -774,7 +774,7 @@ pub fn convert_unlockables_to_json_patch(app: &AppHandle, path: &Path) -> Result
 
 #[try_fn]
 pub fn create_material_entity(app: &AppHandle, path: &Path) -> Result<()> {
-	let material = from_slice::<MaterialInstance>(&fs::read(&path).context("Couldn't read file")?)
+	let material = from_slice::<MaterialInstance>(&fs::read(path).context("Couldn't read file")?)
 		.context("Invalid material instance")?;
 
 	let Some(material_path) = material.id.get_path() else {
@@ -1278,22 +1278,16 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								})
 								.collect_vec();
 
-							if let Some(longest_prefix) = paths.pop() {
-								Some(
-									longest_prefix
-										.into_iter()
-										.enumerate()
-										.take_while(|(idx, element)| {
-											paths.iter().all(|arr| arr.get(*idx) == Some(element))
-										})
-										.map(|(_, x)| x)
-										.collect_vec()
-										.join("/")
-										+ "/"
-								)
-							} else {
-								None
-							}
+							paths.pop().map(|longest_prefix| {
+								longest_prefix
+									.into_iter()
+									.enumerate()
+									.take_while(|(idx, element)| paths.iter().all(|arr| arr.get(*idx) == Some(element)))
+									.map(|(_, x)| x)
+									.collect_vec()
+									.join("/")
+									+ "/"
+							})
 						} else {
 							None
 						};
@@ -1328,9 +1322,8 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 													.strip_prefix(path_prefix.as_deref().unwrap_or(""))
 													.unwrap_or(&resource_path);
 
-												let (parent, filename) = resource_path
-													.rsplit_once("/")
-													.unwrap_or(("", resource_path.as_ref()));
+												let (parent, filename) =
+													resource_path.rsplit_once("/").unwrap_or(("", resource_path));
 
 												let parent = parent
 													.split("/")
@@ -1371,7 +1364,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 								anyhow::Ok(())
 							})?;
 
-						finish_task(&app, task)?;
+						finish_task(app, task)?;
 					}
 				}
 			}
