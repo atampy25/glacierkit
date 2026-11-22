@@ -821,7 +821,7 @@ pub fn create_material_entity(app: &AppHandle, path: &Path) -> Result<()> {
 					MaterialPropertyValue::Float { enabled, value } if enabled => {
 						Some((prop, MaterialOverride::Float(value)))
 					}
-					MaterialPropertyValue::Vector { enabled, value } if enabled => {
+					MaterialPropertyValue::Vector { enabled, value } if enabled && [2, 3, 4].contains(&value.len()) => {
 						Some((prop, MaterialOverride::Vector(value)))
 					}
 					MaterialPropertyValue::Texture { enabled, value, .. } if enabled => {
