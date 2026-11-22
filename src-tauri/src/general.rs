@@ -27,7 +27,7 @@ use crate::{
 	HashMap, Notification, NotificationKind, TONYTOOLS_HASH_LIST_ENDPOINT, TONYTOOLS_HASH_LIST_VERSION_ENDPOINT,
 	event_handling::resource_overview::{get_extract_kinds, initialise_resource_overview},
 	finish_task,
-	game::{Game, GameFiles, custom_game_install},
+	game::{DynGameFiles, GameFiles, VanillaGame, custom_game_install},
 	model::{
 		AppSettings, AppState, ContentSearchRequest, EditorData, EditorRequest, EditorRequestData, EditorState,
 		EditorType, FileBrowserRequest, GameBrowserRequest, GlobalRequest, Hash, JsonPatchType, Request,
@@ -1272,7 +1272,9 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 	let app_settings = app.state::<AppSettings>();
 
 	if let Some(path) = app_settings.settings().game_path.as_ref() {
-		app_state.game.store(Some(Game::load(app, path)?.into()));
+		app_state
+			.game
+			.store(Some(DynGameFiles::new_arc(VanillaGame::load(app, path)?).into()));
 	} else {
 		app_state.game.store(None);
 	}
@@ -1396,7 +1398,7 @@ pub async fn load_game_files(app: &AppHandle) -> Result<()> {
 /// Only available for entities, the repository and unlockables currently
 #[try_fn]
 #[context("Couldn't open {hash} in editor")]
-pub async fn open_in_editor(app: &AppHandle, game: &Game, hash: RuntimeID) -> Result<()> {
+pub async fn open_in_editor(app: &AppHandle, game: &impl GameFiles, hash: RuntimeID) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
 	match game.resource_type(hash).context("Nonexistent resource")?.as_ref() {

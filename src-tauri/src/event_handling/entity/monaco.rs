@@ -535,7 +535,7 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 	let app_state = app.state::<AppState>();
 
-	if let Some(game) = app_state.game.load().as_deref() {
+	if let Some(game) = app_state.game.load().as_ref() {
 		if let Some(ty) = game.resource_type(factory) {
 			if ty == "TEMP" {
 				open_in_editor(app, game, factory).await?;

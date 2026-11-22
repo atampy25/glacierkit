@@ -31,7 +31,7 @@ use crate::{
 	editor_connection::EditorConnection,
 	entity::{CopiedEntityData, ReverseReference},
 	event_handling::tools::FileAction,
-	game::{Game, valid_game_path},
+	game::{DynGameFiles, valid_game_path},
 	geometry::SceneGeometry,
 	ores_repo::{
 		RepositoryItem, RepositoryItemInformation, RepositoryItemKind, UnlockableInformation, UnlockableItem,
@@ -157,7 +157,7 @@ pub struct AppState {
 	/// Synchronises removals to prevent tasks trying to access the data of an editor that has been closed
 	pub editor_removal: Arc<ShardMap<Uuid, tokio::sync::RwLock<()>>>,
 
-	pub game: ArcSwapOption<Game>,
+	pub game: ArcSwapOption<Arc<DynGameFiles<'static>>>,
 
 	pub editor_connection: EditorConnection,
 

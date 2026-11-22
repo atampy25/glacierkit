@@ -19,12 +19,7 @@ use tonytools::hmlanguages;
 use tryvial::{try_block, try_fn};
 use velcro::vec;
 
-use crate::{
-	HashMap, HashSet,
-	game::{Game, GameFiles},
-	languages::get_language_map,
-	model::EditorValidity
-};
+use crate::{HashMap, HashSet, game::GameFiles, languages::get_language_map, model::EditorValidity};
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -463,7 +458,7 @@ pub fn check_local_references_exist(sub_entity: &SubEntity, entity: &Entity) -> 
 	EditorValidity::Valid
 }
 
-pub fn get_ref_decoration(game: &Game, entity: &Entity, reference: Option<&Ref>) -> Option<(String, String)> {
+pub fn get_ref_decoration(game: &impl GameFiles, entity: &Entity, reference: Option<&Ref>) -> Option<(String, String)> {
 	if let Some(ent) = reference.and_then(Ref::as_local) {
 		Some((ent.to_string(), entity.sub_entities.get(&ent)?.name.to_string()))
 	} else if let Some(entity_ref) = reference
@@ -485,7 +480,7 @@ pub fn get_ref_decoration(game: &Game, entity: &Entity, reference: Option<&Ref>)
 #[try_fn]
 #[context("Couldn't get decoration for LINE {}", line)]
 pub fn get_line_decoration(
-	game: &Game,
+	game: &impl GameFiles,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	line: RuntimeID
 ) -> Result<Option<String>> {
@@ -563,7 +558,7 @@ pub fn get_line_decoration(
 #[try_fn]
 #[context("Couldn't get decorations for sub-entity {}", sub_entity.name)]
 pub fn get_decorations(
-	game: &Game,
+	game: &impl GameFiles,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	sub_entity: &SubEntity,
 	entity: &Entity

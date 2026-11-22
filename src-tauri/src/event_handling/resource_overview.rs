@@ -39,7 +39,7 @@ use crate::{
 	bin1::{deserialize_generic, deserialize_generic_writer},
 	biome::format_json,
 	finish_task,
-	game::{Game, GameFiles},
+	game::GameFiles,
 	general::{get_name, open_in_editor},
 	geometry::{parse_prim_to_glb, parse_prim_to_obj, parse_scene_to_glb},
 	languages::get_language_map,
@@ -88,7 +88,7 @@ pub async fn initialise_resource_overview(
 	app_state: &State<'_, AppState>,
 	id: Uuid,
 	hash: RuntimeID,
-	game: &Game
+	game: &impl GameFiles
 ) -> Result<()> {
 	let (filetype, size, chunk_patch, deps) = game.extract_latest_overview_info(hash)?;
 
@@ -940,7 +940,7 @@ pub struct ExtractedFile {
 
 #[try_fn]
 #[context("Couldn't get extraction information for {id}")]
-pub fn get_extract_kinds(game: &Game, id: RuntimeID) -> Result<Vec<ExtractKind>> {
+pub fn get_extract_kinds(game: &impl GameFiles, id: RuntimeID) -> Result<Vec<ExtractKind>> {
 	let mut kinds = vec![ExtractKind::Raw];
 
 	let resource_type = game.resource_type(id).context("No such resource")?;
@@ -1055,7 +1055,7 @@ pub fn get_extract_kinds(game: &Game, id: RuntimeID) -> Result<Vec<ExtractKind>>
 
 #[try_fn]
 pub fn extract_file(
-	game: &Game,
+	game: &impl GameFiles,
 	tonytools_hash_list: &tonytools::hashlist::HashList,
 	id: RuntimeID,
 	kind: ExtractKind

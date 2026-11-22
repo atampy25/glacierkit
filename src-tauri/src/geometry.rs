@@ -32,14 +32,11 @@ use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use tryvial::try_fn;
 
-use crate::{
-	HashMap, HashSet,
-	game::{Game, GameFiles}
-};
+use crate::{HashMap, HashSet, game::GameFiles};
 
 #[try_fn]
 #[context("Couldn't convert PRIM file to OBJ")]
-pub fn parse_prim_to_obj(game: &Game, res_data: &[u8]) -> Result<(Vec<u8>, [f32; 6])> {
+pub fn parse_prim_to_obj(game: &impl GameFiles, res_data: &[u8]) -> Result<(Vec<u8>, [f32; 6])> {
 	let model = RenderPrimitive::parse_bytes(
 		&mut Cursor::new(res_data),
 		match game.version() {
@@ -99,7 +96,11 @@ pub fn parse_prim_to_obj(game: &Game, res_data: &[u8]) -> Result<(Vec<u8>, [f32;
 
 #[try_fn]
 #[context("Couldn't convert PRIM file to GLTF")]
-pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMetadata) -> Result<(Vec<u8>, [f32; 6])> {
+pub fn parse_prim_to_glb(
+	game: &impl GameFiles,
+	res_data: &[u8],
+	res_metadata: &ResourceMetadata
+) -> Result<(Vec<u8>, [f32; 6])> {
 	let model = RenderPrimitive::parse_bytes(
 		&mut Cursor::new(res_data),
 		match game.version() {
@@ -163,7 +164,7 @@ pub fn parse_prim_to_glb(game: &Game, res_data: &[u8], res_metadata: &ResourceMe
 
 			let gltf_material = {
 				#[try_fn]
-				fn get_texture(game: &Game, id: RuntimeID) -> Result<Option<image_0_24::DynamicImage>> {
+				fn get_texture(game: &impl GameFiles, id: RuntimeID) -> Result<Option<image_0_24::DynamicImage>> {
 					if let Ok((res_meta, res_data)) = game.extract_latest_resource(id) {
 						let mut texture = TextureMap::from_memory(&res_data, game.version().into())
 							.context("Couldn't process texture data")?;
@@ -2130,7 +2131,7 @@ pub fn get_scene_geometry(
 #[try_fn]
 #[context("Couldn't convert scene to GLTF")]
 pub fn parse_scene_to_glb(
-	game: &Game,
+	game: &impl GameFiles,
 	scenes: &[RuntimeID],
 	ignore_root_transforms: bool
 ) -> Result<(SceneGeometry, HashMap<RuntimeID, Vec<u8>>)> {

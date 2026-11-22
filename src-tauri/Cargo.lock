@@ -299,6 +299,7 @@ dependencies = [
  "delegate",
  "derive_more",
  "dirs 6.0.0",
+ "dynosaur",
  "ecow",
  "egui",
  "facet",
@@ -4166,6 +4167,26 @@ name = "dynex_core"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b13806bbd41ba81d25a772a999eaa60b19a1ee4d9a7e4baf99bf256d6932750c"
+
+[[package]]
+name = "dynosaur"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdb33e6854ea615b65faf9c40d4ea9c4de9e9fa5d6772ad6ce57950a6da3957d"
+dependencies = [
+ "dynosaur_derive",
+]
+
+[[package]]
+name = "dynosaur_derive"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ac0893f103ae7bf50181323d748d505f27b6255777c28b502030bdaf8749f4c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "ecolor"

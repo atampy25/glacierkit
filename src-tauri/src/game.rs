@@ -81,6 +81,7 @@ pub fn custom_game_install(path: impl AsRef<Path>) -> Result<GameInstall> {
 }
 
 #[arc_trait::arc_trait]
+#[dynosaur::dynosaur(pub DynGameFiles = dyn(box) GameFiles)]
 pub trait GameFiles: Send + Sync {
 	fn install(&self) -> &GameInstall;
 
@@ -88,24 +89,24 @@ pub trait GameFiles: Send + Sync {
 
 	fn platform(&self) -> StorePlatform;
 
-	fn resource_exists(&self, resource: impl Into<RuntimeID>) -> bool;
+	fn resource_exists(&self, resource: RuntimeID) -> bool;
 
-	fn resource_type(&self, resource: impl Into<RuntimeID>) -> Option<ResourceType>;
+	fn resource_type(&self, resource: RuntimeID) -> Option<ResourceType>;
 
-	fn resource_reverse_references(&self, resource: impl Into<RuntimeID>) -> Option<&Vec<RuntimeID>>;
+	fn resource_reverse_references(&self, resource: RuntimeID) -> Option<&Vec<RuntimeID>>;
 
 	fn partition_manager(&self) -> &PartitionManager;
 
-	fn all_resources(&self) -> impl Iterator<Item = RuntimeID>;
+	fn all_resources(&self) -> impl Iterator<Item = RuntimeID> + Send + Sync;
 
 	fn repository(&self) -> &Option<Vec<RepositoryItem>>;
 
 	fn intellisense(&self) -> &Intellisense;
 
-	fn to_rrid(&self, resource: impl Into<RuntimeID>) -> RuntimeResourceID {
+	fn to_rrid(&self, resource: RuntimeID) -> RuntimeResourceID {
 		RuntimeResourceID::from(match self.version() {
-			GlacierGame::FL => resource.into().as_u64() | ((GamePlatform::PC.tag().unwrap() as u64) << 56),
-			_ => resource.into().as_u64()
+			GlacierGame::FL => resource.as_u64() | ((GamePlatform::PC.tag().unwrap() as u64) << 56),
+			_ => resource.as_u64()
 		})
 	}
 
@@ -120,22 +121,66 @@ pub trait GameFiles: Send + Sync {
 	}
 
 	/// Extract the latest copy of a resource.
-	fn extract_latest_resource(&self, resource: impl Into<RuntimeID>) -> Result<(ExtendedResourceMetadata, Vec<u8>)>;
+	fn extract_latest_resource(&self, resource: RuntimeID) -> Result<(ExtendedResourceMetadata, Vec<u8>)>;
 
-	fn extract_latest_metadata(&self, resource: impl Into<RuntimeID>) -> Result<ExtendedResourceMetadata>;
+	fn extract_latest_metadata(&self, resource: RuntimeID) -> Result<ExtendedResourceMetadata>;
 
 	fn extract_latest_overview_info(
 		&self,
-		resource: impl Into<RuntimeID>
+		resource: RuntimeID
 	) -> Result<(ResourceType, u32, String, Vec<ResourceReference>)>;
 
-	fn extract_entity(&self, factory_id: impl Into<RuntimeID>) -> Result<Arc<Entity>>;
+	fn extract_entity(&self, factory_id: RuntimeID) -> Result<Arc<Entity>>;
 
 	/// Get the history of the file, a changelog of events within the partitions. Will return an empty vector if the resource is not found in any partition.
-	fn extract_resource_changelog(&self, resource: impl Into<RuntimeID>) -> Vec<ResourceChangelogEntry>;
+	fn extract_resource_changelog(&self, resource: RuntimeID) -> Vec<ResourceChangelogEntry>;
 }
 
-pub struct Game {
+impl GameFiles for Arc<Arc<DynGameFiles<'static>>> {
+	delegate::delegate! {
+		to (**self) {
+			fn install(&self) -> &GameInstall;
+
+			fn version(&self) -> GlacierGame;
+
+			fn platform(&self) -> StorePlatform;
+
+			fn resource_exists(&self, resource: RuntimeID) -> bool;
+
+			fn resource_type(&self, resource: RuntimeID) -> Option<ResourceType>;
+
+			fn resource_reverse_references(&self, resource: RuntimeID) -> Option<&Vec<RuntimeID>>;
+
+			fn partition_manager(&self) -> &PartitionManager;
+
+			fn all_resources(&self) -> impl Iterator<Item = RuntimeID>;
+
+			fn repository(&self) -> &Option<Vec<RepositoryItem>>;
+
+			fn intellisense(&self) -> &Intellisense;
+
+			/// Extract the latest copy of a resource.
+			fn extract_latest_resource(
+				&self,
+				resource: RuntimeID
+			) -> Result<(ExtendedResourceMetadata, Vec<u8>)>;
+
+			fn extract_latest_metadata(&self, resource: RuntimeID) -> Result<ExtendedResourceMetadata>;
+
+			fn extract_latest_overview_info(
+				&self,
+				resource: RuntimeID
+			) -> Result<(ResourceType, u32, String, Vec<ResourceReference>)>;
+
+			fn extract_entity(&self, factory_id: RuntimeID) -> Result<Arc<Entity>>;
+
+			/// Get the history of the file, a changelog of events within the partitions. Will return an empty vector if the resource is not found in any partition.
+			fn extract_resource_changelog(&self, resource: RuntimeID) -> Vec<ResourceChangelogEntry>;
+		}
+	}
+}
+
+pub struct VanillaGame {
 	install: GameInstall,
 	game_files: PartitionManager,
 	intellisense: Intellisense,
@@ -147,7 +192,7 @@ pub struct Game {
 	cached_entities: PapayaMap<RuntimeID, Arc<Entity>, BuildIdentityHasher<u64>>
 }
 
-impl Game {
+impl VanillaGame {
 	#[try_fn]
 	pub fn load(app: &AppHandle, path: &Path) -> Result<Self> {
 		let install = app
@@ -346,7 +391,7 @@ impl Game {
 	}
 }
 
-impl GameFiles for Game {
+impl GameFiles for VanillaGame {
 	fn install(&self) -> &GameInstall {
 		&self.install
 	}
@@ -359,16 +404,16 @@ impl GameFiles for Game {
 		self.install.platform
 	}
 
-	fn resource_exists(&self, resource: impl Into<RuntimeID>) -> bool {
-		self.resource_types.contains_key(&resource.into())
+	fn resource_exists(&self, resource: RuntimeID) -> bool {
+		self.resource_types.contains_key(&resource)
 	}
 
-	fn resource_type(&self, resource: impl Into<RuntimeID>) -> Option<ResourceType> {
-		self.resource_types.get(&resource.into()).copied()
+	fn resource_type(&self, resource: RuntimeID) -> Option<ResourceType> {
+		self.resource_types.get(&resource).copied()
 	}
 
-	fn resource_reverse_references(&self, resource: impl Into<RuntimeID>) -> Option<&Vec<RuntimeID>> {
-		self.resource_reverse_references.get(&resource.into())
+	fn resource_reverse_references(&self, resource: RuntimeID) -> Option<&Vec<RuntimeID>> {
+		self.resource_reverse_references.get(&resource)
 	}
 
 	fn partition_manager(&self) -> &PartitionManager {
@@ -387,13 +432,6 @@ impl GameFiles for Game {
 		&self.intellisense
 	}
 
-	fn to_rrid(&self, resource: impl Into<RuntimeID>) -> RuntimeResourceID {
-		RuntimeResourceID::from(match self.version() {
-			GlacierGame::FL => resource.into().as_u64() | ((GamePlatform::PC.tag().unwrap() as u64) << 56),
-			_ => resource.into().as_u64()
-		})
-	}
-
 	fn unlockables_id(&self) -> RuntimeID {
 		match self.version() {
 			GlacierGame::H1 | GlacierGame::H2 | GlacierGame::H3 => {
@@ -405,7 +443,7 @@ impl GameFiles for Game {
 	}
 
 	/// Extract the latest copy of a resource.
-	fn extract_latest_resource(&self, resource: impl Into<RuntimeID>) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
+	fn extract_latest_resource(&self, resource: RuntimeID) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
 		let rrid = self.to_rrid(resource);
 		for partition in &self.game_files.partitions {
 			if partition.contains(&rrid) {
@@ -426,7 +464,7 @@ impl GameFiles for Game {
 	}
 
 	/// Get the metadata of the latest copy of a resource. Faster than fully extracting the resource.
-	fn extract_latest_metadata(&self, resource: impl Into<RuntimeID>) -> Result<ExtendedResourceMetadata> {
+	fn extract_latest_metadata(&self, resource: RuntimeID) -> Result<ExtendedResourceMetadata> {
 		let rrid = self.to_rrid(resource);
 		for partition in &self.game_files.partitions {
 			if partition.contains(&rrid) {
@@ -444,7 +482,7 @@ impl GameFiles for Game {
 	/// Get miscellaneous information (resource type, file size, chunk and patch, dependencies with hash and flag) for the latest copy of a resource.
 	fn extract_latest_overview_info(
 		&self,
-		resource: impl Into<RuntimeID>
+		resource: RuntimeID
 	) -> Result<(ResourceType, u32, String, Vec<ResourceReference>)> {
 		let resource_id = self.to_rrid(resource);
 
@@ -487,17 +525,15 @@ impl GameFiles for Game {
 	}
 
 	/// Extract an entity by its factory and put it in the cache. Returns early if the entity is already cached.
-	fn extract_entity(&self, factory_id: impl Into<RuntimeID>) -> Result<Arc<Entity>> {
-		let runtime_id = factory_id.into();
-
+	fn extract_entity(&self, factory_id: RuntimeID) -> Result<Arc<Entity>> {
 		{
-			if let Some(x) = self.cached_entities.pin().get(&runtime_id) {
+			if let Some(x) = self.cached_entities.pin().get(&factory_id) {
 				return Ok(x.clone());
 			}
 		}
 
 		let (temp_meta, temp_data) = self
-			.extract_latest_resource(runtime_id)
+			.extract_latest_resource(factory_id)
 			.context("Couldn't extract TEMP")?;
 
 		if temp_meta.core_info.resource_type != "TEMP" {
@@ -540,13 +576,13 @@ impl GameFiles for Game {
 		};
 
 		let result: Arc<Entity> = entity.into();
-		self.cached_entities.pin().insert(runtime_id, result.clone());
+		self.cached_entities.pin().insert(factory_id, result.clone());
 
 		Ok(result)
 	}
 
 	/// Get the history of the file, a changelog of events within the partitions. Will return an empty vector if the resource is not found in any partition.
-	fn extract_resource_changelog(&self, resource: impl Into<RuntimeID>) -> Vec<ResourceChangelogEntry> {
+	fn extract_resource_changelog(&self, resource: RuntimeID) -> Vec<ResourceChangelogEntry> {
 		let resource_id = self.to_rrid(resource);
 
 		let mut events = vec![];
@@ -624,7 +660,7 @@ impl GameFiles for Game {
 }
 
 pub struct EntitiesOverlay {
-	pub game: Arc<Game>,
+	pub game: Arc<DynGameFiles<'static>>,
 	pub entities: HashMap<RuntimeID, Arc<Entity>>
 }
 
@@ -637,11 +673,11 @@ impl GameFiles for EntitiesOverlay {
 
 			fn platform(&self) -> StorePlatform;
 
-			fn resource_exists(&self, resource: impl Into<RuntimeID>) -> bool;
+			fn resource_exists(&self, resource: RuntimeID) -> bool;
 
-			fn resource_type(&self, resource: impl Into<RuntimeID>) -> Option<ResourceType>;
+			fn resource_type(&self, resource: RuntimeID) -> Option<ResourceType>;
 
-			fn resource_reverse_references(&self, resource: impl Into<RuntimeID>) -> Option<&Vec<RuntimeID>>;
+			fn resource_reverse_references(&self, resource: RuntimeID) -> Option<&Vec<RuntimeID>>;
 
 			fn partition_manager(&self) -> &PartitionManager;
 
@@ -654,24 +690,23 @@ impl GameFiles for EntitiesOverlay {
 			/// Extract the latest copy of a resource.
 			fn extract_latest_resource(
 				&self,
-				resource: impl Into<RuntimeID>
+				resource: RuntimeID
 			) -> Result<(ExtendedResourceMetadata, Vec<u8>)>;
 
-			fn extract_latest_metadata(&self, resource: impl Into<RuntimeID>) -> Result<ExtendedResourceMetadata>;
+			fn extract_latest_metadata(&self, resource: RuntimeID) -> Result<ExtendedResourceMetadata>;
 
 			fn extract_latest_overview_info(
 				&self,
-				resource: impl Into<RuntimeID>
+				resource: RuntimeID
 			) -> Result<(ResourceType, u32, String, Vec<ResourceReference>)>;
 
 			/// Get the history of the file, a changelog of events within the partitions. Will return an empty vector if the resource is not found in any partition.
-			fn extract_resource_changelog(&self, resource: impl Into<RuntimeID>) -> Vec<ResourceChangelogEntry>;
+			fn extract_resource_changelog(&self, resource: RuntimeID) -> Vec<ResourceChangelogEntry>;
 		}
 	}
 
 	#[try_fn]
-	fn extract_entity(&self, factory_id: impl Into<RuntimeID>) -> Result<Arc<Entity>> {
-		let factory_id = factory_id.into();
+	fn extract_entity(&self, factory_id: RuntimeID) -> Result<Arc<Entity>> {
 		if let Some(entity) = self.entities.get(&factory_id) {
 			entity.clone()
 		} else {
