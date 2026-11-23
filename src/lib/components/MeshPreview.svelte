@@ -1,64 +1,70 @@
 <script lang="ts">
 	import { T, Canvas } from "@threlte/core"
-	import { OrbitControls, GLTF } from "@threlte/extras"
-	import { WebIO } from "@gltf-transform/core"
-	import { metalRough } from "@gltf-transform/functions"
-	import { KHRONOS_EXTENSIONS } from "@gltf-transform/extensions"
+	import { OrbitControls, GLTF, Align, Grid, Gizmo } from "@threlte/extras"
+	import { BackSide } from "three"
 
-	async function transform(url: string) {
-		const io = new WebIO().registerExtensions(KHRONOS_EXTENSIONS)
-		const doc = await io.read(url)
-		await doc.transform(metalRough())
-		return URL.createObjectURL(new Blob([await io.writeBinary(doc)]))
-	}
+	let { src = "" }: { src: string } = $props()
 
-	let { src = "", boundingBox = [-1, -1, -1, 0, 0, 0] }: { src: string; boundingBox: [number, number, number, number, number, number] } = $props()
-
-	const center = $derived(getCenter(boundingBox))
-	const objectSize = $derived([boundingBox[3] - boundingBox[0], boundingBox[4] - boundingBox[1], boundingBox[5] - boundingBox[2]])
-	const scaleFactor = $derived(1 / Math.max(...objectSize))
-
-	function getCenter(boundingBox: [number, number, number, number, number, number]): [number, number, number] {
-		const [minX, minY, minZ, maxX, maxY, maxZ] = boundingBox
-		const centerX = (minX + maxX) / 2
-		const centerY = (minY + maxY) / 2
-		const centerZ = (minZ + maxZ) / 2
-		return [centerX, centerY, centerZ]
-	}
-
-	let objectUrl: string | null = $state(null)
-
-	$effect(() => {
-		if (src) {
-			void transform(src).then((url) => {
-				objectUrl = url
-			})
-		}
-
-		return () => {
-			if (objectUrl) {
-				URL.revokeObjectURL(objectUrl)
-				objectUrl = null
-			}
-		}
-	})
+	let centerY = $state(0)
+	let max = $state([0, 0, 0])
 </script>
 
 <Canvas>
 	<T.PerspectiveCamera
 		makeDefault
-		position={[1, 1, 1]}
-		on:create={({ ref }) => {
-			ref.lookAt(center[0], center[2], -center[1])
+		position={[max[0] + 2, max[1] + 2, max[2] + 2]}
+		oncreate={(ref) => {
+			ref.lookAt(0, centerY, 0)
 		}}
 	>
 		<T.DirectionalLight position={[5, 5, 5]} />
-		<OrbitControls enableDamping />
+		<OrbitControls enableDamping target={[0, centerY, 0]}>
+			<Gizmo
+				y={{ label: "Z" }}
+				nz={{
+					label: "Y",
+					enabled: true,
+					opacity: 1,
+					scale: 0.7,
+					labelColor: 0x222222,
+					line: true,
+					border: { size: 0, color: 0xdddddd },
+					hover: {
+						color: 0xffffff,
+						labelColor: 0x222222,
+						opacity: 1,
+						scale: 0.7,
+						border: { size: 0, color: 0xdddddd }
+					}
+				}}
+				z={{ line: false, scale: 0.45, hover: { scale: 0.5 }, label: "" }}
+			/>
+		</OrbitControls>
 	</T.PerspectiveCamera>
 
 	<T.AmbientLight color={0xaaaaaa} />
 
-	{#if objectUrl}
-		<GLTF url={objectUrl} position={[-center[0] * scaleFactor, -center[2] * scaleFactor, center[1] * scaleFactor]} rotation={[0, 0, 0]} scale={[scaleFactor, scaleFactor, scaleFactor]} />
-	{/if}
+	<Align
+		auto
+		y={false}
+		onalign={(data) => {
+			centerY = data.height / 2
+			max[0] = data.boundingBox.max.x
+			max[1] = data.boundingBox.max.y
+			max[2] = data.boundingBox.max.z
+		}}
+	>
+		{#if src}
+			<GLTF url={src} />
+		{/if}
+		<T.Mesh position={[0, 0, 0]}>
+			<T.SphereGeometry args={[0.05]} />
+			<T.MeshBasicMaterial color="blue" />
+		</T.Mesh>
+		<T.Mesh position={[0, 0, 0]}>
+			<T.SphereGeometry args={[0.06]} />
+			<T.MeshBasicMaterial color="white" side={BackSide} />
+		</T.Mesh>
+	</Align>
+	<Grid infiniteGrid sectionColor="white" sectionThickness={1} cellColor="gray" />
 </Canvas>

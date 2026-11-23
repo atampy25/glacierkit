@@ -32,7 +32,6 @@ use crate::{
 	entity::{CopiedEntityData, ReverseReference},
 	event_handling::tools::FileAction,
 	game::{DynGameFiles, valid_game_path},
-	geometry::SceneGeometry,
 	ores_repo::{
 		RepositoryItem, RepositoryItemInformation, RepositoryItemKind, UnlockableInformation, UnlockableItem,
 		UnlockableKind
@@ -381,9 +380,7 @@ pub enum ResourceOverviewData {
 		blueprint_hash: Hash,
 		#[specta(type = Option<String>)]
 		blueprint_path_or_hint: Option<EcoString>,
-		#[specta(type = Option<(Value, Value)>)]
-		#[debug(skip)]
-		preview: Option<(SceneGeometry, HashMap<RuntimeID, Uuid>)>
+		preview: Option<Uuid>
 	},
 	GenericRL {
 		#[debug(skip)]
@@ -405,8 +402,7 @@ pub enum ResourceOverviewData {
 		asset_id: Option<Uuid>
 	},
 	Mesh {
-		asset_id: Uuid,
-		bounding_box: [f32; 6]
+		asset_id: Uuid
 	},
 	MultiAudio {
 		name: String,

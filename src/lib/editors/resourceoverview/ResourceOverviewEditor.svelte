@@ -18,7 +18,6 @@
 	import { VList } from "virtua/svelte"
 	import { convertFileSrc } from "@tauri-apps/api/core"
 	import HexViewer from "$lib/components/HexViewer.svelte"
-	import ScenePreview from "$lib/components/ScenePreview.svelte"
 
 	let { id }: { id: string } = $props()
 
@@ -189,7 +188,7 @@
 										</ClickableTile>
 										{#if data.data.preview}
 											<div class="mt-4 h-[30vh]">
-												<ScenePreview geometry={data.data.preview[0] as any} assets={data.data.preview[1] as any} editorId={id} />
+												<MeshPreview src={convertFileSrc(`${id}/${data.data.preview}`, "editor-asset")} />
 											</div>
 										{:else}
 											<div class="mt-4">
@@ -238,7 +237,7 @@
 										/>
 									{:else if data.type === "mesh"}
 										<div class="h-[30vh]">
-											<MeshPreview src={convertFileSrc(`${id}/${data.data.assetId}`, "editor-asset")} boundingBox={data.data.boundingBox} />
+											<MeshPreview src={convertFileSrc(`${id}/${data.data.assetId}`, "editor-asset")} />
 										</div>
 									{:else if data.type === "audio"}
 										{#if data.data.assetId}

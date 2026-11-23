@@ -258,6 +258,7 @@ dependencies = [
 	"notify",
 	"notify-debouncer-full",
 	"optivorbis",
+	"ordered-float 5.5.1",
 	"ordermap",
 	"os_info",
 	"papaya",
@@ -1322,7 +1323,7 @@ name = "bevy_macro_utils"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7164fe229422295bba15f1885048f34f4660db069aacb895208f996b0c7784fb"
-dependencies = ["proc-macro2", "quote", "syn 2.0.119", "toml_edit 0.25.19+spec-1.1.0"]
+dependencies = ["proc-macro2", "quote", "syn 2.0.119", "toml_edit 0.25.20+spec-1.1.0"]
 
 [[package]]
 name = "bevy_material"
@@ -2539,7 +2540,7 @@ name = "cargo_toml"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82f4b26e751e711a5302649417f2da046dce6391b2ea30a4820f37462314f0b9"
-dependencies = ["semver", "serde", "toml 1.2.1+spec-1.1.0"]
+dependencies = ["semver", "serde", "toml 1.2.2+spec-1.1.0"]
 
 [[package]]
 name = "cc"
@@ -3452,7 +3453,7 @@ name = "embed-resource"
 version = "3.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6168487b5e7eb2673e6efe1200b1848016e436a6ca0b8031bf04bd9d493a249f"
-dependencies = ["cc", "memchr", "rustc_version", "toml 1.2.1+spec-1.1.0", "vswhom", "winreg"]
+dependencies = ["cc", "memchr", "rustc_version", "toml 1.2.2+spec-1.1.0", "vswhom", "winreg"]
 
 [[package]]
 name = "embed_plist"
@@ -6058,10 +6059,10 @@ dependencies = ["jiff-core 0.1.8", "jiff-static 0.2.46", "jiff-tzdb-platform 0.1
 
 [[package]]
 name = "jiff"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5d126d72eb017f10b302e73bdeca446bea405ee449af4d9e7866d6b082d83e"
-dependencies = ["jiff-core 1.0.1", "jiff-static 1.0.1", "jiff-tzdb-platform 1.0.0", "log", "portable-atomic", "portable-atomic-util", "serde_core", "windows-link 0.2.1"]
+checksum = "c5e77cbfb9fff4798e283c2d69dff39fc2c45e7da017e5ce95b654e46ea41236"
+dependencies = ["jiff-core 1.0.1", "jiff-static 1.0.2", "jiff-tzdb-platform 1.0.0", "log", "portable-atomic", "portable-atomic-util", "serde_core", "windows-link 0.2.1"]
 
 [[package]]
 name = "jiff-core"
@@ -6086,9 +6087,9 @@ dependencies = ["jiff-core 0.1.8", "proc-macro2", "quote", "syn 2.0.119"]
 
 [[package]]
 name = "jiff-static"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0127e9bde3c6130d6169e7d8d68676e4be69c4bf7573c308b6f960a5089c428"
+checksum = "e9067a0b23e5be3147d56b2dcf652b18e6b1364caca93fb157653b6fbcab23a9"
 dependencies = ["jiff-core 1.0.1", "proc-macro2", "quote", "syn 3.0.10"]
 
 [[package]]
@@ -6758,9 +6759,9 @@ dependencies = ["autocfg"]
 
 [[package]]
 name = "mesh-tools"
-version = "0.4.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8577d325b50fc91f05c45497b9fa40ef50c0e6b887f18f3861e921bf434b17e8"
+checksum = "e2df477935c088573c90437adec7c2e5a1fe3e73f96a7936c3ac3147863dbaf3"
 dependencies = ["base64 0.13.1", "byteorder", "image 0.24.9", "mint", "serde", "serde_json", "thiserror 1.0.69", "uuid"]
 
 [[package]]
@@ -8100,9 +8101,9 @@ dependencies = ["portable-atomic"]
 
 [[package]]
 name = "postcard"
-version = "1.1.3"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
+checksum = "5431b3dcfdf6d1985c87d11f267a171c0dec0a8cd544c6727b747d36365f1fca"
 dependencies = ["cobs", "embedded-io 0.4.0", "embedded-io 0.6.1", "serde"]
 
 [[package]]
@@ -8163,7 +8164,7 @@ name = "proc-macro-crate"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f"
-dependencies = ["toml_edit 0.25.19+spec-1.1.0"]
+dependencies = ["toml_edit 0.25.20+spec-1.1.0"]
 
 [[package]]
 name = "proc-macro-error"
@@ -9458,7 +9459,7 @@ dependencies = [
 	"indexmap 1.9.3",
 	"indexmap 2.14.2",
 	"jiff 0.2.46",
-	"jiff 1.0.1",
+	"jiff 1.0.2",
 	"schemars 0.9.0",
 	"schemars 1.2.3",
 	"serde_core",
@@ -9627,7 +9628,7 @@ dependencies = ["bstr", "unicode-segmentation"]
 [[package]]
 name = "simple-mod-framework"
 version = "3.0.0-rc.19"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#cde0774e571b7215e9c8e95faa34330bfa821efe"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#57844530533dc252481906cd5c5367280a17e7e4"
 dependencies = [
 	"aho-corasick",
 	"anyhow",
@@ -9713,7 +9714,7 @@ dependencies = [
 [[package]]
 name = "simple-mod-framework-core"
 version = "0.0.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#cde0774e571b7215e9c8e95faa34330bfa821efe"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#57844530533dc252481906cd5c5367280a17e7e4"
 dependencies = [
 	"arc-trait",
 	"better-rune-derive",
@@ -9757,7 +9758,7 @@ dependencies = [
 [[package]]
 name = "simple-mod-framework-types"
 version = "0.0.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#cde0774e571b7215e9c8e95faa34330bfa821efe"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#57844530533dc252481906cd5c5367280a17e7e4"
 dependencies = [
 	"better-rune-derive",
 	"color-eyre",
@@ -10492,7 +10493,7 @@ dependencies = [
 	"tauri-plugin",
 	"tauri-utils",
 	"thiserror 2.0.21",
-	"toml 1.2.1+spec-1.1.0",
+	"toml 1.2.2+spec-1.1.0",
 	"url"
 ]
 
@@ -10686,7 +10687,7 @@ dependencies = [
 	"serde_with",
 	"swift-rs",
 	"thiserror 2.0.21",
-	"toml 1.2.1+spec-1.1.0",
+	"toml 1.2.2+spec-1.1.0",
 	"url",
 	"urlpattern",
 	"uuid",
@@ -10698,7 +10699,7 @@ name = "tauri-winres"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c52bb6904475a6ca662f15ef787f18ade61d5740a1ee12c45d3b748efdb6f796"
-dependencies = ["dunce", "embed-resource", "toml 1.2.1+spec-1.1.0"]
+dependencies = ["dunce", "embed-resource", "toml 1.2.2+spec-1.1.0"]
 
 [[package]]
 name = "tempfile"
@@ -10875,9 +10876,9 @@ dependencies = ["serde", "serde_spanned 0.6.9", "toml_datetime 0.6.3", "toml_edi
 
 [[package]]
 name = "toml"
-version = "1.2.1+spec-1.1.0"
+version = "1.2.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5755c51863cdac711f1956baf8eb9588e060755f7d3c4c979e70ea1e1f32cd7"
+checksum = "5426cb1b964690d913f6c5c1a1ae0b42f428ec506bb4d452876d7a209c9bca3b"
 dependencies = ["indexmap 2.14.2", "serde_core", "serde_spanned 1.1.3", "toml_datetime 1.1.3+spec-1.1.0", "toml_parser", "toml_writer", "winnow 1.0.5"]
 
 [[package]]
@@ -10910,16 +10911,16 @@ dependencies = ["indexmap 2.14.2", "serde", "serde_spanned 0.6.9", "toml_datetim
 
 [[package]]
 name = "toml_edit"
-version = "0.25.19+spec-1.1.0"
+version = "0.25.20+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd43688c4858d7264ae1cf9a9f874a67c3feb74a883b1cd7bebd6a4ea8307218"
+checksum = "e76360e201d6dbd6583e17795ba71a88f47365a9139c8450a7979c32303b8e73"
 dependencies = ["indexmap 2.14.2", "toml_datetime 1.1.3+spec-1.1.0", "toml_parser", "winnow 1.0.5"]
 
 [[package]]
 name = "toml_parser"
-version = "1.1.5+spec-1.1.0"
+version = "1.1.6+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baa693a8032d7e1cada7d0041e96126df243179ff061456783ac7f12bda4744c"
+checksum = "e6769c452d71ba30696c6b37770c439a9cc9110f47f7d5cdbeda79840ef5ea31"
 dependencies = ["winnow 1.0.5"]
 
 [[package]]
@@ -10977,7 +10978,7 @@ dependencies = ["proc-macro2", "quote", "syn 2.0.119"]
 [[package]]
 name = "tracing-chrome"
 version = "0.7.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#cde0774e571b7215e9c8e95faa34330bfa821efe"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#57844530533dc252481906cd5c5367280a17e7e4"
 dependencies = ["serde_json", "tracing-core", "tracing-subscriber"]
 
 [[package]]
@@ -11027,7 +11028,7 @@ name = "trash"
 version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7363f9516b65bd2e855f4e6c3338b1a98efc2773c25349c958908897e1170ded"
-dependencies = ["jiff 1.0.1", "libc", "log", "objc2 0.6.5", "objc2-foundation 0.3.2", "once_cell", "percent-encoding", "scopeguard", "urlencoding", "windows 0.62.2", "windows-core 0.62.2"]
+dependencies = ["jiff 1.0.2", "libc", "log", "objc2 0.6.5", "objc2-foundation 0.3.2", "once_cell", "percent-encoding", "scopeguard", "urlencoding", "windows 0.62.2", "windows-core 0.62.2"]
 
 [[package]]
 name = "tray-icon"
@@ -11426,9 +11427,9 @@ dependencies = ["cc", "libc"]
 
 [[package]]
 name = "walkdir"
-version = "2.5.0"
+version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
+checksum = "b42e295b7452c4604982280d8586001fcad9b8b201cac67bca9771e7a7475403"
 dependencies = ["same-file", "winapi-util"]
 
 [[package]]
@@ -12780,16 +12781,16 @@ checksum = "6df3dc4292935e51816d896edcd52aa30bc297907c26167fec31e2b0c6a32524"
 
 [[package]]
 name = "zerocopy"
-version = "0.8.63"
+version = "0.8.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5fe1f8f1b06191a00962174c61aa5005e0bb391a6d80d07e24d115c01a92ed8"
+checksum = "ed43f3060383c64b000f3c630550aebdfa9d3b76d48de32390483dd2cc7e0865"
 dependencies = ["zerocopy-derive"]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.63"
+version = "0.8.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "863ad3ac83293fb4d740aedbfdc9240dd8d1a50c1099acd76ce80ce7c7230c7f"
+checksum = "a5cbd820fe3e35fb38c83b6dc7e6b1618bc46e0cd10073ae94e8d52dc468d8b9"
 dependencies = ["proc-macro2", "quote", "syn 2.0.119"]
 
 [[package]]

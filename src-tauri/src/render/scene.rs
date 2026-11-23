@@ -29,7 +29,7 @@ use dashmap::DashMap;
 use ecow::EcoString;
 use glacier_commons::{game::GlacierGame, metadata::RuntimeID};
 use glacier_formats::material::{BlendMode, MaterialInstance, MaterialPropertyValue};
-use glacier_geometry::render_primitive::{LodLevel, RenderPrimitive};
+use glacier_geometry::render_primitive::RenderPrimitive;
 use glacier_texture::{mipblock::MipblockData, texture_map::TextureMap};
 use glam::{Affine3, Affine3A, DAffine3};
 use itertools::Itertools;
@@ -194,7 +194,7 @@ impl SceneRenderer {
 				}
 			}
 
-			let geometry = get_scene_geometry(game, &scenes, settings.to_owned())?.into();
+			let geometry = get_scene_geometry(game, &scenes, &settings)?.into();
 
 			self.send(to_bevy::Render {
 				scenes: scenes.into(),
@@ -778,8 +778,11 @@ fn process_material(
 					diffuse_color.unwrap_or(Color::WHITE)
 				},
 				normal_map_texture: normal_texture,
-				emissive: (emissive_color.unwrap_or(LinearRgba::rgb(1.0, 1.0, 1.0)) * emissive_factor.unwrap_or(0.0))
-					.with_alpha(emissive_factor.unwrap_or(0.0).min(1.0)),
+				emissive: {
+					let mut emissive = emissive_color.unwrap_or(LinearRgba::rgb(1.0, 1.0, 1.0));
+					emissive = emissive.with_alpha(emissive.alpha * emissive_factor.unwrap_or(0.0));
+					LinearRgba::rgb(emissive.red, emissive.green, emissive.blue) * emissive.alpha
+				},
 				emissive_texture,
 				metallic: 0.0,
 				perceptual_roughness: 1.0,
@@ -850,16 +853,7 @@ fn process_prim(
 				)
 				.context("Couldn't process PRIM data")?;
 
-				for obj in model.iter_primitive_of_lod(match settings.lod {
-					LodLevel::LEVEL1 => LodLevel::LEVEL1,
-					LodLevel::LEVEL2 => LodLevel::LEVEL2,
-					LodLevel::LEVEL3 => LodLevel::LEVEL3,
-					LodLevel::LEVEL4 => LodLevel::LEVEL4,
-					LodLevel::LEVEL5 => LodLevel::LEVEL5,
-					LodLevel::LEVEL6 => LodLevel::LEVEL6,
-					LodLevel::LEVEL7 => LodLevel::LEVEL7,
-					LodLevel::LEVEL8 => LodLevel::LEVEL8
-				}) {
+				for obj in model.iter_primitive_of_lod(settings.lod_level()) {
 					let mesh = world.resource_mut::<Assets<Mesh>>().add({
 						let mut mesh = Mesh::new(
 							PrimitiveTopology::TriangleList,
@@ -935,7 +929,7 @@ fn process_prim(
 								*override_id,
 								Some(override_props),
 								material_overrides
-									.get(&material_id)
+									.get(override_id)
 									.as_ref()
 									.map(|(_, x)| x)
 									.unwrap_or(&Default::default())

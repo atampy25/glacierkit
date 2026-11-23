@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
+use std::{
+	collections::HashMap,
+	fs,
+	path::{Path, PathBuf},
+	sync::Arc
+};
 
 use anyhow::Result;
 use arc_swap::ArcSwap;
@@ -43,6 +48,42 @@ pub struct Project {
 pub struct ProjectSettings {
 	#[debug(skip)]
 	pub mod_options: HashMap<simple_mod_framework_types::ModOptionID, simple_mod_framework_types::ModOptionValue>
+}
+
+impl Project {
+	#[try_fn]
+	pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+		let mut path = path.as_ref().to_owned();
+
+		// Open any parent with a project.json or manifest.json instead
+		if !path.join("project.json").exists() && !path.join("manifest.json").exists() {
+			let mut check = path.to_owned();
+			while !check.join("project.json").exists() && !check.join("manifest.json").exists() {
+				if !check.pop() {
+					break;
+				}
+			}
+			if check.join("project.json").exists() || check.join("manifest.json").exists() {
+				path = check;
+			}
+		}
+
+		let settings;
+		if let Ok(read) = fs::read(path.join("project.json"))
+			&& let Ok(read_settings) = serde_json::from_slice::<ProjectSettings>(&read)
+		{
+			settings = read_settings;
+		} else {
+			settings = ProjectSettings::default();
+			fs::write(path.join("project.json"), serde_json::to_vec(&settings)?)?;
+		}
+
+		Self {
+			path,
+			settings: Arc::new(settings.to_owned()).into(),
+			deploy: Default::default()
+		}
+	}
 }
 
 pub struct Deploy {

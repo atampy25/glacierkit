@@ -42,7 +42,7 @@ use notify::RecursiveMode;
 use notify_debouncer_full::FileIdMap;
 use quickentity_rs::{entity::Property, generate_patch, variant::Variant};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, from_slice, json, to_value, to_vec};
+use serde_json::{Value, json, to_value};
 use tauri::{AppHandle, Emitter, Manager, async_runtime};
 use tauri_plugin_aptabase::{EventTracker, InitOptions};
 use tauri_plugin_dialog::DialogExt;
@@ -70,7 +70,7 @@ use crate::{
 		Request, SceneRendererEvent, SettingsRequest, TabRequest, TabRequestData, TextEditorEvent, TextEditorRequest,
 		TextFileType, ToolRequest
 	},
-	project::{Project, ProjectSettings}
+	project::Project
 };
 
 #[global_allocator]
@@ -356,7 +356,7 @@ async fn main() {
 
 			app.track_event("App started", None).unwrap();
 
-			info!("Starting app");
+			info!("Loading settings");
 
 			let app_data_path = app.path().app_data_dir().expect("Couldn't get data dir");
 
@@ -364,13 +364,7 @@ async fn main() {
 
 			app.manage(AppSettings::load(&app_data_path).expect("Couldn't load app settings"));
 
-			info!("Loaded settings");
-
-			if app_data_path.join("temp").exists() {
-				fs::remove_dir_all(app_data_path.join("temp"))?;
-			}
-
-			info!("Removed temp folder");
+			info!("Loading state");
 
 			app.manage(AppState {
 				game_installs,
@@ -387,7 +381,7 @@ async fn main() {
 				scene_renderer: Default::default()
 			});
 
-			info!("Managed state");
+			info!("Starting app");
 
 			Ok(())
 		})
@@ -572,26 +566,16 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				}
 			}
 
-			GlobalEvent::LoadWorkspace(mut path) => {
+			GlobalEvent::LoadWorkspace(path) => {
 				app.track_event("Workspace loaded", None).unwrap();
 				let task = start_task(&app, format!("Loading project {}", path.display()))?;
 
-				// Open any parent with a project.json instead
-				if !path.join("project.json").exists() {
-					let mut check = path.to_owned();
-					while !check.join("project.json").exists() {
-						if !check.pop() {
-							break;
-						}
-					}
-					if check.join("project.json").exists() {
-						path = check;
-					}
-				}
+				let project = Arc::new(Project::load(path)?);
+				let path = &project.path; // May be different
 
 				let mut files = vec![];
 
-				for entry in WalkDir::new(&path)
+				for entry in WalkDir::new(path)
 					.sort_by_file_name()
 					.into_iter()
 					.filter_map(|x| x.ok())
@@ -602,28 +586,9 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 					));
 				}
 
-				let settings;
-				if let Ok(read) = fs::read(path.join("project.json")) {
-					if let Ok(read_settings) = from_slice::<ProjectSettings>(&read) {
-						settings = read_settings;
-					} else {
-						settings = ProjectSettings::default();
-						fs::write(path.join("project.json"), to_vec(&settings)?)?;
-					}
-				} else {
-					settings = ProjectSettings::default();
-					fs::write(path.join("project.json"), to_vec(&settings)?)?;
-				}
-
-				let project = Arc::new(Project {
-					path: path.to_owned(),
-					settings: Arc::new(settings.to_owned()).into(),
-					deploy: Default::default()
-				});
-
 				project.background_deploy(&app);
 
-				app_state.project.store(Some(project));
+				app_state.project.store(Some(project.clone()));
 
 				send_request(
 					&app,
@@ -635,7 +600,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				send_request(
 					&app,
 					Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings {
-						settings: settings.to_owned()
+						settings: (*project.settings.load_full()).to_owned()
 					}))
 				)?;
 
@@ -936,10 +901,10 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 										}
 									}
 
-									if needs_redeploy {
-										if let Some(project) = notify_app.state::<AppState>().project.load().as_ref() {
-											project.background_deploy(&notify_app);
-										}
+									if needs_redeploy
+										&& let Some(project) = notify_app.state::<AppState>().project.load().as_ref()
+									{
+										project.background_deploy(&notify_app);
 									}
 								}
 							};
@@ -958,7 +923,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						notify::Config::default()
 					)?;
 
-					watcher.watch(&path, RecursiveMode::Recursive)?;
+					watcher.watch(path, RecursiveMode::Recursive)?;
 
 					Arc::new(watcher)
 				}));

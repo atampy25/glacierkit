@@ -1,33 +1,36 @@
 use std::{
-	fs,
 	io::{Cursor, Write},
 	sync::Arc
 };
 
 use anyhow::{Context, Result, bail};
+use bevy::{
+	color::{Alpha, ColorToComponents},
+	prelude::{Color, LinearRgba}
+};
 use ecow::EcoString;
 use fn_error_context::context;
 use glacier_commons::{
 	game::GlacierGame,
-	metadata::{ResourceMetadata, RuntimeID}
+	metadata::{ResourceMetadata, ResourceReference, RuntimeID}
 };
-use glacier_formats::material::{MaterialInstance, MaterialPropertyValue};
+use glacier_formats::material::{BlendMode, MaterialInstance, MaterialPropertyValue};
 use glacier_geometry::render_primitive::{LodLevel, RenderPrimitive};
 use glacier_texture::{mipblock::MipblockData, texture_map::TextureMap};
-use glam::{Affine3, DAffine3, Vec3};
+use glam::{Affine3, DAffine3, Quat, Vec3};
 use itertools::Itertools;
 use mesh_tools::{
-	GltfBuilder, PbrSpecularGlossiness, TextureInfo, Triangle,
+	AlphaMode, GltfBuilder, SpecularGlossiness, Triangle,
 	compat::{Point3, Vector2, Vector3},
+	material::MaterialBuilder,
 	texture::TextureFormat
 };
+use ordered_float::OrderedFloat;
 use quickentity_rs::{
-	entity::{Entity, EntityID, ExposedEntity, Ref},
-	variant::{RawVariant, Transform, Variant}
+	entity::{Entity, EntityID, ExposedEntity, Ref, SubType},
+	variant::{RawVariant, Variant}
 };
-use rayon::iter::{
-	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator
-};
+use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use tryvial::try_fn;
@@ -94,13 +97,599 @@ pub fn parse_prim_to_obj(game: &impl GameFiles, res_data: &[u8]) -> Result<(Vec<
 	(obj, bounding_box)
 }
 
+/// Convert a transform from the game's Z+ up system to glTF's Y+ up system.
+fn gltf_convert_transform(transform: Affine3) -> Affine3 {
+	let (scale, rotation, translation) = transform.to_scale_rotation_translation();
+
+	Affine3::from_scale_rotation_translation(
+		gltf_convert_size(scale),
+		gltf_convert_rotation(rotation),
+		gltf_convert_point(translation)
+	)
+}
+
+/// Convert a Vec3 describing measurements in the game's Z+ up system to glTF's Y+ up system.
+fn gltf_convert_size(vec: Vec3) -> Vec3 {
+	// Prevent degenerate transformation
+	Vec3::new(
+		if vec.x == 0.0 { 0.001 } else { vec.x },
+		if vec.z == 0.0 { 0.001 } else { vec.z },
+		if vec.y == 0.0 { 0.001 } else { vec.y }
+	)
+}
+
+/// Convert a Quat describing a rotation in the game's Z+ up system to glTF's Y+ up system.
+fn gltf_convert_rotation(quat: Quat) -> Quat {
+	let (axis, angle) = quat.conjugate().to_axis_angle();
+	Quat::from_axis_angle(gltf_convert_point(axis), angle)
+}
+
+/// Convert a Vec3 describing a point or direction in the game's Z+ up system to glTF's Y+ up system.
+fn gltf_convert_point(vec: Vec3) -> Vec3 {
+	Vec3::new(vec.x, vec.z, -vec.y)
+}
+
+#[try_fn]
+pub fn gltf_process_texture(game: &impl GameFiles, text: RuntimeID) -> Result<image_0_24::DynamicImage> {
+	let (res_meta, res_data) = game.extract_latest_resource(text)?;
+
+	let mut texture =
+		TextureMap::from_memory(&res_data, game.version().into()).context("Couldn't process texture data")?;
+
+	if let Some(texd_depend) = res_meta.core_info.references.first() {
+		let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
+		let mipblock =
+			MipblockData::from_memory(&texd_data, game.version().into()).context("Couldn't process TEXD data")?;
+		texture.set_mipblock1(mipblock);
+	}
+
+	if texture.format() == glacier_texture::enums::RenderFormat::BC5 {
+		image_0_24::load_from_memory_with_format(
+			&glacier_texture::convert::create_tga(&texture).context("Couldn't convert texture to TGA")?,
+			image_0_24::ImageFormat::Tga
+		)?
+	} else {
+		image_0_24::load_from_memory(&{
+			let mut bytes = vec![];
+			glacier_texture::convert::create_dynamic_image(&texture)
+				.context("Couldn't convert texture to dynamic image")?
+				.write_to(Cursor::new(&mut bytes), image::ImageFormat::Png)?;
+			bytes
+		})?
+	}
+}
+
+/// Process a specular-glossiness texture into a specular texture plus a metallic-roughness texture.
+/// Methodology from https://github.com/donmccurdy/glTF-Transform/blob/main/packages/functions/src/metal-rough.ts
+pub fn gltf_process_specular_glossiness_texture(
+	texture: image_0_24::DynamicImage
+) -> (image_0_24::DynamicImage, image_0_24::DynamicImage) {
+	let mut metallic = texture.to_owned().to_rgba8();
+
+	// Remove glossiness
+	for pixel in metallic.pixels_mut() {
+		pixel[3] = 255;
+	}
+
+	let mut roughness = texture.into_rgba8();
+
+	// Glossiness to roughness
+	for pixel in roughness.pixels_mut() {
+		let roughness = 255 - pixel[3];
+		pixel[0] = 0;
+		pixel[1] = roughness;
+		pixel[2] = 0;
+		pixel[3] = 255;
+	}
+
+	(metallic.into(), roughness.into())
+}
+
+/// Processed glTF-supported material data.
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub struct ProcessedMaterial {
+	pub diffuse_texture: Option<RuntimeID>,
+	pub diffuse_color: [OrderedFloat<f32>; 4],
+	pub normal_texture: Option<RuntimeID>,
+	pub specular_glossiness_texture: Option<RuntimeID>,
+	pub emissive_texture: Option<RuntimeID>,
+	pub emissive_factor: [OrderedFloat<f32>; 3],
+	pub alpha: AlphaModeWrapper
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+pub enum AlphaModeWrapper {
+	Blend,
+	Mask { cutoff: OrderedFloat<f32> },
+	Opaque
+}
+
+impl From<AlphaModeWrapper> for AlphaMode {
+	fn from(value: AlphaModeWrapper) -> Self {
+		match value {
+			AlphaModeWrapper::Blend => AlphaMode::Blend,
+			AlphaModeWrapper::Mask { cutoff } => AlphaMode::Mask { cutoff: cutoff.0 },
+			AlphaModeWrapper::Opaque => AlphaMode::Opaque
+		}
+	}
+}
+
+pub fn gltf_process_material(
+	game: &impl GameFiles,
+	material: &MaterialInstance,
+	global_overrides: Option<&HashMap<EcoString, Variant>>,
+	overrides: &HashMap<EcoString, Variant>
+) -> ProcessedMaterial {
+	let friendly_names = if let Some(class) = &material.class
+		&& let Ok((_, mate_data)) = game.extract_latest_resource(*class)
+	{
+		let mut beginning = mate_data.len() - 1;
+		while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {
+			beginning -= 1;
+		}
+		beginning += 1;
+
+		String::from_utf8_lossy(mate_data[beginning..mate_data.len() - 1].into())
+			.split('\x00')
+			.filter(|x| x.trim().len() > 2 && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
+			.map(|x| x.trim().to_owned())
+			.tuples()
+			.map(|(prop, friendly)| {
+				(
+					if friendly.starts_with("map") {
+						friendly.chars().skip(3).collect()
+					} else {
+						friendly
+					},
+					prop
+				)
+			})
+			.collect_vec()
+	} else {
+		vec![]
+	};
+
+	let diffuse_texture = friendly_names
+		.iter()
+		.filter_map(|(friendly, prop)| {
+			(friendly.to_lowercase().contains("diffuse") || friendly.to_lowercase().contains("basecolor"))
+				.then_some(prop)
+		})
+		.filter_map(|prop| {
+			if let Some(val) = overrides
+				.get(prop.as_str())
+				.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+				.or_else(|| {
+					prop.strip_prefix("map").and_then(|prop| {
+						overrides
+							.get(prop)
+							.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+					})
+				}) {
+				if let Variant::Resource(_, value) = val {
+					value.as_ref().map(|x| x.resource)
+				} else {
+					None
+				}
+			} else {
+				material.binder.properties.get(prop).and_then(|prop| {
+					if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
+						&& *enabled
+					{
+						*value
+					} else {
+						None
+					}
+				})
+			}
+		})
+		.next();
+
+	let diffuse_color = if diffuse_texture.is_none() {
+		friendly_names
+			.iter()
+			.filter_map(|(friendly, prop)| {
+				(friendly.to_lowercase().contains("diffuse") || friendly.to_lowercase().contains("basecolor"))
+					.then_some(prop)
+			})
+			.filter_map(|prop| {
+				if let Some(val) = overrides
+					.get(prop.as_str())
+					.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+				{
+					if let Variant::ColorRGB(value) = val {
+						Some(Color::srgb(value.r, value.g, value.b))
+					} else if let Variant::ColorRGBA(value) = val {
+						Some(Color::srgba(value.r, value.g, value.b, value.a))
+					} else {
+						None
+					}
+				} else {
+					material.binder.properties.get(prop).and_then(|prop| {
+						if let MaterialPropertyValue::Colour { enabled, value } = prop
+							&& *enabled
+						{
+							Some(if value.len() == 7 {
+								Color::srgb_u8(
+									u8::from_str_radix(&value[1..3], 16).unwrap(),
+									u8::from_str_radix(&value[3..5], 16).unwrap(),
+									u8::from_str_radix(&value[5..7], 16).unwrap()
+								)
+							} else if value.len() == 9 {
+								Color::srgba_u8(
+									u8::from_str_radix(&value[1..3], 16).unwrap(),
+									u8::from_str_radix(&value[3..5], 16).unwrap(),
+									u8::from_str_radix(&value[5..7], 16).unwrap(),
+									u8::from_str_radix(&value[7..9], 16).unwrap()
+								)
+							} else {
+								unreachable!()
+							})
+						} else {
+							None
+						}
+					})
+				}
+			})
+			.next()
+	} else {
+		None
+	};
+
+	let specular_glossiness_texture = friendly_names
+		.iter()
+		.filter_map(|(friendly, prop)| friendly.to_lowercase().contains("spec").then_some(prop))
+		.filter_map(|prop| {
+			if let Some(val) = overrides
+				.get(prop.as_str())
+				.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+				.or_else(|| {
+					prop.strip_prefix("map").and_then(|prop| {
+						overrides
+							.get(prop)
+							.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+					})
+				}) {
+				if let Variant::Resource(_, value) = val {
+					value.as_ref().map(|x| x.resource)
+				} else {
+					None
+				}
+			} else {
+				material.binder.properties.get(prop).and_then(|prop| {
+					if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
+						&& *enabled
+					{
+						*value
+					} else {
+						None
+					}
+				})
+			}
+		})
+		.next();
+
+	let normal_texture = friendly_names
+		.iter()
+		.filter_map(|(friendly, prop)| friendly.to_lowercase().contains("normal").then_some(prop))
+		.chain(material.binder.properties.iter().filter_map(|(name, prop)| {
+			(name.to_lowercase().contains("normal")
+				&& matches!(prop, MaterialPropertyValue::Texture { enabled: true, .. }))
+			.then_some(name)
+		}))
+		.filter_map(|prop| {
+			if let Some(val) = overrides
+				.get(prop.as_str())
+				.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+				.or_else(|| {
+					prop.strip_prefix("map").and_then(|prop| {
+						overrides
+							.get(prop)
+							.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+					})
+				}) {
+				if let Variant::Resource(_, value) = val {
+					value.as_ref().map(|x| x.resource)
+				} else {
+					None
+				}
+			} else {
+				material.binder.properties.get(prop).and_then(|prop| {
+					if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
+						&& *enabled
+					{
+						*value
+					} else {
+						None
+					}
+				})
+			}
+		})
+		.next();
+
+	let emissive_texture = friendly_names
+		.iter()
+		.filter_map(|(friendly, prop)| friendly.to_lowercase().contains("emis").then_some(prop))
+		.filter_map(|prop| {
+			if let Some(val) = overrides
+				.get(prop.as_str())
+				.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+				.or_else(|| {
+					prop.strip_prefix("map").and_then(|prop| {
+						overrides
+							.get(prop)
+							.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop)))
+					})
+				}) {
+				if let Variant::Resource(_, value) = val {
+					value.as_ref().map(|x| x.resource)
+				} else {
+					None
+				}
+			} else {
+				material.binder.properties.get(prop).and_then(|prop| {
+					if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
+						&& *enabled
+					{
+						*value
+					} else {
+						None
+					}
+				})
+			}
+		})
+		.next();
+
+	let emissive_color = friendly_names
+		.iter()
+		.filter_map(|(friendly, prop)| (friendly.to_lowercase().contains("emis")).then_some(prop))
+		.filter_map(|prop| {
+			if let Some(val) = overrides
+				.get(prop.as_str())
+				.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+			{
+				if let Variant::ColorRGB(value) = val {
+					Some(LinearRgba::rgb(value.r, value.g, value.b))
+				} else if let Variant::ColorRGBA(value) = val {
+					Some(LinearRgba::new(value.r, value.g, value.b, value.a))
+				} else {
+					None
+				}
+			} else {
+				material.binder.properties.get(prop).and_then(|prop| {
+					if let MaterialPropertyValue::Colour { enabled, value } = prop
+						&& *enabled
+					{
+						Some(if value.len() == 7 {
+							LinearRgba::rgb(
+								u8::from_str_radix(&value[1..3], 16).unwrap() as f32 / 255.0,
+								u8::from_str_radix(&value[3..5], 16).unwrap() as f32 / 255.0,
+								u8::from_str_radix(&value[5..7], 16).unwrap() as f32 / 255.0
+							)
+						} else if value.len() == 9 {
+							LinearRgba::new(
+								u8::from_str_radix(&value[1..3], 16).unwrap() as f32 / 255.0,
+								u8::from_str_radix(&value[3..5], 16).unwrap() as f32 / 255.0,
+								u8::from_str_radix(&value[5..7], 16).unwrap() as f32 / 255.0,
+								u8::from_str_radix(&value[7..9], 16).unwrap() as f32 / 255.0
+							)
+						} else {
+							unreachable!()
+						})
+					} else {
+						None
+					}
+				})
+			}
+		})
+		.next();
+
+	let emissive_factor = if emissive_texture.is_some() || emissive_color.is_some() {
+		friendly_names
+			.iter()
+			.filter_map(|(friendly, prop)| friendly.to_lowercase().contains("emis_intensity").then_some(prop))
+			.filter_map(|prop| {
+				if let Some(val) = overrides
+					.get(prop.as_str())
+					.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+				{
+					if let Variant::Raw(value) = val
+						&& value.variant_type() == "float32"
+					{
+						Some(value.to_serde().unwrap().as_f64().unwrap() as f32)
+					} else {
+						None
+					}
+				} else {
+					material.binder.properties.get(prop).and_then(|prop| {
+						if let MaterialPropertyValue::Float { enabled, value, .. } = prop
+							&& *enabled
+						{
+							Some(*value)
+						} else {
+							None
+						}
+					})
+				}
+			})
+			.next()
+	} else {
+		None
+	};
+
+	let alpha_discard = friendly_names
+		.iter()
+		.filter_map(|(friendly, prop)| (friendly.to_lowercase().contains("alpha_discard")).then_some(prop))
+		.filter_map(|prop| {
+			if let Some(val) = overrides
+				.get(prop.as_str())
+				.or_else(|| global_overrides.and_then(|overrides| overrides.get(prop.as_str())))
+			{
+				if let Variant::Raw(value) = val
+					&& value.variant_type() == "float32"
+				{
+					Some(value.to_serde().unwrap().as_f64().unwrap() as f32)
+				} else {
+					None
+				}
+			} else {
+				material.binder.properties.get(prop).and_then(|prop| {
+					if let MaterialPropertyValue::Float { enabled, value, .. } = prop
+						&& *enabled
+					{
+						Some(*value)
+					} else {
+						None
+					}
+				})
+			}
+		})
+		.next();
+
+	ProcessedMaterial {
+		diffuse_texture,
+		diffuse_color: {
+			let val = if material.instance_flags.trans_add_emissive {
+				Color::NONE
+			} else {
+				diffuse_color.unwrap_or(Color::WHITE)
+			}
+			.to_srgba()
+			.to_f32_array();
+			[val[0].into(), val[1].into(), val[2].into(), val[3].into()]
+		},
+		normal_texture,
+		specular_glossiness_texture,
+		emissive_texture,
+		emissive_factor: {
+			let mut emissive = emissive_color.unwrap_or(LinearRgba::rgb(1.0, 1.0, 1.0));
+			emissive = emissive.with_alpha(emissive.alpha * emissive_factor.unwrap_or(0.0));
+			let val =
+				(LinearRgba::rgb(emissive.red, emissive.green, emissive.blue) * emissive.alpha).to_f32_array_no_alpha();
+			[val[0].min(1.0).into(), val[1].min(1.0).into(), val[2].min(1.0).into()]
+		},
+		alpha: if material.binder.render_state.blend_enabled.unwrap_or(false)
+			|| material.binder.render_state.decal_blend_diffuse.unwrap_or(0) != 0
+		{
+			match material.binder.render_state.blend_mode.unwrap_or(BlendMode::Trans) {
+				BlendMode::Add => AlphaModeWrapper::Blend, // Unsupported by glTF
+				BlendMode::Sub => AlphaModeWrapper::Blend, // no Sub in bevy
+				BlendMode::Trans => AlphaModeWrapper::Blend,
+				BlendMode::TransOnOpaque => AlphaModeWrapper::Blend, // Unsupported by glTF
+				BlendMode::Opaque => AlphaModeWrapper::Opaque,
+				BlendMode::TransPremultipliedAlpha => AlphaModeWrapper::Blend // Unsupported by glTF
+			}
+		} else if material.binder.render_state.alpha_test_enabled.unwrap_or(false) {
+			AlphaModeWrapper::Mask {
+				cutoff: (material.binder.render_state.alpha_reference.unwrap_or(255) as f32 / 255.0).into()
+			}
+		} else if let Some(alpha_discard) = alpha_discard {
+			AlphaModeWrapper::Mask {
+				cutoff: alpha_discard.into()
+			}
+		} else {
+			AlphaModeWrapper::Opaque
+		}
+	}
+}
+
+/// Information about a mesh suitable for use with glTF.
+pub struct ProcessedMesh {
+	pub positions: Vec<Point3<f32>>,
+	pub indices: Vec<Triangle>,
+	pub normals: Vec<Vector3<f32>>,
+	pub tex_coords: Vec<Vec<Vector2<f32>>>,
+	pub material: Option<RuntimeID>
+}
+
+/// A collection of meshes suitable for use with glTF.
+pub struct ProcessedPrimitive {
+	pub meshes: Vec<ProcessedMesh>,
+	pub bounding_box: [f32; 6]
+}
+
+pub fn gltf_process_prim(
+	model: &RenderPrimitive,
+	references: &[ResourceReference],
+	lod: LodLevel
+) -> ProcessedPrimitive {
+	let mut bounding_box: [f32; 6] = [
+		f32::INFINITY,
+		f32::INFINITY,
+		f32::INFINITY,
+		f32::NEG_INFINITY,
+		f32::NEG_INFINITY,
+		f32::NEG_INFINITY
+	];
+
+	let meshes = model
+		.iter_primitive_of_lod(lod)
+		.map(|mesh| {
+			let bb = mesh.prim_mesh().calc_bb();
+
+			bounding_box[0] = bounding_box[0].min(bb.min.x);
+			bounding_box[1] = bounding_box[1].min(bb.min.y);
+			bounding_box[2] = bounding_box[2].min(bb.min.z);
+
+			bounding_box[3] = bounding_box[3].max(bb.max.x);
+			bounding_box[4] = bounding_box[4].max(bb.max.y);
+			bounding_box[5] = bounding_box[5].max(bb.max.z);
+
+			ProcessedMesh {
+				positions: mesh
+					.get_positions()
+					.into_iter()
+					.map(|pos| {
+						let pos = gltf_convert_point(Vec3::new(pos.x, pos.y, pos.z));
+						Point3 {
+							x: pos.x,
+							y: pos.y,
+							z: pos.z
+						}
+					})
+					.collect_vec(),
+				indices: mesh
+					.get_indices()
+					.as_chunks()
+					.0
+					.iter()
+					.map(|[a, b, c]| Triangle {
+						a: *a as u32,
+						b: *b as u32,
+						c: *c as u32
+					})
+					.collect_vec(),
+				normals: mesh
+					.get_normals()
+					.into_iter()
+					.map(|n| {
+						let n = gltf_convert_point(Vec3::new(n.x, n.y, n.z));
+						Vector3 { x: n.x, y: n.y, z: n.z }
+					})
+					.collect_vec(),
+				tex_coords: mesh
+					.get_tex_coords()
+					.into_iter()
+					.map(|x| x.into_iter().map(|c| Vector2 { x: c.x, y: c.y }).collect())
+					.collect(),
+				material: references
+					.get(mesh.prim_mesh().prim_object.material_id as usize)
+					.map(|r| r.resource)
+			}
+		})
+		.collect();
+
+	ProcessedPrimitive { meshes, bounding_box }
+}
+
 #[try_fn]
 #[context("Couldn't convert PRIM file to GLTF")]
 pub fn parse_prim_to_glb(
 	game: &impl GameFiles,
 	res_data: &[u8],
-	res_metadata: &ResourceMetadata
-) -> Result<(Vec<u8>, [f32; 6])> {
+	res_metadata: &ResourceMetadata,
+	metallic_roughness: bool
+) -> Result<Vec<u8>> {
 	let model = RenderPrimitive::parse_bytes(
 		&mut Cursor::new(res_data),
 		match game.version() {
@@ -112,399 +701,193 @@ pub fn parse_prim_to_glb(
 	)
 	.context("Couldn't process PRIM data")?;
 
-	let materials = res_metadata
-		.references
+	let model = gltf_process_prim(&model, &res_metadata.references, LodLevel::LEVEL8);
+
+	let empty_map = HashMap::default();
+	let materials = model
+		.meshes
 		.par_iter()
-		.enumerate()
-		.filter_map(|(idx, reference)| {
-			game.resource_type(reference.resource)
-				.is_some_and(|x| x == "MATI")
-				.then_some((idx, reference.resource))
-		})
-		.map(|(idx, res)| {
+		.filter_map(|mesh| mesh.material)
+		.map(|res| {
 			let (res_meta, res_data) = game.extract_latest_resource(res)?;
 			let material = MaterialInstance::parse(&res_data, &res_meta.core_info)?;
-			Ok((idx, material))
+			Ok((res, gltf_process_material(game, &material, None, &empty_map)))
 		})
 		.collect::<Result<HashMap<_, _>>>()?;
 
 	let mut gltf = GltfBuilder::new();
 
-	let gltf_materials = materials
-		.into_par_iter()
-		.map(|(idx, material)| {
-			let friendly_names = if let Some(class) = &material.class {
-				let mate_data = game.extract_latest_resource(*class)?.1;
-
-				let mut beginning = mate_data.len() - 1;
-				while mate_data[beginning] == 0 || (mate_data[beginning] > 31 && mate_data[beginning] < 127) {
-					beginning -= 1;
-				}
-				beginning += 1;
-
-				String::from_utf8(mate_data[beginning..mate_data.len() - 1].into())?
-					.split('\x00')
-					.filter(|x| x.trim().len() > 2 && x.trim().as_bytes().iter().all(|x| *x > 31 && *x < 127))
-					.map(|x| x.trim().to_owned())
-					.tuples()
-					.map(|(prop, friendly)| {
-						(
-							if friendly.starts_with("map") {
-								friendly.chars().skip(3).collect()
-							} else {
-								friendly
-							},
-							prop
-						)
-					})
-					.collect_vec()
-			} else {
-				vec![]
-			};
-
-			let gltf_material = {
-				#[try_fn]
-				fn get_texture(game: &impl GameFiles, id: RuntimeID) -> Result<Option<image_0_24::DynamicImage>> {
-					if let Ok((res_meta, res_data)) = game.extract_latest_resource(id) {
-						let mut texture = TextureMap::from_memory(&res_data, game.version().into())
-							.context("Couldn't process texture data")?;
-
-						if let Some(texd_depend) = res_meta.core_info.references.first() {
-							let (_, texd_data) = game.extract_latest_resource(texd_depend.resource)?;
-							let mipblock = MipblockData::from_memory(&texd_data, game.version().into())
-								.context("Couldn't process TEXD data")?;
-							texture.set_mipblock1(mipblock);
-						}
-
-						if texture.format() == glacier_texture::enums::RenderFormat::BC5 {
-							Some(image_0_24::load_from_memory_with_format(
-								&glacier_texture::convert::create_tga(&texture)
-									.context("Couldn't convert texture to TGA")?,
-								image_0_24::ImageFormat::Tga
-							)?)
-						} else {
-							Some(image_0_24::load_from_memory(&{
-								let mut bytes = vec![];
-								glacier_texture::convert::create_dynamic_image(&texture)
-									.context("Couldn't convert texture to dynamic image")?
-									.write_to(Cursor::new(&mut bytes), image::ImageFormat::Png)?;
-								bytes
-							})?)
-						}
-					} else {
-						None
-					}
-				}
-
-				let ((diffuse_texture, specular_texture), (normal_texture, emissive_texture)) = rayon::join(
-					|| {
-						rayon::join(
-							|| {
-								friendly_names
-									.iter()
-									.filter_map(|(friendly, prop)| {
-										(friendly.to_lowercase().contains("diffuse")
-											|| friendly.to_lowercase().contains("basecolor"))
-										.then_some(prop)
-									})
-									.filter_map(|prop| material.binder.properties.get(prop))
-									.filter_map(|prop| {
-										if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
-											&& *enabled
-										{
-											*value
-										} else {
-											None
-										}
-									})
-									.next()
-									.and_then(|id| get_texture(game, id).transpose())
-									.transpose()
-							},
-							|| {
-								friendly_names
-									.iter()
-									.filter_map(|(friendly, prop)| {
-										friendly.to_lowercase().contains("spec").then_some(prop)
-									})
-									.filter_map(|prop| material.binder.properties.get(prop))
-									.filter_map(|prop| {
-										if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
-											&& *enabled
-										{
-											*value
-										} else {
-											None
-										}
-									})
-									.next()
-									.and_then(|id| get_texture(game, id).transpose())
-									.transpose()
-							}
-						)
-					},
-					|| {
-						rayon::join(
-							|| {
-								friendly_names
-									.iter()
-									.filter_map(|(friendly, prop)| {
-										friendly.to_lowercase().contains("normal").then_some(prop)
-									})
-									.chain(material.binder.properties.iter().filter_map(|(name, prop)| {
-										(name.to_lowercase().contains("normal")
-											&& matches!(prop, MaterialPropertyValue::Texture { enabled: true, .. }))
-										.then_some(name)
-									}))
-									.filter_map(|prop| material.binder.properties.get(prop))
-									.filter_map(|prop| {
-										if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
-											&& *enabled
-										{
-											*value
-										} else {
-											None
-										}
-									})
-									.next()
-									.and_then(|id| get_texture(game, id).transpose())
-									.transpose()
-							},
-							|| {
-								friendly_names
-									.iter()
-									.filter_map(|(friendly, prop)| {
-										friendly.to_lowercase().contains("emis").then_some(prop)
-									})
-									.filter_map(|prop| material.binder.properties.get(prop))
-									.filter_map(|prop| {
-										if let MaterialPropertyValue::Texture { enabled, value, .. } = prop
-											&& *enabled
-										{
-											*value
-										} else {
-											None
-										}
-									})
-									.next()
-									.and_then(|id| get_texture(game, id).transpose())
-							}
-						)
-					}
-				);
-
-				let emissive_factor = if emissive_texture.is_some() {
-					friendly_names
-						.iter()
-						.filter_map(|(friendly, prop)| {
-							(friendly.to_lowercase().contains("emis") || friendly.to_lowercase().contains("intensity"))
-								.then_some(prop)
-						})
-						.filter_map(|prop| material.binder.properties.get(prop))
-						.filter_map(|prop| {
-							if let MaterialPropertyValue::Float { enabled, value, .. } = prop
-								&& *enabled
-							{
-								Some([*value, *value, *value])
-							} else if let MaterialPropertyValue::Vector { enabled, value, .. } = prop
-								&& *enabled
-							{
-								(value.len() == 3).then(|| [value[0], value[1], value[2]])
-							} else {
-								None
-							}
-						})
-						.next()
+	let textures = materials
+		.values()
+		.flat_map(|material| {
+			[
+				material.diffuse_texture,
+				material.normal_texture,
+				material.emissive_texture,
+				if !metallic_roughness {
+					material.specular_glossiness_texture
 				} else {
 					None
-				};
-
-				(
-					Some(format!("material_{idx}")),
-					diffuse_texture?,
-					specular_texture?,
-					normal_texture?,
-					emissive_texture.transpose()?,
-					emissive_factor,
-					if material.binder.render_state.blend_enabled.unwrap_or(false) {
-						Some("BLEND".into())
-					} else if material.class_flags.alpha {
-						Some("MASK".into())
-					} else {
-						None
-					},
-					material
-						.binder
-						.render_state
-						.alpha_test_enabled
-						.unwrap_or(false)
-						.then(|| material.binder.render_state.alpha_reference.unwrap_or(255) as f32 / 255.0)
-				)
-			};
-
-			Ok((idx, gltf_material))
+				}
+			]
 		})
-		.collect::<Result<Vec<_>>>()?
+		.flatten()
+		.unique()
+		.par_bridge()
+		.flat_map(|id| gltf_process_texture(game, id).ok().map(|image| (id, image)))
+		.collect::<Vec<_>>()
+		.into_iter()
+		.map(|(id, image)| {
+			Ok((
+				id,
+				gltf.create_texture_from_image(Some(id.to_string()), &image, TextureFormat::PNG)?
+			))
+		})
+		.collect::<Result<HashMap<_, _>>>()?;
+
+	let metallic_roughness_textures = if metallic_roughness {
+		materials
+			.values()
+			.filter_map(|material| material.specular_glossiness_texture)
+			.unique()
+			.par_bridge()
+			.flat_map(|id| {
+				gltf_process_texture(game, id)
+					.ok()
+					.map(|image| (id, gltf_process_specular_glossiness_texture(image)))
+			})
+			.collect::<Vec<_>>()
+			.into_iter()
+			.map(|(id, (specular, metallic_roughness))| {
+				Ok((
+					id,
+					(
+						gltf.create_texture_from_image(Some(format!("{id}:specular")), &specular, TextureFormat::PNG)?,
+						gltf.create_texture_from_image(
+							Some(format!("{id}:metallic_roughness")),
+							&metallic_roughness,
+							TextureFormat::PNG
+						)?
+					)
+				))
+			})
+			.collect::<Result<HashMap<_, _>>>()?
+	} else {
+		HashMap::default()
+	};
+
+	let materials = materials
 		.into_iter()
 		.map(
 			|(
-				idx,
-				(
-					name,
+				id,
+				ProcessedMaterial {
 					diffuse_texture,
-					specular_texture,
+					diffuse_color,
 					normal_texture,
+					specular_glossiness_texture,
 					emissive_texture,
 					emissive_factor,
-					alpha_mode,
-					alpha_cutoff
-				)
+					alpha
+				}
 			)| {
-				Ok((idx, {
-					let diffuse_texture = diffuse_texture
-						.map(|image| gltf.create_texture_from_image(None, &image, TextureFormat::PNG))
-						.transpose()?;
+				Ok((id, {
+					let diffuse_texture = diffuse_texture.and_then(|id| textures.get(&id)).copied();
+					let normal_texture = normal_texture.and_then(|id| textures.get(&id)).copied();
+					let emissive_texture = emissive_texture.and_then(|id| textures.get(&id)).copied();
 
-					let specular_texture = specular_texture
-						.map(|image| gltf.create_texture_from_image(None, &image, TextureFormat::PNG))
-						.transpose()?;
+					let material = {
+						let mut mat = MaterialBuilder::new(Some(id.to_string()))
+							.with_alpha(alpha.into())
+							.with_base_color([
+								diffuse_color[0].0,
+								diffuse_color[1].0,
+								diffuse_color[2].0,
+								diffuse_color[3].0
+							])
+							.with_emissive_factor([emissive_factor[0].0, emissive_factor[1].0, emissive_factor[2].0]);
+						if let Some(diffuse_texture) = diffuse_texture {
+							mat = mat.with_base_color_texture(diffuse_texture);
+						}
+						if let Some(normal_texture) = normal_texture {
+							mat = mat.with_normal_texture(normal_texture, 1.0);
+						}
+						if let Some(emissive_texture) = emissive_texture {
+							mat = mat.with_emissive_texture(emissive_texture);
+						}
+						if metallic_roughness {
+							if let Some((specular_texture, metallic_roughness_texture)) = specular_glossiness_texture
+								.and_then(|id| metallic_roughness_textures.get(&id))
+								.copied()
+							{
+								mat = mat
+									.with_metallic_factor(0.0)
+									.with_roughness_factor(1.0)
+									.with_metallic_roughness_texture(metallic_roughness_texture);
+								mat.material.extensions.get_or_insert_default().other.insert(
+									"KHR_materials_specular".into(),
+									serde_json::json!({
+										"specularTexture": { "index": specular_texture },
+										"specularColorTexture": { "index": specular_texture }
+									})
+								);
+								gltf.declare_extension_used("KHR_materials_specular")?;
+								mat.material.extensions.get_or_insert_default().other.insert(
+									"KHR_materials_ior".into(),
+									serde_json::json!({
+										"ior": 1000.0
+									})
+								);
+								gltf.declare_extension_used("KHR_materials_ior")?;
+							}
+						} else {
+							if let Some(specular_glossiness_texture) =
+								specular_glossiness_texture.and_then(|id| textures.get(&id)).copied()
+							{
+								mat = mat.with_specular_glossiness(SpecularGlossiness {
+									diffuse_factor: Some([
+										diffuse_color[0].0,
+										diffuse_color[1].0,
+										diffuse_color[2].0,
+										diffuse_color[3].0
+									]),
+									diffuse_texture: diffuse_texture.map(Into::into),
+									specular_glossiness_texture: Some(specular_glossiness_texture.into()),
+									..Default::default()
+								});
+							}
+						}
+						mat.build()
+					};
 
-					let normal_texture = normal_texture
-						.map(|image| gltf.create_texture_from_image(None, &image, TextureFormat::PNG))
-						.transpose()?;
-
-					let emissive_texture = emissive_texture
-						.map(|image| gltf.create_texture_from_image(None, &image, TextureFormat::PNG))
-						.transpose()?;
-
-					let index = gltf.add_textured_material(
-						name,
-						diffuse_texture,
-						None,
-						normal_texture,
-						None,
-						emissive_texture,
-						emissive_factor,
-						None,
-						None,
-						alpha_mode,
-						alpha_cutoff,
-						None
-					);
-
-					if let Some(specular_texture) = specular_texture {
-						gltf.gltf
-							.materials
-							.get_or_insert_default()
-							.get_mut(index)
-							.unwrap()
-							.extensions
-							.get_or_insert_default()
-							.pbr_specular_glossiness = Some(PbrSpecularGlossiness {
-							diffuse_texture: diffuse_texture.map(|diffuse_texture| TextureInfo {
-								index: diffuse_texture,
-								..Default::default()
-							}),
-							specular_glossiness_texture: Some(TextureInfo {
-								index: specular_texture,
-								..Default::default()
-							}),
-							..Default::default()
-						});
-					}
-
-					index
+					gltf.add_material_from(material)?
 				}))
 			}
 		)
 		.collect::<Result<HashMap<_, _>>>()?;
 
-	gltf.gltf
-		.extensions_used
-		.get_or_insert_default()
-		.push("KHR_materials_pbrSpecularGlossiness".into());
-
-	let mut bounding_box: [f32; 6] = [
-		f32::INFINITY,
-		f32::INFINITY,
-		f32::INFINITY,
-		f32::NEG_INFINITY,
-		f32::NEG_INFINITY,
-		f32::NEG_INFINITY
-	];
-
+	let prim_id = res_metadata.id.to_string();
 	let nodes = model
-		.iter_primitive_of_lod(LodLevel::LEVEL8)
+		.meshes
+		.into_iter()
 		.enumerate()
 		.map(|(idx, mesh)| {
-			let bb = mesh.prim_mesh().calc_bb();
-
-			bounding_box[0] = bounding_box[0].min(bb.min.x);
-			bounding_box[1] = bounding_box[1].min(bb.min.y);
-			bounding_box[2] = bounding_box[2].min(bb.min.z);
-
-			bounding_box[3] = bounding_box[3].max(bb.max.x);
-			bounding_box[4] = bounding_box[4].max(bb.max.y);
-			bounding_box[5] = bounding_box[5].max(bb.max.z);
-
 			let gltf_mesh = gltf.create_custom_mesh(
-				Some(format!("mesh_{idx}")),
-				&mesh
-					.get_positions()
-					.into_iter()
-					.map(|pos| Point3 {
-						x: pos.x,
-						y: pos.z,
-						z: -pos.y
-					})
-					.collect_vec(),
-				&mesh
-					.get_indices()
-					.as_chunks()
-					.0
-					.iter()
-					.map(|[a, b, c]| Triangle {
-						a: *a as u32,
-						b: *b as u32,
-						c: *c as u32
-					})
-					.collect_vec(),
-				Some(
-					mesh.get_normals()
-						.into_iter()
-						.map(|n| Vector3 {
-							x: n.x,
-							y: n.z,
-							z: -n.y
-						})
-						.collect_vec()
-				),
-				Some(
-					mesh.get_tex_coords()
-						.into_iter()
-						.map(|x| x.into_iter().map(|c| Vector2 { x: c.x, y: c.y }).collect())
-						.collect()
-				),
-				gltf_materials
-					.get(&(mesh.prim_mesh().prim_object.material_id as usize))
-					.copied()
+				Some(format!("{prim_id}:{idx}")),
+				&mesh.positions,
+				&mesh.indices,
+				Some(mesh.normals),
+				Some(mesh.tex_coords),
+				mesh.material.and_then(|material| materials.get(&material)).copied()
 			);
 
-			gltf.add_node(Some(format!("node_{idx}")), Some(gltf_mesh), None, None, None)
+			gltf.add_node(None, Some(gltf_mesh), None, None, None)
 		})
 		.collect_vec();
 
 	gltf.add_scene(None, Some(nodes));
 
-	let output = tempfile::tempdir()?;
-	gltf.export_glb(
-		output
-			.path()
-			.join("model.gltf")
-			.to_str()
-			.context("Temp path is not valid UTF-8")?
-	)?;
-	(fs::read(output.path().join("model.gltf"))?, bounding_box)
+	gltf.to_glb_bytes()?
 }
 
 slotmap::new_key_type! { pub struct InstantiatedEntityID; }
@@ -1155,16 +1538,23 @@ impl Clone for RenderSettings {
 	fn clone(&self) -> Self {
 		Self {
 			lighting: self.lighting,
-			lod: match self.lod {
-				LodLevel::LEVEL1 => LodLevel::LEVEL1,
-				LodLevel::LEVEL2 => LodLevel::LEVEL2,
-				LodLevel::LEVEL3 => LodLevel::LEVEL3,
-				LodLevel::LEVEL4 => LodLevel::LEVEL4,
-				LodLevel::LEVEL5 => LodLevel::LEVEL5,
-				LodLevel::LEVEL6 => LodLevel::LEVEL6,
-				LodLevel::LEVEL7 => LodLevel::LEVEL7,
-				LodLevel::LEVEL8 => LodLevel::LEVEL8
-			}
+			lod: self.lod_level()
+		}
+	}
+}
+
+impl RenderSettings {
+	/// LodLevel doesn't implement Clone/Copy so we have to do this
+	pub fn lod_level(&self) -> LodLevel {
+		match self.lod {
+			LodLevel::LEVEL1 => LodLevel::LEVEL1,
+			LodLevel::LEVEL2 => LodLevel::LEVEL2,
+			LodLevel::LEVEL3 => LodLevel::LEVEL3,
+			LodLevel::LEVEL4 => LodLevel::LEVEL4,
+			LodLevel::LEVEL5 => LodLevel::LEVEL5,
+			LodLevel::LEVEL6 => LodLevel::LEVEL6,
+			LodLevel::LEVEL7 => LodLevel::LEVEL7,
+			LodLevel::LEVEL8 => LodLevel::LEVEL8
 		}
 	}
 }
@@ -1249,7 +1639,7 @@ pub fn get_property_source(
 pub fn get_scene_geometry(
 	game: &impl GameFiles,
 	scenes: &InstantiatedScenes,
-	settings: RenderSettings
+	settings: &RenderSettings
 ) -> Result<SceneGeometry> {
 	#[try_fn]
 	fn get_property_value(
@@ -2002,8 +2392,8 @@ pub fn get_scene_geometry(
 
 	for (scene_id, (_, scene)) in &scenes.scenes {
 		for (id, instance) in &scene.entities {
-			if let InstantiatedEntityFactory::Factory(factory) = instance.factory {
-				if [
+			if let InstantiatedEntityFactory::Factory(factory) = instance.factory
+				&& ([
 					crate::class_for_game!(game, "zgeomentity"),
 					crate::class_for_game!(game, "zlinkedentity"),
 					crate::class_for_game!(game, "zprimitiveproxyentity"),
@@ -2011,20 +2401,19 @@ pub fn get_scene_geometry(
 					crate::class_for_game!(game, "zcoverplane")
 				]
 				.contains(&factory)
-					|| (settings.lighting && factory == crate::class_for_game!(game, "zlightentity"))
-				{
-					process_entity(
-						game,
-						scenes,
-						&settings,
-						*scene_id,
-						scene,
-						id,
-						instance,
-						&mut ids,
-						&mut geometry
-					)?;
-				}
+					|| (settings.lighting && factory == crate::class_for_game!(game, "zlightentity")))
+			{
+				process_entity(
+					game,
+					scenes,
+					settings,
+					*scene_id,
+					scene,
+					id,
+					instance,
+					&mut ids,
+					&mut geometry
+				)?;
 			}
 		}
 	}
@@ -2094,7 +2483,7 @@ pub fn get_scene_geometry(
 						process_entity(
 							game,
 							scenes,
-							&settings,
+							settings,
 							client_scene_id,
 							client_scene,
 							client_id,
@@ -2133,34 +2522,30 @@ pub fn get_scene_geometry(
 pub fn parse_scene_to_glb(
 	game: &impl GameFiles,
 	scenes: &[RuntimeID],
-	ignore_root_transforms: bool
-) -> Result<(SceneGeometry, HashMap<RuntimeID, Vec<u8>>)> {
+	lod: LodLevel,
+	metallic_roughness: bool
+) -> Result<Vec<u8>> {
+	let settings = RenderSettings { lighting: false, lod };
+
 	let mut scenes = instantiate_scenes(game, scenes)?;
 
-	if ignore_root_transforms {
-		for (scene_id, (_, scene)) in &scenes.scenes {
+	for (scene_id, (entity, scene)) in &scenes.scenes {
+		if entity.sub_type == SubType::Template {
 			scenes.property_overrides.insert(
 				(*scene_id, scene.root_entity, "m_mTransform".into()),
-				Variant::Transform(Transform::from_glam(DAffine3::IDENTITY, false))
+				Variant::Transform(quickentity_rs::variant::Transform::from_glam(DAffine3::IDENTITY, false))
 			);
 		}
 	}
 
-	let geometry = get_scene_geometry(
-		game,
-		&scenes,
-		RenderSettings {
-			lighting: false,
-			..Default::default()
-		}
-	)?;
+	let geometry = get_scene_geometry(game, &scenes, &settings)?;
 
-	let glbs = geometry
+	let models = geometry
 		.geometry
 		.values()
 		.filter_map(|ent| {
 			if let GeomEntityData::Geometry { prim, .. } = &ent.data {
-				Some(prim)
+				Some(*prim)
 			} else {
 				None
 			}
@@ -2168,16 +2553,425 @@ pub fn parse_scene_to_glb(
 		.unique()
 		.par_bridge()
 		.map(|prim| {
-			let (res_meta, res_data) = game.extract_latest_resource(*prim)?;
+			let (res_meta, res_data) = game.extract_latest_resource(prim)?;
 
 			Ok((
-				*prim,
-				parse_prim_to_glb(game, &res_data, &res_meta.core_info)
-					.context("Couldn't parse PRIM to GLB")?
-					.0
+				prim,
+				gltf_process_prim(
+					&RenderPrimitive::parse_bytes(
+						&mut Cursor::new(res_data),
+						match game.version() {
+							GlacierGame::H1 => glacier_geometry::WoaVersion::HM2016,
+							GlacierGame::H2 => glacier_geometry::WoaVersion::HM2,
+							GlacierGame::H3 => glacier_geometry::WoaVersion::HM3,
+							_ => bail!("Game version not yet supported")
+						}
+					)
+					.context("Couldn't process PRIM data")?,
+					&res_meta.core_info.references,
+					settings.lod_level()
+				)
 			))
 		})
-		.collect::<Result<_>>()?;
+		.collect::<Result<HashMap<_, _>>>()?;
 
-	(geometry, glbs)
+	let empty_map = HashMap::default();
+	let materials = geometry
+		.geometry
+		.iter()
+		.flat_map(|(_, geom_entity)| {
+			if let GeomEntityData::Geometry {
+				prim,
+				material_overrides,
+				..
+			} = &geom_entity.data
+				&& let Some(model) = models.get(prim)
+			{
+				model
+					.meshes
+					.iter()
+					.filter_map(|mesh| mesh.material)
+					.map(|material_id| {
+						if let Some((override_id, _)) = material_overrides.get(&material_id) {
+							*override_id
+						} else if let Some((override_id, _)) = geometry.global_material_overrides.get(&material_id) {
+							*override_id
+						} else {
+							material_id
+						}
+					})
+					.collect_vec()
+			} else {
+				vec![]
+			}
+		})
+		.unique()
+		.par_bridge()
+		.map(|res| {
+			let (res_meta, res_data) = game.extract_latest_resource(res)?;
+			let material = MaterialInstance::parse(&res_data, &res_meta.core_info)?;
+
+			Ok((res, material))
+		})
+		.collect::<Result<HashMap<_, _>>>()?;
+
+	let materials = geometry
+		.geometry
+		.iter()
+		.flat_map(|(geom_entity_id, geom_entity)| {
+			if let GeomEntityData::Geometry {
+				prim,
+				material_overrides,
+				..
+			} = &geom_entity.data
+				&& let Some(model) = models.get(prim)
+			{
+				model
+					.meshes
+					.iter()
+					.flat_map(|mesh| mesh.material)
+					.flat_map(|material_id| {
+						if let Some((override_id, override_props)) = material_overrides.get(&material_id) {
+							materials.get(override_id).map(|mat| {
+								(
+									(geom_entity_id, material_id),
+									(
+										mat.id,
+										gltf_process_material(
+											game,
+											mat,
+											geometry
+												.global_material_overrides
+												.get(override_id)
+												.as_ref()
+												.map(|(_, x)| x),
+											override_props
+										)
+									)
+								)
+							})
+						} else if let Some((override_id, override_props)) =
+							geometry.global_material_overrides.get(&material_id)
+						{
+							materials.get(override_id).map(|mat| {
+								(
+									(geom_entity_id, material_id),
+									(
+										mat.id,
+										gltf_process_material(
+											game,
+											mat,
+											Some(override_props),
+											material_overrides
+												.get(override_id)
+												.as_ref()
+												.map(|(_, x)| x)
+												.unwrap_or(&empty_map)
+										)
+									)
+								)
+							})
+						} else {
+							materials.get(&material_id).map(|mat| {
+								(
+									(geom_entity_id, material_id),
+									(mat.id, gltf_process_material(game, mat, None, &empty_map))
+								)
+							})
+						}
+					})
+					.collect_vec()
+			} else {
+				vec![]
+			}
+		})
+		.collect::<HashMap<_, _>>();
+
+	let mut gltf = GltfBuilder::new();
+
+	let deduplicated_materials = materials.values().unique().collect_vec();
+	let textures = deduplicated_materials
+		.iter()
+		.flat_map(|(_, material)| {
+			[
+				material.diffuse_texture,
+				material.normal_texture,
+				material.emissive_texture,
+				if !metallic_roughness {
+					material.specular_glossiness_texture
+				} else {
+					None
+				}
+			]
+		})
+		.flatten()
+		.unique()
+		.par_bridge()
+		.flat_map(|id| gltf_process_texture(game, id).ok().map(|image| (id, image)))
+		.collect::<Vec<_>>()
+		.into_iter()
+		.map(|(id, image)| {
+			Ok((
+				id,
+				gltf.create_texture_from_image(Some(id.to_string()), &image, TextureFormat::PNG)?
+			))
+		})
+		.collect::<Result<HashMap<_, _>>>()?;
+
+	let metallic_roughness_textures = if metallic_roughness {
+		deduplicated_materials
+			.iter()
+			.filter_map(|(_, material)| material.specular_glossiness_texture)
+			.unique()
+			.par_bridge()
+			.flat_map(|id| {
+				gltf_process_texture(game, id)
+					.ok()
+					.map(|image| (id, gltf_process_specular_glossiness_texture(image)))
+			})
+			.collect::<Vec<_>>()
+			.into_iter()
+			.map(|(id, (specular, metallic_roughness))| {
+				Ok((
+					id,
+					(
+						gltf.create_texture_from_image(Some(format!("{id}:specular")), &specular, TextureFormat::PNG)?,
+						gltf.create_texture_from_image(
+							Some(format!("{id}:metallic_roughness")),
+							&metallic_roughness,
+							TextureFormat::PNG
+						)?
+					)
+				))
+			})
+			.collect::<Result<HashMap<_, _>>>()?
+	} else {
+		HashMap::default()
+	};
+
+	let mut material_names: HashMap<_, _> = HashMap::default();
+	let added_materials = deduplicated_materials
+		.iter()
+		.map(
+			|(
+				id,
+				material @ ProcessedMaterial {
+					diffuse_texture,
+					diffuse_color,
+					normal_texture,
+					specular_glossiness_texture,
+					emissive_texture,
+					emissive_factor,
+					alpha
+				}
+			)| {
+				Ok((material, {
+					let diffuse_texture = diffuse_texture.and_then(|id| textures.get(&id)).copied();
+					let normal_texture = normal_texture.and_then(|id| textures.get(&id)).copied();
+					let emissive_texture = emissive_texture.and_then(|id| textures.get(&id)).copied();
+
+					let material = {
+						let mut mat = MaterialBuilder::new(Some(format!("{id}:{}", {
+							let count = material_names.entry(id).or_insert(0usize);
+							*count += 1;
+							count
+						})))
+						.with_alpha((*alpha).into())
+						.with_base_color([
+							diffuse_color[0].0,
+							diffuse_color[1].0,
+							diffuse_color[2].0,
+							diffuse_color[3].0
+						])
+						.with_emissive_factor([
+							emissive_factor[0].0,
+							emissive_factor[1].0,
+							emissive_factor[2].0
+						]);
+						if let Some(diffuse_texture) = diffuse_texture {
+							mat = mat.with_base_color_texture(diffuse_texture);
+						}
+						if let Some(normal_texture) = normal_texture {
+							mat = mat.with_normal_texture(normal_texture, 1.0);
+						}
+						if let Some(emissive_texture) = emissive_texture {
+							mat = mat.with_emissive_texture(emissive_texture);
+						}
+						if metallic_roughness {
+							if let Some((specular_texture, metallic_roughness_texture)) = specular_glossiness_texture
+								.and_then(|id| metallic_roughness_textures.get(&id))
+								.copied()
+							{
+								mat = mat
+									.with_metallic_factor(0.0)
+									.with_roughness_factor(1.0)
+									.with_metallic_roughness_texture(metallic_roughness_texture);
+								mat.material.extensions.get_or_insert_default().other.insert(
+									"KHR_materials_specular".into(),
+									serde_json::json!({
+										"specularTexture": { "index": specular_texture },
+										"specularColorTexture": { "index": specular_texture }
+									})
+								);
+								gltf.declare_extension_used("KHR_materials_specular")?;
+								mat.material.extensions.get_or_insert_default().other.insert(
+									"KHR_materials_ior".into(),
+									serde_json::json!({
+										"ior": 1000.0
+									})
+								);
+								gltf.declare_extension_used("KHR_materials_ior")?;
+							}
+						} else {
+							if let Some(specular_glossiness_texture) =
+								specular_glossiness_texture.and_then(|id| textures.get(&id)).copied()
+							{
+								mat = mat.with_specular_glossiness(SpecularGlossiness {
+									diffuse_factor: Some([
+										diffuse_color[0].0,
+										diffuse_color[1].0,
+										diffuse_color[2].0,
+										diffuse_color[3].0
+									]),
+									diffuse_texture: diffuse_texture.map(Into::into),
+									specular_glossiness_texture: Some(specular_glossiness_texture.into()),
+									..Default::default()
+								});
+							}
+						}
+						mat.build()
+					};
+
+					gltf.add_material_from(material)?
+				}))
+			}
+		)
+		.collect::<Result<HashMap<_, _>>>()?;
+
+	let materials = materials
+		.iter()
+		.flat_map(|(k, (_, mat))| added_materials.get(&mat).copied().map(|mat| (k, mat)))
+		.collect::<HashMap<_, _>>();
+
+	let mut added_meshes: HashMap<_, _> = HashMap::default();
+	let meshes = geometry
+		.geometry
+		.iter()
+		.flat_map(|(geom_entity_id, geom_entity)| {
+			if let GeomEntityData::Geometry { prim, .. } = &geom_entity.data
+				&& let Some(model) = models.get(prim)
+			{
+				Some((
+					geom_entity_id,
+					model
+						.meshes
+						.iter()
+						.enumerate()
+						.map(|(idx, mesh)| {
+							let mat = mesh
+								.material
+								.and_then(|material| materials.get(&(geom_entity_id, material)))
+								.copied();
+
+							*added_meshes.entry((*prim, idx, mat)).or_insert_with(|| {
+								gltf.create_custom_mesh(
+									Some(format!(
+										"{prim}:{idx}:{}",
+										mat.map(|m| m.to_string()).unwrap_or_else(|| "None".into())
+									)),
+									&mesh.positions,
+									&mesh.indices,
+									Some(mesh.normals.to_owned()),
+									Some(mesh.tex_coords.to_owned()),
+									mat
+								)
+							})
+						})
+						.collect_vec()
+				))
+			} else {
+				None
+			}
+		})
+		.collect::<HashMap<_, _>>();
+
+	let mut nodes = vec![];
+	let mut names: HashMap<(RuntimeID, EntityID), usize> = HashMap::default();
+	let mut added: HashMap<GeomEntityID, usize> = HashMap::default();
+	let mut geom_entities = geometry.geometry.into_iter().collect_vec();
+	while !geom_entities.is_empty() {
+		let ready = geom_entities
+			.extract_if(.., |(_, geom_entity)| {
+				geom_entity.parent.is_none() || added.contains_key(&geom_entity.parent.unwrap())
+			})
+			.collect_vec();
+
+		for (geom_entity_id, geom_entity) in ready {
+			let transform = geom_entity.transform;
+			let source = scenes.scenes[&geom_entity.source.0].1.entities[geom_entity.source.1].source;
+			let name = format!("{}:{}:{}", source.0, source.1, {
+				let count = names.entry(source).or_insert(0usize);
+				*count += 1;
+				*count
+			});
+
+			match geom_entity.data {
+				GeomEntityData::Spatial => {
+					let (scale, rotation, translation) =
+						gltf_convert_transform(transform).to_scale_rotation_translation();
+
+					let new_node = gltf.add_node(
+						Some(name),
+						None,
+						Some(translation.to_array()),
+						Some(rotation.to_array()),
+						Some(scale.to_array())
+					);
+
+					added.insert(geom_entity_id, new_node);
+					if let Some(parent) = &geom_entity.parent {
+						gltf.add_child_to_node(added[parent], new_node)?;
+					} else {
+						nodes.push(new_node);
+					}
+				}
+
+				GeomEntityData::Geometry { scale, .. } => {
+					if let Some(meshes) = meshes.get(&geom_entity_id) {
+						let (_, rotation, translation) =
+							gltf_convert_transform(transform).to_scale_rotation_translation();
+
+						let scale = gltf_convert_size(scale);
+
+						let mesh_nodes = meshes
+							.iter()
+							.map(|&mesh| gltf.add_node(None, Some(mesh), None, None, None))
+							.collect_vec();
+
+						let new_node = gltf.add_node_with_children(
+							Some(name),
+							None,
+							Some(translation.to_array()),
+							Some(rotation.to_array()),
+							Some(scale.to_array()),
+							mesh_nodes
+						)?;
+
+						added.insert(geom_entity_id, new_node);
+						if let Some(parent) = &geom_entity.parent {
+							gltf.add_child_to_node(added[parent], new_node)?;
+						} else {
+							nodes.push(new_node);
+						}
+					}
+				}
+
+				_ => {}
+			}
+		}
+	}
+
+	gltf.add_scene(None, Some(nodes));
+
+	gltf.to_glb_bytes()?
 }

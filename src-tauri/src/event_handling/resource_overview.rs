@@ -14,6 +14,7 @@ use glacier_formats::{
 	texture::TextureMetadata,
 	wwev::WwiseEvent
 };
+use glacier_geometry::render_primitive::LodLevel;
 use glacier_texture::{
 	enums::{InterpretAs, RenderFormat, TextureType},
 	mipblock::MipblockData,
@@ -35,7 +36,7 @@ use uuid::Uuid;
 use ww2ogg::{CodebookLibrary, WwiseRiffVorbis};
 
 use crate::{
-	HashMap, Notification, NotificationKind,
+	HashSet, Notification, NotificationKind,
 	bin1::{deserialize_generic, deserialize_generic_writer},
 	biome::format_json,
 	finish_task,
@@ -232,7 +233,7 @@ pub async fn initialise_resource_overview(
 					"PRIM" => {
 						let (res_meta, res_data) = game.extract_latest_resource(hash)?;
 
-						let (glb, bounding_box) = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?;
+						let glb = parse_prim_to_glb(game, &res_data, &res_meta.core_info, true)?;
 
 						let asset_id = Uuid::new_v4();
 
@@ -245,7 +246,7 @@ pub async fn initialise_resource_overview(
 							.insert(asset_id, ("model/gltf-binary".into(), glb))
 							.await;
 
-						ResourceOverviewData::Mesh { asset_id, bounding_box }
+						ResourceOverviewData::Mesh { asset_id }
 					}
 
 					"TEXT" => {
@@ -951,7 +952,8 @@ pub fn get_extract_kinds(game: &impl GameFiles, id: RuntimeID) -> Result<Vec<Ext
 				ExtractKind::QN,
 				ExtractKind::Bin1Json,
 				ExtractKind::TBLUAsRaw,
-				ExtractKind::TBLUAsBin1Json
+				ExtractKind::TBLUAsBin1Json,
+				ExtractKind::Glb
 			]);
 		}
 
@@ -1630,12 +1632,27 @@ pub fn extract_file(
 		}
 
 		ExtractKind::Glb => {
-			let (res_meta, res_data) = game.extract_latest_resource(id)?;
-			let (data, _) = parse_prim_to_glb(game, &res_data, &res_meta.core_info)?;
-
 			vec![ExtractedFile {
 				suffix: ".glb".into(),
-				data
+				data: if game.resource_type(id).is_some_and(|x| x == "PRIM") {
+					let (res_meta, res_data) = game.extract_latest_resource(id)?;
+					parse_prim_to_glb(game, &res_data, &res_meta.core_info, false)?
+				} else {
+					let mut scenes = HashSet::default();
+
+					#[try_fn]
+					fn process(game: &impl GameFiles, scenes: &mut HashSet<RuntimeID>, scene: RuntimeID) -> Result<()> {
+						if scenes.insert(scene) {
+							for &scene in &game.extract_entity(scene)?.external_scenes {
+								process(game, scenes, scene)?;
+							}
+						}
+					}
+
+					process(&*game, &mut scenes, id)?;
+
+					parse_scene_to_glb(game, &scenes.into_iter().collect_vec(), LodLevel::LEVEL8, false)?
+				}
 			}]
 		}
 
@@ -2035,8 +2052,27 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 							dependencies,
 							reverse_dependencies,
 							changelog,
-							data: match parse_scene_to_glb(game, &[hash], true) {
-								Ok((geometry, assets)) => ResourceOverviewData::Entity {
+							data: match {
+								let mut scenes = HashSet::default();
+
+								#[try_fn]
+								fn process(
+									game: &impl GameFiles,
+									scenes: &mut HashSet<RuntimeID>,
+									scene: RuntimeID
+								) -> Result<()> {
+									if scenes.insert(scene) {
+										for &scene in &game.extract_entity(scene)?.external_scenes {
+											process(game, scenes, scene)?;
+										}
+									}
+								}
+
+								process(&*game, &mut scenes, hash)?;
+
+								parse_scene_to_glb(game, &scenes.into_iter().collect_vec(), LodLevel::LEVEL7, true)
+							} {
+								Ok(glb) => ResourceOverviewData::Entity {
 									root_entity_name: entity
 										.sub_entities
 										.get(&entity.root_entity)
@@ -2044,24 +2080,18 @@ pub async fn handle_resource_overview_event(app: &AppHandle, id: Uuid, event: Re
 									blueprint_hash: Hash(entity.blueprint),
 									blueprint_path_or_hint: entity.blueprint.get_path_or_hint(),
 									preview: Some({
-										let mut asset_ids = HashMap::default();
+										let asset_id = Uuid::new_v4();
 
-										for (k, v) in assets {
-											let asset_id = Uuid::new_v4();
+										app_state
+											.editor_states
+											.get(&id)
+											.await
+											.context("No such editor")?
+											.assets
+											.insert(asset_id, ("model/gltf-binary".into(), glb))
+											.await;
 
-											app_state
-												.editor_states
-												.get(&id)
-												.await
-												.context("No such editor")?
-												.assets
-												.insert(asset_id, ("model/gltf-binary".into(), v))
-												.await;
-
-											asset_ids.insert(k, asset_id);
-										}
-
-										(geometry, asset_ids)
+										asset_id
 									})
 								},
 
