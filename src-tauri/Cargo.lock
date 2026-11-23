@@ -9628,7 +9628,7 @@ dependencies = ["bstr", "unicode-segmentation"]
 [[package]]
 name = "simple-mod-framework"
 version = "3.0.0-rc.19"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#f151b4b980c51f34d0c42c9ee9f63b2f1a0e5693"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
 dependencies = [
 	"aho-corasick",
 	"anyhow",
@@ -9714,7 +9714,7 @@ dependencies = [
 [[package]]
 name = "simple-mod-framework-core"
 version = "0.0.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#f151b4b980c51f34d0c42c9ee9f63b2f1a0e5693"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
 dependencies = [
 	"arc-trait",
 	"better-rune-derive",
@@ -9758,7 +9758,7 @@ dependencies = [
 [[package]]
 name = "simple-mod-framework-types"
 version = "0.0.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#f151b4b980c51f34d0c42c9ee9f63b2f1a0e5693"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
 dependencies = [
 	"better-rune-derive",
 	"color-eyre",
@@ -10978,7 +10978,7 @@ dependencies = ["proc-macro2", "quote", "syn 2.0.119"]
 [[package]]
 name = "tracing-chrome"
 version = "0.7.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#f151b4b980c51f34d0c42c9ee9f63b2f1a0e5693"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
 dependencies = ["serde_json", "tracing-core", "tracing-subscriber"]
 
 [[package]]
