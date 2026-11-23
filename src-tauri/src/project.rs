@@ -9,6 +9,7 @@ use anyhow::Result;
 use arc_swap::ArcSwap;
 use eyre::{OptionExt, WrapErr};
 use futures::{StreamExt, stream::FuturesUnordered};
+use glacier_commons::metadata::RuntimeID;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use parking_lot::{Mutex, RwLock};
@@ -588,6 +589,42 @@ impl Project {
 			map.entry(path).or_default().push(diag);
 		}
 		map.into_iter().collect()
+	}
+
+	pub fn source_file_for_resource(&self, resource: RuntimeID, additional_mods: &[PathBuf]) -> Option<PathBuf> {
+		let deploy = self.deploy.result.read();
+		let deploy = deploy.as_ref()?;
+
+		let specifier = deploy.resource_specifiers.get(&resource)?;
+		let states = deploy.resource_states.get(specifier)?;
+
+		let mut mod_roots: HashMap<simple_mod_framework_types::ModID, PathBuf> = HashMap::default();
+		if let Ok(manifest) = fs::read(self.path.join("manifest.json"))
+			&& let Ok(manifest) = serde_json::from_slice::<simple_mod_framework_types::Manifest>(&manifest)
+		{
+			mod_roots.insert(manifest.id, self.path.clone());
+		}
+
+		for mod_path in additional_mods {
+			if let Ok(manifest) = fs::read(mod_path.join("manifest.json"))
+				&& let Ok(manifest) = serde_json::from_slice::<simple_mod_framework_types::Manifest>(&manifest)
+			{
+				mod_roots.insert(manifest.id, mod_path.clone());
+			}
+		}
+
+		for (attribution, _) in states {
+			let Some(attribution) = attribution else { continue };
+			let Some(mod_root) = mod_roots.get(&attribution.mod_id) else {
+				continue;
+			};
+			let file_path = attribution.source.to_logical_path(mod_root);
+			if file_path.is_file() && file_path.starts_with(&self.path) {
+				return Some(file_path);
+			}
+		}
+
+		None
 	}
 
 	pub fn background_deploy(self: &Arc<Self>, app: &AppHandle) {

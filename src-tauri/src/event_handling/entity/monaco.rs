@@ -19,10 +19,10 @@ use crate::{
 	event_handling::resource_overview::open_resource_overview,
 	finish_task,
 	game::GameFiles,
-	general::open_in_editor,
+	general::{open_file, open_in_editor},
 	model::{
-		AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest, EntityMonacoEvent,
-		EntityMonacoRequest, EntityTreeRequest, Request, TabRequest, TabRequestData
+		AppSettings, AppState, EditorData, EditorRequest, EditorRequestData, EditorValidity, EntityEditorRequest,
+		EntityMonacoEvent, EntityMonacoRequest, EntityTreeRequest, Request, TabRequest, TabRequestData
 	},
 	send_notification, send_request, start_task
 };
@@ -124,19 +124,31 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityMonacoEvent) 
 		}
 
 		EntityMonacoEvent::OpenResourceOverview { resource, .. } => {
-			if let Some(game) = app_state.game.load().as_ref() {
-				if game.resource_exists(resource) {
-					open_resource_overview(app, resource).await?;
-				} else {
-					send_notification(
-						app,
-						Notification {
-							kind: NotificationKind::Error,
-							title: "Not a vanilla resource".into(),
-							subtitle: "This factory doesn't exist in the base game files.".into()
-						}
-					)?;
-				}
+			let app_settings = app.state::<AppSettings>();
+			let in_vanilla = app_state
+				.game
+				.load()
+				.as_ref()
+				.is_some_and(|game| game.resource_exists(resource));
+
+			if in_vanilla {
+				open_resource_overview(app, resource).await?;
+			} else if let Some(path) = app_state
+				.project
+				.load()
+				.as_ref()
+				.and_then(|p| p.source_file_for_resource(resource, &app_settings.settings().additional_mods))
+			{
+				open_file(app, path).await?;
+			} else if app_state.game.load().is_some() {
+				send_notification(
+					app,
+					Notification {
+						kind: NotificationKind::Error,
+						title: "Not a vanilla resource".into(),
+						subtitle: "This resource doesn't exist in the base game files.".into()
+					}
+				)?;
 			} else {
 				send_notification(
 					app,
@@ -535,6 +547,7 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 #[context("Couldn't handle open factory event")]
 pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 	let app_state = app.state::<AppState>();
+	let app_settings = app.state::<AppSettings>();
 
 	if let Some(game) = app_state.game.load().as_ref() {
 		if let Some(ty) = game.resource_type(factory) {
@@ -543,6 +556,13 @@ pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 			} else {
 				open_resource_overview(app, factory).await?;
 			}
+		} else if let Some(path) = app_state
+			.project
+			.load()
+			.as_ref()
+			.and_then(|p| p.source_file_for_resource(factory, &app_settings.settings().additional_mods))
+		{
+			open_file(app, path).await?;
 		} else {
 			send_notification(
 				app,
@@ -553,6 +573,13 @@ pub async fn open_factory(app: &AppHandle, factory: RuntimeID) -> Result<()> {
 				}
 			)?;
 		}
+	} else if let Some(path) = app_state
+		.project
+		.load()
+		.as_ref()
+		.and_then(|p| p.source_file_for_resource(factory, &app_settings.settings().additional_mods))
+	{
+		open_file(app, path).await?;
 	} else {
 		send_notification(
 			app,
