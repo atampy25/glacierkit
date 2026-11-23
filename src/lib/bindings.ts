@@ -1827,6 +1827,18 @@ export type SettingsEvent =
 			}
 	  }
 	| {
+			type: "addAdditionalMod"
+			data: {
+				path: string
+			}
+	  }
+	| {
+			type: "removeAdditionalMod"
+			data: {
+				path: string
+			}
+	  }
+	| {
 			type: "changeExtractModdedFiles"
 			data: {
 				value: boolean
@@ -1860,6 +1872,7 @@ export type SettingsEvent =
 export type SettingsInner = {
 	gamePath: string | null
 	customGamePaths: string[]
+	additionalMods: string[]
 	extractModdedFiles: boolean
 	colourblindMode: boolean
 	editorConnection: boolean

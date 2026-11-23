@@ -76,25 +76,101 @@ pub struct SMFResult {
 }
 
 struct ProjectWorld {
-	path: PathBuf,
-	manifest: Arc<simple_mod_framework_types::Manifest>,
+	mods: HashMap<simple_mod_framework_types::ModID, (PathBuf, Arc<simple_mod_framework_types::Manifest>)>,
+	mod_order: Vec<simple_mod_framework_types::ModID>,
+	project_mod_id: simple_mod_framework_types::ModID,
 
 	diagnostics: NotificationDiagnostics
 }
 
 impl ProjectWorld {
 	#[try_fn]
-	pub fn new(app: &AppHandle, path: PathBuf) -> Result<Self, eyre::Report> {
-		Self {
-			manifest: Arc::new(
-				serde_json::from_slice::<simple_mod_framework_types::Manifest>(
-					&fs::read(path.join("manifest.json")).wrap_err("Couldn't read project manifest.json")?
+	pub fn new(app: &AppHandle, path: PathBuf, additional_mods: &[PathBuf]) -> Result<Self, eyre::Report> {
+		let mut mods = HashMap::new();
+		let mut mod_order = Vec::new();
+
+		for mod_path in additional_mods {
+			let manifest_path = mod_path.join("manifest.json");
+			let manifest = match fs::read(&manifest_path) {
+				Ok(data) => match serde_json::from_slice::<simple_mod_framework_types::Manifest>(&data) {
+					Ok(manifest) => Arc::new(manifest),
+					Err(e) => {
+						send_notification(
+							app,
+							Notification {
+								kind: NotificationKind::Warning,
+								title: format!("Skipping {}", mod_path.display()),
+								subtitle: format!("Invalid manifest: {e}")
+							}
+						)
+						.map_err(|e| eyre::eyre!("{e:?}"))?;
+						continue;
+					}
+				},
+				Err(e) => {
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Warning,
+							title: format!("Skipping {}", mod_path.display()),
+							subtitle: format!("Couldn't read manifest: {e}")
+						}
+					)
+					.map_err(|e| eyre::eyre!("{e:?}"))?;
+					continue;
+				}
+			};
+
+			if mods.contains_key(&manifest.id) {
+				send_notification(
+					app,
+					Notification {
+						kind: NotificationKind::Warning,
+						title: format!("Skipping {}", mod_path.display()),
+						subtitle: format!("Duplicate mod ID {}", manifest.id)
+					}
 				)
-				.wrap_err("Project manifest is invalid")?
-			),
-			path,
+				.map_err(|e| eyre::eyre!("{e:?}"))?;
+				continue;
+			}
+
+			mod_order.push(manifest.id.to_owned());
+			mods.insert(manifest.id.to_owned(), (mod_path.to_owned(), manifest));
+		}
+
+		let project_manifest = Arc::new(
+			serde_json::from_slice::<simple_mod_framework_types::Manifest>(
+				&fs::read(path.join("manifest.json")).wrap_err("Couldn't read project manifest.json")?
+			)
+			.wrap_err("Project manifest is invalid")?
+		);
+
+		let project_mod_id = project_manifest.id.to_owned();
+		if mods.contains_key(&project_mod_id) {
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Warning,
+					title: format!("Additional mod {project_mod_id} conflicts with project"),
+					subtitle: "The project folder's copy will be used for deployment.".into()
+				}
+			)
+			.map_err(|e| eyre::eyre!("{e:?}"))?;
+			mod_order.retain(|id| id != &project_mod_id);
+		}
+		mod_order.push(project_mod_id.to_owned());
+		mods.insert(project_mod_id.to_owned(), (path, project_manifest));
+
+		Self {
+			mods,
+			mod_order,
+			project_mod_id,
 			diagnostics: NotificationDiagnostics::new(app)
 		}
+	}
+
+	fn project_mod_id(&self) -> &simple_mod_framework_types::ModID {
+		&self.project_mod_id
 	}
 }
 
@@ -107,26 +183,21 @@ impl Diagnostics for ProjectWorld {
 impl Mods for ProjectWorld {
 	#[try_fn]
 	fn get_all_mods(&self) -> eyre::Result<Vec<simple_mod_framework_types::ModID>> {
-		vec![self.manifest.id.to_owned()]
+		self.mod_order.clone()
 	}
 
 	fn get_mod_manifest(
 		&self,
 		id: &simple_mod_framework_types::ModID
 	) -> eyre::Result<Arc<simple_mod_framework_types::Manifest>> {
-		if id == &self.manifest.id {
-			Ok(self.manifest.to_owned())
-		} else {
-			Err(eyre::eyre!("No such mod: {}", id))
-		}
+		self.mods
+			.get(id)
+			.map(|(_, manifest)| manifest.to_owned())
+			.ok_or_else(|| eyre::eyre!("No such mod: {}", id))
 	}
 
 	fn get_mod_root(&self, id: &simple_mod_framework_types::ModID) -> Option<PathBuf> {
-		if id == &self.manifest.id {
-			Some(self.path.to_owned())
-		} else {
-			None
-		}
+		self.mods.get(id).map(|(path, _)| path.to_owned())
 	}
 
 	#[try_fn]
@@ -266,9 +337,10 @@ impl Project {
 		game: Arc<GameContext>
 	) -> Result<(), eyre::Report> {
 		let _guard = self.deploy.sync.write().await;
-		let world = Arc::new(ProjectWorld::new(app, self.path.to_owned())?);
+		let additional_mods = app.state::<AppSettings>().settings().additional_mods.clone();
+		let world = Arc::new(ProjectWorld::new(app, self.path.to_owned(), &additional_mods)?);
 
-		let mod_id = world.get_all_mods()?.remove(0);
+		let mod_id = world.project_mod_id().to_owned();
 
 		let config = Arc::new(simple_mod_framework_types::Config {
 			deploy_order: world.get_all_mods()?,

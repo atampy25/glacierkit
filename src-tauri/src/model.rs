@@ -51,6 +51,7 @@ pub struct AppSettings {
 pub struct SettingsInner {
 	pub game_path: Option<PathBuf>,
 	pub custom_game_paths: Vec<PathBuf>,
+	pub additional_mods: Vec<PathBuf>,
 	pub extract_modded_files: bool,
 	pub colourblind_mode: bool,
 	pub editor_connection: bool,
@@ -63,6 +64,7 @@ impl Default for SettingsInner {
 		Self {
 			game_path: None,
 			custom_game_paths: vec![],
+			additional_mods: vec![],
 			extract_modded_files: false,
 			colourblind_mode: false,
 			editor_connection: true,
@@ -96,6 +98,9 @@ impl AppSettings {
 		{
 			settings.game_path = settings.game_path.filter(|path| valid_game_path(path));
 			settings.custom_game_paths.retain(|path| valid_game_path(path));
+			settings
+				.additional_mods
+				.retain(|path| path.join("manifest.json").is_file());
 
 			Self {
 				data_dir: data_dir.to_owned(),
@@ -148,6 +153,7 @@ impl AppSettings {
 	}
 
 	impl_set!(set_custom_game_paths, custom_game_paths, Vec<PathBuf>);
+	impl_set!(set_additional_mods, additional_mods, Vec<PathBuf>);
 	impl_set!(set_extract_modded_files, extract_modded_files, bool);
 	impl_set!(set_colourblind_mode, colourblind_mode, bool);
 	impl_set!(set_editor_connection, editor_connection, bool);
@@ -671,6 +677,8 @@ nesting::nest! {
 
 				ChangeGameInstall { path: Option<PathBuf> },
 				RemoveCustomGamePath { path: PathBuf },
+				AddAdditionalMod { path: PathBuf },
+				RemoveAdditionalMod { path: PathBuf },
 				ChangeExtractModdedFiles { value: bool },
 				ChangeColourblindMode { value: bool },
 				ChangeEditorConnection { value: bool },

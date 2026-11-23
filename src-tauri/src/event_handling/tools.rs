@@ -1453,6 +1453,81 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 				)?;
 			}
 
+			SettingsEvent::AddAdditionalMod { path } => {
+				if !path.join("manifest.json").is_file() {
+					send_notification(
+						app,
+						Notification {
+							kind: NotificationKind::Error,
+							title: "Invalid mod folder".into(),
+							subtitle: "The selected folder should contain a manifest.json file.".into()
+						}
+					)?;
+
+					return Ok(());
+				}
+
+				let mut additional_mods = app_settings.settings().additional_mods.to_owned();
+				if !additional_mods.contains(&path) {
+					additional_mods.push(path);
+					app_settings.set_additional_mods(additional_mods)?;
+				}
+
+				send_request(
+					app,
+					Request::Tool(ToolRequest::Settings(SettingsRequest::Initialise {
+						game_installs: app_state
+							.game_installs
+							.iter()
+							.cloned()
+							.map(Ok)
+							.chain(
+								app_settings
+									.settings()
+									.custom_game_paths
+									.iter()
+									.map(custom_game_install)
+							)
+							.collect::<Result<_>>()?,
+						settings: (**app_settings.settings()).to_owned()
+					}))
+				)?;
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					project.background_deploy(app);
+				}
+			}
+
+			SettingsEvent::RemoveAdditionalMod { path } => {
+				let mut additional_mods = app_settings.settings().additional_mods.to_owned();
+				additional_mods.retain(|x| *x != path);
+				app_settings.set_additional_mods(additional_mods)?;
+
+				send_request(
+					app,
+					Request::Tool(ToolRequest::Settings(SettingsRequest::Initialise {
+						game_installs: app_state
+							.game_installs
+							.iter()
+							.cloned()
+							.map(Ok)
+							.chain(
+								app_settings
+									.settings()
+									.custom_game_paths
+									.iter()
+									.map(custom_game_install)
+							)
+							.collect::<Result<_>>()?,
+						settings: (**app_settings.settings()).to_owned()
+					}))
+				)?;
+
+				if let Some(project) = app_state.project.load().as_ref() {
+					project.background_deploy(app);
+				}
+			}
+
 			SettingsEvent::ChangeExtractModdedFiles { value } => {
 				app_settings.set_extract_modded_files(value)?;
 			}

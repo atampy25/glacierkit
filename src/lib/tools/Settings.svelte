@@ -21,6 +21,7 @@
 				smfIntegration = request.data.settings.smfIntegration
 				selectedGameInstall = request.data.settings.gamePath
 				customGamePaths = request.data.settings.customGamePaths
+				additionalMods = request.data.settings.additionalMods
 				break
 
 			case "changeProjectSettings":
@@ -129,6 +130,7 @@
 	let gameInstalls: GameInstall[] = []
 	let selectedGameInstall: string | null = null
 	let customGamePaths: string[] = []
+	let additionalMods: string[] = []
 
 	$: if (colourblind) {
 		document.body.classList.add("colourblind-mode")
@@ -183,7 +185,70 @@
 		</TooltipIcon>
 	</div>
 
-	<p class="mt-1">Game</p>
+	<div class="mt-2">
+		<div class="flex items-center gap-2">
+			<p>Additional mods</p>
+			<TooltipIcon icon={Information}>
+				<span slot="tooltipText" style="font-size: 0.875rem; margin-top: 0.5rem; margin-bottom: 0.5rem">
+					Extra mod folders to include when deploying with the SMF integration. These mods are deployed before the current project.
+				</span>
+			</TooltipIcon>
+		</div>
+		<div class="flex flex-col gap-1 mt-1 mb-2">
+			{#each additionalMods as modPath (modPath)}
+				<div class="flex items-center gap-2">
+					<div class="p-2 bg-[#393939] text-[#f4f4f4] flex-grow">
+						<code style="font-size: 0.95em" class="break-all">{modPath}</code>
+					</div>
+					<Button
+						kind="ghost"
+						size="small"
+						icon={Close}
+						iconDescription="Remove"
+						on:click={async () => {
+							await event({
+								type: "tool",
+								data: {
+									type: "settings",
+									data: {
+										type: "removeAdditionalMod",
+										data: { path: modPath }
+									}
+								}
+							})
+						}}
+					/>
+				</div>
+			{/each}
+		</div>
+		<Button
+			size="small"
+			kind="primary"
+			on:click={async () => {
+				const folder = await open({
+					title: "Select mod folder",
+					directory: true
+				})
+
+				if (folder) {
+					await event({
+						type: "tool",
+						data: {
+							type: "settings",
+							data: {
+								type: "addAdditionalMod",
+								data: { path: folder as string }
+							}
+						}
+					})
+				}
+			}}
+		>
+			Add mod folder
+		</Button>
+	</div>
+
+	<p class="mt-3">Game</p>
 	<div class="mt-1 flex flex-wrap gap-2">
 		<TileGroup
 			selected={selectedGameInstall || "null"}

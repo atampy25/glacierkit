@@ -676,6 +676,8 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 						move |evts: notify_debouncer_full::DebounceEventResult| {
 							let res: Result<()> = try {
 								if let Ok(evts) = evts {
+									let mut needs_redeploy = false;
+
 									for evt in evts {
 										if evt.need_rescan() {
 											// Refresh the whole tree
@@ -722,68 +724,29 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												))
 											)?;
 
+											if let Some(project) =
+												notify_app.state::<AppState>().project.load().as_ref()
+											{
+												project.background_deploy(&notify_app);
+											}
+
 											return;
 										}
 
 										match evt.kind {
-											notify::EventKind::Create(kind) => match kind {
-												notify::event::CreateKind::File => {
-													let path =
-														evt.paths.first().context("Create event had no paths")?;
+											notify::EventKind::Create(kind) => {
+												needs_redeploy = true;
+												match kind {
+													notify::event::CreateKind::File => {
+														let path =
+															evt.paths.first().context("Create event had no paths")?;
 
-													send_request(
-														&notify_app,
-														Request::Tool(ToolRequest::FileBrowser(
-															FileBrowserRequest::Create {
-																path: path.to_owned(),
-																is_folder: false
-															}
-														))
-													)?;
-
-													send_request(
-														&notify_app,
-														Request::Tool(ToolRequest::FileBrowser(
-															FileBrowserRequest::FileActions {
-																files: vec![(
-																	path.to_owned(),
-																	FileAction::all_available(path)?
-																		.into_iter()
-																		.map(|x| (x.to_string(), x.icon(), x))
-																		.collect()
-																)]
-															}
-														))
-													)?;
-												}
-
-												notify::event::CreateKind::Folder => {
-													send_request(
-														&notify_app,
-														Request::Tool(ToolRequest::FileBrowser(
-															FileBrowserRequest::Create {
-																path: evt
-																	.paths
-																	.first()
-																	.context("Create event had no path")?
-																	.to_owned(),
-																is_folder: true
-															}
-														))
-													)?;
-												}
-
-												notify::event::CreateKind::Any | notify::event::CreateKind::Other => {
-													let path =
-														evt.paths.first().context("Create event had no paths")?;
-
-													if let Ok(metadata) = fs::metadata(path) {
 														send_request(
 															&notify_app,
 															Request::Tool(ToolRequest::FileBrowser(
 																FileBrowserRequest::Create {
 																	path: path.to_owned(),
-																	is_folder: metadata.is_dir()
+																	is_folder: false
 																}
 															))
 														)?;
@@ -803,12 +766,62 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 															))
 														)?;
 													}
+
+													notify::event::CreateKind::Folder => {
+														send_request(
+															&notify_app,
+															Request::Tool(ToolRequest::FileBrowser(
+																FileBrowserRequest::Create {
+																	path: evt
+																		.paths
+																		.first()
+																		.context("Create event had no path")?
+																		.to_owned(),
+																	is_folder: true
+																}
+															))
+														)?;
+													}
+
+													notify::event::CreateKind::Any
+													| notify::event::CreateKind::Other => {
+														let path =
+															evt.paths.first().context("Create event had no paths")?;
+
+														if let Ok(metadata) = fs::metadata(path) {
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::Create {
+																		path: path.to_owned(),
+																		is_folder: metadata.is_dir()
+																	}
+																))
+															)?;
+
+															send_request(
+																&notify_app,
+																Request::Tool(ToolRequest::FileBrowser(
+																	FileBrowserRequest::FileActions {
+																		files: vec![(
+																			path.to_owned(),
+																			FileAction::all_available(path)?
+																				.into_iter()
+																				.map(|x| (x.to_string(), x.icon(), x))
+																				.collect()
+																		)]
+																	}
+																))
+															)?;
+														}
+													}
 												}
-											},
+											}
 
 											notify::EventKind::Modify(notify::event::ModifyKind::Name(
 												notify::event::RenameMode::Both
 											)) => {
+												needs_redeploy = true;
 												let old_path =
 													evt.paths.first().context("Rename-both event had no first path")?;
 
@@ -853,6 +866,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											notify::EventKind::Modify(notify::event::ModifyKind::Name(
 												notify::event::RenameMode::From
 											)) => {
+												needs_redeploy = true;
 												send_request(
 													&notify_app,
 													Request::Tool(ToolRequest::FileBrowser(
@@ -870,6 +884,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											notify::EventKind::Modify(notify::event::ModifyKind::Name(
 												notify::event::RenameMode::To
 											)) => {
+												needs_redeploy = true;
 												let path = evt.paths.first().context("Rename-to event had no path")?;
 
 												send_request(
@@ -898,6 +913,7 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 											}
 
 											notify::EventKind::Remove(_) => {
+												needs_redeploy = true;
 												send_request(
 													&notify_app,
 													Request::Tool(ToolRequest::FileBrowser(
@@ -912,7 +928,17 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 												)?;
 											}
 
+											notify::EventKind::Modify(_) => {
+												needs_redeploy = true;
+											}
+
 											_ => {}
+										}
+									}
+
+									if needs_redeploy {
+										if let Some(project) = notify_app.state::<AppState>().project.load().as_ref() {
+											project.background_deploy(&notify_app);
 										}
 									}
 								}
@@ -1399,12 +1425,6 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 				if let Some(file) = editor.file.as_ref() {
 					fs::write(file, data_to_save).context("Couldn't write file")?;
 
-					if let Some(project) = app_state.project.load().as_ref()
-						&& file.starts_with(&project.path)
-					{
-						project.background_deploy(&app);
-					}
-
 					send_request(
 						&app,
 						Request::Tab(TabRequest {
@@ -1528,12 +1548,6 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 						editor.file = Some(file.to_owned());
 						fs::write(file, data_to_save).context("Couldn't write file")?;
-
-						if let Some(project) = app_state.project.load().as_ref()
-							&& file.starts_with(&project.path)
-						{
-							project.background_deploy(&app);
-						}
 
 						send_request(
 							&app,
