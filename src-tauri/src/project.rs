@@ -45,7 +45,7 @@ pub struct ProjectSettings {
 
 pub struct Deploy {
 	sync: tokio::sync::RwLock<()>,
-	pub result: RwLock<Option<SMFResult>>
+	pub result: RwLock<Option<Arc<SMFResult>>>
 }
 
 impl Default for Deploy {
@@ -58,7 +58,21 @@ impl Default for Deploy {
 }
 
 pub struct SMFResult {
-	pub resource_states: HashMap<ResourceSpecifier, ResourceStates>
+	pub resource_states: HashMap<ResourceSpecifier, ResourceStates>,
+	pub resource_specifiers: HashMap<glacier_commons::metadata::RuntimeID, ResourceSpecifier>,
+	pub entity_cache: crate::PapayaMap<
+		glacier_commons::metadata::RuntimeID,
+		Arc<quickentity_rs::entity::Entity>,
+		identity_hash::BuildIdentityHasher<u64>
+	>,
+	pub reverse_references: std::sync::OnceLock<
+		HashMap<
+			glacier_commons::metadata::RuntimeID,
+			Vec<glacier_commons::metadata::RuntimeID>,
+			identity_hash::BuildIdentityHasher<u64>
+		>
+	>,
+	pub repository: std::sync::OnceLock<Option<Vec<crate::ores_repo::RepositoryItem>>>
 }
 
 struct ProjectWorld {
@@ -260,7 +274,7 @@ impl Project {
 			deploy_order: world.get_all_mods()?,
 			mod_options: [(
 				mod_id.to_owned(),
-				self.settings.load().mod_options.to_owned().into_iter().collect()
+				self.settings.load().mod_options.clone().into_iter().collect()
 			)]
 			.into_iter()
 			.collect(),
@@ -295,7 +309,7 @@ impl Project {
 		);
 
 		send_request(
-			&app,
+			app,
 			Request::Tool(ToolRequest::Settings(SettingsRequest::ChangeProjectSettings {
 				settings: (**self.settings.load()).to_owned()
 			}))
@@ -313,7 +327,7 @@ impl Project {
 		let mut state = State {
 			deployment: DeployContext::new(&config, &game)?,
 			localisation_hash_list,
-			game,
+			game: game.clone(),
 			config,
 			world
 		};
@@ -386,7 +400,26 @@ impl Project {
 
 		log::debug!("SMF deployment complete with {} resources", resource_states.len());
 
-		self.deploy.result.write().replace(SMFResult { resource_states });
+		let resource_specifiers = resource_states
+			.keys()
+			.sorted_by_cached_key(|specifier| {
+				game.game_files
+					.partitions
+					.iter()
+					.map(|p| p.partition_info())
+					.position(|p| p.name.as_ref().is_some_and(|x| *x == specifier.partition.0))
+					.unwrap_or(usize::MAX)
+			})
+			.map(|specifier| (specifier.id, specifier.to_owned()))
+			.collect();
+
+		self.deploy.result.write().replace(Arc::new(SMFResult {
+			resource_states,
+			resource_specifiers,
+			entity_cache: Default::default(),
+			reverse_references: Default::default(),
+			repository: Default::default()
+		}));
 	}
 
 	pub fn background_deploy(self: &Arc<Self>, app: &AppHandle) {

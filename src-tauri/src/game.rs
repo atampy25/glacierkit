@@ -128,7 +128,7 @@ pub trait GameFiles: Send + Sync {
 	fn extract_resource_changelog(&self, resource: RuntimeID) -> Vec<ResourceChangelogEntry>;
 }
 
-impl GameFiles for Arc<Arc<DynGameFiles<'static>>> {
+impl GameFiles for Arc<DynGameFiles<'static>> {
 	delegate::delegate! {
 		to (**self) {
 			fn install(&self) -> &GameInstall;
@@ -690,6 +690,243 @@ impl GameFiles for EntitiesOverlay {
 	fn extract_entity(&self, factory_id: RuntimeID) -> Result<Arc<Entity>> {
 		if let Some(entity) = self.entities.get(&factory_id) {
 			entity.clone()
+		} else {
+			self.game.extract_entity(factory_id)?
+		}
+	}
+}
+
+pub struct ProjectOverlay {
+	pub game: Arc<DynGameFiles<'static>>,
+	pub deploy: Arc<crate::project::SMFResult>
+}
+
+impl ProjectOverlay {
+	fn deployed_state(&self, id: RuntimeID) -> Option<&simple_mod_framework::state::ResourceState> {
+		let specifier = self.deploy.resource_specifiers.get(&id)?;
+		self.deploy
+			.resource_states
+			.get(specifier)?
+			.back()
+			.map(|(_, state)| state)
+	}
+
+	fn deployed_meta(&self, id: RuntimeID) -> Option<ExtendedResourceMetadata> {
+		let state = self.deployed_state(id)?;
+		Some(ExtendedResourceMetadata {
+			core_info: state.metadata.to_owned(),
+			system_memory_requirement:
+				glacier_commons::metadata::ResourceMetadata::calculate_system_memory_requirement(
+					state.metadata.resource_type,
+					&state.data
+				)
+				.unwrap_or(u32::MAX),
+			video_memory_requirement: glacier_commons::metadata::ResourceMetadata::calculate_video_memory_requirement(
+				state.metadata.resource_type,
+				&state.data,
+				self.version()
+			)
+			.unwrap_or(u32::MAX)
+		})
+	}
+}
+
+impl GameFiles for ProjectOverlay {
+	delegate::delegate! {
+		to self.game {
+			fn install(&self) -> &GameInstall;
+
+			fn version(&self) -> GlacierGame;
+
+			fn platform(&self) -> StorePlatform;
+
+			fn partition_manager(&self) -> &PartitionManager;
+
+			fn smf_context(&self) -> Arc<GameContext>;
+
+			fn intellisense(&self) -> &Intellisense;
+
+			fn extract_resource_changelog(&self, resource: RuntimeID) -> Vec<ResourceChangelogEntry>;
+		}
+	}
+
+	fn resource_exists(&self, resource: RuntimeID) -> bool {
+		self.deploy.resource_specifiers.contains_key(&resource) || self.game.resource_exists(resource)
+	}
+
+	fn resource_type(&self, resource: RuntimeID) -> Option<ResourceType> {
+		self.deployed_state(resource)
+			.map(|x| x.metadata.resource_type)
+			.or_else(|| self.game.resource_type(resource))
+	}
+
+	fn all_resources(&self) -> impl Iterator<Item = RuntimeID> + Send + Sync {
+		let deployed = self.deploy.resource_specifiers.keys().copied().collect::<Vec<_>>();
+		self.game.all_resources().chain(deployed).unique()
+	}
+
+	fn resource_reverse_references(&self, resource: RuntimeID) -> Option<&Vec<RuntimeID>> {
+		self.deploy
+			.reverse_references
+			.get_or_init(|| {
+				let mut merged: HashMap<RuntimeID, Vec<RuntimeID>, BuildIdentityHasher<u64>> = HashMap::default();
+
+				for res in self.game.all_resources() {
+					if let Some(refs) = self.game.resource_reverse_references(res) {
+						merged.insert(res, refs.to_owned());
+					}
+				}
+
+				for (id, specifier) in &self.deploy.resource_specifiers {
+					let Some((_, state)) = self.deploy.resource_states.get(specifier).and_then(|x| x.back()) else {
+						continue;
+					};
+
+					let old_refs = self
+						.game
+						.extract_latest_metadata(*id)
+						.ok()
+						.map(|m| {
+							m.core_info
+								.references
+								.into_iter()
+								.map(|r| r.resource)
+								.collect::<Vec<_>>()
+						})
+						.unwrap_or_default();
+					let new_refs = state.metadata.references.iter().map(|r| r.resource).collect::<Vec<_>>();
+
+					for old_ref in &old_refs {
+						if !new_refs.contains(old_ref)
+							&& let Some(list) = merged.get_mut(old_ref)
+						{
+							list.retain(|x| x != id);
+						}
+					}
+
+					for new_ref in &new_refs {
+						if !old_refs.contains(new_ref) {
+							let list = merged.entry(*new_ref).or_default();
+							if !list.contains(id) {
+								list.push(*id);
+							}
+						}
+					}
+				}
+
+				merged.retain(|_, v| !v.is_empty());
+				merged
+			})
+			.get(&resource)
+	}
+
+	fn repository(&self) -> &Option<Vec<RepositoryItem>> {
+		self.deploy.repository.get_or_init(|| {
+			if let Some(state) = self.deployed_state(crate::general::REPO_ID)
+				&& let Ok(repo) = serde_json::from_slice(&state.data)
+			{
+				return Some(repo);
+			}
+
+			self.game.repository().to_owned()
+		})
+	}
+
+	fn extract_latest_resource(&self, resource: RuntimeID) -> Result<(ExtendedResourceMetadata, Vec<u8>)> {
+		if let Some(state) = self.deployed_state(resource) {
+			let meta = self.deployed_meta(resource).context("Couldn't compute metadata")?;
+			Ok((meta, state.data.to_owned()))
+		} else {
+			self.game.extract_latest_resource(resource)
+		}
+	}
+
+	fn extract_latest_metadata(&self, resource: RuntimeID) -> Result<ExtendedResourceMetadata> {
+		if let Some(meta) = self.deployed_meta(resource) {
+			Ok(meta)
+		} else {
+			self.game.extract_latest_metadata(resource)
+		}
+	}
+
+	fn extract_latest_overview_info(
+		&self,
+		resource: RuntimeID
+	) -> Result<(ResourceType, u32, String, Vec<ResourceReference>)> {
+		if let Some(state) = self.deployed_state(resource) {
+			Ok((
+				state.metadata.resource_type,
+				state.data.len() as u32,
+				self.deploy
+					.resource_specifiers
+					.get(&resource)
+					.unwrap()
+					.partition
+					.0
+					.to_owned()
+					.into(),
+				state.metadata.references.to_owned()
+			))
+		} else {
+			self.game.extract_latest_overview_info(resource)
+		}
+	}
+
+	#[try_fn]
+	fn extract_entity(&self, factory_id: RuntimeID) -> Result<Arc<Entity>> {
+		{
+			if let Some(entity) = self.deploy.entity_cache.pin().get(&factory_id) {
+				return Ok(entity.to_owned());
+			}
+		}
+
+		if let Some(state) = self.deployed_state(factory_id) {
+			if state.metadata.resource_type != "TEMP" {
+				bail!("Given factory was not a TEMP");
+			}
+
+			let temp_meta = self
+				.deployed_meta(factory_id)
+				.context("Couldn't compute TEMP metadata")?;
+
+			macro_rules! impl_game {
+				($ty:ty) => {{
+					let factory = glacier_bin1::deserialize::<$ty>(&state.data)?;
+
+					let blueprint_hash = temp_meta
+						.core_info
+						.references
+						.get(factory.blueprint_index_in_resource_header as usize)
+						.context("Blueprint referenced in factory does not exist in dependencies")?
+						.resource;
+
+					let (tblu_meta, tblu_data) = self
+						.extract_latest_resource(blueprint_hash)
+						.context("Couldn't extract TBLU")?;
+
+					let blueprint = glacier_bin1::deserialize(&tblu_data)?;
+
+					Entity::from_game(
+						&factory,
+						&temp_meta.core_info,
+						&blueprint,
+						&tblu_meta.core_info,
+						false
+					)
+					.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+				}};
+			}
+
+			let entity: Arc<Entity> = match self.version() {
+				GlacierGame::H1 => impl_game!(glacier_bin1::game::h1::STemplateEntity),
+				GlacierGame::H2 => impl_game!(glacier_bin1::game::h2::STemplateEntityFactory),
+				GlacierGame::H3 => impl_game!(glacier_bin1::game::h3::STemplateEntityFactory),
+				GlacierGame::FL => impl_game!(glacier_bin1::game::fl::STemplateEntityFactory)
+			}
+			.into();
+
+			self.deploy.entity_cache.pin().insert(factory_id, entity.clone());
+			entity
 		} else {
 			self.game.extract_entity(factory_id)?
 		}

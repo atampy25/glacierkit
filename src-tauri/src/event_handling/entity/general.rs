@@ -119,7 +119,7 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityGeneralEvent)
 				}
 
 				let game = Arc::new(EntitiesOverlay {
-					game: (**game).clone(),
+					game: app_state.intellisense_game(game),
 					entities
 				});
 

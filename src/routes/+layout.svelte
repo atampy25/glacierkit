@@ -661,7 +661,7 @@
 		{#each notifications as [id, { kind, title, subtitle }] (id)}
 			<div in:fly={{ x: 100 }} out:fade animate:flip>
 				<ToastNotification hideCloseButton {kind} {title}>
-					<div slot="subtitleChildren"><pre>{subtitle}</pre></div>
+					<div slot="subtitle"><pre class="whitespace-pre-wrap">{subtitle}</pre></div>
 				</ToastNotification>
 			</div>
 		{/each}

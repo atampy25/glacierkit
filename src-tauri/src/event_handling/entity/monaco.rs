@@ -364,7 +364,7 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 						let task = start_task(app, "Updating decorations")?;
 
 						let decorations = get_decorations(
-							game,
+							&app_state.intellisense_game(game),
 							tonytools_hash_list,
 							entity.sub_entities.get(&entity_id).context("No such entity")?,
 							entity
@@ -427,12 +427,13 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 
 						// Set any removed properties back to their default values
 						if let Some(game) = app_state.game.load().as_ref() {
+							let game = app_state.intellisense_game(game);
 							for (property, val) in prev_props {
 								if !sub_entity.properties.contains_key(&property)
 									&& SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x)
 									&& let Some((_, def_val, _)) = game
 										.intellisense()
-										.get_properties(game, entity, entity_id, false)?
+										.get_properties(&game, entity, entity_id, false)?
 										.into_iter()
 										.find(|(name, _, _)| *name == property)
 								{

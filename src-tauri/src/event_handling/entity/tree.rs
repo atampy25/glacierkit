@@ -449,18 +449,19 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 	if let Some(game) = app_state.game.load().as_ref()
 		&& let Some(tonytools_hash_list) = app_state.tonytools_hash_list.load().as_ref()
 	{
+		let game = app_state.intellisense_game(game);
 		let task = start_task(app, format!("Gathering intellisense data for {}", id))?;
 
 		let (properties, (pins, subsets)) = rayon::join(
-			|| game.intellisense().get_properties(game, entity, id, true),
+			|| game.intellisense().get_properties(&game, entity, id, true),
 			|| {
 				rayon::join(
-					|| game.intellisense().get_pins(game, entity, id, false),
+					|| game.intellisense().get_pins(&game, entity, id, false),
 					|| {
 						if id == entity.root_entity {
 							Ok(vec![])
 						} else {
-							game.intellisense().get_subsets(game, entity, id, true)
+							game.intellisense().get_subsets(&game, entity, id, true)
 						}
 					}
 				)
@@ -488,7 +489,7 @@ pub async fn select(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 		let task = start_task(app, format!("Computing decorations for {}", id))?;
 
 		let decorations = get_decorations(
-			game,
+			&game,
 			tonytools_hash_list,
 			entity.sub_entities.get(&id).context("No such entity")?,
 			entity
@@ -1397,6 +1398,7 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 	let sub_entity = entity.sub_entities.get(&entity_id).context("No such entity")?;
 
 	if let Some(game) = app_state.game.load().as_ref() {
+		let game = app_state.intellisense_game(game);
 		let (properties, pins, subsets) = if game
 			.resource_type(sub_entity.factory.resource)
 			.is_some_and(|ty| ty == "TEMP")
@@ -1405,17 +1407,17 @@ pub async fn help_menu(app: &AppHandle, editor_id: Uuid, entity_id: EntityID) ->
 
 			(
 				game.intellisense()
-					.get_properties(game, &underlying_entity, underlying_entity.root_entity, false)?,
+					.get_properties(&game, &underlying_entity, underlying_entity.root_entity, false)?,
 				game.intellisense()
-					.get_pins(game, &underlying_entity, underlying_entity.root_entity, false)?,
+					.get_pins(&game, &underlying_entity, underlying_entity.root_entity, false)?,
 				game.intellisense()
-					.get_subsets(game, &underlying_entity, underlying_entity.root_entity, false)?
+					.get_subsets(&game, &underlying_entity, underlying_entity.root_entity, false)?
 			)
 		} else {
 			(
-				game.intellisense().get_properties(game, entity, entity_id, true)?,
-				game.intellisense().get_pins(game, entity, entity_id, true)?,
-				game.intellisense().get_subsets(game, entity, entity_id, true)?
+				game.intellisense().get_properties(&game, entity, entity_id, true)?,
+				game.intellisense().get_pins(&game, entity, entity_id, true)?,
+				game.intellisense().get_subsets(&game, entity, entity_id, true)?
 			)
 		};
 
@@ -2242,7 +2244,8 @@ pub async fn move_entity_to_player(app: &AppHandle, editor_id: Uuid, entity_id: 
 		)
 		.await?;
 
-	if let Some(game) = app_state.game.load().as_ref()
+	let igame = app_state.game.load().as_ref().map(|g| app_state.intellisense_game(g));
+	if let Some(game) = igame.as_ref()
 		&& game
 			.intellisense()
 			.get_properties(game, entity, entity_id, true)?
@@ -2393,7 +2396,8 @@ pub async fn rotate_entity_as_player(app: &AppHandle, editor_id: Uuid, entity_id
 		)
 		.await?;
 
-	if let Some(game) = app_state.game.load().as_ref()
+	let igame = app_state.game.load().as_ref().map(|g| app_state.intellisense_game(g));
+	if let Some(game) = igame.as_ref()
 		&& game
 			.intellisense()
 			.get_properties(game, entity, entity_id, true)?
@@ -2544,7 +2548,8 @@ pub async fn move_entity_to_camera(app: &AppHandle, editor_id: Uuid, entity_id: 
 		)
 		.await?;
 
-	if let Some(game) = app_state.game.load().as_ref()
+	let igame = app_state.game.load().as_ref().map(|g| app_state.intellisense_game(g));
+	if let Some(game) = igame.as_ref()
 		&& game
 			.intellisense()
 			.get_properties(game, entity, entity_id, true)?
@@ -2676,7 +2681,8 @@ pub async fn rotate_entity_as_camera(app: &AppHandle, editor_id: Uuid, entity_id
 		)
 		.await?;
 
-	if let Some(game) = app_state.game.load().as_ref()
+	let igame = app_state.game.load().as_ref().map(|g| app_state.intellisense_game(g));
+	if let Some(game) = igame.as_ref()
 		&& game
 			.intellisense()
 			.get_properties(game, entity, entity_id, true)?
@@ -2861,12 +2867,13 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 
 			// Set any removed properties back to their default values
 			if let Some(game) = app_state.game.load().as_ref() {
+				let game = app_state.intellisense_game(game);
 				for (property, val) in prev_props {
 					if !sub_entity.properties.contains_key(&property)
 						&& SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x)
 						&& let Some((_, def_val, _)) = game
 							.intellisense()
-							.get_properties(game, current, entity_id, false)?
+							.get_properties(&game, current, entity_id, false)?
 							.into_iter()
 							.find(|(name, _, _)| *name == property)
 					{

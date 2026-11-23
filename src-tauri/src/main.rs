@@ -1697,9 +1697,10 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 					if entity.blueprint == tblu.0 && entity.sub_entities.contains_key(&id) {
 						let post_init = if let Some(game) = app_state.game.load().as_ref() {
+							let game = app_state.intellisense_game(game);
 							if let Some((_, _, post_init)) = game
 								.intellisense()
-								.get_properties(game, entity, id, true)?
+								.get_properties(&game, entity, id, true)?
 								.into_iter()
 								.find(|(name, _, _)| *name == property_name)
 							{
@@ -1823,9 +1824,10 @@ async fn handle_event_logic(app: AppHandle, event: Event) -> Result<()> {
 
 					if entity.factory == factory && entity.sub_entities.contains_key(&id) {
 						let post_init = if let Some(game) = app_state.game.load().as_ref() {
+							let game = app_state.intellisense_game(game);
 							if let Some((_, _, post_init)) = game
 								.intellisense()
-								.get_properties(game, entity, id, true)?
+								.get_properties(&game, entity, id, true)?
 								.into_iter()
 								.find(|(name, _, _)| *name == property)
 							{

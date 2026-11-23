@@ -1476,7 +1476,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			SettingsEvent::ChangeProjectSettings { settings } => {
 				if let Some(project) = app_state.project.load().as_ref() {
 					project.settings.store(settings.into());
-					project.background_deploy(&app);
+					project.background_deploy(app);
 				}
 			}
 		},

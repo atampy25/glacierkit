@@ -172,6 +172,21 @@ pub struct AppState {
 	pub scene_renderer: SceneRenderer
 }
 
+impl AppState {
+	pub fn intellisense_game(&self, game: &Arc<DynGameFiles<'static>>) -> Arc<DynGameFiles<'static>> {
+		if let Some(project) = self.project.load().as_ref()
+			&& let Some(deploy) = project.deploy.result.read().clone()
+		{
+			DynGameFiles::new_arc(crate::game::ProjectOverlay {
+				game: game.clone(),
+				deploy
+			})
+		} else {
+			game.clone()
+		}
+	}
+}
+
 pub struct EditorState {
 	pub file: Option<PathBuf>,
 	pub data: EditorData,
