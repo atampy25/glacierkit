@@ -3,7 +3,7 @@
 	import "jstree"
 	import { onMount } from "svelte"
 	import { join, sep as getSep } from "@tauri-apps/api/path"
-	import type { FileBrowserRequest } from "$lib/bindings"
+	import type { FileAction, FileBrowserRequest, FileDiagnostic } from "$lib/bindings"
 	import { Button, Search } from "carbon-components-svelte"
 	import { event, showInFolder } from "$lib/utils"
 	import { open } from "@tauri-apps/plugin-dialog"
@@ -393,6 +393,7 @@
 					)
 
 					fixSelection()
+					applyDiagnosticsToNode(request.data.path)
 				}
 				break
 
@@ -409,6 +410,7 @@
 						tree.rename_node(tree.get_node(pathToID[request.data.oldPath]), request.data.newPath.split(sep).at(-1)!)
 						pathToID[request.data.newPath] = pathToID[request.data.oldPath]
 						delete pathToID[request.data.oldPath]
+						applyDiagnosticsToNode(request.data.newPath)
 					} else {
 						// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
 						tree.rename_node(tree.get_node(pathToID[request.data.oldPath]), v4())
@@ -424,6 +426,7 @@
 								pathToID[request.data.newPath] = pathToID[request.data.oldPath]
 								delete pathToID[request.data.oldPath]
 								tree.rename_node(tree.get_node(pathToID[request.data.newPath]), request.data.newPath.split(sep).at(-1)!)
+								applyDiagnosticsToNode(request.data.newPath)
 							}
 						)
 					}
@@ -445,6 +448,7 @@
 							tree.rename_node(tree.get_node(pathToID[inProgressRename]), request.data.newPath.split(sep).at(-1)!)
 							pathToID[request.data.newPath] = pathToID[inProgressRename]
 							delete pathToID[inProgressRename]
+							applyDiagnosticsToNode(request.data.newPath)
 						} else {
 							// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
 							tree.rename_node(tree.get_node(pathToID[inProgressRename]), v4())
@@ -461,6 +465,7 @@
 										pathToID[request.data.newPath] = pathToID[inProgressRename]
 										delete pathToID[inProgressRename]
 										tree.rename_node(tree.get_node(pathToID[request.data.newPath]), request.data.newPath.split(sep).at(-1)!)
+										applyDiagnosticsToNode(request.data.newPath)
 									}
 								}
 							)
@@ -478,11 +483,17 @@
 
 			case "newTree":
 				path = request.data.basePath
+				fileDiagnostics = {}
 				await replaceTree(request.data.files)
 				break
 
 			case "fileActions":
 				Object.assign(fileActions, Object.fromEntries(request.data.files))
+				break
+
+			case "setFileDiagnostics":
+				fileDiagnostics = Object.fromEntries(request.data.diagnostics)
+				applyAllDiagnostics()
 				break
 
 			default:
@@ -493,6 +504,51 @@
 
 	const pathToID: Record<string, string> = {}
 	const fileActions: Record<string, [string, string, FileAction][]> = {}
+	let fileDiagnostics: Record<string, FileDiagnostic[]> = {}
+
+	function getDiagnosticClass(diags: FileDiagnostic[]) {
+		if (diags.some((d) => d.severity === "error")) return "item-error"
+		if (diags.some((d) => d.severity === "warning")) return "item-warning"
+		return ""
+	}
+
+	function getDiagnosticTitle(diags: FileDiagnostic[]) {
+		return diags.map((d) => d.message).join("\n")
+	}
+
+	function applyDiagnosticsToNode(path: string) {
+		const id = pathToID[path]
+		if (!id || !tree) return
+		const node = tree.get_node(id)
+		if (!node) return
+
+		const diags = fileDiagnostics[path] || []
+
+		node.li_attr = node.li_attr || {}
+		node.a_attr = node.a_attr || {}
+
+		const cls = String(node.li_attr.class || "")
+			.split(/\s+/)
+			.filter((c) => c && c !== "item-warning" && c !== "item-error")
+
+		const diagCls = getDiagnosticClass(diags)
+		if (diagCls) cls.push(diagCls)
+
+		node.li_attr.class = cls.join(" ")
+		if (diags.length) {
+			node.a_attr.title = getDiagnosticTitle(diags)
+		} else {
+			delete node.a_attr.title
+		}
+
+		tree.redraw_node(id, false, false, false)
+	}
+
+	function applyAllDiagnostics() {
+		for (const p of Object.keys(pathToID)) {
+			applyDiagnosticsToNode(p)
+		}
+	}
 
 	async function replaceTree(files: [string, boolean][]) {
 		tree.settings!.core.data = []
@@ -515,12 +571,16 @@
 			if (path.trim() && !path.endsWith("project.json")) {
 				const id = v4()
 
+				const diags = fileDiagnostics[path] || []
+				const diagCls = getDiagnosticClass(diags)
 				tree.settings!.core.data.push({
 					id,
 					parent: pathToID[path.split(sep).slice(0, -1).join(sep)],
 					icon: isFolder ? "fa-regular fa-folder" : icons.find((a) => path.endsWith(a[0])) ? icons.find((a) => path.endsWith(a[0]))![1] : "fa-regular fa-file",
 					text: path.split(sep).at(-1),
-					folder: isFolder
+					folder: isFolder,
+					li_attr: diagCls ? { class: diagCls } : {},
+					a_attr: diags.length ? { title: getDiagnosticTitle(diags) } : {}
 				})
 
 				pathToID[path] = id

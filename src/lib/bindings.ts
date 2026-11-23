@@ -1064,6 +1064,19 @@ export type FileBrowserRequest =
 				files: [string, [string, string, FileAction][]][]
 			}
 	  }
+	| {
+			type: "setFileDiagnostics"
+			data: {
+				diagnostics: [string, FileDiagnostic[]][]
+			}
+	  }
+
+export type FileDiagnostic = {
+	severity: FileDiagnosticSeverity
+	message: string
+}
+
+export type FileDiagnosticSeverity = "warning" | "error"
 
 export type GameBrowserEntry = {
 	hash: Hash

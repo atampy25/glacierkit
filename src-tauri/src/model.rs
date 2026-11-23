@@ -613,6 +613,20 @@ nesting::nest! {
 	}
 }
 
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum FileDiagnosticSeverity {
+	Warning,
+	Error
+}
+
+#[derive(Type, Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDiagnostic {
+	pub severity: FileDiagnosticSeverity,
+	pub message: String
+}
+
 nesting::nest! {
 	#![derive(Type, Serialize, Deserialize, Clone, derive_more::Debug)]
 	#![enums(serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type", content = "data"))]
@@ -1080,6 +1094,11 @@ nesting::nest! {
 				FileActions {
 					#[debug(skip)]
 					files: Vec<(PathBuf, Vec<(String, String, FileAction)>)>
+				},
+
+				SetFileDiagnostics {
+					#[debug(skip)]
+					diagnostics: Vec<(PathBuf, Vec<FileDiagnostic>)>
 				}
 			}
 

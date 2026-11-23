@@ -761,6 +761,22 @@
 		@apply line-through !important;
 	}
 
+	:global(.jstree-default .item-warning > a) {
+		@apply text-yellow-300 !important;
+	}
+
+	:global(.colourblind-mode .jstree-default .item-warning > a) {
+		@apply underline !important;
+	}
+
+	:global(.jstree-default .item-error > a) {
+		@apply text-red-300 !important;
+	}
+
+	:global(.colourblind-mode .jstree-default .item-error > a) {
+		@apply underline font-bold !important;
+	}
+
 	:global(.jstree-default .jstree-hovered) {
 		background: #3a3a3a;
 		border-radius: 2px;

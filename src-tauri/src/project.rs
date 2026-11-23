@@ -6,7 +6,7 @@ use eyre::{OptionExt, WrapErr};
 use futures::{StreamExt, stream::FuturesUnordered};
 use indexmap::IndexMap;
 use itertools::Itertools;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use relative_path::{PathExt, RelativePath, RelativePathBuf};
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,9 @@ use tryvial::try_fn;
 use crate::{
 	Notification, NotificationKind, finish_task,
 	game::{GameFiles, NotificationDiagnostics},
-	model::{AppSettings, Request, SettingsRequest, ToolRequest},
+	model::{
+		AppSettings, FileBrowserRequest, FileDiagnostic, FileDiagnosticSeverity, Request, SettingsRequest, ToolRequest
+	},
 	send_notification, send_request, start_task
 };
 
@@ -45,14 +47,16 @@ pub struct ProjectSettings {
 
 pub struct Deploy {
 	sync: tokio::sync::RwLock<()>,
-	pub result: RwLock<Option<Arc<SMFResult>>>
+	pub result: RwLock<Option<Arc<SMFResult>>>,
+	pub file_diagnostics: Arc<Mutex<Vec<(PathBuf, FileDiagnostic)>>>
 }
 
 impl Default for Deploy {
 	fn default() -> Self {
 		Self {
 			sync: ().into(),
-			result: None.into()
+			result: None.into(),
+			file_diagnostics: Arc::new(Mutex::new(vec![]))
 		}
 	}
 }
@@ -80,12 +84,18 @@ struct ProjectWorld {
 	mod_order: Vec<simple_mod_framework_types::ModID>,
 	project_mod_id: simple_mod_framework_types::ModID,
 
-	diagnostics: NotificationDiagnostics
+	diagnostics: NotificationDiagnostics,
+	file_diagnostics: Arc<Mutex<Vec<(PathBuf, FileDiagnostic)>>>
 }
 
 impl ProjectWorld {
 	#[try_fn]
-	pub fn new(app: &AppHandle, path: PathBuf, additional_mods: &[PathBuf]) -> Result<Self, eyre::Report> {
+	pub fn new(
+		app: &AppHandle,
+		path: PathBuf,
+		additional_mods: &[PathBuf],
+		file_diagnostics: Arc<Mutex<Vec<(PathBuf, FileDiagnostic)>>>
+	) -> Result<Self, eyre::Report> {
 		let mut mods = HashMap::new();
 		let mut mod_order = Vec::new();
 
@@ -165,17 +175,39 @@ impl ProjectWorld {
 			mods,
 			mod_order,
 			project_mod_id,
-			diagnostics: NotificationDiagnostics::new(app)
+			diagnostics: NotificationDiagnostics::new(app),
+			file_diagnostics
 		}
 	}
 
 	fn project_mod_id(&self) -> &simple_mod_framework_types::ModID {
 		&self.project_mod_id
 	}
+
+	fn collected_file_diagnostics(&self) -> Vec<(PathBuf, Vec<FileDiagnostic>)> {
+		let mut map: IndexMap<PathBuf, Vec<FileDiagnostic>> = IndexMap::new();
+		for (path, diag) in self.file_diagnostics.lock().iter().cloned() {
+			map.entry(path).or_default().push(diag);
+		}
+		map.into_iter().collect()
+	}
 }
 
 impl Diagnostics for ProjectWorld {
 	fn emit_diagnostic(&self, diagnostic: simple_mod_framework::diagnostics::Diagnostic) -> Result<(), eyre::Report> {
+		if let simple_mod_framework::diagnostics::DiagnosticTarget::Operation { mod_id, source, .. } =
+			&diagnostic.target
+			&& let Some((mod_root, _)) = self.mods.get(mod_id)
+		{
+			self.file_diagnostics.lock().push((
+				source.to_logical_path(mod_root),
+				FileDiagnostic {
+					severity: FileDiagnosticSeverity::Warning,
+					message: diagnostic.kind.to_string()
+				}
+			));
+		}
+
 		self.diagnostics.emit_diagnostic(diagnostic)
 	}
 }
@@ -183,7 +215,7 @@ impl Diagnostics for ProjectWorld {
 impl Mods for ProjectWorld {
 	#[try_fn]
 	fn get_all_mods(&self) -> eyre::Result<Vec<simple_mod_framework_types::ModID>> {
-		self.mod_order.clone()
+		self.mod_order.to_owned()
 	}
 
 	fn get_mod_manifest(
@@ -337,8 +369,15 @@ impl Project {
 		game: Arc<GameContext>
 	) -> Result<(), eyre::Report> {
 		let _guard = self.deploy.sync.write().await;
-		let additional_mods = app.state::<AppSettings>().settings().additional_mods.clone();
-		let world = Arc::new(ProjectWorld::new(app, self.path.to_owned(), &additional_mods)?);
+		self.deploy.file_diagnostics.lock().clear();
+
+		let additional_mods = app.state::<AppSettings>().settings().additional_mods.to_owned();
+		let world = Arc::new(ProjectWorld::new(
+			app,
+			self.path.to_owned(),
+			&additional_mods,
+			self.deploy.file_diagnostics.clone()
+		)?);
 
 		let mod_id = world.project_mod_id().to_owned();
 
@@ -401,7 +440,7 @@ impl Project {
 			localisation_hash_list,
 			game: game.clone(),
 			config,
-			world
+			world: world.clone()
 		};
 
 		state
@@ -492,6 +531,22 @@ impl Project {
 			reverse_references: Default::default(),
 			repository: Default::default()
 		}));
+
+		send_request(
+			app,
+			Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::SetFileDiagnostics {
+				diagnostics: world.collected_file_diagnostics()
+			}))
+		)
+		.map_err(|e| eyre::eyre!("{e:?}"))?;
+	}
+
+	fn collected_file_diagnostics(&self) -> Vec<(PathBuf, Vec<FileDiagnostic>)> {
+		let mut map: IndexMap<PathBuf, Vec<FileDiagnostic>> = IndexMap::new();
+		for (path, diag) in self.deploy.file_diagnostics.lock().iter().cloned() {
+			map.entry(path).or_default().push(diag);
+		}
+		map.into_iter().collect()
 	}
 
 	pub fn background_deploy(self: &Arc<Self>, app: &AppHandle) {
@@ -506,17 +561,46 @@ impl Project {
 					let game = game.smf_context();
 					async move {
 						let task = start_task(&app, "Deploying mod").unwrap();
-						if let Err(e) = project.deploy(&app, localisation_hash_list, game).await {
-							send_notification(
+						let deploy_error = project.deploy(&app, localisation_hash_list, game).await.err();
+
+						let mut diagnostics = project.collected_file_diagnostics();
+						if let Some(e) = &deploy_error {
+							let error_text = format!("{e:?}");
+
+							let _ = send_notification(
 								&app,
 								Notification {
 									kind: NotificationKind::Error,
 									title: "Mod failed to deploy".into(),
-									subtitle: format!("{e:?}")
+									subtitle: error_text.to_owned()
 								}
-							)
-							.expect("Couldn't send data to frontend");
+							);
+
+							for entry in walkdir::WalkDir::new(&project.path).into_iter().filter_map(|x| x.ok()) {
+								if entry.file_type().is_file()
+									&& error_text.contains(entry.path().relative_to(&project.path).unwrap().as_str())
+								{
+									let diag = FileDiagnostic {
+										severity: FileDiagnosticSeverity::Error,
+										message: error_text.to_owned()
+									};
+
+									if let Some((_, diags)) = diagnostics.iter_mut().find(|(p, _)| p == entry.path()) {
+										diags.push(diag);
+									} else {
+										diagnostics.push((entry.path().into(), vec![diag]));
+									}
+								}
+							}
 						}
+
+						let _ = send_request(
+							&app,
+							Request::Tool(ToolRequest::FileBrowser(FileBrowserRequest::SetFileDiagnostics {
+								diagnostics
+							}))
+						);
+
 						let _ = finish_task(&app, task);
 					}
 				});
