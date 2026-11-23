@@ -491,26 +491,16 @@ pub async fn open_file(app: &AppHandle, path: impl AsRef<Path>) -> Result<()> {
 											})
 										})
 									})
-								&& let temp_pos = temp_states
-									.iter()
-									.find_position(|(attribution, _)| {
-										attribution.as_ref().is_some_and(|attribution| {
-											attribution.source == relative_file
-												&& attribution.script_identifier.is_none()
-										})
+								&& let Some(temp_pos) = temp_states.iter().position(|(attribution, _)| {
+									attribution.as_ref().is_some_and(|attribution| {
+										attribution.source == relative_file && attribution.script_identifier.is_none()
 									})
-									.unwrap()
-									.0
-								&& let tblu_pos = tblu_states
-									.iter()
-									.find_position(|(attribution, _)| {
-										attribution.as_ref().is_some_and(|attribution| {
-											attribution.source == relative_file
-												&& attribution.script_identifier.is_none()
-										})
+								})
+								&& let Some(tblu_pos) = tblu_states.iter().position(|(attribution, _)| {
+									attribution.as_ref().is_some_and(|attribution| {
+										attribution.source == relative_file && attribution.script_identifier.is_none()
 									})
-									.unwrap()
-									.0
+								})
 								&& temp_pos > 0
 								&& let Some((Some(_), temp_prev)) = temp_states.get(temp_pos - 1)
 								&& tblu_pos > 0

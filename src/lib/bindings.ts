@@ -975,6 +975,7 @@ export type FileAction =
 	| { type: "convertUnlockablesPatchToMergePatch" }
 	| { type: "convertUnlockablesPatchToJsonPatch" }
 	| { type: "createMaterialEntity" }
+	| { type: "patchThisEntity" }
 
 export type FileBrowserEvent =
 	| {

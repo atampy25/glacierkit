@@ -1,6 +1,6 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::Arc};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use ecow::{EcoString, eco_format};
 use fn_error_context::context;
 use glacier_commons::{
@@ -21,6 +21,7 @@ use quickentity_rs::{
 use rayon::iter::{
 	IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelBridge, ParallelIterator
 };
+use relative_path::PathExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_slice, from_str, from_value, to_string, to_value};
 use specta::Type;
@@ -42,9 +43,9 @@ use crate::{
 	game::{GameFiles, custom_game_install, valid_game_path},
 	general::{EMPTY_ID, REPO_ID, initialise_app, load_game_files, open_file, open_in_editor},
 	model::{
-		AppSettings, AppState, ContentSearchEvent, FileBrowserEvent, GameBrowserEntry, GameBrowserEvent,
-		GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SearchSort, SettingsEvent, SettingsRequest,
-		ToolEvent, ToolRequest
+		AppSettings, AppState, ContentSearchEvent, EditorData, EditorState, EditorType, FileBrowserEvent,
+		GameBrowserEntry, GameBrowserEvent, GameBrowserRequest, GlobalRequest, Hash, Request, SearchFilter, SearchSort,
+		SettingsEvent, SettingsRequest, TabRequest, TabRequestData, ToolEvent, ToolRequest
 	},
 	ores_repo::UnlockableItem,
 	send_notification, send_request, start_progress, start_task, task_progress
@@ -65,7 +66,8 @@ pub enum FileAction {
 	ConvertRepoPatchToJsonPatch,
 	ConvertUnlockablesPatchToMergePatch,
 	ConvertUnlockablesPatchToJsonPatch,
-	CreateMaterialEntity
+	CreateMaterialEntity,
+	PatchThisEntity
 }
 
 impl std::fmt::Display for FileAction {
@@ -82,7 +84,8 @@ impl std::fmt::Display for FileAction {
 			Self::ConvertUnlockablesPatchToJsonPatch => {
 				write!(f, "Convert to JSON.patch.json")
 			}
-			Self::CreateMaterialEntity => write!(f, "Create Material Entity")
+			Self::CreateMaterialEntity => write!(f, "Create Material Entity"),
+			Self::PatchThisEntity => write!(f, "Patch This Entity")
 		}
 	}
 }
@@ -97,8 +100,8 @@ impl FileAction {
 		};
 
 		match extension {
-			"entity.json" => vec![Self::NormaliseQN, Self::ConvertEntityToPatch],
-			"entity.patch.json" => vec![Self::NormaliseQN, Self::ConvertPatchToEntity],
+			"entity.json" => vec![Self::NormaliseQN, Self::ConvertEntityToPatch, Self::PatchThisEntity],
+			"entity.patch.json" => vec![Self::NormaliseQN, Self::ConvertPatchToEntity, Self::PatchThisEntity],
 			"repository.json" => vec![Self::ConvertRepoPatchToJsonPatch],
 			"unlockables.json" => vec![Self::ConvertUnlockablesPatchToJsonPatch],
 			"JSON.patch.json" => vec![
@@ -119,11 +122,12 @@ impl FileAction {
 			Self::ConvertRepoPatchToJsonPatch => "fa-solid fa-right-left".into(),
 			Self::ConvertUnlockablesPatchToMergePatch => "fa-solid fa-right-left".into(),
 			Self::ConvertUnlockablesPatchToJsonPatch => "fa-solid fa-right-left".into(),
-			Self::CreateMaterialEntity => "fa fa-plus".into()
+			Self::CreateMaterialEntity => "fa fa-plus".into(),
+			Self::PatchThisEntity => "fa fa-plus".into()
 		}
 	}
 
-	pub fn perform(self, app: &AppHandle, path: &Path) -> Result<()> {
+	pub async fn perform(self, app: &AppHandle, path: &Path) -> Result<()> {
 		match self {
 			Self::NormaliseQN => normalise_qn_file(app, path),
 			Self::ConvertEntityToPatch => convert_entity_to_patch(app, path),
@@ -132,7 +136,8 @@ impl FileAction {
 			Self::ConvertRepoPatchToJsonPatch => convert_repo_to_json_patch(app, path),
 			Self::ConvertUnlockablesPatchToMergePatch => convert_unlockables_to_merge_patch(app, path),
 			Self::ConvertUnlockablesPatchToJsonPatch => convert_unlockables_to_json_patch(app, path),
-			Self::CreateMaterialEntity => create_material_entity(app, path)
+			Self::CreateMaterialEntity => create_material_entity(app, path),
+			Self::PatchThisEntity => patch_this_entity(app, path).await
 		}
 	}
 }
@@ -438,6 +443,131 @@ pub fn convert_patch_to_entity(app: &AppHandle, path: &Path) -> Result<()> {
 			}
 		)?;
 	}
+}
+
+#[try_fn]
+pub async fn patch_this_entity(app: &AppHandle, path: &Path) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let extension = path
+		.file_name()
+		.context("No file name")?
+		.to_string_lossy()
+		.split('.')
+		.skip(1)
+		.collect_vec()
+		.join(".");
+
+	let base = match extension.as_ref() {
+		"entity.json" => {
+			Arc::new(from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity")?)
+		}
+
+		"entity.patch.json" => {
+			let patch: Patch =
+				from_slice(&fs::read(path).context("Couldn't read file")?).context("Invalid entity patch")?;
+
+			if let Some(game) = app_state.game.load().as_ref()
+				&& let Some(project) = app_state.project.load().as_ref()
+				&& let Ok(relative_file) = path.relative_to(&project.path)
+				&& let Some(deploy_result) = project.deploy.result.read().as_ref()
+				&& let Some((_, temp_state)) = deploy_result
+					.resource_states
+					.iter()
+					.filter(|(r, _)| r.id == patch.factory)
+					.map(|(_, states)| states)
+					.find_map(|states| {
+						states.iter().find(|(attribution, _)| {
+							attribution.as_ref().is_some_and(|attribution| {
+								attribution.source == relative_file && attribution.script_identifier.is_none()
+							})
+						})
+					})
+				&& let Some((_, tblu_state)) = deploy_result
+					.resource_states
+					.iter()
+					.filter(|(r, _)| r.id == patch.blueprint)
+					.map(|(_, states)| states)
+					.find_map(|states| {
+						states.iter().find(|(attribution, _)| {
+							attribution.as_ref().is_some_and(|attribution| {
+								attribution.source == relative_file && attribution.script_identifier.is_none()
+							})
+						})
+					}) {
+				macro_rules! impl_game {
+					($ty:ty) => {{
+						let factory = glacier_bin1::deserialize::<$ty>(&temp_state.data)?;
+						let blueprint = glacier_bin1::deserialize(&tblu_state.data)?;
+						Entity::from_game(
+							&factory,
+							&temp_state.metadata,
+							&blueprint,
+							&tblu_state.metadata,
+							false
+						)
+						.map_err(|x| anyhow!("QuickEntity error: {:?}", x))?
+					}};
+				}
+
+				let entity = match game.version() {
+					GlacierGame::H1 => impl_game!(glacier_bin1::game::h1::STemplateEntity),
+					GlacierGame::H2 => impl_game!(glacier_bin1::game::h2::STemplateEntityFactory),
+					GlacierGame::H3 => impl_game!(glacier_bin1::game::h3::STemplateEntityFactory),
+					GlacierGame::FL => impl_game!(glacier_bin1::game::fl::STemplateEntityFactory)
+				};
+
+				Arc::new(entity)
+			} else {
+				send_notification(
+					app,
+					Notification {
+						kind: NotificationKind::Error,
+						title: "Unknown patch".into(),
+						subtitle: "The selected file is not included in the current deploy configuration.".into()
+					}
+				)?;
+				return Ok(());
+			}
+		}
+
+		_ => {
+			bail!("Can't patch non-QN files");
+		}
+	};
+
+	let id = Uuid::new_v4();
+	let name = format!(
+		"Patch to {}",
+		path.file_name().context("No file name")?.to_string_lossy()
+	);
+
+	app_state
+		.editor_states
+		.insert(
+			id.to_owned(),
+			EditorState {
+				file: None,
+				data: EditorData::QNPatch {
+					base: base.clone(),
+					current: (*base).clone().into(),
+					settings: Default::default()
+				},
+				..Default::default()
+			}
+		)
+		.await;
+
+	send_request(
+		app,
+		Request::Tab(TabRequest {
+			tab: id,
+			data: TabRequestData::Create {
+				name: name.into(),
+				editor_type: EditorType::QNPatch
+			}
+		})
+	)?;
 }
 
 #[try_fn]
@@ -958,7 +1088,7 @@ pub async fn handle_tool_event(app: &AppHandle, event: ToolEvent) -> Result<()> 
 			}
 
 			FileBrowserEvent::PerformFileAction { path, action } => {
-				action.perform(app, &path)?;
+				action.perform(app, &path).await?;
 			}
 		},
 
