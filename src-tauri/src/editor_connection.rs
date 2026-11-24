@@ -14,6 +14,7 @@ use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use glacier_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
 use glacier_commons::{metadata::ResourceMetadata, resource_type};
 use indexmap::IndexMap;
+use log::error;
 use quickentity_rs::{
 	entity::{EntityID, Ref},
 	game::{FromQuickEntity, ToQuickEntity},
@@ -294,13 +295,25 @@ pub struct EditorConnection {
 }
 
 fn report_error(app: &AppHandle, error: Error) {
-	send_request(
+	error!("{error:?}");
+
+	let _ = send_request(
 		app,
 		Request::Global(GlobalRequest::ErrorReport {
 			error: format!("{error:?}")
 		})
-	)
-	.expect("Couldn't send error report to frontend");
+	);
+}
+
+fn parse_entity_id(id: &str) -> Result<EntityID> {
+	id.parse().with_context(|| format!("Couldn't parse entity ID {id:?}"))
+}
+
+fn parse_tblu(tblu: String) -> Result<Hash> {
+	Ok(Hash(
+		tblu.parse()
+			.with_context(|| format!("Couldn't parse TBLU hash {tblu:?}"))?
+	))
 }
 
 fn standalone_factory() -> STemplateEntityFactory {
@@ -339,7 +352,16 @@ fn temp_metadata() -> ResourceMetadata {
 	}
 }
 
-fn debounced_event_to_gk_event(app: &AppHandle, evt: SDKEditorEvent) -> Option<Event> {
+#[try_fn]
+fn selection_event(id: &str, tblu: String) -> Result<Event> {
+	Event::EditorConnection(EditorConnectionEvent::EntitySelected {
+		id: parse_entity_id(id)?,
+		tblu: parse_tblu(tblu)?
+	})
+}
+
+#[try_fn]
+fn debounced_event_to_gk_event(evt: SDKEditorEvent) -> Result<Option<Event>> {
 	match evt {
 		SDKEditorEvent::EntityTransformUpdated {
 			entity: EntityDetails::Game {
@@ -351,25 +373,23 @@ fn debounced_event_to_gk_event(app: &AppHandle, evt: SDKEditorEvent) -> Option<E
 		} => {
 			let transform = properties
 				.swap_remove("m_mTransform")
-				.expect("No m_mTransform on entity whose transform was updated");
+				.with_context(|| format!("No m_mTransform on entity {id} whose transform was updated"))?;
+
+			let matrix = from_value::<glacier_bin1::game::h3::SMatrix43>(transform.data)
+				.with_context(|| format!("Couldn't parse transform of entity {id} as SMatrix43"))?;
 
 			Some(Event::EditorConnection(EditorConnectionEvent::EntityTransformUpdated {
-				id: id.parse().expect("Couldn't parse entity ID"),
-				tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
-				transform: {
-					let matrix = from_value::<glacier_bin1::game::h3::SMatrix43>(transform.data)
-						.expect("Couldn't parse transform as ZVariant");
-
-					matrix
-						.to_qn(
-							&standalone_factory(),
-							&temp_metadata(),
-							&standalone_blueprint(),
-							&temp_metadata(),
-							false
-						)
-						.into_ok()
-				}
+				id: parse_entity_id(&id)?,
+				tblu: parse_tblu(tblu)?,
+				transform: matrix
+					.to_qn(
+						&standalone_factory(),
+						&temp_metadata(),
+						&standalone_blueprint(),
+						&temp_metadata(),
+						false
+					)
+					.into_ok()
 			}))
 		}
 
@@ -377,18 +397,17 @@ fn debounced_event_to_gk_event(app: &AppHandle, evt: SDKEditorEvent) -> Option<E
 			entity: EntityDetails::Game { id, tblu, .. },
 			property,
 			value
-		} => Some(Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged {
-			id: id.parse().expect("Couldn't parse entity ID"),
-			tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
-			property_name: match property {
+		} => {
+			let property_name = match property {
 				PropertyID::Unknown(id) => id.to_string(),
 				PropertyID::Known(name) => name
-			},
-			property_value: match from_value::<ZVariant>(json!({
+			};
+
+			let property_value = from_value::<ZVariant>(json!({
 				"$type": value.property_type,
 				"$val": value.data
 			}))
-			.expect("Couldn't parse value as ZVariant")
+			.with_context(|| format!("Couldn't parse value of {property_name} on entity {id} as ZVariant"))?
 			.to_qn(
 				&standalone_factory(),
 				&temp_metadata(),
@@ -397,23 +416,20 @@ fn debounced_event_to_gk_event(app: &AppHandle, evt: SDKEditorEvent) -> Option<E
 				false
 			)
 			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
-			{
-				Ok(x) => x,
-				Err(e) => {
-					report_error(app, e.context("Couldn't interpret SDK property changed value"));
+			.with_context(|| format!("Couldn't interpret value of {property_name} on entity {id}"))?;
 
-					return None;
-				}
-			}
-		})),
-
-		// Ignore editor entities
-		SDKEditorEvent::EntityTransformUpdated { .. } => None,
+			Some(Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged {
+				id: parse_entity_id(&id)?,
+				tblu: parse_tblu(tblu)?,
+				property_name,
+				property_value
+			}))
+		}
 
 		// Ignore editor entities
-		SDKEditorEvent::EntityPropertyChanged { .. } => None,
+		SDKEditorEvent::EntityTransformUpdated { .. } | SDKEditorEvent::EntityPropertyChanged { .. } => None,
 
-		_ => panic!("This event kind should not be debounced")
+		other => bail!("Event {other:?} should not be debounced")
 	}
 }
 
@@ -431,8 +447,10 @@ impl EditorConnection {
 			let app = _app;
 
 			while let Some(evt) = recvr.next().await {
-				if let Some(event) = debounced_event_to_gk_event(&app, evt) {
-					handle_event(&app, event);
+				match debounced_event_to_gk_event(evt) {
+					Ok(Some(event)) => handle_event(&app, event),
+					Ok(None) => {}
+					Err(e) => report_error(&app, e.context("Couldn't handle SDK editor event"))
 				}
 			}
 		});
@@ -543,7 +561,7 @@ impl EditorConnection {
 							while let Some(shard) = editor_states.next().await {
 								for (id, editor) in shard.iter() {
 									if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-										send_request(
+										let _ = send_request(
 											&app,
 											Request::Editor(EditorRequest {
 												editor: id.to_owned(),
@@ -553,10 +571,9 @@ impl EditorConnection {
 													}
 												))
 											})
-										)
-										.expect("Couldn't send data to frontend");
+										);
 
-										send_request(
+										let _ = send_request(
 											&app,
 											Request::Editor(EditorRequest {
 												editor: id.to_owned(),
@@ -564,21 +581,19 @@ impl EditorConnection {
 													EntityMonacoRequest::SetEditorConnected { connected: false }
 												))
 											})
-										)
-										.expect("Couldn't send data to frontend");
+										);
 									}
 								}
 							}
 
-							send_notification(
+							let _ = send_notification(
 								&app,
 								Notification {
 									kind: NotificationKind::Info,
 									title: "Disconnected from ZHMModSDK editor".into(),
 									subtitle: "Editor integration features will no longer be available.".into()
 								}
-							)
-							.expect("Couldn't send data to frontend");
+							);
 						}
 					}
 				})
@@ -608,33 +623,26 @@ impl EditorConnection {
 							SDKEditorEvent::EntitySelected {
 								entity: EntityDetails::Game { id, tblu, .. }
 							} => {
-								handle_event(
-									&app,
-									Event::EditorConnection(EditorConnectionEvent::EntitySelected {
-										id: id.parse().expect("Couldn't parse entity ID"),
-										tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash"))
-									})
-								);
+								match selection_event(&id, tblu) {
+									Ok(event) => handle_event(&app, event),
+									Err(e) => report_error(&app, e.context("Couldn't handle SDK entity selection"))
+								}
 							}
 
 							SDKEditorEvent::EntityTransformUpdated { .. }
 							| SDKEditorEvent::EntityPropertyChanged { .. } => {
-								debounced_events
-									.send(evt)
-									.await
-									.expect("Couldn't queue debounced event");
+								if debounced_events.send(evt).await.is_err() {
+									report_error(
+										&app,
+										anyhow!("SDK editor transform and property sync has stopped")
+									);
+								}
 							}
 
 							SDKEditorEvent::Error { message, .. }
 								if !message.contains("Could not find entity for the given selector") =>
 							{
-								send_request(
-									&app,
-									Request::Global(GlobalRequest::ErrorReport {
-										error: format!("SDK editor error: {:?}", message)
-									})
-								)
-								.expect("Couldn't send error report to frontend");
+								report_error(&app, anyhow!("SDK editor error: {:?}", message));
 							}
 
 							_ => {}
