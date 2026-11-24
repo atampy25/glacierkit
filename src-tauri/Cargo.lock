@@ -3734,7 +3734,7 @@ name = "facet-reflect"
 version = "0.46.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "399876f2bded4a572385dc414336aad0002ce4b4154cd0d1cfe9d1881243c400"
-dependencies = ["facet-core", "facet-path", "hashbrown 0.17.1", "regex", "smallvec 2.0.0-beta.3"]
+dependencies = ["facet-core", "facet-path", "hashbrown 0.17.2", "regex", "smallvec 2.0.0-beta.3"]
 
 [[package]]
 name = "fancy-regex"
@@ -3908,7 +3908,7 @@ name = "fontique"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c20b425addb8661e97fe1d51c4d8bcec3ec29ed6ad0db983976a7521276b8f7"
-dependencies = ["hashbrown 0.17.1", "linebender_resource_handle", "memmap2", "parlance", "read-fonts 0.39.2", "smallvec 1.16.6"]
+dependencies = ["hashbrown 0.17.2", "linebender_resource_handle", "memmap2", "parlance", "read-fonts 0.39.2", "smallvec 1.16.6"]
 
 [[package]]
 name = "foreign-types"
@@ -4421,7 +4421,7 @@ name = "gix-hashtable"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e261d54091f0d1c729bc83f54548c071bdec60a697de1e58e88bdfd7a99d24e"
-dependencies = ["gix-hash", "hashbrown 0.17.1", "parking_lot"]
+dependencies = ["gix-hash", "hashbrown 0.17.2", "parking_lot"]
 
 [[package]]
 name = "gix-ignore"
@@ -4435,7 +4435,7 @@ name = "gix-imara-diff"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c91d8cffac8849493a82233811bd02b2b183b8cf39bf704de0fa0841b737595"
-dependencies = ["bstr", "hashbrown 0.17.1"]
+dependencies = ["bstr", "hashbrown 0.17.2"]
 
 [[package]]
 name = "gix-index"
@@ -5196,9 +5196,9 @@ dependencies = ["allocator-api2", "equivalent", "foldhash 0.2.0", "serde", "serd
 
 [[package]]
 name = "hashbrown"
-version = "0.17.1"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+checksum = "735eaa21a6a5ffb2e84362faaeb90c05ba8e19797ca30428478cb6ea3a4921bc"
 dependencies = ["allocator-api2", "equivalent", "foldhash 0.2.0"]
 
 [[package]]
@@ -5788,7 +5788,7 @@ name = "iddqd"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8450e1521a7518a32addf0b805ffcfbc8f9c558d2ad5769f068f2aeef5a81126"
-dependencies = ["allocator-api2", "equivalent", "foldhash 0.2.0", "hashbrown 0.17.1"]
+dependencies = ["allocator-api2", "equivalent", "foldhash 0.2.0", "hashbrown 0.17.2"]
 
 [[package]]
 name = "ident_case"
@@ -5884,7 +5884,7 @@ name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
-dependencies = ["equivalent", "hashbrown 0.17.1", "rayon", "serde", "serde_core"]
+dependencies = ["equivalent", "hashbrown 0.17.2", "rayon", "serde", "serde_core"]
 
 [[package]]
 name = "indextree"
@@ -5990,9 +5990,9 @@ checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "iri-string"
-version = "0.7.14"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1663ee7d8cf2900cc1414b1e1eec9f348d6eaa3bcab07579f4726a4b8499f447"
+checksum = "5c7e416dac88ecbabfd77afe2078006bd868aef4b90ef85aedbcb52fa1c7ba13"
 dependencies = ["memchr", "serde"]
 
 [[package]]
@@ -7814,7 +7814,7 @@ checksum = "8fad031076f48f0d4d85ce1aea9b94b4e715a4d636a030a123038f8f5b5e4343"
 dependencies = [
 	"fontique",
 	"harfrust",
-	"hashbrown 0.17.1",
+	"hashbrown 0.17.2",
 	"icu_normalizer 2.4.0",
 	"icu_properties 2.4.0",
 	"icu_segmenter 2.4.0",
@@ -8894,7 +8894,7 @@ name = "rkyv"
 version = "0.8.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9776093b7ca170454ab1406954f7b7d97a57c51dc6c0642957fb2ef25c2d399"
-dependencies = ["bytecheck", "bytes", "hashbrown 0.17.1", "indexmap 2.14.2", "munge", "ptr_meta", "rancor", "rend", "rkyv_derive", "tinyvec", "uuid"]
+dependencies = ["bytecheck", "bytes", "hashbrown 0.17.2", "indexmap 2.14.2", "munge", "ptr_meta", "rancor", "rend", "rkyv_derive", "tinyvec", "uuid"]
 
 [[package]]
 name = "rkyv_derive"
@@ -9628,7 +9628,7 @@ dependencies = ["bstr", "unicode-segmentation"]
 [[package]]
 name = "simple-mod-framework"
 version = "3.0.0-rc.19"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#0f09a8fb0de8432cbc2bfd9489b1c2c0fd50473c"
 dependencies = [
 	"aho-corasick",
 	"anyhow",
@@ -9714,7 +9714,7 @@ dependencies = [
 [[package]]
 name = "simple-mod-framework-core"
 version = "0.0.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#0f09a8fb0de8432cbc2bfd9489b1c2c0fd50473c"
 dependencies = [
 	"arc-trait",
 	"better-rune-derive",
@@ -9758,7 +9758,7 @@ dependencies = [
 [[package]]
 name = "simple-mod-framework-types"
 version = "0.0.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#0f09a8fb0de8432cbc2bfd9489b1c2c0fd50473c"
 dependencies = [
 	"better-rune-derive",
 	"color-eyre",
@@ -10978,7 +10978,7 @@ dependencies = ["proc-macro2", "quote", "syn 2.0.119"]
 [[package]]
 name = "tracing-chrome"
 version = "0.7.0"
-source = "git+https://github.com/hitman-rs/simple-mod-framework#1a4582de1ed0a55a9054fb3c94cb924b0d66b17a"
+source = "git+https://github.com/hitman-rs/simple-mod-framework#0f09a8fb0de8432cbc2bfd9489b1c2c0fd50473c"
 dependencies = ["serde_json", "tracing-core", "tracing-subscriber"]
 
 [[package]]

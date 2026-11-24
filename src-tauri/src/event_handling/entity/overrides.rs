@@ -31,6 +31,7 @@ pub fn send_overrides_decorations(app: &AppHandle, editor_id: Uuid, entity: &Ent
 	let app_state = app.state::<AppState>();
 
 	if let Some(game) = app_state.game.load().as_ref() {
+		let game = &app_state.intellisense_game(game);
 		let task = start_task(app, "Updating override decorations")?;
 
 		let decorations = entity
