@@ -111,6 +111,9 @@
 
 														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
 
+														node.original.source = "projectFiles"
+														node.original.path = path
+
 														tree.set_icon(id, icons.find((a) => path.endsWith(a[0])) ? icons.find((a) => path.endsWith(a[0]))![1] : "fa-regular fa-file")
 
 														pathToID[path] = id
@@ -163,6 +166,9 @@
 														}
 
 														const path = await join(Object.fromEntries(Object.entries(pathToID).map((a) => [a[1], a[0]]))[selected_node.id], node.text)
+
+														node.original.source = "projectFiles"
+														node.original.path = path
 
 														pathToID[path] = id
 
@@ -221,6 +227,8 @@
 
 										delete pathToID[oldPath]
 										pathToID[newPath] = node.id
+
+										node.original.path = newPath
 
 										tree.set_icon(node.id, icons.find((a) => newPath.endsWith(a[0])) ? icons.find((a) => newPath.endsWith(a[0]))![1] : "fa-regular fa-file")
 
@@ -349,6 +357,8 @@
 					delete pathToID[oldPath]
 					pathToID[newPath] = node.id
 
+					node.original.path = newPath
+
 					await event({
 						type: "tool",
 						data: {
@@ -387,7 +397,9 @@
 									? icons.find((a) => request.data.path.endsWith(a[0]))![1]
 									: "fa-regular fa-file",
 							text: request.data.path.split(sep).at(-1)!,
-							folder: request.data.isFolder
+							folder: request.data.isFolder,
+							source: "projectFiles",
+							path: request.data.path
 						},
 						getPositionOfNode(pathToID[request.data.path.split(sep).slice(0, -1).join(sep)], request.data.path.split(sep).at(-1)!, request.data.isFolder)
 					)
@@ -410,6 +422,7 @@
 						tree.rename_node(tree.get_node(pathToID[request.data.oldPath]), request.data.newPath.split(sep).at(-1)!)
 						pathToID[request.data.newPath] = pathToID[request.data.oldPath]
 						delete pathToID[request.data.oldPath]
+						tree.get_node(pathToID[request.data.newPath]).original.path = request.data.newPath
 						applyDiagnosticsToNode(request.data.newPath)
 					} else {
 						// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
@@ -426,6 +439,7 @@
 								pathToID[request.data.newPath] = pathToID[request.data.oldPath]
 								delete pathToID[request.data.oldPath]
 								tree.rename_node(tree.get_node(pathToID[request.data.newPath]), request.data.newPath.split(sep).at(-1)!)
+								tree.get_node(pathToID[request.data.newPath]).original.path = request.data.newPath
 								applyDiagnosticsToNode(request.data.newPath)
 							}
 						)
@@ -448,6 +462,7 @@
 							tree.rename_node(tree.get_node(pathToID[inProgressRename]), request.data.newPath.split(sep).at(-1)!)
 							pathToID[request.data.newPath] = pathToID[inProgressRename]
 							delete pathToID[inProgressRename]
+							tree.get_node(pathToID[request.data.newPath]).original.path = request.data.newPath
 							applyDiagnosticsToNode(request.data.newPath)
 						} else {
 							// To prevent uniqueness issues a UUID is generated and then the file is renamed back when it's done being moved
@@ -463,6 +478,7 @@
 								() => {
 									if (typeof inProgressRename === "string") {
 										pathToID[request.data.newPath] = pathToID[inProgressRename]
+										tree.get_node(pathToID[request.data.newPath]).original.path = request.data.newPath
 										delete pathToID[inProgressRename]
 										tree.rename_node(tree.get_node(pathToID[request.data.newPath]), request.data.newPath.split(sep).at(-1)!)
 										applyDiagnosticsToNode(request.data.newPath)
@@ -562,7 +578,9 @@
 			parent: "#",
 			icon: "fa-regular fa-folder",
 			text: basePath.split(sep).at(-1),
-			folder: true
+			folder: true,
+			source: "projectFiles",
+			path: basePath
 		})
 
 		pathToID[basePath] = rootNode
@@ -579,6 +597,8 @@
 					icon: isFolder ? "fa-regular fa-folder" : icons.find((a) => path.endsWith(a[0])) ? icons.find((a) => path.endsWith(a[0]))![1] : "fa-regular fa-file",
 					text: path.split(sep).at(-1),
 					folder: isFolder,
+					source: "projectFiles",
+					path,
 					li_attr: diagCls ? { class: diagCls } : {},
 					a_attr: diags.length ? { title: getDiagnosticTitle(diags) } : {}
 				})

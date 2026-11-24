@@ -77,7 +77,16 @@
 					dots: true,
 					icons: true
 				},
-				check_callback: true,
+				check_callback: (_a, _b, _c, _d, more) => {
+					if (more) {
+						if (more.is_multi) {
+							more.origin.settings!.dnd!.always_copy = true
+						} else {
+							more.origin.settings!.dnd!.always_copy = false
+						}
+					}
+					return true
+				},
 				force_text: true,
 				keyboard: {
 					f2: () => {}
@@ -764,31 +773,61 @@
 			}
 		})
 
-		// Drag and drop from game browser
-		jQuery("#" + elemID).on("copy_node.jstree", async (_, { node, original }: { node: { id: string; parent: string }; original: { id: string } }) => {
-			trackEvent("Drag and drop from game browser to entity tree")
+		// Drag and drop from game browser or project files
+		jQuery("#" + elemID).on("copy_node.jstree", async (_, { node, original }: { node: { id: string; parent: string }; original: any }) => {
+			if (original.original?.source === "projectFiles") {
+				trackEvent("Drag and drop from project files to entity tree")
 
-			tree.delete_node(node.id)
+				tree.delete_node(node.id)
 
-			await event({
-				type: "editor",
-				data: {
-					editor: editorID,
+				if (original.original.folder) {
+					return
+				}
+
+				await event({
+					type: "editor",
 					data: {
-						type: "entity",
+						editor: editorID,
 						data: {
-							type: "tree",
+							type: "entity",
 							data: {
-								type: "addGameBrowserItem",
+								type: "tree",
 								data: {
-									parentId: node.parent,
-									file: original.id
+									type: "addProjectFileItem",
+									data: {
+										parentId: node.parent,
+										path: original.original.path
+									}
 								}
 							}
 						}
 					}
-				}
-			})
+				})
+			} else {
+				trackEvent("Drag and drop from game browser to entity tree")
+
+				tree.delete_node(node.id)
+
+				await event({
+					type: "editor",
+					data: {
+						editor: editorID,
+						data: {
+							type: "entity",
+							data: {
+								type: "tree",
+								data: {
+									type: "addGameBrowserItem",
+									data: {
+										parentId: node.parent,
+										file: original.id
+									}
+								}
+							}
+						}
+					}
+				})
+			}
 		})
 
 		jQuery("#" + elemID).on("ready.jstree", () => {

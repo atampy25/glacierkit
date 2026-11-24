@@ -794,6 +794,11 @@ nesting::nest! {
 							file: Hash
 						},
 
+						AddProjectFileItem {
+							parent_id: String,
+							path: PathBuf
+						},
+
 						SelectEntityInEditor {
 							entity_id: EntityID
 						},

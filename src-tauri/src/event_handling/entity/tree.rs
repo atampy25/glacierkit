@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{fs, ops::Deref, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
@@ -102,6 +102,10 @@ pub async fn handle(app: &AppHandle, editor_id: Uuid, event: EntityTreeEvent) ->
 
 		EntityTreeEvent::AddGameBrowserItem { parent_id, file } => {
 			add_game_browser_item(app, editor_id, parent_id, file.0).await?;
+		}
+
+		EntityTreeEvent::AddProjectFileItem { parent_id, path } => {
+			add_project_file_item(app, editor_id, parent_id, path).await?;
 		}
 
 		EntityTreeEvent::SelectEntityInEditor { entity_id } => {
@@ -2112,6 +2116,240 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 				subtitle: "A copy of the game hasn't been selected, or the hash list is unavailable.".into()
 			}
 		)?;
+	}
+
+	finish_task(app, task)?;
+
+	if let EditorData::QNPatch {
+		ref base, ref current, ..
+	} = editor_state.data
+	{
+		send_request(
+			app,
+			Request::Editor(EditorRequest {
+				editor: editor_id,
+				data: EditorRequestData::Entity(EntityEditorRequest::Tree({
+					let (new, modified, removed) = get_diff_info(base, current);
+					EntityTreeRequest::SetDiffInfo { new, modified, removed }
+				}))
+			})
+		)?;
+	}
+}
+
+#[try_fn]
+#[context("Couldn't handle project file add event")]
+pub async fn add_project_file_item(app: &AppHandle, editor_id: Uuid, parent_id: String, path: PathBuf) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	let task = start_task(app, format!("Adding {}", path.display()))?;
+
+	let mut editor_state = app_state
+		.editor_states
+		.get_mut(&editor_id)
+		.await
+		.context("No such editor")?;
+
+	let entity = match editor_state.data {
+		EditorData::QNEntity { ref mut entity, .. } => entity,
+		EditorData::QNPatch { ref mut current, .. } => current,
+
+		_ => {
+			Err(anyhow!("Editor {} is not a QN editor", editor_id))?;
+			panic!();
+		}
+	};
+
+	let entity = Arc::make_mut(entity);
+
+	let extension = path
+		.file_name()
+		.and_then(|s| s.to_str())
+		.unwrap_or("")
+		.split_once('.')
+		.map(|(_, ext)| ext)
+		.unwrap_or("");
+
+	match extension {
+		"entity.json" | "entity.patch.json" | "aspect.entity.json" | "material.entity.json" => {
+			let parsed = serde_json::from_slice::<serde_json::Value>(&fs::read(path).context("Couldn't read file")?)
+				.context("File is invalid JSON")?;
+
+			let factory = parsed
+				.get("factory")
+				.and_then(|x| x.as_str())
+				.context("Missing factory key")?
+				.parse::<RuntimeID>()
+				.context("Factory is invalid")?;
+
+			let blueprint = parsed
+				.get("blueprint")
+				.and_then(|x| x.as_str())
+				.context("Missing blueprint key")?
+				.parse::<RuntimeID>()
+				.context("Blueprint is invalid")?;
+
+			let entity_id = random_entity_id();
+			let sub_entity = SubEntity {
+				parent: if parent_id != "#" {
+					Some(Ref::local(parent_id.parse()?))
+				} else {
+					None
+				},
+				name: factory
+					.get_path()
+					.and_then(|x| {
+						x.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace("].pc_entitytype", "")
+							.replace("].pc_entitytemplate", "")
+							.replace("].entitytype", "")
+							.replace("].entitytemplate", "")
+							.replace(".entitytemplate", "")
+							.split('/')
+							.next_back()
+							.map(|x| x.to_owned().into())
+					})
+					.unwrap_or_else(|| factory.to_string().into()),
+				factory: ResourceReference {
+					resource: factory,
+					flags: Default::default()
+				},
+				blueprint: blueprint,
+				..Default::default()
+			};
+
+			send_request(
+				app,
+				Request::Editor(EditorRequest {
+					editor: editor_id.to_owned(),
+					data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems {
+						new_entities: vec![(
+							entity_id.to_owned(),
+							sub_entity.parent.to_owned(),
+							sub_entity.name.to_owned(),
+							sub_entity.factory.resource.to_owned(),
+							false
+						)]
+					}))
+				})
+			)?;
+
+			entity.sub_entities.insert(entity_id, sub_entity);
+
+			send_request(
+				app,
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
+				})
+			)?;
+		}
+
+		"sfx.wem" => {
+			let wwev_id = path
+				.file_stem()
+				.and_then(|x| x.to_str())
+				.and_then(|x| x.split_once('~'))
+				.context("sfx.wem file name is invalid")?
+				.0
+				.parse::<RuntimeID>()
+				.context("sfx.wem file name is invalid")?;
+
+			let name = if let Some(game) = app_state.game.load().as_ref() {
+				let game = app_state.intellisense_game(game);
+				let (wwev_meta, wwev_data) = game.extract_latest_resource(wwev_id)?;
+				let wwev = WwiseEvent::parse(game.version(), &wwev_data, &wwev_meta.core_info)?;
+				wwev.name
+			} else {
+				wwev_id.to_string()
+			};
+
+			let entity_id = random_entity_id();
+			let sub_entity = SubEntity {
+				parent: if parent_id != "#" {
+					Some(Ref::local(parent_id.parse()?))
+				} else {
+					None
+				},
+				name: name.into(),
+				factory: ResourceReference {
+					resource: if let Some(game) = app_state.game.load().as_ref()
+						&& game.version() == GlacierGame::FL
+					{
+						rid!("[modules:/zaudioevententity.class].entitytype")
+					} else {
+						rid!("[modules:/zaudioevententity.class].pc_entitytype")
+					},
+					flags: Default::default()
+				},
+				blueprint: if let Some(game) = app_state.game.load().as_ref()
+					&& game.version() == GlacierGame::FL
+				{
+					rid!("[modules:/zaudioevententity.class].entityblueprint")
+				} else {
+					rid!("[modules:/zaudioevententity.class].pc_entityblueprint")
+				},
+				properties: {
+					let mut properties = OrderMap::default();
+					properties.insert(
+						"m_pMainEvent".into(),
+						Property {
+							value: Variant::Resource(
+								false,
+								Some(ResourceReference {
+									resource: wwev_id,
+									flags: ReferenceFlags {
+										reference_type: ReferenceType::Normal,
+										..Default::default()
+									}
+								})
+							),
+							post_init: false
+						}
+					);
+					properties
+				},
+				..Default::default()
+			};
+
+			send_request(
+				app,
+				Request::Editor(EditorRequest {
+					editor: editor_id.to_owned(),
+					data: EditorRequestData::Entity(EntityEditorRequest::Tree(EntityTreeRequest::NewItems {
+						new_entities: vec![(
+							entity_id.to_owned(),
+							sub_entity.parent.to_owned(),
+							sub_entity.name.to_owned(),
+							sub_entity.factory.resource.to_owned(),
+							false
+						)]
+					}))
+				})
+			)?;
+
+			entity.sub_entities.insert(entity_id, sub_entity);
+
+			send_request(
+				app,
+				Request::Tab(TabRequest {
+					tab: editor_id,
+					data: TabRequestData::SetUnsaved { unsaved: true }
+				})
+			)?;
+		}
+
+		_ => {
+			send_notification(
+				app,
+				Notification {
+					kind: NotificationKind::Error,
+					title: "Not a valid template".into(),
+					subtitle: "Only entity templates can be dragged into the entity tree.".into()
+				}
+			)?;
+		}
 	}
 
 	finish_task(app, task)?;

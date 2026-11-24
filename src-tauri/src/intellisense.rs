@@ -690,6 +690,8 @@ impl Intellisense {
 										{
 											found.push((prop_name, default_val, false));
 										}
+
+										// TODO: Scene references
 									}
 
 									"WSGT" => {

@@ -587,6 +587,13 @@ export type EntityTreeEvent_Deserialize =
 			}
 	  }
 	| {
+			type: "addProjectFileItem"
+			data: {
+				parentId: string
+				path: string
+			}
+	  }
+	| {
 			type: "selectEntityInEditor"
 			data: {
 				entityId: string
@@ -694,6 +701,13 @@ export type EntityTreeEvent_Serialize =
 			data: {
 				parentId: string
 				file: Hash
+			}
+	  }
+	| {
+			type: "addProjectFileItem"
+			data: {
+				parentId: string
+				path: string
 			}
 	  }
 	| {
