@@ -14,6 +14,7 @@ use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use glacier_bin1::game::h3::{STemplateEntityBlueprint, STemplateEntityFactory, ZVariant};
 use glacier_commons::{metadata::ResourceMetadata, resource_type};
 use indexmap::IndexMap;
+use log::error;
 use quickentity_rs::{
 	entity::{EntityID, Ref},
 	game::{FromQuickEntity, ToQuickEntity},
@@ -293,6 +294,145 @@ pub struct EditorConnection {
 	app: AppHandle
 }
 
+fn report_error(app: &AppHandle, error: Error) {
+	error!("{error:?}");
+
+	let _ = send_request(
+		app,
+		Request::Global(GlobalRequest::ErrorReport {
+			error: format!("{error:?}")
+		})
+	);
+}
+
+fn parse_entity_id(id: &str) -> Result<EntityID> {
+	id.parse().with_context(|| format!("Couldn't parse entity ID {id:?}"))
+}
+
+fn parse_tblu(tblu: String) -> Result<Hash> {
+	Ok(Hash(
+		tblu.parse()
+			.with_context(|| format!("Couldn't parse TBLU hash {tblu:?}"))?
+	))
+}
+
+fn standalone_factory() -> STemplateEntityFactory {
+	STemplateEntityFactory {
+		blueprint_index_in_resource_header: 0,
+		root_entity_index: 0,
+		sub_type: 0,
+		sub_entities: vec![],
+		external_scene_type_indices_in_resource_header: vec![],
+		property_overrides: vec![]
+	}
+}
+
+fn standalone_blueprint() -> STemplateEntityBlueprint {
+	STemplateEntityBlueprint {
+		sub_type: 0,
+		root_entity_index: 0,
+		sub_entities: vec![],
+		external_scene_type_indices_in_resource_header: vec![],
+		pin_connections: vec![],
+		input_pin_forwardings: vec![],
+		output_pin_forwardings: vec![],
+		override_deletes: vec![],
+		pin_connection_overrides: vec![],
+		pin_connection_override_deletes: vec![]
+	}
+}
+
+fn temp_metadata() -> ResourceMetadata {
+	ResourceMetadata {
+		id: EMPTY_ID,
+		resource_type: resource_type!("TEMP"),
+		compressed: true,
+		scrambled: true,
+		references: vec![]
+	}
+}
+
+#[try_fn]
+fn selection_event(id: &str, tblu: String) -> Result<Event> {
+	Event::EditorConnection(EditorConnectionEvent::EntitySelected {
+		id: parse_entity_id(id)?,
+		tblu: parse_tblu(tblu)?
+	})
+}
+
+#[try_fn]
+fn debounced_event_to_gk_event(evt: SDKEditorEvent) -> Result<Option<Event>> {
+	match evt {
+		SDKEditorEvent::EntityTransformUpdated {
+			entity: EntityDetails::Game {
+				id,
+				tblu,
+				mut properties,
+				..
+			}
+		} => {
+			let transform = properties
+				.swap_remove("m_mTransform")
+				.with_context(|| format!("No m_mTransform on entity {id} whose transform was updated"))?;
+
+			let matrix = from_value::<glacier_bin1::game::h3::SMatrix43>(transform.data)
+				.with_context(|| format!("Couldn't parse transform of entity {id} as SMatrix43"))?;
+
+			Some(Event::EditorConnection(EditorConnectionEvent::EntityTransformUpdated {
+				id: parse_entity_id(&id)?,
+				tblu: parse_tblu(tblu)?,
+				transform: matrix
+					.to_qn(
+						&standalone_factory(),
+						&temp_metadata(),
+						&standalone_blueprint(),
+						&temp_metadata(),
+						false
+					)
+					.into_ok()
+			}))
+		}
+
+		SDKEditorEvent::EntityPropertyChanged {
+			entity: EntityDetails::Game { id, tblu, .. },
+			property,
+			value
+		} => {
+			let property_name = match property {
+				PropertyID::Unknown(id) => id.to_string(),
+				PropertyID::Known(name) => name
+			};
+
+			let property_value = from_value::<ZVariant>(json!({
+				"$type": value.property_type,
+				"$val": value.data
+			}))
+			.with_context(|| format!("Couldn't parse value of {property_name} on entity {id} as ZVariant"))?
+			.to_qn(
+				&standalone_factory(),
+				&temp_metadata(),
+				&standalone_blueprint(),
+				&temp_metadata(),
+				false
+			)
+			.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
+			.with_context(|| format!("Couldn't interpret value of {property_name} on entity {id}"))?;
+
+			Some(Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged {
+				id: parse_entity_id(&id)?,
+				tblu: parse_tblu(tblu)?,
+				property_name,
+				property_value
+			}))
+		}
+
+		// Ignore editor entities
+		SDKEditorEvent::EntityTransformUpdated { .. } | SDKEditorEvent::EntityPropertyChanged { .. } => None,
+
+		other => bail!("Event {other:?} should not be debounced")
+	}
+}
+
 impl EditorConnection {
 	pub fn new(app: AppHandle) -> Self {
 		let (sender, _) = broadcast::channel(32);
@@ -307,157 +447,10 @@ impl EditorConnection {
 			let app = _app;
 
 			while let Some(evt) = recvr.next().await {
-				match evt {
-					SDKEditorEvent::EntityTransformUpdated {
-						entity: EntityDetails::Game {
-							id,
-							tblu,
-							mut properties,
-							..
-						}
-					} => {
-						let transform = properties
-							.swap_remove("m_mTransform")
-							.expect("No m_mTransform on entity whose transform was updated");
-
-						handle_event(
-							&app,
-							Event::EditorConnection(EditorConnectionEvent::EntityTransformUpdated {
-								id: id.parse().expect("Couldn't parse entity ID"),
-								tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
-								transform: {
-									let matrix = from_value::<glacier_bin1::game::h3::SMatrix43>(transform.data)
-										.expect("Couldn't parse transform as ZVariant");
-
-									matrix
-										.to_qn(
-											&STemplateEntityFactory {
-												blueprint_index_in_resource_header: 0,
-												root_entity_index: 0,
-												sub_type: 0,
-												sub_entities: vec![],
-												external_scene_type_indices_in_resource_header: vec![],
-												property_overrides: vec![]
-											},
-											&ResourceMetadata {
-												id: EMPTY_ID,
-												resource_type: resource_type!("TEMP"),
-												compressed: true,
-												scrambled: true,
-												references: vec![]
-											},
-											&STemplateEntityBlueprint {
-												sub_type: 0,
-												root_entity_index: 0,
-												sub_entities: vec![],
-												external_scene_type_indices_in_resource_header: vec![],
-												pin_connections: vec![],
-												input_pin_forwardings: vec![],
-												output_pin_forwardings: vec![],
-												override_deletes: vec![],
-												pin_connection_overrides: vec![],
-												pin_connection_override_deletes: vec![]
-											},
-											&ResourceMetadata {
-												id: EMPTY_ID,
-												resource_type: resource_type!("TEMP"),
-												compressed: true,
-												scrambled: true,
-												references: vec![]
-											},
-											false
-										)
-										.into_ok()
-								}
-							})
-						);
-					}
-
-					SDKEditorEvent::EntityPropertyChanged {
-						entity: EntityDetails::Game { id, tblu, .. },
-						property,
-						value
-					} => {
-						handle_event(
-							&app,
-							Event::EditorConnection(EditorConnectionEvent::EntityPropertyChanged {
-								id: id.parse().expect("Couldn't parse entity ID"),
-								tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash")),
-								property_name: match property {
-									PropertyID::Unknown(id) => id.to_string(),
-									PropertyID::Known(name) => name
-								},
-								property_value: match from_value::<ZVariant>(json!({
-									"$type": value.property_type,
-									"$val": value.data
-								}))
-								.expect("Couldn't parse value as ZVariant")
-								.to_qn(
-									&STemplateEntityFactory {
-										blueprint_index_in_resource_header: 0,
-										root_entity_index: 0,
-										sub_type: 0,
-										sub_entities: vec![],
-										external_scene_type_indices_in_resource_header: vec![],
-										property_overrides: vec![]
-									},
-									&ResourceMetadata {
-										id: EMPTY_ID,
-										resource_type: resource_type!("TEMP"),
-										compressed: true,
-										scrambled: true,
-										references: vec![]
-									},
-									&STemplateEntityBlueprint {
-										sub_type: 0,
-										root_entity_index: 0,
-										sub_entities: vec![],
-										external_scene_type_indices_in_resource_header: vec![],
-										pin_connections: vec![],
-										input_pin_forwardings: vec![],
-										output_pin_forwardings: vec![],
-										override_deletes: vec![],
-										pin_connection_overrides: vec![],
-										pin_connection_override_deletes: vec![]
-									},
-									&ResourceMetadata {
-										id: EMPTY_ID,
-										resource_type: resource_type!("TEMP"),
-										compressed: true,
-										scrambled: true,
-										references: vec![]
-									},
-									false
-								)
-								.map_err(|x| anyhow!("QuickEntity error: {:?}", x))
-								{
-									Ok(x) => x,
-									Err(e) => {
-										send_request(
-											&app,
-											Request::Global(GlobalRequest::ErrorReport {
-												error: format!(
-													"{:?}",
-													e.context("Couldn't interpret SDK property changed value")
-												)
-											})
-										)
-										.expect("Couldn't send error report to frontend");
-
-										continue;
-									}
-								}
-							})
-						);
-					}
-
-					// Ignore editor entities
-					SDKEditorEvent::EntityTransformUpdated { .. } => {}
-
-					// Ignore editor entities
-					SDKEditorEvent::EntityPropertyChanged { .. } => {}
-
-					_ => panic!("This event kind should not be debounced")
+				match debounced_event_to_gk_event(evt) {
+					Ok(Some(event)) => handle_event(&app, event),
+					Ok(None) => {}
+					Err(e) => report_error(&app, e.context("Couldn't handle SDK editor event"))
 				}
 			}
 		});
@@ -554,16 +547,7 @@ impl EditorConnection {
 										// It's ok if there are no listeners
 										let _ = events.send(msg);
 									} {
-										send_request(
-											&app,
-											Request::Global(GlobalRequest::ErrorReport {
-												error: format!(
-													"{:?}",
-													e.context("Editor connection message handling error")
-												)
-											})
-										)
-										.expect("Couldn't send error report to frontend");
+										report_error(&app, e.context("Editor connection message handling error"));
 									}
 								}
 							}
@@ -577,7 +561,7 @@ impl EditorConnection {
 							while let Some(shard) = editor_states.next().await {
 								for (id, editor) in shard.iter() {
 									if let EditorData::QNEntity { .. } | EditorData::QNPatch { .. } = editor.data {
-										send_request(
+										let _ = send_request(
 											&app,
 											Request::Editor(EditorRequest {
 												editor: id.to_owned(),
@@ -587,10 +571,9 @@ impl EditorConnection {
 													}
 												))
 											})
-										)
-										.expect("Couldn't send data to frontend");
+										);
 
-										send_request(
+										let _ = send_request(
 											&app,
 											Request::Editor(EditorRequest {
 												editor: id.to_owned(),
@@ -598,21 +581,19 @@ impl EditorConnection {
 													EntityMonacoRequest::SetEditorConnected { connected: false }
 												))
 											})
-										)
-										.expect("Couldn't send data to frontend");
+										);
 									}
 								}
 							}
 
-							send_notification(
+							let _ = send_notification(
 								&app,
 								Notification {
 									kind: NotificationKind::Info,
 									title: "Disconnected from ZHMModSDK editor".into(),
 									subtitle: "Editor integration features will no longer be available.".into()
 								}
-							)
-							.expect("Couldn't send data to frontend");
+							);
 						}
 					}
 				})
@@ -642,33 +623,26 @@ impl EditorConnection {
 							SDKEditorEvent::EntitySelected {
 								entity: EntityDetails::Game { id, tblu, .. }
 							} => {
-								handle_event(
-									&app,
-									Event::EditorConnection(EditorConnectionEvent::EntitySelected {
-										id: id.parse().expect("Couldn't parse entity ID"),
-										tblu: Hash(tblu.parse().expect("Couldn't parse TBLU hash"))
-									})
-								);
+								match selection_event(&id, tblu) {
+									Ok(event) => handle_event(&app, event),
+									Err(e) => report_error(&app, e.context("Couldn't handle SDK entity selection"))
+								}
 							}
 
 							SDKEditorEvent::EntityTransformUpdated { .. }
 							| SDKEditorEvent::EntityPropertyChanged { .. } => {
-								debounced_events
-									.send(evt)
-									.await
-									.expect("Couldn't queue debounced event");
+								if debounced_events.send(evt).await.is_err() {
+									report_error(
+										&app,
+										anyhow!("SDK editor transform and property sync has stopped")
+									);
+								}
 							}
 
 							SDKEditorEvent::Error { message, .. }
 								if !message.contains("Could not find entity for the given selector") =>
 							{
-								send_request(
-									&app,
-									Request::Global(GlobalRequest::ErrorReport {
-										error: format!("SDK editor error: {:?}", message)
-									})
-								)
-								.expect("Couldn't send error report to frontend");
+								report_error(&app, anyhow!("SDK editor error: {:?}", message));
 							}
 
 							_ => {}
