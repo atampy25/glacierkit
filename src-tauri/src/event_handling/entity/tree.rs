@@ -1,6 +1,6 @@
 use std::{ops::Deref, sync::Arc};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use arboard::Clipboard;
 use ecow::EcoString;
 use fn_error_context::context;
@@ -11,11 +11,11 @@ use glacier_commons::{
 	rid
 };
 use glacier_formats::wwev::WwiseEvent;
-use log::debug;
+use log::{debug, warn};
 use ordermap::OrderMap;
 use quickentity_rs::{
 	apply_patch,
-	entity::{EntityID, ExposedEntity, LocalPinConnection, PinConnection, Property, Ref, SubEntity},
+	entity::{Entity, EntityID, ExposedEntity, LocalPinConnection, PinConnection, Property, Ref, SubEntity},
 	patch::{Patch, PatchOperation, SubEntityOperation},
 	variant::{Transform, Variant, Vec3}
 };
@@ -26,7 +26,6 @@ use tauri::{AppHandle, Manager};
 use tryvial::try_fn;
 use uuid::Uuid;
 
-use super::monaco::SAFE_TO_SYNC;
 use crate::{
 	HashMap, HashSet, Notification, NotificationKind,
 	biome::to_string_clear,
@@ -281,6 +280,13 @@ pub async fn create(app: &AppHandle, editor_id: Uuid, id: EntityID, content: Sub
 			})
 		)?;
 	}
+
+	let entity_snapshot = editor_entity(&editor_state.data)?;
+	drop(editor_state);
+
+	if let Err(e) = spawn_new_entities_in_game(app, &entity_snapshot, &[id]).await {
+		warn!("{e:?}");
+	}
 }
 
 #[try_fn]
@@ -306,7 +312,9 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 
 	let entity = Arc::make_mut(entity);
 
-	entity.sub_entities.get_mut(&id).context("No such entity")?.name = new_name.into();
+	entity.sub_entities.get_mut(&id).context("No such entity")?.name = new_name.clone().into();
+
+	let tblu = entity.blueprint.to_hash();
 
 	send_request(
 		app,
@@ -343,6 +351,14 @@ pub async fn rename(app: &AppHandle, editor_id: Uuid, id: EntityID, new_name: St
 				}))
 			})
 		)?;
+	}
+
+	drop(editor_state);
+
+	if app_state.editor_connection.is_connected().await {
+		if let Err(e) = app_state.editor_connection.set_entity_name(id, &tblu, &new_name).await {
+			warn!("{e:?}");
+		}
 	}
 }
 
@@ -821,6 +837,8 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 
 	entity.sub_entities.retain(|x, _| !entities_to_delete.contains(x));
 
+	let tblu = entity.blueprint.to_hash();
+
 	finish_task(app, task)?;
 
 	send_notification(
@@ -872,6 +890,16 @@ pub async fn delete(app: &AppHandle, editor_id: Uuid, id: EntityID) -> Result<()
 				}))
 			})
 		)?;
+	}
+
+	drop(editor_state);
+
+	if app_state.editor_connection.is_connected().await {
+		for entity_id in &entities_to_delete {
+			if let Err(e) = app_state.editor_connection.destroy_entity(*entity_id, &tblu).await {
+				warn!("{e:?}");
+			}
+		}
 	}
 }
 
@@ -1206,6 +1234,8 @@ pub async fn paste(
 
 	entity.sub_entities.extend(paste_data.data.to_owned());
 
+	let pasted_entity_ids = paste_data.data.keys().copied().collect::<Vec<_>>();
+
 	let mut new_entities = vec![];
 	let reverse_parent_refs = reverse_parent_refs_set(entity);
 
@@ -1307,6 +1337,13 @@ pub async fn paste(
 				}))
 			})
 		)?;
+	}
+
+	let entity_snapshot = editor_entity(&editor_state.data)?;
+	drop(editor_state);
+
+	if let Err(e) = spawn_new_entities_in_game(app, &entity_snapshot, &pasted_entity_ids).await {
+		warn!("{e:?}");
 	}
 }
 
@@ -1476,6 +1513,8 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 	let app_state = app.state::<AppState>();
 
 	let task = start_task(app, format!("Adding {}", file))?;
+
+	let mut added_entity_id = None;
 
 	let mut editor_state = app_state
 		.editor_states
@@ -2010,6 +2049,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 			)?;
 
 			entity.sub_entities.insert(entity_id, sub_entity);
+			added_entity_id = Some(entity_id);
 
 			send_request(
 				app,
@@ -2085,6 +2125,7 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 			)?;
 
 			entity.sub_entities.insert(entity_id, sub_entity);
+			added_entity_id = Some(entity_id);
 
 			send_request(
 				app,
@@ -2131,6 +2172,53 @@ pub async fn add_game_browser_item(app: &AppHandle, editor_id: Uuid, parent_id: 
 			})
 		)?;
 	}
+
+	if let Some(added_entity_id) = added_entity_id {
+		let entity_snapshot = editor_entity(&editor_state.data)?;
+		drop(editor_state);
+
+		if let Err(e) = spawn_new_entities_in_game(app, &entity_snapshot, &[added_entity_id]).await {
+			warn!("{e:?}");
+		}
+	}
+}
+
+#[try_fn]
+fn editor_entity(data: &EditorData) -> Result<Arc<Entity>> {
+	match data {
+		EditorData::QNEntity { entity, .. } => entity.to_owned(),
+		EditorData::QNPatch { current, .. } => current.to_owned(),
+		_ => bail!("Editor is not a QN editor")
+	}
+}
+
+#[try_fn]
+#[context("Couldn't spawn new entities in game")]
+async fn spawn_new_entities_in_game(app: &AppHandle, entity: &Entity, new_entity_ids: &[EntityID]) -> Result<()> {
+	let app_state = app.state::<AppState>();
+
+	if !app_state.editor_connection.is_connected().await {
+		return Ok(());
+	}
+
+	let tblu = entity.blueprint.to_hash();
+
+	let new_entities = new_entity_ids
+		.iter()
+		.map(|id| Ok((*id, entity.sub_entities.get(id).context("No such entity")?.to_owned())))
+		.collect::<Result<Vec<_>>>()?;
+
+	for (_, sub_entity) in &new_entities {
+		let Some(parent) = sub_entity.parent.as_ref().and_then(|x| x.as_local()) else {
+			return Ok(());
+		};
+
+		if !new_entity_ids.contains(&parent) && !app_state.editor_connection.entity_exists(parent, &tblu).await? {
+			return Ok(());
+		}
+	}
+
+	app_state.editor_connection.spawn_entities(entity, &new_entities).await?;
 }
 
 #[try_fn]
@@ -2857,20 +2945,21 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 					should_sync = true;
 				}
 
-				if should_sync && SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x) {
-					app_state
+				if should_sync
+					&& let Err(e) = app_state
 						.editor_connection
 						.set_property(entity_id, &current.blueprint.to_hash(), property, val.value.to_owned())
-						.await?;
+						.await
+				{
+					warn!("{e:?}");
 				}
 			}
 
 			// Set any removed properties back to their default values
 			if let Some(game) = app_state.game.load().as_ref() {
 				let game = app_state.intellisense_game(game);
-				for (property, val) in prev_props {
+				for property in prev_props.into_keys() {
 					if !sub_entity.properties.contains_key(&property)
-						&& SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x)
 						&& let Some((_, def_val, _)) = game
 							.intellisense()
 							.get_properties(&game, current, entity_id, false)?
@@ -2882,10 +2971,13 @@ pub async fn restore_to_original(app: &AppHandle, editor_id: Uuid, entity_id: En
 							property, entity_id
 						);
 
-						app_state
+						if let Err(e) = app_state
 							.editor_connection
 							.set_property(entity_id, &current.blueprint.to_hash(), &property, def_val)
-							.await?;
+							.await
+						{
+							warn!("{e:?}");
+						}
 					}
 				}
 			}

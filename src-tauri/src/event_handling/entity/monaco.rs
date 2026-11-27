@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result, anyhow};
 use fn_error_context::context;
 use glacier_commons::metadata::RuntimeID;
-use log::debug;
+use log::{debug, warn};
 use quickentity_rs::entity::{EntityID, SubEntity};
 use serde_json::from_str;
 use tauri::{AppHandle, Manager};
@@ -26,53 +26,6 @@ use crate::{
 	},
 	send_notification, send_request, start_task
 };
-
-pub static SAFE_TO_SYNC: [&str; 44] = [
-	"SMatrix43",
-	"float32",
-	"bool",
-	"SColorRGB",
-	"ZString",
-	"SVector3",
-	"int32",
-	"uint8",
-	"SVector2",
-	"uint32",
-	"ZGuid",
-	"ZCurve",
-	"SColorRGBA",
-	"ZGameTime",
-	"TArray<ZGameTime>",
-	"TArray<bool>",
-	"TArray<SGaitTransitionEntry>",
-	"TArray<SMapMarkerData>",
-	"uint64",
-	"TArray<int32>",
-	"TArray<SConversationPart>",
-	"SBodyPartDamageMultipliers",
-	"TArray<SVector2>",
-	"TArray<ZSharedSensorDef.SVisibilitySetting>",
-	"TArray<ZString>",
-	"TArray<STargetableBoneConfiguration>",
-	"TArray<ZSecuritySystemCameraConfiguration.SHitmanVisibleEscalationRule>",
-	"TArray<ZSecuritySystemCameraConfiguration.SDeadBodyVisibleEscalationRule>",
-	"S25DProjectionSettings",
-	"SVector4",
-	"TArray<SClothVertex>",
-	"TArray<SFontLibraryDefinition>",
-	"TArray<SCamBone>",
-	"TArray<SVector3>",
-	"TArray<ZHUDOccluderTriggerEntity.SBoneTestSetup>",
-	"uint16",
-	"SWorldSpaceSettings",
-	"SCCEffectSet",
-	"TArray<AI.SFirePattern01>",
-	"TArray<AI.SFirePattern02>",
-	"SSCCuriousConfiguration",
-	"TArray<SColorRGB>",
-	"SEntityTemplateReference",
-	"ZSpatialEntity.ERoomBehaviour"
-];
 
 #[try_fn]
 #[context("Couldn't handle monaco event")]
@@ -409,6 +362,16 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 					let task = start_task(app, "Syncing properties")?;
 
 					if app_state.editor_connection.is_connected().await {
+						if sub_entity.name != previous.name {
+							if let Err(e) = app_state
+								.editor_connection
+								.set_entity_name(entity_id, &entity.blueprint.to_hash(), &sub_entity.name)
+								.await
+							{
+								warn!("{e:?}");
+							}
+						}
+
 						let prev_props = previous.properties;
 
 						for (property, val) in &sub_entity.properties {
@@ -422,10 +385,10 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 								should_sync = true;
 							}
 
-							if should_sync && SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x) {
+							if should_sync {
 								debug!("Syncing property {} for entity {}", property, entity_id);
 
-								app_state
+								if let Err(e) = app_state
 									.editor_connection
 									.set_property(
 										entity_id,
@@ -433,16 +396,18 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 										property,
 										val.value.to_owned()
 									)
-									.await?;
+									.await
+								{
+									warn!("{e:?}");
+								}
 							}
 						}
 
 						// Set any removed properties back to their default values
 						if let Some(game) = app_state.game.load().as_ref() {
 							let game = app_state.intellisense_game(game);
-							for (property, val) in prev_props {
+							for property in prev_props.into_keys() {
 								if !sub_entity.properties.contains_key(&property)
-									&& SAFE_TO_SYNC.iter().any(|&x| val.value.variant_type() == x)
 									&& let Some((_, def_val, _)) = game
 										.intellisense()
 										.get_properties(&game, entity, entity_id, false)?
@@ -455,10 +420,13 @@ pub async fn update_content(app: &AppHandle, editor_id: Uuid, entity_id: EntityI
 										property, entity_id
 									);
 
-									app_state
+									if let Err(e) = app_state
 										.editor_connection
 										.set_property(entity_id, &entity.blueprint.to_hash(), &property, def_val)
-										.await?;
+										.await
+									{
+										warn!("{e:?}");
+									}
 								}
 							}
 						}
