@@ -78,7 +78,7 @@
 					icons: true
 				},
 				check_callback: (_a, _b, _c, _d, more) => {
-					if (more) {
+					if (more && more.origin) {
 						if (more.is_multi) {
 							more.origin.settings!.dnd!.always_copy = true
 						} else {
