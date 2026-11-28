@@ -875,6 +875,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tauri-apps/api@npm:2.12.5":
+  version: 2.12.5
+  resolution: "@tauri-apps/api@npm:2.12.5"
+  checksum: fa35056017c27d1812b246590f09a81b0dde097aa4062c5978f44bcce82363e9e4b7b35c18524d29d96ab63f87a77504d1ef1b851ed7ffd3241bfff27686c1c7
+  languageName: node
+  linkType: hard
+
 "@tauri-apps/api@npm:^1.0.0":
   version: 1.5.3
   resolution: "@tauri-apps/api@npm:1.5.3"
@@ -886,13 +893,6 @@ __metadata:
   version: 2.12.1
   resolution: "@tauri-apps/api@npm:2.12.1"
   checksum: 03efa7deb1517e9310367be22b6d980f7bb8e96677d97af868288c322da2e5dc87153e31ef9d585a374b7f6eee584a2dd761328250dd3007d0bbffb8eb597e79
-  languageName: node
-  linkType: hard
-
-"@tauri-apps/api@npm:^2.13.0":
-  version: 2.13.0
-  resolution: "@tauri-apps/api@npm:2.13.0"
-  checksum: b2ce957e5b69a7a1731cab7f0324107a1316352a8e120d1032016e87036ef4da3f7ced0eeb4c18d28b38b2100881494c89676159beba85210d445bf354ef2ad3
   languageName: node
   linkType: hard
 
@@ -3141,7 +3141,7 @@ __metadata:
     "@sveltejs/adapter-static": "npm:^3.0.10"
     "@sveltejs/kit": "npm:^2.59.1"
     "@sveltejs/vite-plugin-svelte": "npm:^7.1.2"
-    "@tauri-apps/api": "npm:^2.13.0"
+    "@tauri-apps/api": "npm:2.12.5"
     "@tauri-apps/cli": "npm:^2.12.6"
     "@tauri-apps/plugin-clipboard-manager": "npm:^2.5.0"
     "@tauri-apps/plugin-dialog": "npm:^2.8.4"
